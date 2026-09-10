@@ -1,10 +1,13 @@
-//! Forward Rotel batches from bounded memory. No trace storage or database outbox.
+//! Postgres is also the durable forwarding queue. External downtime never keeps
+//! an ingress request open. Expired retention bounds the backlog on disk.
 use crate::{config::SecretEnv, error::Error};
+use futures::TryStreamExt;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use prost::Message as _;
+use prost::Message;
 use secrecy::ExposeSecret;
+use sqlx::PgPool;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
@@ -84,61 +87,111 @@ impl Destination {
         }))
     }
 }
-use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
-use rotel::{bounded_channel::BoundedReceiver, topology::payload::Message};
-
-enum Outcome {
-    Finished,
-    Retry(Option<Duration>),
-}
-
 pub(super) async fn run(
-    mut receiver: BoundedReceiver<Vec<Message<ResourceSpans>>>,
+    pool: PgPool,
     destination: Option<Destination>,
+    days: i32,
     cancel: CancellationToken,
 ) {
-    while let Some(batch) = receiver.next().await {
-        let Some(destination) = &destination else {
-            continue;
-        };
-        let mut request = ExportTraceServiceRequest::default();
-        for mut message in batch {
-            if super::ingress::prepare(&mut message).is_err() {
-                ::tracing::warn!("Rejected trace batch with invalid internal scope");
+    let notifications = crate::database::notifications::Notifications::default();
+    let mut cleanup = tokio::time::interval(Duration::from_secs(3600));
+    let Some(destination) = destination else {
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => return,
+                _ = cleanup.tick() => {
+                    if sqlx::query_file!("../../queries/tracing/cleanup.sql", days).execute(&pool).await.is_err() {
+                        ::tracing::warn!("Trace retention cleanup failed");
+                    }
+                }
+            }
+        }
+    };
+    let mut changed = loop {
+        tokio::select! {
+            _ = cancel.cancelled() => return,
+            result = notifications.subscribe(&pool, "tilde_tracing") => match result {
+                Ok(changed) => break changed,
+                Err(_) => ::tracing::warn!("Unable to listen for trace exports"),
+            }
+        }
+        tokio::select! {
+            _ = cancel.cancelled() => return,
+            _ = tokio::time::sleep(Duration::from_secs(1)) => {}
+        }
+    };
+    changed.mark_changed();
+    let mut retry = None;
+    loop {
+        tokio::select! {
+            _ = cancel.cancelled() => break,
+            _ = cleanup.tick() => {
+                if sqlx::query_file!("../../queries/tracing/cleanup.sql", days).execute(&pool).await.is_err() {
+                    ::tracing::warn!("Trace retention cleanup failed");
+                }
                 continue;
             }
-            request.resource_spans.extend(message.payload);
-        }
-        if request.resource_spans.is_empty() {
-            continue;
-        }
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
-        let mut backoff = Duration::from_secs(1);
-        loop {
-            match tokio::time::timeout_at(deadline, send(destination, &request)).await {
-                Ok(Outcome::Finished) => break,
-                Ok(Outcome::Retry(after)) => {
-                    let delay = after.unwrap_or(backoff).max(backoff);
-                    if tokio::time::Instant::now() + delay >= deadline {
-                        ::tracing::warn!("Trace export retry budget exhausted; batch dropped");
-                        break;
-                    }
-                    tokio::select! {
-                        _=cancel.cancelled()=>{::tracing::warn!("Trace export interrupted during retry; batch dropped");break;},
-                        _=tokio::time::sleep(delay)=>{},
-                    }
-                    backoff = (backoff * 2).min(Duration::from_secs(30));
+            _ = changed.changed() => {}
+            _ = async {
+                match retry {
+                    Some(deadline) => tokio::time::sleep_until(deadline).await,
+                    None => std::future::pending().await,
                 }
-                Err(_) => {
-                    ::tracing::warn!("Trace export retry budget exhausted; batch dropped");
-                    break;
-                }
+            } => {}
+        }
+        changed.borrow_and_update();
+        let result = async {
+            if forward(&pool, &destination).await? {
+                // A batch was processed. Drain any remaining due batches immediately.
+                changed.mark_changed();
             }
+            let row = sqlx::query_file!("../../queries/tracing/next_retry.sql")
+                .fetch_one(&pool)
+                .await?;
+            Ok::<_, Error>(row.retry_at)
         }
+        .await;
+        retry = match result {
+            Ok(next) => next.map(|at| {
+                // A past deadline with no claimable rows means another exporter owns them.
+                // Its delivery notification wakes us; a bounded retry covers owner failure.
+                let delay = (at - chrono::Utc::now())
+                    .to_std()
+                    .unwrap_or_default()
+                    .max(Duration::from_secs(1));
+                tokio::time::Instant::now() + delay
+            }),
+            Err(_) => {
+                ::tracing::warn!("Trace forwarding database operation failed");
+                Some(tokio::time::Instant::now() + Duration::from_secs(1))
+            }
+        };
     }
 }
-async fn send(destination: &Destination, request: &ExportTraceServiceRequest) -> Outcome {
-    match destination
+
+async fn forward(pool: &PgPool, destination: &Destination) -> Result<bool, Error> {
+    let mut tx = pool.begin().await?;
+    let mut rows = sqlx::query_file!("../../queries/tracing/pending.sql").fetch(&mut *tx);
+    let mut request = ExportTraceServiceRequest::default();
+    let mut trace_ids = vec![];
+    let mut span_ids = vec![];
+    while let Some(row) = rows.try_next().await? {
+        let decoded = ExportTraceServiceRequest::decode(row.otlp.as_slice())
+            .map_err(|_| Error::Invalid("Stored trace payload is not valid OTLP".into()))?;
+        request.resource_spans.extend(decoded.resource_spans);
+        trace_ids.push(row.trace_id);
+        span_ids.push(row.span_id);
+        // Bound each HTTP export by bytes as well as span count.
+        if request.encoded_len() >= 4 * 1024 * 1024 {
+            break;
+        }
+    }
+    drop(rows);
+    if trace_ids.is_empty() {
+        return Ok(false);
+    }
+    let mut retry_after = None;
+    let delivery = match destination
         .client
         .post(destination.url.clone())
         .headers(destination.headers.clone())
@@ -164,7 +217,7 @@ async fn send(destination: &Destination, request: &ExportTraceServiceRequest) ->
                 }
             }
             if !valid {
-                Outcome::Retry(None)
+                "pending"
             } else {
                 match ExportTraceServiceResponse::decode(body.as_slice()) {
                     Ok(reply)
@@ -174,10 +227,10 @@ async fn send(destination: &Destination, request: &ExportTraceServiceRequest) ->
                             .is_some_and(|p| p.rejected_spans > 0) =>
                     {
                         ::tracing::warn!("External collector partially rejected a trace batch");
-                        Outcome::Finished
+                        "rejected"
                     }
-                    Ok(_) => Outcome::Finished,
-                    Err(_) => Outcome::Retry(None),
+                    Ok(_) => "sent",
+                    Err(_) => "pending",
                 }
             }
         }
@@ -186,10 +239,10 @@ async fn send(destination: &Destination, request: &ExportTraceServiceRequest) ->
                 status = response.status().as_u16(),
                 "External collector rejected a trace batch"
             );
-            Outcome::Finished
+            "rejected"
         }
         Ok(response) => {
-            let retry_after = response
+            retry_after = response
                 .headers()
                 .get(http::header::RETRY_AFTER)
                 .and_then(|h| h.to_str().ok())
@@ -202,8 +255,19 @@ async fn send(destination: &Destination, request: &ExportTraceServiceRequest) ->
                     })
                 })
                 .map(|seconds| seconds.clamp(0, 86400));
-            Outcome::Retry(retry_after.map(|seconds| Duration::from_secs(seconds as u64)))
+            "pending"
         }
-        Err(_) => Outcome::Retry(None),
-    }
+        Err(_) => "pending",
+    };
+    sqlx::query_file!(
+        "../../queries/tracing/delivery.sql",
+        &trace_ids,
+        &span_ids,
+        delivery,
+        retry_after
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
 }

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM tracing_spans WHERE received_at < NOW()-make_interval(days=>$1);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b42f4d3279712cb5d1355bda195026a12e90746fd4cb3662ce767a5271977e2"
+}

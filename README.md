@@ -425,24 +425,30 @@ also start the default local database separately.
 
 ## Invocation tracing
 
-Tilde embeds Rotel to forward platform and agent spans to your collector. Enable
-tracing by setting the complete OTLP/HTTP protobuf traces URL:
+Tilde embeds Rotel and stores invocation traces in Postgres automatically. Agents
+send standard OTLP/HTTP to `/v1/traces` on `ENGINE_AGENT_RUNTIME_PUBLIC_URL` with
+an agent connect bearer token. The TypeScript SDK propagates invocation context,
+collects instrumented agent spans, and batches uploads using the current token.
+Webhook/API context is preserved across durable invocation scheduling; callback
+RPC spans remain open for their streamed responses.
+
+To also forward stored traces to an external collector, configure:
 
 ```sh
 ENGINE_TRACING_EXPORT_ENDPOINT=https://collector.example.com/v1/traces
 ENGINE_TRACING_EXPORT_HEADERS='Authorization=Bearer your-collector-token'
+ENGINE_TRACING_RETENTION_DAYS=7
 ```
 
-Without an endpoint, tracing is disabled. Agents send OTLP/HTTP to `/v1/traces`
-on `ENGINE_AGENT_RUNTIME_PUBLIC_URL` with their connect token. The TypeScript SDK
-propagates context across model/tool instrumentation and streamed callbacks.
-Webhook/API ancestry survives durable message scheduling and invocation dispatch.
+The endpoint is the complete OTLP/HTTP protobuf traces URL. External forwarding
+runs asynchronously with persisted retries; it does not delay ingestion success.
+Success from the ingestion endpoint means Postgres committed the uploaded spans.
+Overloaded ingestion returns retryable 503 responses. The same connect token can
+upload final traces for five minutes after invocation end, while other agent
+operations remain revoked.
 
-Rotel batches asynchronously through bounded queues. Ingestion success means
-acceptance into memory; collector failures retry for up to five minutes per batch.
-Overload returns retryable 503 responses. There is no local trace storage or replay,
-and queued telemetry may be lost on process failure or exhausted retry budgets.
-Final agent uploads remain authorized for five minutes after invocation end.
-
-See [tracing implementation](crates/tilde/src/tracing/README.md) for queue limits,
-authentication and delivery semantics. Postgres trace storage is a separate follow-up.
+Trace payloads are stored as raw OTLP protobuf bytes. Retention also expires pending external
+deliveries; changing the collector URL redirects the pending backlog. SDK queues
+are bounded, so sustained overload or process failure before acknowledgement can
+lose unpersisted telemetry. See [tracing implementation](crates/tilde/src/tracing/README.md)
+for queue limits and delivery semantics. No trace viewer is included yet.

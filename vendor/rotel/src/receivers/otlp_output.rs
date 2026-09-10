@@ -12,6 +12,7 @@ use flume::r#async::SendFut;
 #[derive(Clone)]
 pub struct OTLPOutput<T> {
     tx: BoundedSender<T>,
+    pub wait_for_ack: bool,
     pub validator: Option<std::sync::Arc<dyn Fn(&T) -> Result<(), u16> + Send + Sync>>,
 }
 
@@ -19,8 +20,15 @@ impl<T> OTLPOutput<T> {
     pub fn new(tx: BoundedSender<T>) -> Self {
         Self {
             tx,
+            wait_for_ack: false,
             validator: None,
         }
+    }
+
+    /// Delay HTTP success until the downstream consumer acknowledges persistence.
+    pub fn with_ack(mut self) -> Self {
+        self.wait_for_ack = true;
+        self
     }
 
     /// Validate an entire decoded request before batching can split it.

@@ -258,7 +258,7 @@ tasks:
       - pnpm --dir sdk/ts example
 
   test:tracing:
-    desc: Verify embedded Rotel forwarding and SDK trace propagation
+    desc: Verify embedded Rotel persistence, forwarding, and SDK trace propagation
     cmds:
       - scripts/with-postgres.sh cargo test -p tilde --test tracing
       - pnpm --dir sdk/ts build

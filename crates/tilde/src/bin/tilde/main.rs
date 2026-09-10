@@ -180,6 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool.clone(),
         chat.tokens.clone(),
         trace_destination,
+        config.tracing_retention_days,
     );
     opentelemetry::global::set_tracer_provider(telemetry.provider.clone());
     let agent_router = tilde::iam::listeners::agent_runtime_router(

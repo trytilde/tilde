@@ -82,7 +82,6 @@ struct Collector {
     available: Arc<AtomicBool>,
     attempts: Arc<AtomicUsize>,
     received: Arc<AtomicUsize>,
-    payloads: Arc<std::sync::Mutex<Vec<ResourceSpans>>>,
 }
 async fn collect(
     State(state): State<Collector>,
@@ -104,52 +103,14 @@ async fn collect(
             .sum::<usize>(),
         Ordering::SeqCst,
     );
-    state
-        .payloads
-        .lock()
-        .unwrap()
-        .extend(request.resource_spans);
     (
         http::StatusCode::OK,
         ExportTraceServiceResponse::default().encode_to_vec(),
     )
 }
 
-async fn collector() -> (Collector, String, tokio::task::JoinHandle<()>) {
-    let state = Collector {
-        available: Arc::new(AtomicBool::new(true)),
-        attempts: Arc::new(AtomicUsize::new(0)),
-        received: Arc::new(AtomicUsize::new(0)),
-        payloads: Arc::new(std::sync::Mutex::new(Vec::new())),
-    };
-    let (url, server) = serve(
-        Router::new()
-            .route("/v1/traces", post(collect))
-            .with_state(state.clone()),
-    )
-    .await;
-    (state, url, server)
-}
-fn destination(url: &str) -> Option<Destination> {
-    Destination::new(
-        Some(format!("{url}/v1/traces")),
-        Some(tilde::config::SecretEnv(SecretString::from(
-            "authorization=Bearer collector-test",
-        ))),
-    )
-    .unwrap()
-}
-async fn wait_count(collector: &Collector, count: usize) {
-    tokio::time::timeout(Duration::from_secs(15), async {
-        while collector.received.load(Ordering::SeqCst) < count {
-            tokio::time::sleep(Duration::from_millis(25)).await;
-        }
-    })
-    .await
-    .unwrap();
-}
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn rotel_forwards_without_storage_and_retries_collector_outages() {
+async fn rotel_persists_before_ack_deduplicates_and_forwards_independently() {
     let db = Database::new().await;
     sqlx::raw_sql(include_str!("sql/tracing_fixture.sql"))
         .execute(&db.pool)
@@ -158,9 +119,25 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
     let crypto = Arc::new(Encryption::initialize(&db.pool, seed(19)).await.unwrap());
     let tokens = Tokens::new(db.pool.clone(), crypto.clone());
     let token = tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
-    let (collector, remote, remote_task) = collector().await;
-    collector.available.store(false, Ordering::SeqCst);
-    let runtime = Runtime::start(db.pool.clone(), tokens.clone(), destination(&remote));
+    let collector = Collector {
+        available: Arc::new(AtomicBool::new(false)),
+        attempts: Arc::new(AtomicUsize::new(0)),
+        received: Arc::new(AtomicUsize::new(0)),
+    };
+    let (remote, remote_task) = serve(
+        Router::new()
+            .route("/v1/traces", post(collect))
+            .with_state(collector.clone()),
+    )
+    .await;
+    let destination = Destination::new(
+        Some(format!("{remote}/v1/traces")),
+        Some(tilde::config::SecretEnv(SecretString::from(
+            "authorization=Bearer collector-test",
+        ))),
+    )
+    .unwrap();
+    let runtime = Runtime::start(db.pool.clone(), tokens.clone(), destination, 7);
     let (url, server) = serve(tilde::iam::listeners::agent_runtime_router(
         tilde::agent::Agents::new(db.pool.clone(), crypto.clone()),
         tilde::chat::Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()),
@@ -193,7 +170,29 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
             .status(),
         400
     );
-    // Queue acceptance is independent of downstream availability; a request may span several batches.
+    // No success before the asynchronous database transaction can commit.
+    let mut lock = db.pool.begin().await.unwrap();
+    sqlx::query("LOCK TABLE tracing_spans IN ACCESS EXCLUSIVE MODE")
+        .execute(&mut *lock)
+        .await
+        .unwrap();
+    let request = client
+        .post(&endpoint)
+        .bearer_auth(token.expose_secret())
+        .header("content-type", "application/x-protobuf")
+        .body(spans(1536).encode_to_vec());
+    let pending = tokio::spawn(async move { request.send().await.unwrap() });
+    tokio::time::sleep(Duration::from_millis(350)).await;
+    assert!(!pending.is_finished());
+    lock.commit().await.unwrap();
+    assert_eq!(pending.await.unwrap().status(), 200);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM tracing_spans")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1536);
+    assert_eq!(collector.received.load(Ordering::SeqCst), 0);
+    // Retry after an ambiguous response must not overwrite or duplicate stored spans.
     assert_eq!(
         client
             .post(&endpoint)
@@ -206,35 +205,34 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
             .status(),
         200
     );
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while collector.attempts.load(Ordering::SeqCst) == 0 {
-            tokio::time::sleep(Duration::from_millis(25)).await;
-        }
-    })
-    .await
-    .unwrap();
-    assert_eq!(collector.received.load(Ordering::SeqCst), 0);
-    collector.available.store(true, Ordering::SeqCst);
-    wait_count(&collector, 1536).await;
-    assert!(
-        sqlx::query_scalar::<_, bool>("SELECT to_regclass('tracing_spans') IS NULL")
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM tracing_spans")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1536);
+    let (otlp, owner): (Vec<u8>, Uuid) =
+        sqlx::query_as("SELECT otlp,invocation_id FROM tracing_spans LIMIT 1")
             .fetch_one(&db.pool)
             .await
-            .unwrap()
+            .unwrap();
+    assert_eq!(owner, id(5));
+    let decoded = ExportTraceServiceRequest::decode(otlp.as_slice()).unwrap();
+    let prompt = &decoded.resource_spans[0].scope_spans[0].spans[0].attributes;
+    assert!(prompt.iter().any(|a| a.key == "prompt"
+        && a.value.as_ref().unwrap().value
+            == Some(Value::StringValue("private test prompt".into()))));
+    assert_eq!(
+        decoded.resource_spans[0].schema_url,
+        "https://example.com/resource-schema"
     );
-    {
-        let resources = collector.payloads.lock().unwrap();
-        assert_eq!(
-            resources[0].schema_url,
-            "https://example.com/resource-schema"
-        );
-        let scope = &resources[0].scope_spans[0];
-        assert_eq!(scope.schema_url, "https://example.com/scope-schema");
-        let attrs = &scope.spans[0].attributes;
-        assert!(attrs.iter().any(|a| a.key == "prompt"));
-        assert!(attrs.iter().any(|a| a.key == "tilde.invocation.id"
-            && a.value.as_ref().unwrap().value == Some(Value::StringValue(id(5).to_string()))));
-    }
+    assert_eq!(
+        decoded.resource_spans[0].scope_spans[0].schema_url,
+        "https://example.com/scope-schema"
+    );
+    let attributes = &decoded.resource_spans[0].scope_spans[0].spans[0].attributes;
+    assert!(attributes.iter().any(|a| a.key == "tilde.invocation.id"
+        && a.value.as_ref().unwrap().value == Some(Value::StringValue(id(5).to_string()))));
+    // A platform span joins the same trace through the provider -> Rotel path.
     let parent = tilde::telemetry::context::restore(
         "00-01010101010101010101010101010101-0202020202020202-01",
         "",
@@ -253,7 +251,22 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
         .await
         .unwrap()
         .unwrap();
-    wait_count(&collector, 1537).await;
+    collector.available.store(true, Ordering::SeqCst);
+    tokio::time::timeout(Duration::from_secs(15), async {
+        loop {
+            let pending: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM tracing_spans WHERE delivery='pending'")
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            if pending == 0 && collector.received.load(Ordering::SeqCst) == 1537 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
     // Termination revokes actions immediately, while the identical token uploads final spans.
     sqlx::query("UPDATE chat_invocations SET status='canceled',ended_at=NOW() WHERE id=$1")
         .bind(id(5))
@@ -317,7 +330,7 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
         .await
         .unwrap();
     assert!(tokens.verify_trace(token.expose_secret()).await.is_err());
-
+    collector.available.store(false, Ordering::SeqCst);
     let mut last = runtime
         .provider
         .tracer("test-platform")
@@ -325,7 +338,40 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
     opentelemetry::trace::Span::end(&mut last);
     server.abort();
     runtime.shutdown().await;
-    assert_eq!(collector.received.load(Ordering::SeqCst), 1539);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM tracing_spans")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        count, 1538,
+        "shutdown must flush the provider and partial Rotel batch"
+    );
+    let destination = Destination::new(
+        Some(format!("{remote}/v1/traces")),
+        Some(tilde::config::SecretEnv(SecretString::from(
+            "authorization=Bearer collector-test",
+        ))),
+    )
+    .unwrap();
+    collector.available.store(true, Ordering::SeqCst);
+    let restarted = Runtime::start(db.pool.clone(), tokens, destination, 7);
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let pending: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM tracing_spans WHERE delivery='pending'")
+                    .fetch_one(&db.pool)
+                    .await
+                    .unwrap();
+            if pending == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .unwrap();
+    restarted.shutdown().await;
+    assert!(collector.received.load(Ordering::SeqCst) >= 1538);
     remote_task.abort();
     db.close().await;
 }
@@ -346,8 +392,7 @@ async fn request_context_survives_durable_invocation_dispatch() {
     sqlx::raw_sql("INSERT INTO chat_users(id,name) VALUES('00000000-0000-4000-8000-000000000006','Human'); INSERT INTO chat_participants(id,thread_id,user_id) VALUES('00000000-0000-4000-8000-000000000007','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000006');").execute(&db.pool).await.unwrap();
     let crypto = Arc::new(Encryption::initialize(&db.pool, seed(29)).await.unwrap());
     let chat = tilde::chat::Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1:1".into());
-    let (collector, remote, remote_server) = collector().await;
-    let runtime = Runtime::start(db.pool.clone(), chat.tokens.clone(), destination(&remote));
+    let runtime = Runtime::start(db.pool.clone(), chat.tokens.clone(), None, 7);
     opentelemetry::global::set_tracer_provider(runtime.provider.clone());
     async fn trigger(State(chat): State<tilde::chat::Chat>) -> String {
         chat.post(tilde::chat::PostMessage {
@@ -397,27 +442,13 @@ async fn request_context_survives_durable_invocation_dispatch() {
     worker.await.unwrap();
     server.abort();
     runtime.shutdown().await;
-    let rows: Vec<_> = collector
-        .payloads
-        .lock()
-        .unwrap()
-        .iter()
-        .flat_map(|r| &r.scope_spans)
-        .flat_map(|s| &s.spans)
-        .map(|span| {
-            let owner = span
-                .attributes
-                .iter()
-                .find(|a| a.key == "tilde.invocation.id")
-                .and_then(|a| a.value.as_ref())
-                .and_then(|v| match &v.value {
-                    Some(Value::StringValue(v)) => v.parse::<Uuid>().ok(),
-                    _ => None,
-                });
-            (span.span_id.clone(), span.parent_span_id.clone(), owner)
-        })
-        .collect();
-    remote_server.abort();
+    let rows: Vec<(Vec<u8>, Vec<u8>, Option<Uuid>)> = sqlx::query_as(
+        "SELECT span_id,parent_span_id,invocation_id FROM tracing_spans WHERE trace_id=$1",
+    )
+    .bind(vec![3u8; 16])
+    .fetch_all(&db.pool)
+    .await
+    .unwrap();
     let request_span = hex::decode(parent.split('-').nth(2).unwrap()).unwrap();
     assert!(
         rows.iter()
@@ -482,8 +513,7 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
     sqlx::query("INSERT INTO iam_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '1 hour')")
         .bind(Sha256::digest(management_token.expose_secret().as_bytes()).to_vec())
         .bind(id(10)).execute(&db.pool).await.unwrap();
-    let (collector, remote, remote_server) = collector().await;
-    let telemetry = Runtime::start(db.pool.clone(), chat.tokens.clone(), destination(&remote));
+    let telemetry = Runtime::start(db.pool.clone(), chat.tokens.clone(), None, 7);
     let (runtime_url, runtime_server) = serve(listeners::agent_runtime_router(
         agents.clone(),
         chat.clone(),
@@ -541,7 +571,13 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
         }
         assert_eq!(request.send().await.unwrap().status(), 401);
     }
-    assert_eq!(collector.received.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM tracing_spans")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        0
+    );
     for path in ["/v1/metrics", "/v1/logs"] {
         assert_eq!(
             http.post(format!("{runtime_url}{path}"))
@@ -566,7 +602,13 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
             .status(),
         200
     );
-    wait_count(&collector, 1).await;
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM tracing_spans")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        1
+    );
     sqlx::query("UPDATE chat_invocations SET status='stopped',ended_at=NOW() WHERE id=$1")
         .bind(id(5))
         .execute(&db.pool)
@@ -614,6 +656,5 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
     runtime_server.abort();
     management_server.abort();
     telemetry.shutdown().await;
-    remote_server.abort();
     db.close().await;
 }

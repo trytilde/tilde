@@ -14,8 +14,9 @@ Local integration changes:
 - Expose the HTTP Tower service builder and its concrete types so Tilde can
   compose authentication, admission control and timeouts on its existing listener.
 - Accept Send bodies without an unnecessary Sync bound, for Axum compatibility.
-- Add decoded-request validation to OTLPOutput before batching can split a request.
-  Tilde acknowledges bounded in-memory queue acceptance.
+- Add optional decoded-request validation and downstream acknowledgement to
+  OTLPOutput. Validation happens before splitting. Tilde acknowledges only after
+  Postgres commit; rejected requests use non-retryable HTTP responses.
 - Bound decoded HTTP bodies to 4 MiB and reject malformed content-type headers
   without panicking.
 - Split large messages before offering them to the batch buffer, avoiding the
@@ -24,6 +25,7 @@ Local integration changes:
   remains waiting forever in a zero-span batch.
 - Drain pending sends, partial batches and queued messages on shutdown.
 
-Application-level token authorization and bounded collector forwarding are implemented in crates/tilde/src/tracing. Keep those policies
+Application-level Postgres persistence, token authorization and durable
+external delivery are implemented in crates/tilde/src/tracing. Keep those policies
 out of the fork. Upgrade by comparing these files against the pinned upstream
 revision and running the tracing integration tests before changing the revision.

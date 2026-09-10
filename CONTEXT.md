@@ -138,15 +138,15 @@ live invocation state and unexpired tokens. No separate telemetry credential exi
 
 Message and invocation rows retain W3C trace context across durable dispatch.
 Platform request/response-stream spans, invocation execution, and SDK agent/callback
-spans enter a bounded Rotel batching pipeline and forward to an environment-configured
-OTLP/HTTP collector. No trace payloads or export queues are stored in Postgres.
-Ingestion acknowledges in-memory queue acceptance. Retry budgets and queues are bounded;
-process failure or exhausted retries can lose queued telemetry. The destination must
-tolerate duplicate delivery. Tracing is disabled without an export endpoint, and the
-SDK skips export for unsampled invocations. Authenticated uploads remain scoped through
-application invocation records. Postgres trace persistence is a separate follow-up.
-The SDK batches and rotates bearer credentials per invocation; its OTLP URL preserves
-the runtime callback path prefix. Trace viewing/query APIs are not implemented.
+spans enter the same bounded Rotel batching pipeline. Postgres stores raw
+OTLP protobuf envelopes with typed trace/span/parent/timing and invocation indexes. Ingestion
+acknowledges database commit. An independent worker forwards persisted spans to an
+optional environment-configured OTLP/HTTP destination with durable retries.
+Delivery is at least once; trace/span identity deduplicates local retries. Retention
+also expires pending delivery, and changing the endpoint redirects pending rows.
+The SDK scopes batching and rotating bearer credentials to individual invocations.
+Its OTLP URL retains the runtime callback path prefix, including behind reverse proxies.
+Trace viewing/query APIs are not yet implemented.
 
 `sdk/ts/langsmith-agent` is an isolated AI SDK 6 / LangSmith demo. It loads the
 OpenAI key from SOPS, sends synthetic recipe/tool traces to LangSmith for UI

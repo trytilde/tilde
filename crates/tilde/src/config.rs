@@ -50,6 +50,8 @@ pub struct Config {
     pub tracing_export_endpoint: Option<String>,
     #[envconfig(from = "ENGINE_TRACING_EXPORT_HEADERS")]
     pub tracing_export_headers: Option<SecretEnv>,
+    #[envconfig(from = "ENGINE_TRACING_RETENTION_DAYS", default = "7")]
+    pub tracing_retention_days: i32,
     #[envconfig(from = "ENGINE_CONNECTION_SETUP_PUBLIC_URL")]
     pub connection_setup_public_url: Option<String>,
     #[envconfig(from = "ENGINE_CONNECTION_UI_DEV_URL")]
@@ -105,6 +107,11 @@ impl Config {
     }
     /// OIDC is required only by the enabled management API, never by the agent runtime API.
     pub fn validate_services(&self) -> Result<(), Error> {
+        if !(1..=365).contains(&self.tracing_retention_days) {
+            return Err(Error::Invalid(
+                "ENGINE_TRACING_RETENTION_DAYS must be between 1 and 365".into(),
+            ));
+        }
         if self.management_enabled {
             for (name, value) in [
                 ("ENGINE_OIDC_ISSUER", self.oidc_issuer.as_deref()),

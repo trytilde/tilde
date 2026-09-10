@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tracing_spans(trace_id,span_id,parent_span_id,invocation_id,start_unix_nano,end_unix_nano,otlp,delivery)\nSELECT * FROM UNNEST($1::bytea[],$2::bytea[],$3::bytea[],$4::uuid[],$5::bigint[],$6::bigint[],$7::bytea[],$8::text[])\nON CONFLICT(trace_id,span_id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "ByteaArray",
+        "ByteaArray",
+        "ByteaArray",
+        "UuidArray",
+        "Int8Array",
+        "Int8Array",
+        "ByteaArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "276b31386c27047ba7955e9d012b691cf63a75873f63cb6a9c47452ac8418902"
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE tracing_spans SET delivery=$3, attempts=LEAST(attempts+1,20),\n retry_at=NOW()+make_interval(secs=>GREATEST(COALESCE($4,0),LEAST(300,POWER(2,LEAST(attempts+1,9)))::integer))\nWHERE (trace_id,span_id) IN (SELECT * FROM UNNEST($1::bytea[],$2::bytea[]));\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "ByteaArray",
+        "ByteaArray",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0649369cde06d518577c84ab18bee65ccf3c8c5160fcd406af32fa31322c85ba"
+}

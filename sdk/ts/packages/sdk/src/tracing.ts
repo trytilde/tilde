@@ -78,17 +78,6 @@ export function invocationTracing(
   headers: Headers,
   token: () => string,
 ) {
-  // No destination on Tilde means its invocation context is not sampled.
-  const flags = headers.get("traceparent")?.split("-")[3];
-  if (!flags || !(Number.parseInt(flags, 16) & 1)) {
-    return {
-      context: ROOT_CONTEXT,
-      run<T>(fn: () => T): T {
-        return context.with(ROOT_CONTEXT, fn);
-      },
-      async end(_failed: boolean) {},
-    };
-  }
   // Match the runtime RPC base path when a reverse proxy separates audiences by prefix.
   const traceEndpoint = new URL(request.callbackUrl);
   traceEndpoint.pathname = `${traceEndpoint.pathname.replace(/\/$/, "")}/v1/traces`;
