@@ -1,0 +1,36 @@
+name: Check
+on:
+  push:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: task version:check
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir sdk/ts install --frozen-lockfile
+      - run: pnpm tools
+      - run: pnpm exec buf lint
+      - run: pnpm generate:check
+      - name: Check contract compatibility
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: pnpm exec buf breaking --against ".git#branch=origin/$BASE_REF"
+      - run: task check:web
+      - run: task build:connection-ui
+      - run: pnpm --dir web build
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo install sqlx-cli --version 0.8.6 --locked --no-default-features --features rustls,postgres
+      - run: task sqlx:prepare -- --check
+      - run: scripts/with-postgres.sh task test:run

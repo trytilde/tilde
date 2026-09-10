@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_id,name,kind,categories FROM connection_providers WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%') ORDER BY provider_id LIMIT $3;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "categories",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "10265c3ab39975d1473dced80d13b0dcc1eb5d9c9c8a5fada0ce4fc190d59e5b"
+}

@@ -1,0 +1,1 @@
+SELECT provider_redirect_url,id,connection_id,step,action_id,connection_setup_token,connection_setup_token_hash,callback_token,callback_hash,error_code,expires_at,claimed_at FROM connection_setups WHERE connection_id=$1 ORDER BY created_at DESC LIMIT 1;

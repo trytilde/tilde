@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM connection_values WHERE connection_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2cfc9b73671d0bfc465c1a0fd0d193fd2912ee8abe6e492fc59023cf9857d97e"
+}

@@ -1,0 +1,22 @@
+version: v2
+clean: true
+plugins:
+  - local: .tools/protoc-gen-buffa
+    out: crates/tilde/src/generated/messages
+    opt: [views=true, json=true]
+  - local: .tools/protoc-gen-buffa-packaging
+    out: crates/tilde/src/generated/messages
+    strategy: all
+  - local: .tools/protoc-gen-connect-rust
+    out: crates/tilde/src/generated/services
+    opt: [buffa_module=crate::proto]
+  - local: .tools/protoc-gen-buffa-packaging
+    out: crates/tilde/src/generated/services
+    strategy: all
+    opt: [filter=services]
+  - local: protoc-gen-es
+    out: web/src/gen
+    opt: [target=js+dts, import_extension=js]
+  - local: protoc-gen-es
+    out: sdk/ts/packages/sdk/src/gen
+    opt: [target=js+dts, import_extension=js]

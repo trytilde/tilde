@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_invocations SET execution_traceparent=$2 WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eb7f47a1a57e6a5c6359d21d0a2a27b0ad41a77b740812c6942c116987e7cfe8"
+}

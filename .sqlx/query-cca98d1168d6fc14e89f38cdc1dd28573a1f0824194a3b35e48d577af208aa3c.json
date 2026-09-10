@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connections SET status='ready',account_label=$2,token_expires_at=$3,credential_version=credential_version+1,refresh_claim_until=NULL,updated_at=now() WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cca98d1168d6fc14e89f38cdc1dd28573a1f0824194a3b35e48d577af208aa3c"
+}

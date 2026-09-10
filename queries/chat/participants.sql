@@ -1,0 +1,1 @@
+SELECT p.id,p.active,p.user_id,p.agent_id,COALESCE(u.name,a.name) AS "name!" FROM chat_participants p LEFT JOIN chat_users u ON u.id=p.user_id LEFT JOIN agents a ON a.id=p.agent_id WHERE p.thread_id=$1 ORDER BY p.id;

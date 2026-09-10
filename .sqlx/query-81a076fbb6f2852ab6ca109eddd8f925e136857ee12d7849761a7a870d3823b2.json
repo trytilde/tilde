@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_runs(id,thread_id,agent_id,objective,goal_id,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(thread_id,agent_id,idempotency_key) DO NOTHING RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "81a076fbb6f2852ab6ca109eddd8f925e136857ee12d7849761a7a870d3823b2"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH parameters AS (DELETE FROM connection_oauth_parameters WHERE provider_id=$1)\nDELETE FROM connection_oauth_result_fields WHERE provider_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "10a8f08a688b681ce1096d1314ea36f012779ef2af5c417191cc73086959b07b"
+}

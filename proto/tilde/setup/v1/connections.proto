@@ -1,0 +1,68 @@
+syntax = "proto3";
+package tilde.setup.v1;
+import "tilde/types/v1/connections.proto";
+
+// Public broker commands authenticate with their own expiring connection setup token, independently of management sessions.
+
+service ConnectionSetupService {
+  rpc GetSetup(GetSetupRequest) returns (GetSetupResponse);
+  rpc SaveDraft(SaveDraftRequest) returns (SaveDraftResponse);
+  rpc StartOAuth(StartOAuthRequest) returns (StartOAuthResponse);
+  rpc SaveCredentials(SaveCredentialsRequest) returns (SaveCredentialsResponse);
+  rpc ExecuteProviderAction(ExecuteProviderActionRequest) returns (ExecuteProviderActionResponse);
+  rpc CancelSetup(CancelSetupRequest) returns (CancelSetupResponse);
+}
+
+message GetSetupRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; }
+
+message GetSetupResponse { Brokering state = 1; }
+
+message SaveDraftRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; string action_id = 3; repeated tilde.types.v1.InputField draft = 4; }
+
+message SaveDraftResponse { Brokering state = 1; }
+
+message StartOAuthRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; string action_id = 3; repeated tilde.types.v1.InputField fields = 4; }
+
+message StartOAuthResponse { Brokering state = 1; }
+
+message SaveCredentialsRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; string action_id = 3; repeated tilde.types.v1.InputField fields = 4; }
+
+message SaveCredentialsResponse { Brokering state = 1; }
+
+message ExecuteProviderActionRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; string action_id = 3; repeated tilde.types.v1.InputField fields = 4; string action = 5; }
+
+message ExecuteProviderActionResponse { Brokering state = 1; }
+
+message CancelSetupRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; }
+
+message CancelSetupResponse { Brokering state = 1; }
+
+message Brokering {
+  string setup_id = 1; string connection_id = 2; string action_id = 3; string step = 4; optional string error_code = 5;
+  reserved 6;
+  string ui_path = 16;
+  repeated tilde.types.v1.InputField draft = 17;
+  AuthDriver auth_driver = 18;
+  optional string input_schema_json = 20;
+  string connection_name = 14;
+  string type_name = 15;
+  string type_id = 19;
+  optional string webhook_url = 21;
+  oneof action { FormAction form = 7; RedirectAction redirect = 8; FormPostAction form_post = 9; CompleteAction complete = 10; WorkingAction working = 11; FailedAction failed = 12; CancelledAction cancelled = 13; }
+}
+
+message FormAction {}
+
+message RedirectAction { string url = 1 [debug_redact = true]; }
+
+message FormPostAction { string url = 1 [debug_redact = true]; repeated tilde.types.v1.Parameter fields = 2; }
+
+message CompleteAction {}
+
+message WorkingAction {}
+
+message FailedAction {}
+
+message CancelledAction {}
+
+enum AuthDriver { AUTH_DRIVER_UNSPECIFIED = 0; AUTH_DRIVER_STATIC = 1; AUTH_DRIVER_OAUTH_CODE = 2; AUTH_DRIVER_OAUTH_CLIENT_CREDENTIALS = 3; AUTH_DRIVER_OAUTH_JWT_BEARER = 4; AUTH_DRIVER_CUSTOM = 5; reserved 6; }

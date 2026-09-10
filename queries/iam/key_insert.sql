@@ -1,0 +1,1 @@
+INSERT INTO iam_signing_key(id,sealed) VALUES(TRUE,$1) ON CONFLICT DO NOTHING;

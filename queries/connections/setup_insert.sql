@@ -1,0 +1,1 @@
+INSERT INTO connection_setups(id,connection_id,step,action_id,connection_setup_token,connection_setup_token_hash,callback_token,callback_hash,expires_at) VALUES($1,$2,'fields',$3,$4,$5,$6,$7,now()+interval '10 minutes');

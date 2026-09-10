@@ -1,0 +1,1002 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::bounded_channel::{BoundedSender, SendError};
+#[cfg(feature = "file_receiver")]
+use crate::receivers::file::offset_tracker::LineOffset;
+use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
+use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
+use opentelemetry_proto::tonic::metrics::v1::ResourceMetrics;
+use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use tracing::warn;
+
+#[cfg(feature = "pyo3")]
+use rotel_sdk::py::request_context::RequestContext as PyRequestContext;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Message<T> {
+    pub metadata: Option<MessageMetadata>,
+    pub request_context: Option<RequestContext>,
+    pub payload: Vec<T>,
+}
+
+impl<T> Message<T> {
+    pub fn new(
+        metadata: Option<MessageMetadata>,
+        payload: Vec<T>,
+        request_context: Option<RequestContext>,
+    ) -> Self {
+        Self {
+            metadata,
+            payload,
+            request_context,
+        }
+    }
+
+    // Used in testing
+    #[allow(dead_code)]
+    pub(crate) fn len(&self) -> usize {
+        self.payload.len()
+    }
+}
+
+pub struct MessageMetadata {
+    data: MessageMetadataInner,
+    ref_count: Arc<AtomicU32>,
+    response_claimed: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum RequestContext {
+    Http(HashMap<String, String>),
+    Grpc(HashMap<String, String>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MessageMetadataInner {
+    Kafka(KafkaMetadata),
+    Forwarder(ForwarderMetadata),
+    #[cfg(feature = "file_receiver")]
+    File(FileMetadata),
+    #[cfg(feature = "kmsg_receiver")]
+    Kmsg(KmsgMetadata),
+}
+
+#[allow(clippy::from_over_into)]
+#[cfg(feature = "pyo3")]
+impl Into<PyRequestContext> for RequestContext {
+    fn into(self) -> PyRequestContext {
+        match self {
+            RequestContext::Http(h) => {
+                PyRequestContext::HttpContext(rotel_sdk::py::request_context::HttpContext {
+                    headers: h,
+                })
+            }
+            RequestContext::Grpc(h) => {
+                PyRequestContext::GrpcContext(rotel_sdk::py::request_context::GrpcContext {
+                    metadata: h,
+                })
+            }
+        }
+    }
+}
+
+impl MessageMetadata {
+    /// Create new MessageMetadata with Kafka variant, starting with ref_count = 1
+    pub fn kafka(metadata: KafkaMetadata) -> Self {
+        Self {
+            data: MessageMetadataInner::Kafka(metadata),
+            ref_count: Arc::new(AtomicU32::new(1)),
+            response_claimed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn forwarder(metadata: ForwarderMetadata) -> Self {
+        Self {
+            data: MessageMetadataInner::Forwarder(metadata),
+            ref_count: Arc::new(AtomicU32::new(1)),
+            response_claimed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Create new MessageMetadata with File variant, starting with ref_count = 1
+    #[cfg(feature = "file_receiver")]
+    pub fn file(metadata: FileMetadata) -> Self {
+        Self {
+            data: MessageMetadataInner::File(metadata),
+            ref_count: Arc::new(AtomicU32::new(1)),
+            response_claimed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Create a new MessageMetadata with Kmsg variant, starting with ref_count = 1
+    #[cfg(feature = "kmsg_receiver")]
+    pub fn kmsg(metadata: KmsgMetadata) -> Self {
+        Self {
+            data: MessageMetadataInner::Kmsg(metadata),
+            ref_count: Arc::new(AtomicU32::new(1)),
+            response_claimed: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Get the inner metadata data
+    pub fn inner(&self) -> &MessageMetadataInner {
+        &self.data
+    }
+
+    /// Get reference count for debugging/testing
+    pub fn ref_count(&self) -> u32 {
+        self.ref_count.load(Ordering::Acquire)
+    }
+
+    /// Helper method to get Kafka metadata if available
+    pub fn as_kafka(&self) -> Option<&KafkaMetadata> {
+        if let MessageMetadataInner::Kafka(km) = &self.data {
+            Some(km)
+        } else {
+            None
+        }
+    }
+
+    /// Create a shallow clone that shares the same reference count Arc
+    /// Used for retry scenarios where we don't want to increment the ref count
+    pub fn shallow_clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            ref_count: self.ref_count.clone(),
+            response_claimed: self.response_claimed.clone(),
+        }
+    }
+}
+
+impl Clone for MessageMetadata {
+    fn clone(&self) -> Self {
+        self.ref_count.fetch_add(1, Ordering::AcqRel);
+        Self {
+            data: self.data.clone(),
+            ref_count: self.ref_count.clone(),
+            response_claimed: self.response_claimed.clone(),
+        }
+    }
+}
+
+/// Debug implementation for MessageMetadata
+impl std::fmt::Debug for MessageMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MessageMetadata")
+            .field("data", &self.data)
+            .field("ref_count", &self.ref_count())
+            .finish()
+    }
+}
+
+/// PartialEq implementation for MessageMetadata
+impl PartialEq for MessageMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+#[derive(Clone)]
+pub struct KafkaMetadata {
+    pub offset: i64,
+    pub partition: i32,
+    pub topic_id: u8,
+    pub ack_chan: Option<BoundedSender<KafkaAcknowledgement>>,
+}
+
+/// HTTP metadata containing request headers and other HTTP context
+#[derive(Clone, Debug, PartialEq)]
+pub struct HttpMetadata {
+    /// Map of header names (lowercase) to header values
+    pub headers: HashMap<String, String>,
+}
+
+impl HttpMetadata {
+    /// Create new HttpMetadata with headers
+    pub fn new(headers: HashMap<String, String>) -> Self {
+        Self { headers }
+    }
+
+    /// Get a header value by name (case-insensitive)
+    pub fn get_header(&self, name: &str) -> Option<&String> {
+        self.headers.get(&name.to_lowercase())
+    }
+}
+
+/// gRPC metadata containing request metadata and other gRPC context
+#[derive(Clone, Debug, PartialEq)]
+pub struct GrpcMetadata {
+    /// Map of metadata keys (lowercase) to metadata values
+    pub headers: HashMap<String, String>,
+}
+
+impl GrpcMetadata {
+    /// Create new GrpcMetadata with headers
+    pub fn new(headers: HashMap<String, String>) -> Self {
+        Self { headers }
+    }
+}
+
+impl KafkaMetadata {
+    /// Create new KafkaMetadata
+    pub fn new(
+        offset: i64,
+        partition: i32,
+        topic_id: u8,
+        ack_chan: Option<BoundedSender<KafkaAcknowledgement>>,
+    ) -> Self {
+        Self {
+            offset,
+            partition,
+            topic_id,
+            ack_chan,
+        }
+    }
+}
+
+// Manual Debug for KafkaMetadata since BoundedSender doesn't implement Debug
+impl std::fmt::Debug for KafkaMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KafkaMetadata")
+            .field("offset", &self.offset)
+            .field("partition", &self.partition)
+            .field("topic_id", &self.topic_id)
+            .field("ack_chan", &self.ack_chan.is_some())
+            .finish()
+    }
+}
+
+// Manual PartialEq for KafkaMetadata since BoundedSender can't be compared
+impl PartialEq for KafkaMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset
+            && self.partition == other.partition
+            && self.topic_id == other.topic_id
+        // We don't compare ack_chan as it's not meaningful for equality
+    }
+}
+
+#[derive(Clone)]
+pub struct ForwarderMetadata {
+    request_id: String,
+    ack_chan: Option<BoundedSender<ForwarderAcknowledgement>>,
+}
+
+impl ForwarderMetadata {
+    pub fn new(
+        request_id: String,
+        ack_chan: Option<BoundedSender<ForwarderAcknowledgement>>,
+    ) -> Self {
+        Self {
+            request_id,
+            ack_chan,
+        }
+    }
+}
+
+impl std::fmt::Debug for ForwarderMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ForwarderMetadata")
+            .field("request_id", &self.request_id)
+            .finish()
+    }
+}
+
+impl PartialEq for ForwarderMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.request_id == other.request_id
+    }
+}
+
+// TODO: consider whether we want a generic reason or enum.
+pub trait Ack {
+    #[allow(async_fn_in_trait)]
+    async fn ack(&self) -> Result<(), SendError>;
+    #[allow(async_fn_in_trait)]
+    async fn nack(&self, reason: ExporterError) -> Result<(), SendError>;
+}
+
+impl MessageMetadata {
+    /// Decrement ref_count by 1, returning the previous value.
+    /// Returns None if already at 0 (underflow).
+    fn decrement_ref_count(&self, op: &str) -> Option<u32> {
+        match self
+            .ref_count
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+                if v == 0 { None } else { Some(v - 1) }
+            }) {
+            Ok(prev) => Some(prev),
+            Err(_) => {
+                warn!("attempt to {} payload already at ref_count=0", op);
+                None
+            }
+        }
+    }
+
+    /// Try to claim the response slot. Returns true if this caller won.
+    fn claim_response(&self) -> bool {
+        self.response_claimed
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    async fn send_ack(&self) -> Result<(), SendError> {
+        match &self.data {
+            MessageMetadataInner::Kafka(km) => {
+                if let Some(ack_chan) = &km.ack_chan {
+                    ack_chan
+                        .send(KafkaAcknowledgement::Ack(KafkaAck {
+                            offset: km.offset,
+                            partition: km.partition,
+                            topic_id: km.topic_id,
+                        }))
+                        .await?;
+                }
+            }
+            MessageMetadataInner::Forwarder(fm) => {
+                if let Some(ack_chan) = &fm.ack_chan {
+                    ack_chan
+                        .send(ForwarderAcknowledgement::Ack(ForwarderPayloadDetails {
+                            request_id: fm.request_id.clone(),
+                        }))
+                        .await?;
+                }
+            }
+            #[cfg(feature = "file_receiver")]
+            MessageMetadataInner::File(fm) => {
+                if let Some(ack_chan) = &fm.ack_chan {
+                    ack_chan
+                        .send(FileAcknowledgement::Ack(FileAck {
+                            file_id: fm.file_id,
+                            offsets: fm.offsets.clone(),
+                        }))
+                        .await?;
+                }
+            }
+            #[cfg(feature = "kmsg_receiver")]
+            MessageMetadataInner::Kmsg(km) => {
+                if let Some(ack_chan) = &km.ack_chan {
+                    ack_chan
+                        .send(KmsgAcknowledgement::Ack(KmsgAck {
+                            sequences: km.sequences.clone(),
+                        }))
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn send_nack(&self, reason: ExporterError) -> Result<(), SendError> {
+        match &self.data {
+            MessageMetadataInner::Kafka(km) => {
+                if let Some(ack_chan) = &km.ack_chan {
+                    ack_chan
+                        .send(KafkaAcknowledgement::Nack(KafkaNack {
+                            offset: km.offset,
+                            partition: km.partition,
+                            topic_id: km.topic_id,
+                            reason,
+                        }))
+                        .await?;
+                }
+            }
+            MessageMetadataInner::Forwarder(fm) => {
+                if let Some(ack_chan) = &fm.ack_chan {
+                    ack_chan
+                        .send(ForwarderAcknowledgement::Nack(ForwarderPayloadDetails {
+                            request_id: fm.request_id.clone(),
+                        }))
+                        .await?;
+                }
+            }
+            #[cfg(feature = "file_receiver")]
+            MessageMetadataInner::File(fm) => {
+                if let Some(ack_chan) = &fm.ack_chan {
+                    ack_chan
+                        .send(FileAcknowledgement::Nack(FileNack {
+                            file_id: fm.file_id,
+                            offsets: fm.offsets.clone(),
+                            reason,
+                        }))
+                        .await?;
+                }
+            }
+            #[cfg(feature = "kmsg_receiver")]
+            MessageMetadataInner::Kmsg(km) => {
+                if let Some(ack_chan) = &km.ack_chan {
+                    ack_chan
+                        .send(KmsgAcknowledgement::Nack(KmsgNack {
+                            sequences: km.sequences.clone(),
+                            reason,
+                        }))
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Ack for MessageMetadata {
+    async fn ack(&self) -> Result<(), SendError> {
+        // Decrement ref count first — ack only fires when all refs are resolved
+        let prev_count = match self.decrement_ref_count("ack") {
+            Some(prev) => prev,
+            None => return Ok(()),
+        };
+
+        // Only try to claim if this was the last reference
+        if prev_count == 1 && self.claim_response() {
+            self.send_ack().await?;
+        }
+        Ok(())
+    }
+
+    async fn nack(&self, reason: ExporterError) -> Result<(), SendError> {
+        // Claim response slot FIRST — nack has priority over concurrent acks
+        let claimed = self.claim_response();
+
+        // Decrement ref count for bookkeeping
+        self.decrement_ref_count("nack");
+
+        if claimed {
+            self.send_nack(reason).await?;
+        }
+        Ok(())
+    }
+}
+
+pub enum KafkaAcknowledgement {
+    Ack(KafkaAck),
+    Nack(KafkaNack),
+}
+
+pub struct KafkaAck {
+    pub offset: i64,
+    pub partition: i32,
+    pub topic_id: u8,
+}
+
+pub struct KafkaNack {
+    pub offset: i64,
+    pub partition: i32,
+    pub topic_id: u8,
+    pub reason: ExporterError,
+}
+
+/// Metadata for file receiver messages
+#[cfg(feature = "file_receiver")]
+#[derive(Clone)]
+pub struct FileMetadata {
+    /// The unique file identity
+    pub file_id: crate::receivers::file::input::FileId,
+    /// Line offsets (begin offset + length) for all lines in this batch
+    pub offsets: Vec<LineOffset>,
+    /// Channel to send acknowledgements back to the file receiver
+    pub ack_chan: Option<BoundedSender<FileAcknowledgement>>,
+}
+
+#[cfg(feature = "file_receiver")]
+impl FileMetadata {
+    /// Create new FileMetadata
+    pub fn new(
+        file_id: crate::receivers::file::input::FileId,
+        offsets: Vec<LineOffset>,
+        ack_chan: Option<BoundedSender<FileAcknowledgement>>,
+    ) -> Self {
+        Self {
+            file_id,
+            offsets,
+            ack_chan,
+        }
+    }
+}
+
+// Manual Debug for FileMetadata since BoundedSender doesn't implement Debug
+#[cfg(feature = "file_receiver")]
+impl std::fmt::Debug for FileMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileMetadata")
+            .field("file_id", &self.file_id)
+            .field("offsets", &self.offsets)
+            .field("ack_chan", &self.ack_chan.is_some())
+            .finish()
+    }
+}
+
+// Manual PartialEq for FileMetadata since BoundedSender can't be compared
+#[cfg(feature = "file_receiver")]
+impl PartialEq for FileMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.file_id == other.file_id && self.offsets == other.offsets
+        // We don't compare ack_chan as it's not meaningful for equality
+    }
+}
+
+/// Acknowledgement message from exporter back to file receiver
+#[cfg(feature = "file_receiver")]
+pub enum FileAcknowledgement {
+    Ack(FileAck),
+    Nack(FileNack),
+}
+
+/// Successful acknowledgement of a file batch
+#[cfg(feature = "file_receiver")]
+pub struct FileAck {
+    pub file_id: crate::receivers::file::input::FileId,
+    pub offsets: Vec<LineOffset>,
+}
+
+/// Failed acknowledgement of a file batch
+#[cfg(feature = "file_receiver")]
+pub struct FileNack {
+    pub file_id: crate::receivers::file::input::FileId,
+    pub offsets: Vec<LineOffset>,
+    pub reason: ExporterError,
+}
+
+/// Metadata for kmsg receiver messages
+#[cfg(feature = "kmsg_receiver")]
+#[derive(Clone)]
+pub struct KmsgMetadata {
+    /// Sequence numbers of kernel messages in this batch
+    pub sequences: Vec<u64>,
+    /// Channel to send acknowledgements back to the kmsg receiver
+    pub ack_chan: Option<BoundedSender<KmsgAcknowledgement>>,
+}
+
+#[cfg(feature = "kmsg_receiver")]
+impl KmsgMetadata {
+    /// Creata e new KmsgMetadata
+    pub fn new(sequences: Vec<u64>, ack_chan: Option<BoundedSender<KmsgAcknowledgement>>) -> Self {
+        Self {
+            sequences,
+            ack_chan,
+        }
+    }
+}
+
+// Manual Debug for KmsgMetadata since BoundedSender doesn't implement Debug
+#[cfg(feature = "kmsg_receiver")]
+impl std::fmt::Debug for KmsgMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KmsgMetadata")
+            .field("sequences", &self.sequences)
+            .field("ack_chan", &self.ack_chan.is_some())
+            .finish()
+    }
+}
+
+// Manual PartialEq for KmsgMetadata since BoundedSender can't be compared
+#[cfg(feature = "kmsg_receiver")]
+impl PartialEq for KmsgMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.sequences == other.sequences
+        // We don't compare ack_chan as it's not meaningful for equality
+    }
+}
+
+/// Acknowledgement message from exporter back to kmsg receiver
+#[cfg(feature = "kmsg_receiver")]
+pub enum KmsgAcknowledgement {
+    Ack(KmsgAck),
+    Nack(KmsgNack),
+}
+
+/// Successful acknowledgement of a kmsg batch
+#[cfg(feature = "kmsg_receiver")]
+pub struct KmsgAck {
+    pub sequences: Vec<u64>,
+}
+
+/// Failed acknowledgement of a kmsg batch
+#[cfg(feature = "kmsg_receiver")]
+pub struct KmsgNack {
+    pub sequences: Vec<u64>,
+    pub reason: ExporterError,
+}
+
+pub enum ForwarderAcknowledgement {
+    Ack(ForwarderPayloadDetails),
+    Nack(ForwarderPayloadDetails),
+}
+
+pub struct ForwarderPayloadDetails {
+    pub request_id: String,
+}
+
+/// Error types that can occur during export operations
+#[derive(Debug, Clone)]
+pub enum ExporterError {
+    /// Generic export error with code and message
+    ExportFailed {
+        /// Error code (e.g., HTTP status code, internal error code)
+        error_code: u16,
+        /// Human-readable error message
+        error_message: String,
+    },
+    /// Export was cancelled before completion
+    Cancelled,
+    /// Configuration error preventing export
+    Configuration(String),
+}
+
+/// Trait for converting telemetry data into OTLP protocol format
+pub trait OTLPFrom<T> {
+    fn otlp_from(value: T) -> Self;
+}
+
+/// Trait for converting telemetry data into OTLP protocol format
+pub trait OTLPInto<T> {
+    fn otlp_into(self) -> T;
+}
+
+impl OTLPFrom<Vec<ResourceSpans>> for ExportTraceServiceRequest {
+    fn otlp_from(value: Vec<ResourceSpans>) -> Self {
+        ExportTraceServiceRequest {
+            resource_spans: value,
+        }
+    }
+}
+
+impl OTLPFrom<Vec<Message<ResourceSpans>>> for ExportTraceServiceRequest {
+    fn otlp_from(value: Vec<Message<ResourceSpans>>) -> Self {
+        ExportTraceServiceRequest {
+            resource_spans: value.into_iter().flat_map(|m| m.payload).collect(),
+        }
+    }
+}
+
+impl OTLPFrom<Vec<ResourceMetrics>> for ExportMetricsServiceRequest {
+    fn otlp_from(value: Vec<ResourceMetrics>) -> Self {
+        ExportMetricsServiceRequest {
+            resource_metrics: value,
+        }
+    }
+}
+
+impl OTLPFrom<Vec<Message<ResourceMetrics>>> for ExportMetricsServiceRequest {
+    fn otlp_from(value: Vec<Message<ResourceMetrics>>) -> Self {
+        ExportMetricsServiceRequest {
+            resource_metrics: value.into_iter().flat_map(|m| m.payload).collect(),
+        }
+    }
+}
+
+impl OTLPFrom<Vec<ResourceLogs>> for ExportLogsServiceRequest {
+    fn otlp_from(value: Vec<ResourceLogs>) -> Self {
+        ExportLogsServiceRequest {
+            resource_logs: value,
+        }
+    }
+}
+
+impl OTLPFrom<Vec<Message<ResourceLogs>>> for ExportLogsServiceRequest {
+    fn otlp_from(value: Vec<Message<ResourceLogs>>) -> Self {
+        ExportLogsServiceRequest {
+            resource_logs: value.into_iter().flat_map(|m| m.payload).collect(),
+        }
+    }
+}
+
+impl OTLPInto<Vec<ResourceSpans>> for ExportTraceServiceRequest {
+    fn otlp_into(self) -> Vec<ResourceSpans> {
+        self.resource_spans
+    }
+}
+
+impl OTLPInto<Vec<ResourceMetrics>> for ExportMetricsServiceRequest {
+    fn otlp_into(self) -> Vec<ResourceMetrics> {
+        self.resource_metrics
+    }
+}
+
+impl OTLPInto<Vec<ResourceLogs>> for ExportLogsServiceRequest {
+    fn otlp_into(self) -> Vec<ResourceLogs> {
+        self.resource_logs
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum OTLPPayload {
+    Traces(Vec<ResourceSpans>),
+    Metrics(Vec<ResourceMetrics>),
+    Logs(Vec<ResourceLogs>),
+}
+
+impl From<Vec<ResourceMetrics>> for OTLPPayload {
+    fn from(value: Vec<ResourceMetrics>) -> Self {
+        OTLPPayload::Metrics(value)
+    }
+}
+
+impl From<Vec<ResourceSpans>> for OTLPPayload {
+    fn from(value: Vec<ResourceSpans>) -> Self {
+        OTLPPayload::Traces(value)
+    }
+}
+
+impl From<Vec<ResourceLogs>> for OTLPPayload {
+    fn from(value: Vec<ResourceLogs>) -> Self {
+        OTLPPayload::Logs(value)
+    }
+}
+
+impl TryFrom<OTLPPayload> for Vec<ResourceSpans> {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Traces(v) => Ok(v),
+            OTLPPayload::Metrics(_) => Err("Cannot convert metrics payload to traces"),
+            OTLPPayload::Logs(_) => Err("Cannot convert logs payload to traces"),
+        }
+    }
+}
+
+impl TryFrom<OTLPPayload> for Vec<ResourceMetrics> {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Metrics(v) => Ok(v),
+            OTLPPayload::Traces(_) => Err("Cannot convert traces payload to metrics"),
+            OTLPPayload::Logs(_) => Err("Cannot convert logs payload to metrics"),
+        }
+    }
+}
+
+impl TryFrom<OTLPPayload> for Vec<ResourceLogs> {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Logs(v) => Ok(v),
+            OTLPPayload::Traces(_) => Err("Cannot convert traces payload to logs"),
+            OTLPPayload::Metrics(_) => Err("Cannot convert metrics payload to logs"),
+        }
+    }
+}
+
+impl TryFrom<OTLPPayload> for ExportTraceServiceRequest {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Traces(spans) => Ok(ExportTraceServiceRequest {
+                resource_spans: spans,
+            }),
+            OTLPPayload::Metrics(_) => {
+                Err("Cannot convert metrics payload to trace service request")
+            }
+            OTLPPayload::Logs(_) => Err("Cannot convert logs payload to trace service request"),
+        }
+    }
+}
+
+impl TryFrom<OTLPPayload> for ExportMetricsServiceRequest {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Metrics(metrics) => Ok(ExportMetricsServiceRequest {
+                resource_metrics: metrics,
+            }),
+            OTLPPayload::Traces(_) => {
+                Err("Cannot convert traces payload to metrics service request")
+            }
+            OTLPPayload::Logs(_) => Err("Cannot convert logs payload to metrics service request"),
+        }
+    }
+}
+
+impl TryFrom<OTLPPayload> for ExportLogsServiceRequest {
+    type Error = &'static str;
+
+    fn try_from(value: OTLPPayload) -> Result<Self, Self::Error> {
+        match value {
+            OTLPPayload::Logs(logs) => Ok(ExportLogsServiceRequest {
+                resource_logs: logs,
+            }),
+            OTLPPayload::Traces(_) => Err("Cannot convert traces payload to logs service request"),
+            OTLPPayload::Metrics(_) => {
+                Err("Cannot convert metrics payload to logs service request")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use tokio::time::timeout;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_reference_counting_single_ack() {
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(1);
+
+        let kafka_metadata = KafkaMetadata::new(123, 0, 1, Some(ack_tx));
+
+        let metadata = MessageMetadata::kafka(kafka_metadata);
+
+        // Should start with ref count 1
+        assert_eq!(metadata.ref_count(), 1);
+
+        // Call ack() once - should send acknowledgment since count goes to 0
+        metadata.ack().await.unwrap();
+
+        // Should receive the acknowledgment
+        let ack = ack_rx.next().await.unwrap();
+        match ack {
+            KafkaAcknowledgement::Ack(kafka_ack) => {
+                assert_eq!(kafka_ack.offset, 123);
+                assert_eq!(kafka_ack.partition, 0);
+                assert_eq!(kafka_ack.topic_id, 1);
+            }
+            _ => panic!("Expected Ack"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reference_counting_clone_and_ack() {
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(1);
+
+        let kafka_metadata = KafkaMetadata::new(456, 2, 3, Some(ack_tx));
+
+        let metadata1 = MessageMetadata::kafka(kafka_metadata);
+        assert_eq!(metadata1.ref_count(), 1);
+
+        // Clone should increment ref count
+        let metadata2 = metadata1.clone();
+        assert_eq!(metadata1.ref_count(), 2);
+        assert_eq!(metadata2.ref_count(), 2);
+
+        // First ack() should not send acknowledgment (count goes from 2 to 1)
+        metadata1.ack().await.unwrap();
+        assert_eq!(metadata2.ref_count(), 1);
+
+        // Should not have received acknowledgment yet
+        let result =
+            tokio::time::timeout(std::time::Duration::from_millis(100), ack_rx.next()).await;
+        assert!(result.is_err(), "Should not receive ack yet");
+
+        // Second ack() should send acknowledgment (count goes from 1 to 0)
+        metadata2.ack().await.unwrap();
+
+        // Should receive the acknowledgment now
+        let ack = ack_rx.next().await.unwrap();
+        match ack {
+            KafkaAcknowledgement::Ack(kafka_ack) => {
+                assert_eq!(kafka_ack.offset, 456);
+                assert_eq!(kafka_ack.partition, 2);
+                assert_eq!(kafka_ack.topic_id, 3);
+            }
+            _ => panic!("Expected Ack"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shallow_clone_does_not_increment_ref_count() {
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(1);
+
+        let kafka_metadata = KafkaMetadata::new(789, 1, 2, Some(ack_tx));
+
+        let metadata1 = MessageMetadata::kafka(kafka_metadata);
+        assert_eq!(metadata1.ref_count(), 1);
+
+        // Shallow clone should NOT increment ref count (used for retry scenarios)
+        let metadata2 = metadata1.shallow_clone();
+        assert_eq!(metadata1.ref_count(), 1);
+        assert_eq!(metadata2.ref_count(), 1);
+
+        // First ack() should send acknowledgment immediately (count goes from 1 to 0)
+        metadata1.ack().await.unwrap();
+
+        // Should receive acknowledgment
+        let ack = ack_rx.next().await.unwrap();
+        match ack {
+            KafkaAcknowledgement::Ack(kafka_ack) => {
+                assert_eq!(kafka_ack.offset, 789);
+                assert_eq!(kafka_ack.partition, 1);
+                assert_eq!(kafka_ack.topic_id, 2);
+            }
+            _ => panic!("Expected Ack"),
+        }
+
+        // Second ack() on shallow clone should not send another acknowledgment
+        // (since the first ack already sent it when count reached 0)
+        // This will log a warning about underflow
+        metadata2.ack().await.unwrap();
+
+        // Should not receive another acknowledgment
+        let result =
+            tokio::time::timeout(std::time::Duration::from_millis(100), ack_rx.next()).await;
+        assert!(result.is_err(), "Should not receive second ack");
+    }
+
+    #[tokio::test]
+    async fn test_nack_on_clone_sends_immediately() {
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(2);
+
+        let forwarder_metadata =
+            ForwarderMetadata::new("test-request-123".to_string(), Some(ack_tx));
+
+        let metadata1 = MessageMetadata::forwarder(forwarder_metadata);
+        assert_eq!(metadata1.ref_count(), 1);
+
+        // Clone should increment ref count
+        let metadata2 = metadata1.clone();
+        assert_eq!(metadata1.ref_count(), 2);
+        assert_eq!(metadata2.ref_count(), 2);
+
+        // Call nack() on one clone - should send Nack immediately regardless of ref count
+        let error = ExporterError::ExportFailed {
+            error_code: 500,
+            error_message: "Test error message".to_string(),
+        };
+        metadata1.nack(error).await.unwrap();
+
+        // Should immediately receive the Nack acknowledgment
+        let ack = timeout(Duration::from_millis(100), ack_rx.next())
+            .await
+            .unwrap()
+            .unwrap();
+        match ack {
+            ForwarderAcknowledgement::Nack(details) => {
+                assert_eq!(details.request_id, "test-request-123");
+            }
+            _ => panic!("Expected Nack"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_nack_then_ack_on_clones() {
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(2);
+
+        let forwarder_metadata =
+            ForwarderMetadata::new("test-request-456".to_string(), Some(ack_tx));
+
+        let metadata1 = MessageMetadata::forwarder(forwarder_metadata);
+        assert_eq!(metadata1.ref_count(), 1);
+
+        // Clone should increment ref count
+        let metadata2 = metadata1.clone();
+        assert_eq!(metadata1.ref_count(), 2);
+        assert_eq!(metadata2.ref_count(), 2);
+
+        // Step 1: Call nack() on one clone
+        let error = ExporterError::Cancelled;
+        metadata1.nack(error).await.unwrap();
+
+        // Step 2: Should immediately receive the Nack acknowledgment
+        let ack = timeout(Duration::from_millis(100), ack_rx.next())
+            .await
+            .unwrap()
+            .unwrap();
+        match ack {
+            ForwarderAcknowledgement::Nack(details) => {
+                assert_eq!(details.request_id, "test-request-456");
+            }
+            _ => panic!("Expected Nack"),
+        }
+
+        // Step 3: Call ack() on the other clone
+        metadata2.ack().await.unwrap();
+
+        // Step 4: No Ack message should be sent (because nack was already called)
+        let result = timeout(Duration::from_millis(100), ack_rx.next()).await;
+        assert!(
+            result.is_err(),
+            "Should not receive Ack after Nack was sent"
+        );
+    }
+}

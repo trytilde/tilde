@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_message_dispatch(message_id,agent_id) VALUES($1,$2) ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "35e5dd28c59ba6c285b67dbc2e7bc473d463933fcd812038f883ec78b6f0db6e"
+}

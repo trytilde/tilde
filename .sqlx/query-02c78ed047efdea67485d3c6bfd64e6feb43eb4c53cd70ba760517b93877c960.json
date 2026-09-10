@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_oauth_parameters(provider_id,type_id,phase,name,value) VALUES($1,$2,$3,$4,$5);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "02c78ed047efdea67485d3c6bfd64e6feb43eb4c53cd70ba760517b93877c960"
+}

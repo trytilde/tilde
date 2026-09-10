@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_messages SET text=$2,status=$3 WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cf5bb23ac1dc23e08193e5d364967678592ce25b5e60b00da798d554146c04bc"
+}

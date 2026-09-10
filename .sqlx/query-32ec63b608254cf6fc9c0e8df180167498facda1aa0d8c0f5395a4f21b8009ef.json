@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM chat_converted_messages WHERE message_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "32ec63b608254cf6fc9c0e8df180167498facda1aa0d8c0f5395a4f21b8009ef"
+}

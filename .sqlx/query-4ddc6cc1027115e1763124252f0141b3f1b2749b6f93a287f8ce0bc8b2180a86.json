@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_tool_calls(id,thread_id,invocation_id,participant_id,name,provider_id,status,input_json) VALUES($1,$2,$3,$4,$5,$6,'running',$7);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ddc6cc1027115e1763124252f0141b3f1b2749b6f93a287f8ce0bc8b2180a86"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@trytilde/sdk-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @trytilde/sdk test",
+    "example": "pnpm --filter @trytilde/example-agent start"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "pnpm@10.33.1"
+}

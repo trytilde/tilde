@@ -1,0 +1,29 @@
+name: Build toolchain
+description: Install the repository's Rust, JavaScript, Python, and Task toolchains
+runs:
+  using: composite
+  steps:
+    - uses: go-task/setup-task@v1
+      with:
+        version: 3.53.1
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10.33.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+        cache-dependency-path: |
+          pnpm-lock.yaml
+          sdk/ts/pnpm-lock.yaml
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: 1.98.1
+        components: rustfmt, clippy
+    - name: Install Linux build dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y cmake pkg-config libssl-dev

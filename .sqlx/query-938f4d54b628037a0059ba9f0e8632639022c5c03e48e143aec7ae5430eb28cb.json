@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO iam_signing_key(id,sealed) VALUES(TRUE,$1) ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "938f4d54b628037a0059ba9f0e8632639022c5c03e48e143aec7ae5430eb28cb"
+}

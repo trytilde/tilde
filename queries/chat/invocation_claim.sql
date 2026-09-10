@@ -1,0 +1,1 @@
+UPDATE chat_invocations SET status='running',started_at=NOW(),lease_expires_at=NOW()+INTERVAL '30 seconds' WHERE id=$1 AND status='pending' RETURNING id,run_id,thread_id,agent_id,traceparent,tracestate;

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_goals(id,thread_id,agent_id,objective) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ab40dc7ba64dc82b7eab372d84041ccf44a048d4cb8d94c561dbcb5ca932ee48"
+}

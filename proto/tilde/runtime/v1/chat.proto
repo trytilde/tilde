@@ -1,0 +1,111 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/runtime/v1/cache.proto";
+import "tilde/types/v1/chat.proto";
+
+// Callbacks into Tilde derive the acting agent and current thread from a live invocation token. Other-agent targets remain explicit and capability checked.
+
+service ChatService {
+  rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc StartRun(StartRunRequest) returns (StartRunResponse);
+  rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
+  rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
+  rpc RenewConnectToken(RenewConnectTokenRequest) returns (RenewConnectTokenResponse);
+  rpc CacheConvertedMessages(CacheConvertedMessagesRequest) returns (CacheConvertedMessagesResponse);
+  rpc HydrateConvertedMessages(HydrateConvertedMessagesRequest) returns (HydrateConvertedMessagesResponse);
+  rpc ReportToolCall(ReportToolCallRequest) returns (ReportToolCallResponse);
+  rpc SetTyping(SetTypingRequest) returns (SetTypingResponse);
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  rpc InvokeTool(stream InvokeToolRequest) returns (InvokeToolResponse);
+  rpc ListGoals(ListGoalsRequest) returns (ListGoalsResponse);
+  rpc CreateGoal(CreateGoalRequest) returns (CreateGoalResponse);
+  rpc UpdateGoal(UpdateGoalRequest) returns (UpdateGoalResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
+  rpc SetRunStatus(SetRunStatusRequest) returns (SetRunStatusResponse);
+}
+
+message GetThreadRequest {}
+
+message GetThreadResponse { tilde.types.v1.Thread thread = 1; }
+
+message ListMessagesRequest {  uint32 limit = 2; string before_message_id = 3; }
+
+message ListMessagesResponse { repeated tilde.types.v1.Message messages = 1; string next_page_token = 2;  repeated tilde.runtime.v1.CachedAgentRepresentation cached_messages = 3; }
+
+message StartRunRequest {  string agent_id = 2; string objective = 3;  string idempotency_key = 5; }
+
+message StartRunResponse { tilde.types.v1.Run run = 1; }
+
+message UploadAttachmentRequest { string id = 1;  string filename = 3; string media_type = 4; bytes content = 5 [debug_redact = true]; }
+
+message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }
+
+message DownloadAttachmentRequest {  string attachment_id = 2; }
+
+message DownloadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; bytes content = 2 [debug_redact = true]; }
+
+message RenewConnectTokenRequest {}
+
+message RenewConnectTokenResponse { string token = 1 [debug_redact = true]; uint32 expires_in = 2; }
+
+message CacheConvertedMessagesRequest { repeated tilde.runtime.v1.CachedAgentRepresentation messages = 1; }
+
+message CacheConvertedMessagesResponse { bool success = 1; }
+
+message HydrateConvertedMessagesRequest { repeated string message_ids = 1; }
+
+message HydrateConvertedMessagesResponse { repeated tilde.runtime.v1.CachedAgentRepresentation messages = 1; }
+
+message ReportToolCallRequest { tilde.types.v1.ToolCall tool_call = 1; }
+
+message ReportToolCallResponse {}
+
+message SetTypingRequest { bool typing = 1; }
+
+message SetTypingResponse {}
+
+message ListToolsRequest {}
+
+message ListToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; }
+
+message InvokeToolRequest {
+  string name = 1;
+  string call_id = 2;
+  uint32 sequence = 3;
+  string input_json = 4 [debug_redact = true];
+  string chunk_json = 5 [debug_redact = true];
+  bool finish = 6;
+}
+
+message InvokeToolResponse { string output_json = 1 [debug_redact = true]; }
+
+message ListGoalsRequest {}
+
+message ListGoalsResponse { repeated tilde.types.v1.Goal goals = 1; }
+
+message CreateGoalRequest { string id = 1; string objective = 2; }
+
+message CreateGoalResponse { tilde.types.v1.Goal goal = 1; }
+
+message UpdateGoalRequest { string id = 1; string status = 2; }
+
+message UpdateGoalResponse { tilde.types.v1.Goal goal = 1; }
+
+message ListTasksRequest {}
+
+message ListTasksResponse { repeated tilde.types.v1.Task tasks = 1; }
+
+message CreateTaskRequest { string id = 1; string title = 2; optional string goal_id = 3; repeated string dependency_ids = 4; }
+
+message CreateTaskResponse { tilde.types.v1.Task task = 1; }
+
+message UpdateTaskRequest { string id = 1; string status = 2; string blocked_reason = 3; }
+
+message UpdateTaskResponse { tilde.types.v1.Task task = 1; }
+
+message SetRunStatusRequest { string status = 1; }
+
+message SetRunStatusResponse {}

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.message_id,c.representation FROM chat_converted_messages c JOIN chat_messages m ON m.id=c.message_id WHERE c.agent_id=$1 AND m.thread_id=$2 AND c.message_id=ANY($3::UUID[]) ORDER BY c.message_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "representation",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "669455014d44e5729dd57228b03cfaec3c539b1217c8a924170945103f013b8b"
+}

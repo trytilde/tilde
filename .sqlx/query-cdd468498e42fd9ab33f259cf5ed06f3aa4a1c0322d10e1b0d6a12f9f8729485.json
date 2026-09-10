@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n (SELECT count(*) FROM connection_setups WHERE id=$1) AS \"setups!\",\n (SELECT count(*) FROM connection_setup_drafts WHERE setup_id=$1) AS \"drafts!\",\n (SELECT count(*) FROM connection_setup_values WHERE setup_id=$1) AS \"staged!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "setups!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "drafts!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "staged!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "cdd468498e42fd9ab33f259cf5ed06f3aa4a1c0322d10e1b0d6a12f9f8729485"
+}

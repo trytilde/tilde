@@ -1,0 +1,25 @@
+/target/
+/dist/
+/node_modules/
+/web/node_modules/
+/web/dist/
+/.tools/
+/.env.*
+!/.env.example
+!/.env.test
+/secrets.yaml
+/.secrets.*
+/.load-secrets.*
+/.run/
+
+/sdk/ts/node_modules/
+/sdk/ts/**/node_modules/
+/sdk/ts/**/dist/
+
+/web/provider-dist/
+
+__pycache__/
+
+# Local runtime credentials must not enter the initial repository commit.
+/.env
+/secrets.enc.yaml

@@ -1,0 +1,1 @@
+UPDATE connections SET refresh_claim_until=now()+interval '90 seconds' WHERE id=$1 AND status='ready' AND credential_version=$2 AND (refresh_claim_until IS NULL OR refresh_claim_until<now()) RETURNING id;

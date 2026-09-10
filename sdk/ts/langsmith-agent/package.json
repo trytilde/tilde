@@ -1,0 +1,13 @@
+{
+  "name": "@trytilde/langsmith-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.112",
+    "@trytilde/sdk": "workspace:*",
+    "ai": "^6.0.280",
+    "langsmith": "^0.10.2",
+    "zod": "^4.6.1"
+  }
+}

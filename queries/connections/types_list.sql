@@ -1,0 +1,1 @@
+SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema FROM connection_types WHERE provider_id=$1 ORDER BY type_id;

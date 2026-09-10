@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_messages m SET status='aborted' WHERE m.status='streaming' AND (m.stream_expires_at<NOW() OR EXISTS(SELECT 1 FROM chat_invocations i WHERE i.id=m.invocation_id AND i.status IN ('stopped','failed','canceled'))) RETURNING m.id,m.thread_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6b515ec2d9b0d8d37d20659e826ec35ac0feb4e1044fa8277b19cab417a83e1c"
+}

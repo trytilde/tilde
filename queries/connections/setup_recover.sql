@@ -1,0 +1,1 @@
+UPDATE connection_setups SET step='failed',error_code=CASE WHEN expires_at<=now() THEN 'setup_expired' ELSE 'setup_interrupted' END,claimed_at=NULL,updated_at=now() WHERE step NOT IN ('complete','cancelled','failed') AND (expires_at<=now() OR claimed_at<now()-interval '90 seconds') RETURNING id,connection_id;

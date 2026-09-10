@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_converted_messages(agent_id,message_id,representation) VALUES($1,$2,$3) ON CONFLICT(agent_id,message_id) DO UPDATE SET representation=EXCLUDED.representation;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bca8d43173fb19b261f13bac13ab226d97a3c4c3722827f856b53662ce80a5ff"
+}

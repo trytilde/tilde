@@ -1,0 +1,1 @@
+SELECT t.id,t.title,t.primary_agent_id FROM chat_threads t WHERE ($1::UUID IS NULL OR EXISTS(SELECT 1 FROM chat_participants p WHERE p.thread_id=t.id AND p.agent_id=$1)) AND ($2::UUID IS NULL OR t.id>$2) ORDER BY t.id LIMIT $3;

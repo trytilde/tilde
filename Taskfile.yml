@@ -1,0 +1,285 @@
+version: "3"
+output: interleaved
+
+dotenv: [".env.local", ".env.secrets", ".env"]
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install JavaScript dependencies and pinned Protobuf generators
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm tools
+      - pnpm --dir sdk/ts install --frozen-lockfile
+
+  generate:
+    desc: Generate Rust and TypeScript contracts without compiling Rust
+    cmds:
+      - task: setup
+      - pnpm generate
+
+  build:
+    desc: Build the complete release binary with the React UI embedded
+    cmds:
+      - task: generate
+      - task: build:connection-ui
+      - pnpm --dir web build
+      - pnpm --dir sdk/ts build
+      - cargo build --locked --release --features embedded-web
+
+  dev:
+    desc: Run the agent runtime API, optional management API, and optional Vite UI
+    vars:
+      DEV_ADDRESS: '{{.ADDRESS | default "127.0.0.1"}}'
+      DEV_ISSUER: '{{if and .ENGINE_OIDC_ISSUER (ne .ENGINE_OIDC_ISSUER "http://127.0.0.1:5556")}}{{.ENGINE_OIDC_ISSUER}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:5556{{end}}'
+      PUBLIC_PORT: '{{if eq (.ENGINE_WEB_ENABLED | default "true") "false"}}{{.API_PORT | default "8080"}}{{else}}{{.WEB_PORT | default "5173"}}{{end}}'
+    env:
+      ADDRESS: "{{.DEV_ADDRESS}}"
+      WEB_HOST: "{{.DEV_ADDRESS}}"
+      ENGINE_ALLOW_NETWORK: '{{if .ADDRESS}}true{{else}}{{.ENGINE_ALLOW_NETWORK | default "false"}}{{end}}'
+      DEX_DEV_ISSUER: "{{.DEV_ISSUER}}"
+      DEX_DEV_WEB_CALLBACK: 'http://{{.DEV_ADDRESS}}:{{.WEB_PORT | default "5173"}}/auth/callback'
+      DEX_DEV_API_CALLBACK: 'http://{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}/auth/callback'
+      ENGINE_CONNECTION_UI_DEV_URL: 'http://{{.DEV_ADDRESS}}:{{.CONNECTION_UI_PORT | default "5174"}}'
+      CONNECTION_UI_PORT: '{{.CONNECTION_UI_PORT | default "5174"}}'
+      ENGINE_CONNECTION_SETUP_PUBLIC_URL: '{{.ENGINE_CONNECTION_SETUP_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
+      ENGINE_MANAGEMENT_ENABLED: '{{.ENGINE_MANAGEMENT_ENABLED | default "true"}}'
+      ENGINE_WEB_ENABLED: '{{.ENGINE_WEB_ENABLED | default "true"}}'
+      API_PORT: '{{.API_PORT | default "8080"}}'
+      WEB_PORT: '{{.WEB_PORT | default "5173"}}'
+      ENGINE_MANAGEMENT_LISTEN: '{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}'
+      ENGINE_MANAGEMENT_PUBLIC_URL: '{{.ENGINE_MANAGEMENT_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS .PUBLIC_PORT)}}'
+      ENGINE_WEB_ORIGINS: 'http://{{.DEV_ADDRESS}}:{{.WEB_PORT | default "5173"}},http://{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}},http://{{.DEV_ADDRESS}}:{{.CONNECTION_UI_PORT | default "5174"}},http://localhost:{{.WEB_PORT | default "5173"}}'
+      ENGINE_AGENT_RUNTIME_LISTEN: '{{.ENGINE_AGENT_RUNTIME_LISTEN | default "127.0.0.1:8081"}}'
+      ENGINE_AGENT_RUNTIME_PUBLIC_URL: '{{.ENGINE_AGENT_RUNTIME_PUBLIC_URL | default "http://127.0.0.1:8081"}}'
+      ENGINE_DEV_URL: '{{.ENGINE_DEV_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
+      ENGINE_OIDC_ISSUER: "{{.DEV_ISSUER}}"
+      ENGINE_OIDC_CLIENT_ID: '{{.ENGINE_OIDC_CLIENT_ID | default "tilde-dev"}}'
+      ENGINE_OIDC_CLIENT_SECRET: '{{.ENGINE_OIDC_CLIENT_SECRET | default "tilde-local-dev-secret"}}'
+      ENGINE_OIDC_ALLOW_HTTP: '{{.ENGINE_OIDC_ALLOW_HTTP | default "true"}}'
+    cmds:
+      - task: generate
+      - pnpm --dir sdk/ts build
+      - cargo run --bin tilde -- check-config
+      - task: dev:postgres
+      - |
+        if [ "$ENGINE_MANAGEMENT_ENABLED" = true ] && [ "$ENGINE_OIDC_ISSUER" = "http://$ADDRESS:5556" ]; then
+          POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-unused-dev-compose}" docker compose --profile dev up -d dex
+        fi
+      - task --parallel --failfast --output interleaved dev:api dev:web dev:connection-ui
+
+  dev:postgres:
+    desc: Start loopback Postgres when using the default local development database
+    cmds:
+      - |
+        case "$DATABASE_URL" in
+          postgres://engine:*@127.0.0.1:5432/engine|postgresql://engine:*@127.0.0.1:5432/engine|postgres://engine:*@localhost:5432/engine|postgresql://engine:*@localhost:5432/engine)
+            docker compose up -d --wait postgres
+            ;;
+        esac
+
+  build:connection-ui:
+    desc: Build all colocated provider React iframe pages
+    cmds:
+      - pnpm --dir sdk/ts build
+      - pnpm --dir web exec tsc -p tsconfig.connections.json
+      - pnpm --dir web exec vite build --config vite.connections.config.ts
+
+  dev:connection-ui:
+    desc: Watch provider TSX pages with Vite and HMR
+    cmds:
+      - 'if [ "$ENGINE_MANAGEMENT_ENABLED" != false ]; then pnpm --dir web exec vite --config vite.connections.config.ts; fi'
+
+  dev:api:
+    cmds:
+      - cargo run --bin tilde
+
+  dev:web:
+    cmds:
+      - 'if [ "$ENGINE_WEB_ENABLED" != false ]; then pnpm --dir web exec vite; fi'
+
+  secrets:load:
+    desc: Decrypt SOPS chat credentials into private dev and test dotenv files
+    aliases: [sops:decrypt]
+    silent: true
+    cmds:
+      - python3 scripts/load-secrets.py
+
+  secrets:edit:
+    desc: Edit the encrypted secret document with SOPS, then refresh dotenv files
+    interactive: true
+    cmds:
+      - sops secrets.enc.yaml
+      - task: secrets:load
+
+  test:chat:
+    desc: Test all six chat providers against local HTTP fixtures and disposable Postgres
+    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    cmds:
+      - scripts/with-postgres.sh cargo test -p tilde --test chat_connections_audit --test chat_tools
+
+  test:chat:accounts:
+    desc: Read-only checks of all six configured provider accounts (requires secrets:load)
+    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    cmds:
+      - scripts/with-postgres.sh cargo test -p tilde --features live-chat-tests --test chat_providers_live -- --ignored {{.CLI_ARGS}}
+
+  test:chat:live:
+    desc: Real two-way provider messages and captured webhooks (phone tests need a replying recipient)
+    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    cmds:
+      - scripts/with-postgres.sh cargo test -p tilde --features live-chat-tests --test chat_providers_two_way -- --ignored --nocapture --test-threads=1 {{.CLI_ARGS}}
+
+  test:
+    desc: Run Rust and generated-client tests with disposable Postgres
+    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    cmds:
+      - task: generate
+      - scripts/with-postgres.sh task test:run
+
+  test:run:
+    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    requires:
+      vars: [TEST_DATABASE_URL]
+    env:
+      ENGINE_TEST_BINARY: '{{.CARGO_TARGET_DIR | default "target"}}/debug/tilde'
+    cmds:
+      - python3 scripts/test-env.py
+      - node scripts/test-dev-services.mjs
+      - task: build:connection-ui
+      - pnpm --dir web build
+      - pnpm --dir sdk/ts build
+      - cargo test --workspace
+      - cargo build --features embedded-web
+      - node web/scripts/test-client.mjs
+      - scripts/with-postgres.sh node scripts/test-services.mjs
+      - pnpm --dir sdk/ts build
+      - scripts/with-postgres.sh pnpm --dir sdk/ts test
+
+  sqlx:prepare:
+    desc: Refresh SQLx metadata in disposable Postgres (append -- --check to verify)
+    cmds:
+      - scripts/with-postgres.sh task sqlx:prepare:run -- {{.CLI_ARGS}}
+
+  sqlx:prepare:run:
+    requires:
+      vars: [DATABASE_URL]
+    env:
+      SQLX_OFFLINE: "false"
+    cmds:
+      - cargo sqlx migrate run --source migrations
+      - cargo sqlx prepare --workspace {{.CLI_ARGS}} -- --all-targets --all-features
+
+  check:web:
+    desc: Vite+ formatting, lint and type checks across frontend, provider UIs and SDK
+    aliases: [lint]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - pnpm --dir sdk/ts build
+      - pnpm exec vp check .
+
+  fix:web:
+    desc: Apply Vite+ formatter and safe lint fixes
+    aliases: [lint:fix]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - pnpm exec vp check --fix .
+
+  check:
+    desc: Check generated contracts, frontend types, Rust formatting and Clippy
+    cmds:
+      - task: version:check
+      - task: setup
+      - pnpm generate:check
+      - task: check:web
+      - task: build:connection-ui
+      - pnpm --dir web build
+      - pnpm --dir sdk/ts build
+      - cargo fmt --all --check
+      - cargo clippy --all-targets --all-features -- -D warnings
+
+  change:
+    desc: Add a Changie change fragment (append -- for CLI options)
+    interactive: true
+    cmds:
+      - changie new {{.CLI_ARGS}}
+
+  check-changie:
+    desc: Require a new change fragment, including blank acknowledgements
+    cmds:
+      - scripts/check-changie.sh {{.CLI_ARGS}}
+
+  version:check:
+    desc: Check release versions across Rust and TypeScript packages
+    cmds:
+      - python3 scripts/check-versions.py
+
+  release:prepare:
+    desc: Batch changes and update all release versions (task release:prepare -- patch)
+    preconditions:
+      - sh: test -n '{{.CLI_ARGS}}'
+        msg: Supply major, minor, patch, auto, or an explicit version after --
+    cmds:
+      - task: version:check
+      - changie batch {{.CLI_ARGS}}
+      - changie merge
+      - cargo metadata --offline --format-version 1 > /dev/null
+      - pnpm --dir sdk/ts install --lockfile-only --offline --ignore-scripts
+      - task: version:check
+
+  release:archive:
+    desc: Smoke-test and archive the native release binary with a SHA-256 checksum
+    cmds:
+      - scripts/release-archive.sh
+
+  sdk:pack:
+    desc: Build and pack public SDK packages into dist/npm
+    cmds:
+      - task: version:check
+      - pnpm --dir sdk/ts build
+      - scripts/sdk-pack.sh
+
+  sdk:publish:
+    desc: Build and publish unpublished public SDK versions to npm (append -- --dry-run to preview)
+    cmds:
+      - task: version:check
+      - pnpm --dir sdk/ts build
+      - pnpm --dir sdk/ts -r publish --access public --no-git-checks --tag latest {{.CLI_ARGS}}
+
+  agent:example:
+    desc: Run the example ConnectRPC agent (requires AGENT_SIGNING_KEY)
+    interactive: true
+    cmds:
+      - task: generate
+      - pnpm --dir sdk/ts build
+      - pnpm --dir sdk/ts example
+
+  test:tracing:
+    desc: Verify embedded Rotel forwarding and SDK trace propagation
+    cmds:
+      - scripts/with-postgres.sh cargo test -p tilde --test tracing
+      - pnpm --dir sdk/ts build
+      - node --test sdk/ts/packages/sdk/test/tracing.test.mjs
+
+  agent:langsmith:build:
+    desc: Build the isolated Vercel AI SDK / LangSmith demo agent
+    cmds:
+      - pnpm --dir sdk/ts --filter @trytilde/sdk build
+      - pnpm --dir sdk/ts/langsmith-agent exec tsc -p tsconfig.json
+
+  agent:langsmith:
+    desc: Generate a recipe trace in LangSmith using the OpenAI key from SOPS
+    dotenv: [".env.langsmith"]
+    cmds:
+      - task: agent:langsmith:build
+      - python3 scripts/run-langsmith-agent.py
+
+  agent:langsmith:serve:
+    desc: Host the LangSmith demo as a Tilde ConnectRPC agent on port 3002
+    dotenv: [".env.langsmith"]
+    cmds:
+      - task: agent:langsmith:build
+      - python3 scripts/run-langsmith-agent.py --serve

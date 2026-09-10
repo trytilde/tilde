@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT thread_id,participant_id FROM chat_typing WHERE expires_at<=NOW() ORDER BY thread_id,participant_id LIMIT 100;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "d9bcc60c2c3d08edf657b5928edb16f1e0389178d286452483b2823189c81ee0"
+}

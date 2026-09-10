@@ -1,0 +1,47 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+message Agent {
+  string id = 1;
+  string name = 2;
+  reserved 3;
+  reserved "description";
+  optional string endpoint_url = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  reserved 7;
+  reserved "secret_names";
+  AgentMetrics metrics = 8;
+  Capabilities capabilities = 9;
+}
+
+message AgentMetrics {
+  AgentHealthStatus health = 1;
+  repeated AgentHealthHour health_history = 2;
+  uint64 thread_count = 3;
+  optional double average_turns_per_thread = 4;
+  optional double average_response_ms = 5;
+  google.protobuf.Timestamp last_health_check_at = 6;
+}
+
+enum AgentHealthStatus {
+  AGENT_HEALTH_STATUS_UNSPECIFIED = 0;
+  AGENT_HEALTH_STATUS_HEALTHY = 1;
+  AGENT_HEALTH_STATUS_UNHEALTHY = 2;
+  AGENT_HEALTH_STATUS_UNKNOWN = 3;
+}
+
+message AgentHealthHour {
+  google.protobuf.Timestamp hour_start = 1;
+  uint32 total_checks = 2;
+  uint32 failed_checks = 3;
+}
+
+message Capabilities { map<string, CapabilityScope> grants = 1; }
+
+message CapabilityScope {
+  // none, any, or only. IDs are supported only for target-scoped actions.
+  string mode = 1;
+  repeated string ids = 2;
+}

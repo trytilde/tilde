@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH removed_draft AS (DELETE FROM connection_setup_drafts WHERE setup_id=$1)\nDELETE FROM connection_setup_values WHERE setup_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2993eec29285ce153d6cddd7c47506d4ce06e67f9fa057dd4950f8353a96ccf1"
+}

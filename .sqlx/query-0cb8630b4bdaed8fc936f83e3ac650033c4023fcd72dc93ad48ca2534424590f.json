@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_threads(id,title,primary_agent_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0cb8630b4bdaed8fc936f83e3ac650033c4023fcd72dc93ad48ca2534424590f"
+}

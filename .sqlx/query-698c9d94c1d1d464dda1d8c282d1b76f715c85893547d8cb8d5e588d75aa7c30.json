@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_setups SET provider_redirect_url=$3 WHERE id=$1 AND action_id=$2 AND claimed_at IS NOT NULL AND step NOT IN ('complete','failed','cancelled');\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "698c9d94c1d1d464dda1d8c282d1b76f715c85893547d8cb8d5e588d75aa7c30"
+}

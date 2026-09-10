@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_setups SET step='cancelled',claimed_at=NULL,updated_at=now()\nWHERE id=$1 AND step NOT IN ('complete','failed','cancelled');\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1dbd3da40ec19852442e467def9ed7ada8e91a948d07b75bcea78034c686bf92"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT field_key,encrypted_value FROM connection_setup_drafts WHERE setup_id=$1 ORDER BY field_key;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "field_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "encrypted_value",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "1b21c0f30e2016bd06e1c635cbe2f77405c06fb779b2485f003e57ee988113fc"
+}

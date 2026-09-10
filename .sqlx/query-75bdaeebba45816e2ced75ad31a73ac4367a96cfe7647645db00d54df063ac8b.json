@@ -1,0 +1,118 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema FROM connection_types WHERE provider_id=$1 ORDER BY type_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "type_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "driver",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "channel_capable",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "authorization_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "token_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "client_auth",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "pkce",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "scopes",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 10,
+        "name": "scope_separator",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "access_token_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "refresh_token_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "expires_in_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "scope_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "success_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "credential_schema",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "75bdaeebba45816e2ced75ad31a73ac4367a96cfe7647645db00d54df063ac8b"
+}

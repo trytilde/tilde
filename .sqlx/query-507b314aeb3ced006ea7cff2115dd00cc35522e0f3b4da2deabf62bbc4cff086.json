@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id,p.active,p.user_id,p.agent_id,COALESCE(u.name,a.name) AS \"name!\" FROM chat_participants p LEFT JOIN chat_users u ON u.id=p.user_id LEFT JOIN agents a ON a.id=p.agent_id WHERE p.thread_id=$1 AND p.id=$2;\n\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "name!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      null
+    ]
+  },
+  "hash": "507b314aeb3ced006ea7cff2115dd00cc35522e0f3b4da2deabf62bbc4cff086"
+}

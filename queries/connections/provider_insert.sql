@@ -1,0 +1,2 @@
+INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories;

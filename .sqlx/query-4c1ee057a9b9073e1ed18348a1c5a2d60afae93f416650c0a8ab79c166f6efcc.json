@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.id,t.title,t.status,t.goal_id,t.blocked_reason,ARRAY(SELECT dependency_id FROM chat_task_dependencies WHERE task_id=t.id ORDER BY dependency_id) AS \"dependencies!\" FROM chat_tasks t WHERE thread_id=$1 AND agent_id=$2 AND id=$3;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "goal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "blocked_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "dependencies!",
+        "type_info": "UuidArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "4c1ee057a9b9073e1ed18348a1c5a2d60afae93f416650c0a8ab79c166f6efcc"
+}

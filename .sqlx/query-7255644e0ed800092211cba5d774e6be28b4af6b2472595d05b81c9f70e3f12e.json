@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_inputs SET invocation_id=$2 WHERE invocation_id=$1 AND NOT accepted;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7255644e0ed800092211cba5d774e6be28b4af6b2472595d05b81c9f70e3f12e"
+}

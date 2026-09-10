@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Serialize first-time key creation across server processes.\nSELECT pg_advisory_xact_lock($1) AS \"locked!: ()\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locked!: ()",
+        "type_info": "Void"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c528e0d11c08c7119c7914fd05784623ead5bdff799c850c3c1e440b2b65c213"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_participants SET active=$3 WHERE thread_id=$1 AND id=$2 AND active<>$3;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ed0717ab5c6fa12c509c20e33b3327ba2c0991ba891745fa45c1b176dc4c6d8"
+}

@@ -1,0 +1,1 @@
+SELECT r.id,r.thread_id,r.agent_id,r.objective,r.status,r.goal_id,i.id AS invocation_id,i.status AS invocation_status FROM chat_runs r JOIN chat_invocations i ON i.run_id=r.id WHERE r.id=$1 ORDER BY i.started_at DESC NULLS FIRST LIMIT 1;

@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Internal retry check: ciphertext is never part of an Agent response.\nSELECT id, name, endpoint_url, created_at, updated_at, capabilities AS \"capabilities!: Json<Capabilities>\", webhook_signing_key FROM agents WHERE id = $1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "webhook_signing_key",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c89d67ef451fe7f991ee0051e8728d915207bef051155a953babdac5f22c3960"
+}

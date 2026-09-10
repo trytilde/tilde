@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- One poller per database; rollback releases this lock even during cancellation.\nSELECT pg_try_advisory_xact_lock(6073477207316124756) AS \"acquired!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "acquired!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a8cfff61f1d479e2e5848e193321751cddd6e76785d57e06c8b6487a856ae214"
+}

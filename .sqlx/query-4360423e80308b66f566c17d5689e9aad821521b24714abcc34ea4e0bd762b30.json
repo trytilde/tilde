@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories) VALUES($1,$2,$3,$4,$5,$6,$7,$8)\nON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bytea",
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4360423e80308b66f566c17d5689e9aad821521b24714abcc34ea4e0bd762b30"
+}

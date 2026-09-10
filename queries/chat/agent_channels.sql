@@ -1,0 +1,1 @@
+SELECT c.id,c.name,c.provider_id,c.type_id,c.account_label FROM connection_agents ca JOIN connections c ON c.id=ca.connection_id WHERE ca.agent_id=$1 AND ca.capability='channel' AND c.status='ready' ORDER BY c.id;

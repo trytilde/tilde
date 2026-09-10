@@ -1,0 +1,32 @@
+name: Changie
+on:
+  push:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  changeset:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Require a new fragment
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: scripts/check-changie.sh "$BASE_REF"
+      - run: python3 scripts/check-versions.py
+      - uses: miniscruff/changie-action@v3
+        with:
+          version: v1.24.0
+          args: batch major --dry-run
+      - name: Check generated changelog and manifest replacements
+        run: |
+          changie merge
+          git diff --exit-code -- CHANGELOG.md VERSION Cargo.toml sdk/ts/packages

@@ -1,0 +1,1 @@
+UPDATE chat_messages m SET status='aborted' WHERE m.status='streaming' AND (m.stream_expires_at<NOW() OR EXISTS(SELECT 1 FROM chat_invocations i WHERE i.id=m.invocation_id AND i.status IN ('stopped','failed','canceled'))) RETURNING m.id,m.thread_id;

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM connection_types WHERE provider_id=$1 AND NOT(type_id=ANY($2));\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b5ff1a8978b750e70d1c3126cf22740f33db56b838f91e88fddab4be5de348b5"
+}

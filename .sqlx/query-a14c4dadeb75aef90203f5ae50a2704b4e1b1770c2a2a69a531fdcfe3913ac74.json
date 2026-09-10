@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_tasks t SET status=$4,blocked_reason=$5 WHERE thread_id=$1 AND agent_id=$2 AND id=$3 AND (status IN ('pending','working','blocked') OR status=$4) RETURNING t.id,t.title,t.status,t.goal_id,t.blocked_reason,ARRAY(SELECT dependency_id FROM chat_task_dependencies WHERE task_id=t.id ORDER BY dependency_id) AS \"dependencies!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "goal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "blocked_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "dependencies!",
+        "type_info": "UuidArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "a14c4dadeb75aef90203f5ae50a2704b4e1b1770c2a2a69a531fdcfe3913ac74"
+}

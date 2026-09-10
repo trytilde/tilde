@@ -1,0 +1,1 @@
+SELECT id FROM agents WHERE id=$1 FOR KEY SHARE;

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT capabilities AS \"capabilities!: Json<Capabilities>\" FROM agents WHERE id=$1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5c9d30f296feb611965fa708e08cda63b1a935533e0f33dd9c98fa18b16fa4d7"
+}

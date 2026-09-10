@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.connection_id AS \"connection_id?\",d.external_message_id AS \"external_message_id?\",d.destination AS \"destination?\",d.status AS \"delivery_status?\",m.id,m.thread_id,m.participant_id,m.text,m.status,m.in_reply_to_message_id,m.created_at,m.format,m.subject,m.invocation_id,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',a.id,'thread_id',a.thread_id,'filename',a.filename,'media_type',a.media_type,'size_bytes',a.size_bytes,'sha256',a.sha256) ORDER BY a.id) FROM chat_message_attachments ma JOIN chat_attachments a ON a.id=ma.attachment_id WHERE ma.message_id=m.id),'[]'::jsonb) AS \"attachments!: AttachmentRecords\",ARRAY(SELECT participant_id FROM chat_message_targets WHERE message_id=m.id ORDER BY participant_id) AS \"targets!\" FROM chat_messages m LEFT JOIN chat_message_deliveries d ON d.message_id=m.id WHERE m.thread_id=$1 ORDER BY m.created_at DESC,m.id DESC LIMIT $2;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "connection_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_message_id?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "destination?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "delivery_status?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "in_reply_to_message_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "format",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "subject",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "invocation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 14,
+        "name": "attachments!: AttachmentRecords",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 15,
+        "name": "targets!",
+        "type_info": "UuidArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "ba4883332e013ec79304cccd2054fb6e56966103ff89e2642c113c0889d2bec1"
+}

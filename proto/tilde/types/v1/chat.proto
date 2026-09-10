@@ -1,0 +1,50 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+message User { string id = 1; string name = 2; }
+
+message Participant { string id = 1; string name = 2; optional string user_id = 3; optional string agent_id = 4; bool active = 5; }
+
+message ParticipantRef { optional string user_id = 1; optional string agent_id = 2; }
+
+message Thread { string id = 1; string title = 2; string primary_agent_id = 3; repeated Participant participants = 4; ChannelBinding channel = 5; }
+
+message Message { string id = 1; string thread_id = 2; string participant_id = 3; string text = 4; string status = 5; repeated string addressed_participant_ids = 6; optional string in_reply_to_message_id = 7; repeated Attachment attachments = 8; google.protobuf.Timestamp created_at = 9; reserved 10; string format = 11; MessageDelivery delivery = 12; optional string subject = 13; }
+
+message Run { string id = 1; string thread_id = 2; string agent_id = 3; string objective = 4; string status = 5; string invocation_id = 6; string invocation_status = 7; optional string goal_id = 8; }
+
+message Goal { string id = 1; string objective = 2; string status = 3; }
+
+message Task { string id = 1; string title = 2; string status = 3; optional string goal_id = 4; repeated string dependency_ids = 5; string blocked_reason = 6; }
+
+message ToolDefinition {
+  string name = 1;
+  string provider_id = 2;
+  string description = 3;
+  string input_schema_json = 4;
+  // Empty when this tool does not accept incremental input.
+  string chunk_schema_json = 5;
+}
+
+message Typing { string participant_id = 1; bool typing = 2; google.protobuf.Timestamp expires_at = 3; }
+
+message Attachment { string id = 1; string thread_id = 2; string filename = 3; string media_type = 4; int64 size_bytes = 5; string sha256 = 6; }
+
+message ToolCall {
+ string id = 1; string name = 2; string provider_id = 3; string status = 4;
+ string input_json = 5 [debug_redact = true]; string output_json = 6 [debug_redact = true];
+ string error = 7; string input_delta = 8 [debug_redact = true];
+}
+
+message ChannelBinding { string connection_id = 1; string provider_id = 2; string external_id = 3; }
+
+message MessageDelivery { string connection_id = 1; string external_message_id = 2; string destination = 3; string status = 4; }
+
+message MessageChunk { string message_id = 1; string text_delta = 2; }
+
+message Activity {
+ int64 sequence = 1; string kind = 2; string entity_id = 3; string text_delta = 4;
+ google.protobuf.Timestamp created_at = 5; string participant_id = 6; string invocation_id = 7;
+ oneof detail { Message message = 8; Participant participant = 9; Typing typing = 10; ToolCall tool_call = 11; MessageChunk message_chunk = 12; }
+}

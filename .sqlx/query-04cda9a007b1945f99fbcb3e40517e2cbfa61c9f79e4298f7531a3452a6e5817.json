@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connections SET status='failed',updated_at=now() WHERE id=$1 AND status<>'ready' AND status<>'disconnected';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "04cda9a007b1945f99fbcb3e40517e2cbfa61c9f79e4298f7531a3452a6e5817"
+}

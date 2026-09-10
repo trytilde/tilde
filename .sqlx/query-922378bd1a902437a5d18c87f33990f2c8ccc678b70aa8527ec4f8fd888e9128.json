@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_invocations SET lease_expires_at=NOW()+INTERVAL '30 seconds' WHERE id=$1 AND status='running';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "922378bd1a902437a5d18c87f33990f2c8ccc678b70aa8527ec4f8fd888e9128"
+}

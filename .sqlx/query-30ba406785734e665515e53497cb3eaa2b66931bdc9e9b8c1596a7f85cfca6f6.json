@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM iam_oidc_states WHERE state_hash=$1 AND browser_hash=$2 AND expires_at>NOW() RETURNING id,nonce,verifier;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "nonce",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "verifier",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "30ba406785734e665515e53497cb3eaa2b66931bdc9e9b8c1596a7f85cfca6f6"
+}

@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::exporters::awsemf::AwsEmfPayload;
+use crate::topology::payload::MessageMetadata;
+use bytes::Bytes;
+use flate2::Compression;
+use flate2::bufread::GzEncoder;
+use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
+use http::{HeaderMap, HeaderValue, Method, Request, Uri};
+use http_body_util::Full;
+use serde_json::json;
+use std::error::Error;
+use std::io::Read;
+use tower::BoxError;
+
+use super::event::{Event, EventBatch};
+
+fn build_url(endpoint: &url::Url, path: &str) -> url::Url {
+    endpoint.join(path).unwrap()
+}
+
+#[derive(Clone)]
+pub struct AwsEmfRequestBuilder {
+    base_headers: HeaderMap,
+    uri: Uri,
+    log_group_name: String,
+    log_stream_name: String,
+}
+
+impl AwsEmfRequestBuilder {
+    pub fn new(
+        endpoint: String,
+        log_group_name: String,
+        log_stream_name: String,
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        let uri: url::Url = match endpoint.parse() {
+            Ok(u) => u,
+            Err(e) => return Err(format!("failed to parse endpoint {}: {}", endpoint, e).into()),
+        };
+
+        let logs_url = build_url(&uri, "/");
+        let uri: Uri = logs_url.to_string().parse()?;
+        let mut base_headers = HeaderMap::new();
+        base_headers.insert(CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+        base_headers.insert(
+            "X-Amz-Target",
+            HeaderValue::from_static("Logs_20140328.PutLogEvents"),
+        );
+        base_headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/x-amz-json-1.1"),
+        );
+
+        let s = Self {
+            uri,
+            base_headers,
+            log_group_name,
+            log_stream_name,
+        };
+        Ok(s)
+    }
+
+    pub fn build(
+        &self,
+        events: Vec<Event>,
+        mut metadata: Option<Vec<MessageMetadata>>,
+    ) -> Result<Vec<Request<AwsEmfPayload>>, BoxError> {
+        if events.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut events = events;
+        // CW requires events are in sorted timestamp order. We don't implement Ord because
+        // the sorting only applies for this use case of submitting to Cloudwatch
+        events.sort_by(|a, b| a.timestamp_ms.cmp(&b.timestamp_ms));
+
+        let mut batches = Vec::new();
+        let mut curr_batch = EventBatch::new();
+        for evt in events {
+            if let Some(e) = curr_batch.add_event(evt) {
+                // Event didn't fit, start new batch
+                batches.push(curr_batch);
+
+                curr_batch = EventBatch::new();
+                curr_batch.add_event(e);
+            }
+        }
+        batches.push(curr_batch);
+
+        let mut reqs = Vec::with_capacity(batches.len());
+        let total_batches = batches.len();
+
+        for (idx, batch) in batches.into_iter().enumerate() {
+            let data = json!({
+                "logGroupName": self.log_group_name,
+                "logStreamName": self.log_stream_name,
+                "logEvents": batch.get_events(),
+            })
+            .to_string();
+
+            let data = Bytes::from(data.into_bytes());
+
+            let mut gz_vec = Vec::new();
+            let mut gz = GzEncoder::new(&data[..], Compression::default());
+            gz.read_to_end(&mut gz_vec).unwrap();
+
+            let body = Bytes::from(gz_vec);
+
+            let mut req_builder = Request::builder()
+                .uri(self.uri.clone())
+                .method(Method::POST);
+
+            let builder_headers = req_builder.headers_mut().unwrap();
+            for (k, v) in self.base_headers.iter() {
+                builder_headers.insert(k, v.clone());
+            }
+
+            let req = req_builder.body(Full::from(body));
+
+            match req {
+                Ok(request) => {
+                    // Proper metadata assignment for reference counting:
+                    // - Single batch: take metadata (no cloning needed)
+                    // - Multiple batches: clone for all except last, take for last
+                    let batch_metadata = if idx == total_batches - 1 {
+                        // Last batch: take original metadata so ref count can reach 0
+                        metadata.take()
+                    } else {
+                        // Earlier batches: clone metadata (increments ref count)
+                        metadata.clone()
+                    };
+
+                    // Decompose the request to get parts and body
+                    let (parts, body) = request.into_parts();
+
+                    // Create MessagePayload with just the body
+                    let payload = AwsEmfPayload::new(body, batch_metadata);
+
+                    // Reconstruct request with the payload as the body
+                    let wrapped_request = Request::from_parts(parts, payload);
+
+                    reqs.push(wrapped_request);
+                }
+                Err(e) => return Err(Box::new(e)),
+            }
+        }
+
+        Ok(reqs)
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_task_dependencies(thread_id,agent_id,task_id,dependency_id) VALUES($1,$2,$3,$4);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55eb8b6dd880bc2445ce6482368a40d68cc83839e7989879a9bf6a0533f9e523"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_setups(id,connection_id,step,action_id,connection_setup_token,connection_setup_token_hash,callback_token,callback_hash,expires_at) VALUES($1,$2,'fields',$3,$4,$5,$6,$7,now()+interval '10 minutes');\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6495c40fab2a151fcd1b20d0a7cd2070906e47e826886409fd26661b29593966"
+}

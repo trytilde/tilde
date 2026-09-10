@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_typing(thread_id,participant_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '10 seconds') ON CONFLICT(thread_id,participant_id) DO UPDATE SET expires_at=EXCLUDED.expires_at RETURNING expires_at;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6130905e2f0833fe56ca9cbbe6c9c00fa2e9f3711085833c246cf71e40b62a8f"
+}

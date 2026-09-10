@@ -1,0 +1,1 @@
+UPDATE chat_tasks t SET status=$4,blocked_reason=$5 WHERE thread_id=$1 AND agent_id=$2 AND id=$3 AND (status IN ('pending','working','blocked') OR status=$4) RETURNING t.id,t.title,t.status,t.goal_id,t.blocked_reason,ARRAY(SELECT dependency_id FROM chat_task_dependencies WHERE task_id=t.id ORDER BY dependency_id) AS "dependencies!";

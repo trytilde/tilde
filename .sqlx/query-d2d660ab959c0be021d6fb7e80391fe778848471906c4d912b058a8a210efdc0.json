@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_messages SET text=text || $2,stream_expires_at=NOW()+INTERVAL '30 seconds' WHERE id=$1 AND status='streaming';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d2d660ab959c0be021d6fb7e80391fe778848471906c4d912b058a8a210efdc0"
+}

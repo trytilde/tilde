@@ -1,0 +1,3 @@
+# Ordinary builds use checked-in query metadata. `cargo sqlx prepare` refreshes it.
+[env]
+SQLX_OFFLINE = "true"

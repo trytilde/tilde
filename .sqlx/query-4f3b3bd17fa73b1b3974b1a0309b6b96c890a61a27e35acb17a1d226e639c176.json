@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "TextArray",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4f3b3bd17fa73b1b3974b1a0309b6b96c890a61a27e35acb17a1d226e639c176"
+}

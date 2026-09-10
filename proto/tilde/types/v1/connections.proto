@@ -1,0 +1,71 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; }
+
+enum ClientAuthentication { CLIENT_AUTHENTICATION_UNSPECIFIED = 0; CLIENT_AUTHENTICATION_BODY = 1; CLIENT_AUTHENTICATION_BASIC = 2; CLIENT_AUTHENTICATION_NONE = 3; }
+
+message Parameter { string name = 1; string value = 2; }
+
+message OAuthResultField { string key = 1; string path = 2; bool required = 3; }
+
+message OAuthConfiguration {
+  optional string authorization_url = 1;
+  string token_url = 2;
+  ClientAuthentication client_authentication = 3;
+  bool pkce = 4;
+  repeated string scopes = 5;
+  string scope_separator = 6;
+  repeated Parameter authorization_parameters = 7;
+  repeated Parameter token_parameters = 8;
+  string access_token_path = 9;
+  string refresh_token_path = 10;
+  string expires_in_path = 11;
+  string scope_path = 12;
+  optional string success_path = 13;
+  repeated OAuthResultField result_fields = 14;
+}
+
+message ConnectionType {
+ string id = 1; string name = 2; repeated Capability capabilities = 4;
+ reserved 3,5,6;
+ oneof credential_source {
+  StaticCredentialSource static = 7;
+  OAuthCredentialSource oauth = 13;
+  CustomCredentialSource custom = 14;
+ }
+ reserved 8,9,10,11,12;
+}
+
+message StaticCredentialSource { reserved 1; string schema_json = 2; }
+
+enum OAuthGrant { O_AUTH_GRANT_UNSPECIFIED = 0; O_AUTH_GRANT_AUTHORIZATION_CODE = 1; O_AUTH_GRANT_CLIENT_CREDENTIALS = 2; O_AUTH_GRANT_JWT_BEARER = 3; }
+
+message OAuthCredentialSource { reserved 1; OAuthConfiguration configuration = 2; OAuthGrant grant = 3; optional string additional_schema_json = 4; }
+
+message CustomCredentialSource {}
+
+message Provider {
+ string id = 1; string name = 3; repeated ConnectionType connection_types = 5; repeated string categories = 10;
+ reserved 2,4,6;
+ oneof kind { BuiltInProvider built_in = 7; ConfiguredProvider configured = 8; RemoteProvider remote = 9; }
+}
+
+message BuiltInProvider {}
+
+message ConfiguredProvider {}
+
+message Connection {
+  string id = 1; string name = 2; string provider_id = 3; reserved 4; string type_id = 5;
+  string status = 6; optional string account_label = 7; repeated Capability capabilities = 8;
+  google.protobuf.Timestamp created_at = 9; google.protobuf.Timestamp updated_at = 10; repeated AssociatedAgent associated_agents = 11; optional string webhook_url = 12;
+}
+
+message InputField { string key = 1; string value = 2 [debug_redact = true]; }
+
+message RemoteProvider { string endpoint = 1; optional string ui_url = 2; }
+
+message CapabilityAssignment { Capability capability = 1; string agent_id = 2; }
+
+message AssociatedAgent { Capability capability = 1; string id = 2; string name = 3; optional string endpoint_url = 4; }

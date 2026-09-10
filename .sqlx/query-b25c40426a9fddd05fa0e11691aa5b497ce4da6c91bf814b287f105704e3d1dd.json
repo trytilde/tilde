@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id AS participant_id FROM chat_invocations i JOIN chat_participants p ON p.thread_id=i.thread_id AND p.agent_id=i.agent_id WHERE i.id=$1 AND p.active AND i.status='running' AND i.lease_expires_at>NOW();\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b25c40426a9fddd05fa0e11691aa5b497ce4da6c91bf814b287f105704e3d1dd"
+}

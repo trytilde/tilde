@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_attachments SET content=$2,size_bytes=$3,sha256=$4 WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d71cdb0e94890880deee970115284387c7e4e528bc5ed48d11fd48b9bc869b6e"
+}

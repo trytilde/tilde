@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_message_targets(message_id,participant_id) SELECT $1,id FROM chat_participants WHERE thread_id=$2 AND id=$3 AND active;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4995cc5176f600c43d8e6104235c03dbb801bc51199e9391d7d0b0a6fafbd687"
+}

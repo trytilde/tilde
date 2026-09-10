@@ -1,0 +1,56 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/connections.proto";
+
+service ConnectionsService {
+  rpc ListProviders(ListProvidersRequest) returns (ListProvidersResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetProvider(GetProviderRequest) returns (GetProviderResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc RegisterProvider(RegisterProviderRequest) returns (RegisterProviderResponse);
+  rpc StartConnection(StartConnectionRequest) returns (StartConnectionResponse);
+  rpc GetConnection(GetConnectionRequest) returns (GetConnectionResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc AssignCapability(AssignCapabilityRequest) returns (AssignCapabilityResponse);
+  rpc UnassignCapability(UnassignCapabilityRequest) returns (UnassignCapabilityResponse);
+  rpc Reconnect(ReconnectRequest) returns (ReconnectResponse);
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+}
+
+message ListProvidersRequest { uint32 page_size = 1; string page_token = 2; optional string search = 3; }
+
+message ListProvidersResponse { repeated tilde.types.v1.Provider providers = 1; string next_page_token = 2; }
+
+message GetProviderRequest { string id = 1; }
+
+message GetProviderResponse { tilde.types.v1.Provider provider = 1; }
+
+message RegisterProviderRequest { tilde.types.v1.Provider provider = 1; reserved 2; optional string backend_token = 3 [debug_redact = true]; }
+
+message RegisterProviderResponse { tilde.types.v1.Provider provider = 1; }
+
+message StartConnectionRequest { string id = 1; string name = 2; string provider_id = 3; string type_id = 4; repeated tilde.types.v1.CapabilityAssignment assignments = 5; }
+
+message StartConnectionResponse { tilde.types.v1.Connection connection = 1; string brokering_url = 2 [debug_redact = true]; }
+
+message GetConnectionRequest { string id = 1; }
+
+message GetConnectionResponse { tilde.types.v1.Connection connection = 1; }
+
+message ListConnectionsRequest { uint32 page_size = 1; string page_token = 2; optional string agent_id = 3; bool unassigned_channel_only = 4; }
+
+message ListConnectionsResponse { repeated tilde.types.v1.Connection connections = 1; string next_page_token = 2; }
+
+message AssignCapabilityRequest { string connection_id = 1; tilde.types.v1.CapabilityAssignment assignment = 2; }
+
+message AssignCapabilityResponse { tilde.types.v1.Connection connection = 1; }
+
+message UnassignCapabilityRequest { string connection_id = 1; tilde.types.v1.CapabilityAssignment assignment = 2; }
+
+message UnassignCapabilityResponse { tilde.types.v1.Connection connection = 1; }
+
+message ReconnectRequest { string id = 1; }
+
+message ReconnectResponse { tilde.types.v1.Connection connection = 1; string brokering_url = 2 [debug_redact = true]; }
+
+message DisconnectRequest { string id = 1; }
+
+message DisconnectResponse {}

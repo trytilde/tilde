@@ -1,0 +1,2 @@
+@import "../sdk/ts/packages/connection-ui/src/style.css";
+@source "../crates/tilde/src/connections/catalog/**/*.tsx";

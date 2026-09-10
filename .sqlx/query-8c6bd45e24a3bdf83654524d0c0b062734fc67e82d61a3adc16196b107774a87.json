@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO encryption_keys (id, backend, wrapping_key_id, wrap_nonce, wrapped_key)\nVALUES ($1, $2, $3, $4, $5);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c6bd45e24a3bdf83654524d0c0b062734fc67e82d61a3adc16196b107774a87"
+}

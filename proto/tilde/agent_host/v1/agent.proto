@@ -1,0 +1,29 @@
+syntax = "proto3";
+package tilde.agent_host.v1;
+import "tilde/runtime/v1/cache.proto";
+import "tilde/types/v1/chat.proto";
+
+// Implemented by the deployed agent host; Tilde calls these methods using the agent’s signing key.
+
+service AgentService {
+  rpc Invoke(InvokeRequest) returns (stream InvokeResponse);
+  rpc Steer(SteerRequest) returns (SteerResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+  rpc Healthz(HealthzRequest) returns (HealthzResponse);
+}
+
+message InvokeRequest { string invocation_id = 1; string run_id = 2; string thread_id = 3; string agent_id = 4; string objective = 5; string callback_url = 6; string capability = 7 [debug_redact = true]; repeated tilde.types.v1.Message messages = 8; tilde.types.v1.Thread thread = 9;  repeated tilde.runtime.v1.CachedAgentRepresentation cached_messages = 10; }
+
+message InvokeResponse { string reasoning_delta = 1; bool stopped = 2; repeated string pending_input_ids = 3; }
+
+message SteerRequest { string invocation_id = 1; string input_id = 2; string text = 3; tilde.types.v1.Message message = 4; }
+
+message SteerResponse {}
+
+message CancelRequest { string invocation_id = 1; }
+
+message CancelResponse {}
+
+message HealthzRequest {}
+
+message HealthzResponse { bool ready = 1; }

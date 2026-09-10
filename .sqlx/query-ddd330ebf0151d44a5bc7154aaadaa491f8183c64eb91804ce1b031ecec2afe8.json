@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.id,r.thread_id,r.agent_id,r.objective,r.status,r.goal_id,i.id AS invocation_id,i.status AS invocation_status FROM chat_runs r JOIN chat_invocations i ON i.run_id=r.id WHERE r.id=$1 ORDER BY i.started_at DESC NULLS FIRST LIMIT 1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "objective",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "goal_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "invocation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "invocation_status",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ddd330ebf0151d44a5bc7154aaadaa491f8183c64eb91804ce1b031ecec2afe8"
+}

@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: secrets\.enc\.yaml$
+    kms: arn:aws:kms:us-east-1:914788356809:alias/tilde-app-dev-sops

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT NOT EXISTS(SELECT 1 FROM chat_task_dependencies d JOIN chat_tasks t ON t.id=d.dependency_id WHERE d.task_id=$1 AND t.status<>'completed') AS \"ready!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ready!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e32c3c8db44692d5ad185db3241694aafd655f57afafac6f8f267cce6f6e3499"
+}

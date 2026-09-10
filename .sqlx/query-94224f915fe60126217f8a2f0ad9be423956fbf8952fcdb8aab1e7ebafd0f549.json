@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_setups SET step=$2 WHERE id=$1 AND step='fields' AND claimed_at IS NULL;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "94224f915fe60126217f8a2f0ad9be423956fbf8952fcdb8aab1e7ebafd0f549"
+}

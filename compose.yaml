@@ -1,0 +1,62 @@
+services:
+  dex:
+    image: ghcr.io/dexidp/dex:v2.43.1
+    profiles: [dev]
+    environment:
+      DEX_DEV_ISSUER: ${DEX_DEV_ISSUER:-http://127.0.0.1:5556}
+      DEX_DEV_WEB_CALLBACK: ${DEX_DEV_WEB_CALLBACK:-http://127.0.0.1:5173/auth/callback}
+      DEX_DEV_API_CALLBACK: ${DEX_DEV_API_CALLBACK:-http://127.0.0.1:8080/auth/callback}
+      DEX_DEV_PASSWORD_HASH: "$$2a$$10$$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+    command: [dex, serve, /etc/dex/config.yaml]
+    ports:
+      - "${ADDRESS:-127.0.0.1}:5556:5556"
+    volumes:
+      - ./dev/dex.yaml:/etc/dex/config.yaml:ro
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: engine
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: engine
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U engine -d engine"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  engine:
+    build: .
+    command:
+      [
+        "--management-listen",
+        "0.0.0.0:8080",
+        "--agent-runtime-listen",
+        "0.0.0.0:8081",
+        "--allow-network",
+      ]
+    ports:
+      - "127.0.0.1:${ENGINE_PORT:-8080}:8080"
+      - "127.0.0.1:${ENGINE_AGENT_RUNTIME_PORT:-8081}:8081"
+    environment:
+      DATABASE_URL: postgres://engine:${POSTGRES_PASSWORD}@postgres:5432/engine
+      ENGINE_ENCRYPTION_BACKEND: ${ENGINE_ENCRYPTION_BACKEND:-seed}
+      ENGINE_ENCRYPTION_KEY: ${ENGINE_ENCRYPTION_KEY:-}
+      ENGINE_KMS_KEY_ID: ${ENGINE_KMS_KEY_ID:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      ENGINE_MANAGEMENT_ENABLED: ${ENGINE_MANAGEMENT_ENABLED:-true}
+      ENGINE_WEB_ENABLED: ${ENGINE_WEB_ENABLED:-true}
+      ENGINE_MANAGEMENT_PUBLIC_URL: ${ENGINE_MANAGEMENT_PUBLIC_URL:-http://127.0.0.1:8080}
+      ENGINE_AGENT_RUNTIME_PUBLIC_URL: ${ENGINE_AGENT_RUNTIME_PUBLIC_URL:-http://127.0.0.1:8081}
+      ENGINE_OIDC_ISSUER: ${ENGINE_OIDC_ISSUER:-}
+      ENGINE_OIDC_CLIENT_ID: ${ENGINE_OIDC_CLIENT_ID:-}
+      ENGINE_OIDC_CLIENT_SECRET: ${ENGINE_OIDC_CLIENT_SECRET:-}
+      ENGINE_OIDC_ALLOW_HTTP: ${ENGINE_OIDC_ALLOW_HTTP:-false}
+      ENGINE_WEB_ORIGINS: ${ENGINE_WEB_ORIGINS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  postgres-data:

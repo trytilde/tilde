@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM chat_typing WHERE thread_id=$1 AND participant_id=$2 AND expires_at<=NOW();\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "710d2ac18060042d76f17dbb2c1c28c30052bbfa366ddda1c7d82986b66f4c54"
+}

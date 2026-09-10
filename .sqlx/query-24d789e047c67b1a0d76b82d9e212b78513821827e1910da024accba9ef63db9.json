@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agents\nSET name = COALESCE($2, name),\n    endpoint_url = CASE WHEN $3 THEN $4 ELSE endpoint_url END,\n    capabilities = COALESCE($5, capabilities),\n    updated_at = NOW()\nWHERE id = $1\nRETURNING id, name, endpoint_url, created_at, updated_at, capabilities AS \"capabilities!: Json<Capabilities>\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "24d789e047c67b1a0d76b82d9e212b78513821827e1910da024accba9ef63db9"
+}

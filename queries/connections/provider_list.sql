@@ -1,0 +1,1 @@
+SELECT provider_id,name,kind,categories FROM connection_providers WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%') ORDER BY provider_id LIMIT $3;

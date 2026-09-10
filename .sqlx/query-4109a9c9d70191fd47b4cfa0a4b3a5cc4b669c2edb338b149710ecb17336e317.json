@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH states AS (DELETE FROM iam_oidc_states WHERE expires_at<NOW()) DELETE FROM iam_sessions WHERE expires_at<NOW();\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4109a9c9d70191fd47b4cfa0a4b3a5cc4b669c2edb338b149710ecb17336e317"
+}

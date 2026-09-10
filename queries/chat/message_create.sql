@@ -1,0 +1,1 @@
+INSERT INTO chat_messages(id,thread_id,participant_id,text,status,invocation_id,in_reply_to_message_id,stream_expires_at,traceparent,tracestate) VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5='streaming' THEN NOW()+INTERVAL '30 seconds' ELSE NULL END,$8,$9);

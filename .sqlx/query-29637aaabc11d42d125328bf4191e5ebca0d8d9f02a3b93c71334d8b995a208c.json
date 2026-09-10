@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH expired AS (\n    DELETE FROM connection_setups\n    WHERE created_at<=now()-interval '10 minutes' OR expires_at<=now()\n    RETURNING connection_id\n)\nUPDATE connections SET status='failed',updated_at=now()\nWHERE id IN (SELECT connection_id FROM expired)\nAND status NOT IN ('ready','disconnected');\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "29637aaabc11d42d125328bf4191e5ebca0d8d9f02a3b93c71334d8b995a208c"
+}

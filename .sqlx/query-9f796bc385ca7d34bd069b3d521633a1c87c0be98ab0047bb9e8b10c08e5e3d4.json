@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_oauth_result_fields(provider_id,type_id,field_key,json_pointer,required) VALUES($1,$2,$3,$4,$5);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9f796bc385ca7d34bd069b3d521633a1c87c0be98ab0047bb9e8b10c08e5e3d4"
+}

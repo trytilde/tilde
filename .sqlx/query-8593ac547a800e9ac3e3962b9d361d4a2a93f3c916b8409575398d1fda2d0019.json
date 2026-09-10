@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT snapshot FROM chat_activity WHERE thread_id=$1 AND entity_id=$2 AND kind='message.completed' ORDER BY sequence DESC LIMIT 1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "8593ac547a800e9ac3e3962b9d361d4a2a93f3c916b8409575398d1fda2d0019"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_messages SET status=$2 WHERE id=$1 AND status='streaming';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "78933ea8bbefe7d1c9afe26efebc7bbef775c1c298ae97c5b2287ad150fc17f2"
+}

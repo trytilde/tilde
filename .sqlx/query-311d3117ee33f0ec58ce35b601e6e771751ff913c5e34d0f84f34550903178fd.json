@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT expires_at=created_at+interval '10 minutes' AS \"ten_minutes!\" FROM connection_setups WHERE id=$1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ten_minutes!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "311d3117ee33f0ec58ce35b601e6e771751ff913c5e34d0f84f34550903178fd"
+}

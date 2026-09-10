@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_setups SET step=$3,action_id=$4,claimed_at=NULL,error_code=NULL,updated_at=now() WHERE id=$1 AND action_id=$2 AND claimed_at IS NOT NULL RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4bc80b97f6f6d59836da6d60df2c8aadb2a4d8973811cdaced88c7e94b08b196"
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connections(id,name,provider_id,type_id,status) VALUES($1,$2,$3,$4,'requires_action') ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fc439e53645d84b8b5e170018b87926868e9cdcedc581c0a4e38b1e18539f3c5"
+}

@@ -1,0 +1,1 @@
+SELECT kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id FROM connection_providers WHERE provider_id=$1;

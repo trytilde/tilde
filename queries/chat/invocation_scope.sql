@@ -1,0 +1,1 @@
+SELECT p.id AS participant_id FROM chat_invocations i JOIN chat_participants p ON p.thread_id=i.thread_id AND p.agent_id=i.agent_id WHERE i.id=$1 AND p.active AND i.status='running' AND i.lease_expires_at>NOW();

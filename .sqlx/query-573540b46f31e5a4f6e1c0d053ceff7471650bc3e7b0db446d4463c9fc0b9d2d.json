@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id FROM connection_providers WHERE provider_id=$1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "remote_endpoint",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "remote_ui_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "remote_authorization",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "remote_authorization_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "573540b46f31e5a4f6e1c0d053ceff7471650bc3e7b0db446d4463c9fc0b9d2d"
+}

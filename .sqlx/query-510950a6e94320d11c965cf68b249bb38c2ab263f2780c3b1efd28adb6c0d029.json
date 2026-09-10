@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_threads(id,title,primary_agent_id) VALUES($1,$2,$3);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "510950a6e94320d11c965cf68b249bb38c2ab263f2780c3b1efd28adb6c0d029"
+}

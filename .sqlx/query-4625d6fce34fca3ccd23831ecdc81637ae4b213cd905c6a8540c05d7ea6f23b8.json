@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_setups SET created_at=now()-interval '11 minutes' WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4625d6fce34fca3ccd23831ecdc81637ae4b213cd905c6a8540c05d7ea6f23b8"
+}

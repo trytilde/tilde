@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_setup_drafts(setup_id,field_key,encrypted_value) VALUES($1,$2,$3) ON CONFLICT(setup_id,field_key) DO UPDATE SET encrypted_value=excluded.encrypted_value;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0acde94301f4745f18f83c46cb95bfeb839b82cc64159cf5d71ace12187de413"
+}

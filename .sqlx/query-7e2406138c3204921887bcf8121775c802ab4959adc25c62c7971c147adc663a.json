@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_channel_receipts(connection_id,external_id,message_id) VALUES($1,$2,$3);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7e2406138c3204921887bcf8121775c802ab4959adc25c62c7971c147adc663a"
+}

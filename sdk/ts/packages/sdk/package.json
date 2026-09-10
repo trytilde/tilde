@@ -1,0 +1,50 @@
+{
+  "name": "@trytilde/sdk",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./connection-setup": {
+      "types": "./dist/connection-setup.d.ts",
+      "import": "./dist/connection-setup.js"
+    },
+    "./connection-provider": {
+      "types": "./dist/connection-provider.d.ts",
+      "import": "./dist/connection-provider.js"
+    },
+    "./management": {
+      "types": "./dist/management.d.ts",
+      "import": "./dist/management.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./agent-host": {
+      "types": "./dist/agent-host.d.ts",
+      "import": "./dist/agent-host.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-contracts.mjs",
+    "test": "node test/chat.integration.mjs"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.14.1",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-node": "2.2.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.11.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/sdk-trace-node": "^2.11.0"
+  }
+}

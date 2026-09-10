@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id,objective,goal_id FROM chat_runs WHERE thread_id=$1 AND agent_id=$2 AND idempotency_key=$3;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "objective",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "goal_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "cac7c8d0f0dcb6c75dc7e1c22e16c2d7c09c1c82456b11b7bff3b37a9f47e88a"
+}

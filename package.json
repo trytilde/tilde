@@ -1,0 +1,20 @@
+{
+  "name": "tilde-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tools": "node scripts/install-codegen.mjs",
+    "generate": "buf lint && buf generate",
+    "generate:check": "node scripts/check-generated.mjs",
+    "dev": "task dev",
+    "build": "task build",
+    "test:client": "node web/scripts/test-client.mjs"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.72.0",
+    "@bufbuild/protoc-gen-es": "2.14.1",
+    "@types/node": "26.5.0",
+    "vite-plus": "0.3.1"
+  },
+  "packageManager": "pnpm@10.33.1"
+}

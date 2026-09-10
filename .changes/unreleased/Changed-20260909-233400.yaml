@@ -1,0 +1,3 @@
+kind: Changed
+body: Version the Rust binary and TypeScript SDK packages together using Changie.
+time: 2026-09-09T23:34:00.25658226+02:00

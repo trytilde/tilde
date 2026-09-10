@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_threads SET activity_sequence=activity_sequence+1 WHERE id=$1 RETURNING activity_sequence;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "activity_sequence",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "852a644e9a5b1b69d57421b3f91c197410d64e59992d33aca8bf9e44f99d7caf"
+}
