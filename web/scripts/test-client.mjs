@@ -24,6 +24,7 @@ async function start(key = seed) {
   const env = {
     ...process.env,
     ...oidc.env,
+    ENGINE_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
     ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
     DATABASE_URL: database,
     ENGINE_ENCRYPTION_BACKEND: "seed",
@@ -143,6 +144,7 @@ try {
   );
   const minimal = await client(server.url, false).createAgent({
     name: "Minimal agent",
+    endpointUrl: "http://127.0.0.1:3000/agent",
     webhookSigningKey: value,
   });
   assert.match(minimal.agent.id, /^[0-9a-f-]{36}$/);
@@ -168,8 +170,12 @@ try {
       rpc.createAgent({ ...request, webhookSigningKey: randomBytes(32).toString("hex") }),
       (error) => error instanceof ConnectError && error.code === Code.AlreadyExists,
     );
-    const updated = await rpc.updateAgent({ id, name: "Renamed", endpointUrl: "" });
-    assert.equal(updated.agent.endpointUrl, undefined);
+    await assert.rejects(
+      rpc.updateAgent({ id, endpointUrl: "" }),
+      (error) => error instanceof ConnectError && error.code === Code.InvalidArgument,
+    );
+    const updated = await rpc.updateAgent({ id, name: "Renamed" });
+    assert.equal(updated.agent.endpointUrl, request.endpointUrl);
     const read = await rpc.getAgent({ id });
     const json = toJsonString(GetAgentResponseSchema, read);
     assert(!json.includes(value));
@@ -189,7 +195,12 @@ try {
   const rpc = client(server.url, true);
   for (const id of ids) {
     assert.equal((await rpc.getAgent({ id })).agent.name, "Renamed");
-    await rpc.createAgent({ id, name: "Renamed", webhookSigningKey: value });
+    await rpc.createAgent({
+      id,
+      name: "Renamed",
+      endpointUrl: "http://127.0.0.1:3000/agent",
+      webhookSigningKey: value,
+    });
     await rpc.deleteAgent({ id });
     await rpc.deleteAgent({ id });
     await assert.rejects(

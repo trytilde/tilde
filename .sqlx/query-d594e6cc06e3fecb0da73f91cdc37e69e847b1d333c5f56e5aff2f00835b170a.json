@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connection_agents SET access_mode=$3 WHERE connection_id=$1 AND agent_id=$2 AND capability='channel';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d594e6cc06e3fecb0da73f91cdc37e69e847b1d333c5f56e5aff2f00835b170a"
+}

@@ -25,9 +25,11 @@ fn typed_environment_validates_before_initializing_encryption() {
     );
     for (name, value) in [
         ("WEB_PORT", "65536"),
+        ("INGRESS_PORT", "65536"),
         ("API_PORT", "not-a-port"),
         ("ENGINE_ALLOW_NETWORK", "perhaps"),
         ("ENGINE_MANAGEMENT_LISTEN", "invalid"),
+        ("ENGINE_EVENT_INGRESS_LISTEN", "invalid"),
         ("ENGINE_ENCRYPTION_BACKEND", "invalid"),
     ] {
         let mut values = base.clone();
@@ -39,9 +41,18 @@ fn typed_environment_validates_before_initializing_encryption() {
     }
     for (name, value) in [
         ("WEB_PORT", "0"),
+        ("INGRESS_PORT", "0"),
+        ("INGRESS_PORT", "8080"),
+        ("INGRESS_PORT", "5173"),
         ("WEB_PORT", "8080"),
         ("ENGINE_ENCRYPTION_KEY", "private-invalid-key"),
         ("DATABASE_URL", ""),
+        ("ENGINE_EVENT_INGRESS_LISTEN", "127.0.0.1:8080"),
+        ("ENGINE_EVENT_INGRESS_LISTEN", "127.0.0.1:8081"),
+        (
+            "ENGINE_EVENT_INGRESS_PUBLIC_URL",
+            "https://events.example/path",
+        ),
     ] {
         let mut values = base.clone();
         values.insert(name.into(), value.into());

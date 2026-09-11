@@ -1,1 +1,1 @@
-INSERT INTO connection_agents(connection_id,capability,agent_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING;
+INSERT INTO connection_agents(connection_id,capability,agent_id,access_mode) SELECT $1,$2,$3,CASE WHEN provider_id='github' THEN 'disabled' ELSE 'private' END FROM connections WHERE id=$1 ON CONFLICT DO NOTHING;

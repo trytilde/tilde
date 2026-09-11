@@ -459,8 +459,13 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
     let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into());
     let agent_token = chat.tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
     let agents = Agents::new(db.pool.clone(), crypto.clone());
-    let connections =
-        Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()).unwrap();
+    let connections = Connections::new(
+        db.pool.clone(),
+        crypto.clone(),
+        "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     let oidc = Oidc::new(
         db.pool.clone(),
         crypto.clone(),

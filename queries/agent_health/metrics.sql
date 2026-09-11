@@ -1,4 +1,4 @@
-WITH selected AS (SELECT id, endpoint_url FROM agents WHERE id = ANY($1)),
+WITH selected AS (SELECT id, endpoint_url FROM agents WHERE deleted_at IS NULL AND id = ANY($1)),
 sessions AS (
     SELECT p.agent_id, COUNT(*) AS count
     FROM chat_participants p JOIN selected a ON a.id = p.agent_id GROUP BY p.agent_id

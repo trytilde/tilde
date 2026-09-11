@@ -15,7 +15,8 @@
       "@trytilde/connection-ui": ["../sdk/ts/packages/connection-ui/src/index.ts"],
       "react": ["./node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
-      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"]
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
+      "@trytilde/agent-avatar": ["../sdk/ts/packages/agent-avatar/src/agent-avatar.tsx"]
     }
   },
   "include": ["src"]

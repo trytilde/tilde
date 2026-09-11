@@ -31,5 +31,5 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && apt-get clean && useradd --uid 10001 --create-home engine
 COPY --from=rust /src/target/release/tilde /usr/local/bin/tilde
 USER engine
-EXPOSE 8080
+EXPOSE 8080 8081 8082
 ENTRYPOINT ["/usr/local/bin/tilde"]

@@ -275,12 +275,13 @@ See the [chat domain](CONTEXT.md#chat) and the [TypeScript SDK and example agent
 
 ## IAM and API listeners
 
-One Tilde process serves two APIs:
+One Tilde process serves three APIs:
 
 | API | Default bind | Authentication |
 | --- | --- | --- |
 | Management API | `127.0.0.1:8080` | User bearer session from OIDC |
 | Agent runtime API | `127.0.0.1:8081` | Signed invocation connect token |
+| Event ingress API | `127.0.0.1:8082` | Provider webhook signatures |
 
 Every user admitted by the configured OIDC provider has unrestricted management
 access. There is no role model or API-key support. Configure the provider's login
@@ -296,7 +297,7 @@ The initial OIDC implementation validates RS256 ID tokens.
 Use `ENGINE_MANAGEMENT_LISTEN` / `--management-listen` and
 `ENGINE_AGENT_RUNTIME_LISTEN` / `--agent-runtime-listen` for bind addresses.
 `ENGINE_AGENT_RUNTIME_PUBLIC_URL` must be reachable by agent servers and is the
-callback URL delivered on invocation. Both listeners require `--allow-network`
+callback URL delivered on invocation. All listeners require `--allow-network`
 when binding outside loopback. These names replace `ENGINE_LISTEN`,
 `ENGINE_PUBLIC_URL` and `--listen`.
 
@@ -322,28 +323,28 @@ To start only Dex manually: `POSTGRES_PASSWORD=unused-local-dev docker compose
 
 ### Agent capabilities
 
-Create/update agents with a `capabilities.grants` map, or use the registry editor:
+Create/update agents with typed `capabilities` fields, or use the registry editor:
 
 ```json
 {
-  "grants": {
-    "tools.invoke": {"mode": "only", "ids": ["sendMessage"]},
-    "work.read": {"mode": "any"},
-    "work.write": {"mode": "any"},
-    "run.update": {"mode": "any"},
-    "agents.invoke": {"mode": "only", "ids": ["TARGET-AGENT-UUID"]}
-  }
+  "toolsInvoke": {"mode": "TARGET_SELECTION_SELECTED", "ids": ["sendMessage"]},
+  "workRead": "BINARY_PERMISSION_YES",
+  "workWrite": "BINARY_PERMISSION_YES",
+  "runUpdate": "BINARY_PERMISSION_YES",
+  "agentsInvoke": {"mode": "TARGET_SELECTION_SELECTED", "ids": ["TARGET-AGENT-UUID"]}
 }
 ```
 
-Missing grants deny. Valid names are `agents.read`, `agents.create`,
-`agents.update`, `agents.delete`, `agents.invoke`, `agents.grant_capabilities`,
-`thread.read`, `work.read`, `work.write`, `run.update`, and `tools.invoke`.
-Agent targets use UUIDs; tool targets use catalog names. `agents.create`,
-`thread.read`, `work.read`, `work.write` and `run.update` support `none`/`any`
-only; thread and work operations remain restricted to the invocation scope.
-Omitting capabilities on update preserves them; supplying an empty grants map
-clears them. Grants cannot exceed the grantor's invocation authority.
+`agentsCreate`, `threadRead`, `workRead`, `workWrite` and `runUpdate` use the
+`BinaryPermission` enum (`NO` or `YES`). The other capability fields use
+`TargetPermission`, with `TargetSelection.NONE`, `ALL`, or `SELECTED` and IDs
+only for `SELECTED`. Agent targets use UUIDs; tool targets use catalog names.
+Missing fields deny. Omitting capabilities on update preserves them; an empty
+capabilities message clears them. Grants cannot exceed the grantor's authority.
+The edit screen saves toggle changes immediately and agent selections on modal
+confirmation. Tool-name edits save on blur or Enter. Failed saves restore the last
+saved setting and display an error; creation submits its initial permissions with
+the registration request.
 
 Connect tokens expire after 15 minutes. The SDK renews them every five minutes
 while the invocation is active, retaining or narrowing its original authority.
@@ -391,6 +392,38 @@ stops all processes.
 Postgres shell wrapper owns temporary database allocation and cleanup. JavaScript
 scripts remain for code-generator installation, generated-file verification and
 protocol/process integration tests.
+
+### Local provider webhooks with ngrok
+
+Install the [ngrok CLI](https://ngrok.com/download), then add to `.env.local`:
+
+```dotenv
+NGROK_ENABLED=true
+NGROK_DOMAIN=your-domain.ngrok-free.app
+NGROK_AUTHTOKEN=your-token
+```
+
+`task secrets:load` also loads `ngrok_authtoken` from SOPS into the private dev
+dotenv file. Run `task dev`; ngrok forwards only to event ingress at
+`ADDRESS:INGRESS_PORT` (default port `8082`). The launcher sets
+`ENGINE_EVENT_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any configured
+ingress public URL while ngrok is enabled. This also updates the webhook URLs
+displayed and copied in connection setup iframes. The dashboard, setup UI and OAuth redirects remain
+on management; ngrok never forwards to management or the agent runtime API.
+
+All connection webhook URLs and provider manifests use the event ingress origin.
+Existing provider webhook registrations must be updated to the new URL shown on
+the connection; starting the listener does not rewrite provider registrations.
+`/connections/webhooks/{connection_id}` is served only on event ingress, which
+remains active when management and web are disabled. Deployments can expose this
+listener while keeping management private. Configure its bind with
+`ENGINE_EVENT_INGRESS_LISTEN` or `--event-ingress-listen`, and its externally
+reachable origin with `ENGINE_EVENT_INGRESS_PUBLIC_URL`.
+
+Ngrok is disabled by default and belongs only to Task's dev launcher; the packaged
+Rust server never starts it. It stops with Ctrl+C or a dev service failure.
+`task dev:ngrok` can attach a dev tunnel separately; the running API must already
+use the matching event ingress public URL and port.
 
 ### Development over Tailscale
 
@@ -446,3 +479,10 @@ Final agent uploads remain authorized for five minutes after invocation end.
 
 See [tracing implementation](crates/tilde/src/tracing/README.md) for queue limits,
 authentication and delivery semantics. Postgres trace storage is a separate follow-up.
+
+Agent creation requires an HTTP(S) endpoint. Custom avatar uploads use the `ENGINE_S3_*`
+settings in `.env.example`; `task dev` starts MinIO and creates the private avatar bucket.
+`task dev:s3` starts only storage, and `task test:avatars` checks real S3 upload/read/replace.
+When setting `ADDRESS` for Tailscale, `task dev` uses that address for signed avatar URLs.
+For other deployments, set `ENGINE_S3_PUBLIC_ENDPOINT` if the browser-facing storage URL
+is different from `ENGINE_S3_ENDPOINT`; Docker Compose also accepts `ENGINE_S3_CONTAINER_ENDPOINT`.

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_identity_verifications SET status=$2 WHERE id=$1 AND status='pending';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f0d3a21366762cdd596b15e4db3ca3ea085cc3966b02ac0f773664983c0f55f4"
+}

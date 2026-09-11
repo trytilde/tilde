@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, endpoint_url AS \"endpoint_url!\", webhook_signing_key\nFROM agents WHERE deleted_at IS NULL AND endpoint_url IS NOT NULL ORDER BY id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "endpoint_url!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "webhook_signing_key",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "2039e757beb38021470b3e7df8a9f924d2fd561794f36e7f43c4e5dafe0df646"
+}

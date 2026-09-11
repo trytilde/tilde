@@ -64,3 +64,12 @@ export function finishLogin(): Promise<void> {
     history.replaceState(null, "", "/");
   })());
 }
+
+/** Revoke the server session before clearing local credentials and notifying the auth boundary. */
+export async function logout() {
+  const response = await fetch("/auth/logout", { method: "POST", headers: authHeaders() });
+  if (!response.ok && response.status !== 401)
+    throw new Error("Unable to sign out. Please try again.");
+  clearAccessToken();
+  window.dispatchEvent(new Event("tilde.signed-out"));
+}

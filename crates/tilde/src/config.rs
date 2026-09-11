@@ -45,6 +45,18 @@ impl FromStr for WebOrigins {
 /// One typed environment schema. Never derive Debug or serialize this configuration.
 #[derive(Envconfig)]
 pub struct Config {
+    #[envconfig(from = "ENGINE_S3_BUCKET")]
+    pub s3_bucket: Option<String>,
+    #[envconfig(from = "ENGINE_S3_REGION", default = "us-east-1")]
+    pub s3_region: String,
+    #[envconfig(from = "ENGINE_S3_ENDPOINT")]
+    pub s3_endpoint: Option<String>,
+    #[envconfig(from = "ENGINE_S3_PUBLIC_ENDPOINT")]
+    pub s3_public_endpoint: Option<String>,
+    #[envconfig(from = "ENGINE_S3_ACCESS_KEY_ID")]
+    pub s3_access_key_id: Option<SecretEnv>,
+    #[envconfig(from = "ENGINE_S3_SECRET_ACCESS_KEY")]
+    pub s3_secret_access_key: Option<SecretEnv>,
     /// Exact OTLP/HTTP traces URL, including /v1/traces.
     #[envconfig(from = "ENGINE_TRACING_EXPORT_ENDPOINT")]
     pub tracing_export_endpoint: Option<String>,
@@ -58,6 +70,10 @@ pub struct Config {
     pub management_enabled: bool,
     #[envconfig(from = "ENGINE_WEB_ENABLED", default = "true")]
     pub web_enabled: bool,
+    #[envconfig(from = "ENGINE_EVENT_INGRESS_LISTEN", default = "127.0.0.1:8082")]
+    pub event_ingress_listen: SocketAddr,
+    #[envconfig(from = "ENGINE_EVENT_INGRESS_PUBLIC_URL")]
+    pub event_ingress_public_url: Option<String>,
     #[envconfig(from = "ENGINE_AGENT_RUNTIME_LISTEN", default = "127.0.0.1:8081")]
     pub agent_runtime_listen: SocketAddr,
     #[envconfig(from = "ENGINE_AGENT_RUNTIME_PUBLIC_URL")]
@@ -94,17 +110,71 @@ pub struct Config {
     pub log_filter: tracing_subscriber::EnvFilter,
     #[envconfig(from = "API_PORT", default = "8080")]
     pub api_port: u16,
+    #[envconfig(from = "INGRESS_PORT", default = "8082")]
+    pub ingress_port: u16,
     #[envconfig(from = "WEB_PORT", default = "5173")]
     pub web_port: u16,
 }
 
 impl Config {
+    /// Dedicated credentials keep local MinIO configuration separate from AWS KMS credentials.
+    pub fn avatar_store(&mut self) -> Result<Option<crate::agent::avatar::AvatarStore>, Error> {
+        let Some(bucket) = self.s3_bucket.take().filter(|s| !s.is_empty()) else {
+            return Ok(None);
+        };
+        let credentials = match (
+            self.s3_access_key_id.take(),
+            self.s3_secret_access_key.take(),
+        ) {
+            (Some(id), Some(secret)) => Some(client_aws_sigv4::Credentials {
+                access_key_id: id.0.expose_secret().to_owned(),
+                secret_access_key: secret.0.expose_secret().to_owned(),
+                session_token: None,
+            }),
+            (None, None) => None,
+            _ => {
+                return Err(Error::Invalid(
+                    "Supply both S3 access key and secret, or use the AWS credential chain".into(),
+                ));
+            }
+        };
+        let endpoint = self
+            .s3_endpoint
+            .take()
+            .unwrap_or_else(|| format!("https://s3.{}.amazonaws.com", self.s3_region));
+        crate::agent::avatar::AvatarStore::new(
+            bucket,
+            self.s3_region.clone(),
+            endpoint,
+            self.s3_public_endpoint.take(),
+            credentials,
+        )
+        .map(Some)
+    }
+
     /// Static assets share the management bind only in builds that embed the web app.
     pub fn management_listener_enabled(&self) -> bool {
         self.management_enabled || (self.web_enabled && cfg!(feature = "embedded-web"))
     }
     /// OIDC is required only by the enabled management API, never by the agent runtime API.
     pub fn validate_services(&self) -> Result<(), Error> {
+        let mut listeners = vec![self.agent_runtime_listen, self.event_ingress_listen];
+        if self.management_listener_enabled() {
+            listeners.push(self.management_listen);
+        }
+        for (index, listen) in listeners.iter().enumerate() {
+            if listen.port() != 0 && listeners[..index].contains(listen) {
+                return Err(Error::Invalid("Management, agent runtime and event ingress listeners must use distinct addresses".into()));
+            }
+        }
+        if let Some(origin) = &self.event_ingress_public_url {
+            crate::network::Boundary::new(
+                self.event_ingress_listen,
+                self.allow_network,
+                vec![origin.clone()],
+            )?;
+        }
+
         if self.management_enabled {
             for (name, value) in [
                 ("ENGINE_OIDC_ISSUER", self.oidc_issuer.as_deref()),
@@ -132,12 +202,15 @@ impl Config {
         if self.database_url.0.expose_secret().trim().is_empty() {
             return Err(Error::Invalid("DATABASE_URL is required".into()));
         }
-        if (self.management_enabled && self.api_port == 0)
+        if self.ingress_port == 0
+            || (self.management_enabled && self.ingress_port == self.api_port)
+            || (self.web_enabled && self.ingress_port == self.web_port)
+            || (self.management_enabled && self.api_port == 0)
             || (self.web_enabled && self.web_port == 0)
             || (self.management_enabled && self.web_enabled && self.api_port == self.web_port)
         {
             return Err(Error::Invalid(
-                "API_PORT and WEB_PORT must be distinct ports from 1 to 65535".into(),
+                "API_PORT, WEB_PORT and INGRESS_PORT must be distinct ports from 1 to 65535".into(),
             ));
         }
         match self.encryption_backend {

@@ -7,7 +7,9 @@
 //! Registration stores an endpoint without invoking it; chat dispatches work through
 //! that endpoint's ConnectRPC runtime. Updates cannot rotate the signing key.
 use crate::proto::tilde::types::v1 as types;
+pub mod avatar;
 pub mod health;
+mod lifecycle;
 pub mod rpc;
 use crate::iam::capabilities::Capabilities;
 use crate::{
@@ -29,10 +31,14 @@ use uuid::Uuid;
 pub struct Agents {
     pool: PgPool,
     encryption: Arc<Encryption>,
+    avatars: Option<avatar::AvatarStore>,
 }
 
 #[derive(Debug, Clone, FromRow)]
 pub struct Agent {
+    pub avatar_seed: Uuid,
+    pub avatar_key: Option<String>,
+    pub paused: bool,
     pub capabilities: sqlx::types::Json<crate::iam::capabilities::Capabilities>,
     pub id: Uuid,
     pub name: String,
@@ -46,7 +52,7 @@ pub struct CreateAgent {
     pub id: Uuid,
     pub name: String,
     pub webhook_signing_key: SecretString,
-    pub endpoint_url: Option<String>,
+    pub endpoint_url: String,
 }
 pub struct UpdateAgent {
     pub capabilities: Option<crate::iam::capabilities::Capabilities>,
@@ -67,7 +73,11 @@ struct Cursor {
 impl Agents {
     /// Bind this service to one database and its already-unlocked encryption key.
     pub fn new(pool: PgPool, encryption: Arc<Encryption>) -> Self {
-        Self { pool, encryption }
+        Self {
+            pool,
+            encryption,
+            avatars: None,
+        }
     }
 
     /// Read health and activity metrics for a bounded registry page.
@@ -121,13 +131,16 @@ impl Agents {
         );
         drop(stored_key);
         if current.name != name
-            || current.endpoint_url != endpoint
+            || current.endpoint_url.as_deref() != Some(endpoint.as_str())
             || !same_key
             || current.capabilities.0 != input.capabilities
         {
             return Err(Error::Conflict);
         }
         Ok(Agent {
+            avatar_seed: current.avatar_seed,
+            avatar_key: current.avatar_key,
+            paused: current.paused,
             capabilities: current.capabilities,
             id: current.id,
             name: current.name,
@@ -147,6 +160,19 @@ impl Agents {
 
     /// Bounded keyset pagination with timestamp/ID tie-breaking.
     pub async fn list(&self, page_size: u32, page_token: &str) -> Result<AgentPage, Error> {
+        self.list_filtered(page_size, page_token, "").await
+    }
+
+    /// Search is applied before pagination, so matches are not limited to the current page.
+    pub async fn list_filtered(
+        &self,
+        page_size: u32,
+        page_token: &str,
+        search: &str,
+    ) -> Result<AgentPage, Error> {
+        if search.len() > 200 {
+            return Err(Error::Invalid("Agent search is too long".into()));
+        }
         let size = if page_size == 0 {
             50
         } else {
@@ -171,7 +197,8 @@ impl Agents {
             "../../queries/agent/list.sql",
             cursor.as_ref().map(|c| c.created_at),
             cursor.as_ref().map(|c| c.id),
-            (size + 1) as i64
+            (size + 1) as i64,
+            search.trim()
         )
         .fetch_all(&self.pool)
         .await?;
@@ -197,7 +224,7 @@ impl Agents {
         })
     }
 
-    /// Patch supplied fields. An empty endpoint removes it; omitted fields stay unchanged.
+    /// Patch supplied fields. Endpoints cannot be cleared; omitted fields stay unchanged.
     pub async fn update(&self, input: UpdateAgent) -> Result<Agent, Error> {
         self.update_as(input, None).await
     }
@@ -232,7 +259,7 @@ impl Agents {
         }
         let name = input.name.as_deref().map(validate_name).transpose()?;
         let change_endpoint = input.endpoint_url.is_some();
-        let endpoint = validate_endpoint(input.endpoint_url)?;
+        let endpoint = input.endpoint_url.map(validate_endpoint).transpose()?;
         let updated = sqlx::query_file_as!(
             Agent,
             "../../queries/agent/update.sql",
@@ -253,14 +280,6 @@ impl Agents {
         tx.commit().await?;
         Ok(updated)
     }
-
-    /// Deletion is idempotent and removes the encrypted signing key with the row.
-    pub async fn delete(&self, id: Uuid) -> Result<(), Error> {
-        sqlx::query_file!("../../queries/agent/delete.sql", id)
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
 }
 
 fn validate_name(name: &str) -> Result<String, Error> {
@@ -272,10 +291,10 @@ fn validate_name(name: &str) -> Result<String, Error> {
     }
     Ok(name.into())
 }
-fn validate_endpoint(value: Option<String>) -> Result<Option<String>, Error> {
-    let Some(value) = value.filter(|v| !v.is_empty()) else {
-        return Ok(None);
-    };
+fn validate_endpoint(value: String) -> Result<String, Error> {
+    if value.trim().is_empty() {
+        return Err(Error::Invalid("An agent endpoint is required".into()));
+    }
     let url = url::Url::parse(&value).map_err(|_| Error::Invalid("Invalid endpoint URL".into()))?;
     if !matches!(url.scheme(), "http" | "https")
         || url.host_str().is_none()
@@ -288,7 +307,7 @@ fn validate_endpoint(value: Option<String>) -> Result<Option<String>, Error> {
             "Endpoint must be HTTP(S); credentials must not appear in the URL".into(),
         ));
     }
-    Ok(Some(url.to_string()))
+    Ok(url.to_string())
 }
 fn validate_webhook_signing_key(value: &str) -> Result<(), Error> {
     if !(32..=1024).contains(&value.len()) || !value.bytes().all(|byte| byte.is_ascii_graphic()) {

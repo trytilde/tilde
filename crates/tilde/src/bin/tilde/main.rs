@@ -30,6 +30,8 @@ struct Args {
     #[arg(long)]
     agent_runtime_listen: Option<SocketAddr>,
     #[arg(long)]
+    event_ingress_listen: Option<SocketAddr>,
+    #[arg(long)]
     allow_network: bool,
     #[arg(long, value_delimiter = ',')]
     web_origin: Vec<String>,
@@ -60,14 +62,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(listen) = args.agent_runtime_listen {
         config.agent_runtime_listen = listen;
     }
-    if config.management_listener_enabled()
-        && config.management_listen == config.agent_runtime_listen
-        && config.management_listen.port() != 0
-    {
-        return Err(
-            "Management API and agent runtime API listeners must use distinct addresses".into(),
-        );
+    if let Some(listen) = args.event_ingress_listen {
+        config.event_ingress_listen = listen;
     }
+    network::Boundary::new(
+        config.event_ingress_listen,
+        config.allow_network || args.allow_network,
+        vec![],
+    )?;
     network::Boundary::new(
         config.agent_runtime_listen,
         config.allow_network || args.allow_network,
@@ -89,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.web_origins.0.clone(),
         )?;
     }
+    let avatars = config.avatar_store()?;
     let protection = config.key_protection()?;
     let trace_destination = tilde::telemetry::Destination::new(
         config.tracing_export_endpoint.take(),
@@ -111,7 +114,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|_| "Encryption key initialization timed out")??,
     );
-    let agents = Agents::new(pool.clone(), encryption.clone());
+    let mut agents = Agents::new(pool.clone(), encryption.clone());
+    if let Some(avatars) = avatars {
+        agents = agents.with_avatar_store(avatars);
+    }
     let listener = if management_listener_enabled {
         Some(tokio::net::TcpListener::bind(config.management_listen).await?)
     } else {
@@ -122,6 +128,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|listener| listener.local_addr())
         .transpose()?
         .unwrap_or(config.management_listen);
+    let ingress_listener = tokio::net::TcpListener::bind(config.event_ingress_listen).await?;
+    let ingress_address = ingress_listener.local_addr()?;
+    let ingress_url = config
+        .event_ingress_public_url
+        .unwrap_or_else(|| format!("http://{ingress_address}"));
+    let ingress_boundary = network::Boundary::new(
+        ingress_address,
+        config.allow_network,
+        vec![ingress_url.clone()],
+    )?;
     let agent_runtime_listener = tokio::net::TcpListener::bind(config.agent_runtime_listen).await?;
     let agent_address = agent_runtime_listener.local_addr()?;
     let agent_callback_url = config
@@ -169,6 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool.clone(),
         encryption.clone(),
         connection_setup_url,
+        ingress_url,
     )?;
     connections.seed().await?;
     connections.recover().await?;
@@ -176,11 +193,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     health.cleanup().await?;
     let chat = tilde::chat::Chat::new(pool.clone(), encryption.clone(), agent_callback_url)
         .with_connections(connections.clone());
-    let telemetry = tilde::telemetry::Runtime::start(
-        pool.clone(),
-        chat.tokens.clone(),
-        trace_destination,
-    );
+    let telemetry =
+        tilde::telemetry::Runtime::start(pool.clone(), chat.tokens.clone(), trace_destination);
     opentelemetry::global::set_tracer_provider(telemetry.provider.clone());
     let agent_router = tilde::iam::listeners::agent_runtime_router(
         agents.clone(),
@@ -194,6 +208,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         agent_boundary,
         network::guard,
     ));
+    let ingress_router =
+        tilde::iam::listeners::event_ingress_router(chat.clone(), connections.clone())
+            .layer(axum::middleware::from_fn(
+                tilde::telemetry::context::request,
+            ))
+            .layer(axum::middleware::from_fn_with_state(
+                ingress_boundary,
+                network::guard,
+            ));
     let (chat_shutdown, chat_shutdown_rx) = tokio::sync::watch::channel(false);
     let mut connection_worker = tokio::spawn(connections.clone().worker(chat_shutdown_rx.clone()));
     let mut health_worker = tokio::spawn(health.run(chat_shutdown_rx.clone()));
@@ -255,7 +278,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = router.layer(axum::middleware::from_fn(
         tilde::telemetry::context::request,
     ));
-    tracing::info!(management_address=%address, agent_runtime_address=%agent_address, management_enabled=config.management_enabled, web_enabled=config.web_enabled && cfg!(feature="embedded-web"), management_listener=listener.is_some(), "tilde listening");
+    tracing::info!(event_ingress_address=%ingress_address, management_address=%address, agent_runtime_address=%agent_address, management_enabled=config.management_enabled, web_enabled=config.web_enabled && cfg!(feature="embedded-web"), management_listener=listener.is_some(), "tilde listening");
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
     let user_shutdown = server_shutdown_rx.clone();
     let server = async move {
@@ -271,10 +294,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     };
+    let ingress_server = axum::serve(ingress_listener, ingress_router)
+        .with_graceful_shutdown(wait_shutdown(server_shutdown_rx.clone()));
     let agent_server = axum::serve(agent_runtime_listener, agent_router)
         .with_graceful_shutdown(wait_shutdown(server_shutdown_rx));
     let mut servers =
-        tokio::spawn(async move { tokio::try_join!(server, agent_server).map(|_| ()) });
+        tokio::spawn(
+            async move { tokio::try_join!(server, agent_server, ingress_server).map(|_| ()) },
+        );
     let result = tokio::select! {
         _ = shutdown() => Ok(()),
         result = &mut servers => result.unwrap_or_else(|e|Err(std::io::Error::other(e))),

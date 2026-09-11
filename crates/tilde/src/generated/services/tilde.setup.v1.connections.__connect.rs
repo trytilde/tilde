@@ -1,3 +1,11 @@
+///Shorthand for `OwnedView<SetConnectionNameRequestView<'static>>`.
+pub type OwnedSetConnectionNameRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetConnectionNameResponseView<'static>>`.
+pub type OwnedSetConnectionNameResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<GetSetupRequestView<'static>>`.
 pub type OwnedGetSetupRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::setup::v1::__buffa::view::GetSetupRequestView<'static>,
@@ -50,6 +58,40 @@ pub type OwnedCancelSetupRequestView = ::buffa::view::OwnedView<
 pub type OwnedCancelSetupResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::setup::v1::__buffa::view::CancelSetupResponseView<'static>,
 >;
+impl ::connectrpc::Encodable<crate::proto::tilde::setup::v1::SetConnectionNameResponse>
+for crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::setup::v1::SetConnectionNameResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::setup::v1::GetSetupResponse>
 for crate::proto::tilde::setup::v1::__buffa::view::GetSetupResponseView<'_> {
     fn encode(
@@ -264,6 +306,12 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const CONNECTION_SETUP_SERVICE_SERVICE_NAME: &str = "tilde.setup.v1.ConnectionSetupService";
+/// Static [`Spec`](::connectrpc::Spec) for the `SetConnectionName` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CONNECTION_SETUP_SERVICE_SET_CONNECTION_NAME_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.setup.v1.ConnectionSetupService/SetConnectionName",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `GetSetup` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CONNECTION_SETUP_SERVICE_GET_SETUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.setup.v1.ConnectionSetupService/GetSetup",
@@ -351,6 +399,29 @@ pub const CONNECTION_SETUP_SERVICE_CANCEL_SETUP_SPEC: ::connectrpc::Spec = ::con
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait ConnectionSetupService: Send + Sync + 'static {
+    /// Handle the SetConnectionName RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_connection_name<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::setup::v1::SetConnectionNameResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the GetSetup RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -521,6 +592,35 @@ impl<S: ConnectionSetupService> ConnectionSetupServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                CONNECTION_SETUP_SERVICE_SERVICE_NAME,
+                "SetConnectionName",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_connection_name(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::setup::v1::SetConnectionNameResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTION_SETUP_SERVICE_SET_CONNECTION_NAME_SPEC)
             .route_view(
                 CONNECTION_SETUP_SERVICE_SERVICE_NAME,
                 "GetSetup",
@@ -752,6 +852,12 @@ for ConnectionSetupServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("tilde.setup.v1.ConnectionSetupService/")?;
         match method {
+            "SetConnectionName" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CONNECTION_SETUP_SERVICE_SET_CONNECTION_NAME_SPEC),
+                )
+            }
             "GetSetup" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -804,6 +910,28 @@ for ConnectionSetupServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "SetConnectionName" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_connection_name(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::setup::v1::SetConnectionNameResponse,
+                        >(format)
+                })
+            }
             "GetSetup" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -1006,7 +1134,7 @@ for ConnectionSetupServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = ConnectionSetupServiceClient::new(conn, config);
-/// let response = client.get_setup(request).await?;
+/// let response = client.set_connection_name(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -1018,7 +1146,7 @@ for ConnectionSetupServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = ConnectionSetupServiceClient::new(http, config);
-/// let response = client.get_setup(request).await?;
+/// let response = client.set_connection_name(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -1028,7 +1156,7 @@ for ConnectionSetupServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.get_setup(request).await?;
+/// let resp = client.set_connection_name(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -1036,7 +1164,7 @@ for ConnectionSetupServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.get_setup(request).await?.into_owned();
+/// let owned = client.set_connection_name(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -1066,6 +1194,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the SetConnectionName RPC. Sends a request to /tilde.setup.v1.ConnectionSetupService/SetConnectionName.
+    pub async fn set_connection_name(
+        &self,
+        request: crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_connection_name_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetConnectionName RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_connection_name_with_options(
+        &self,
+        request: crate::proto::tilde::setup::v1::SetConnectionNameRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::setup::v1::__buffa::view::SetConnectionNameResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTION_SETUP_SERVICE_SET_CONNECTION_NAME_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the GetSetup RPC. Sends a request to /tilde.setup.v1.ConnectionSetupService/GetSetup.
     pub async fn get_setup(

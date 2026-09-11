@@ -1,0 +1,12 @@
+syntax = "proto3";
+package tilde.setup.v1;
+import "tilde/types/v1/access.proto";
+// Public endpoints authenticate only the short-lived identity verification token.
+service IdentityVerificationService {
+ rpc GetIdentityVerification(GetIdentityVerificationRequest) returns (GetIdentityVerificationResponse);
+ rpc ApproveIdentityVerification(ApproveIdentityVerificationRequest) returns (ApproveIdentityVerificationResponse);
+}
+message GetIdentityVerificationRequest { string id = 1; string identity_verification_token = 2 [debug_redact = true]; }
+message GetIdentityVerificationResponse { tilde.types.v1.IdentityVerification verification = 1; }
+message ApproveIdentityVerificationRequest { string id = 1; string identity_verification_token = 2 [debug_redact = true]; }
+message ApproveIdentityVerificationResponse { tilde.types.v1.IdentityVerification verification = 1; }

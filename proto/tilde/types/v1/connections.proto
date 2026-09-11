@@ -47,6 +47,10 @@ message OAuthCredentialSource { reserved 1; OAuthConfiguration configuration = 2
 message CustomCredentialSource {}
 
 message Provider {
+ optional string account_name_label = 13;
+ optional string icon_url = 11;
+ // Plain-text setup guidance rendered below the provider title.
+ optional string instructions = 12;
  string id = 1; string name = 3; repeated ConnectionType connection_types = 5; repeated string categories = 10;
  reserved 2,4,6;
  oneof kind { BuiltInProvider built_in = 7; ConfiguredProvider configured = 8; RemoteProvider remote = 9; }

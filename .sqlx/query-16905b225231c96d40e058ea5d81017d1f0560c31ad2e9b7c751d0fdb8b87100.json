@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, avatar_seed, avatar_key, paused, endpoint_url, created_at, updated_at, capabilities AS \"capabilities!: Json<Capabilities>\" FROM agents WHERE deleted_at IS NULL AND id = $1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "avatar_seed",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "avatar_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "paused",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "16905b225231c96d40e058ea5d81017d1f0560c31ad2e9b7c751d0fdb8b87100"
+}

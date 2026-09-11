@@ -36,6 +36,8 @@ hex.workspace = true
 webpki-roots = "0.26"
 
 client-aws-kms.workspace = true
+client-aws-config.workspace = true
+client-aws-sigv4.workspace = true
 envconfig = "0.11.1"
 aes = { version = "0.8.4", features = ["zeroize"] }
 ghash = { version = "0.5.1", features = ["zeroize"] }

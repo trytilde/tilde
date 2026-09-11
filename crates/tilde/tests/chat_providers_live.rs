@@ -27,8 +27,13 @@ async fn probe(provider: &str, typ: &str, credential: &str, url: String, slack: 
             .await
             .unwrap(),
     );
-    let connections =
-        Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()).unwrap();
+    let connections = Connections::new(
+        db.pool.clone(),
+        crypto.clone(),
+        "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     connections.seed().await.unwrap();
     let id = connections
         .start(Uuid::new_v4(), "Read-only live probe", provider, typ, &[])

@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agents SET paused=$2, generation=generation + CASE WHEN paused <> $2 THEN 1 ELSE 0 END,\nupdated_at=NOW() WHERE id=$1 AND deleted_at IS NULL\nRETURNING generation, endpoint_url, webhook_signing_key;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "webhook_signing_key",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "b54392fedd13e0c314c16bd7ec2b6fbb46ca7ff1bf048c4daf9f7db1f8597540"
+}

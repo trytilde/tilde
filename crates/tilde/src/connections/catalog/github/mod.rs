@@ -3,6 +3,9 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        account_name_label: Some("GitHub account".into()),
+        icon_url: Some("https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/github/default.svg".into()),
+        instructions: Some("Create a GitHub App or connect an existing installation to receive repository conversations.".into()),
         id: "github".into(),
         name: "GitHub".into(),
         kind: ProviderKind::BuiltIn,
@@ -178,6 +181,13 @@ use crate::connections::service::Connections;
 pub(crate) struct Github;
 #[async_trait::async_trait]
 impl Runtime for Github {
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[
+            "Create a GitHub App or connect an existing installation using the form below.",
+            "For an existing app, configure its webhook with the Webhook URL below and enter the matching signing secret.",
+        ]
+    }
+
     fn ui(&self) -> &'static str {
         "github"
     }
@@ -240,7 +250,10 @@ impl Runtime for Github {
                 &service.public_url,
                 &service.callback_url(setup)?,
                 state.expose_secret(),
-                setup.connection_id,
+                &format!(
+                    "{}/connections/webhooks/{}",
+                    service.event_ingress_url, setup.connection_id
+                ),
             )?,
             "github_install" => Action::Redirect {
                 url: github_install_url(&service.endpoints, &values, state.expose_secret())?,
@@ -275,7 +288,10 @@ impl Runtime for Github {
             &service.public_url,
             &service.callback_url(setup)?,
             "validate",
-            setup.connection_id,
+            &format!(
+                "{}/connections/webhooks/{}",
+                service.event_ingress_url, setup.connection_id
+            ),
         )?;
         service.transition(setup, "github_manifest").await
     }

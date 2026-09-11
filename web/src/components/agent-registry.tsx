@@ -3,7 +3,6 @@ import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
 import { agents } from "@/client";
 import { useCursorPage, type FetchPage } from "@/hooks/use-cursor-page";
-import { AgentEditor } from "@/components/agent-editor";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,7 +27,13 @@ const fetchPage: FetchPage<Agent> = async (request, signal) => {
   const response = await agents.listAgents(request, { signal });
   return { items: response.agents, nextPageToken: response.nextPageToken };
 };
-export function AgentRegistry() {
+export function AgentRegistry({
+  onOpen,
+  onCreate,
+}: {
+  onOpen: (agent: Agent) => void;
+  onCreate: () => void;
+}) {
   const page = useCursorPage(fetchPage);
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -36,17 +41,44 @@ export function AgentRegistry() {
     }, 30_000);
     return () => window.clearInterval(timer);
   }, [page.refresh, page.loading]);
-  const [editing, setEditing] = useState<Agent | null | undefined>();
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState("");
+  const [retryStop, setRetryStop] = useState<Agent | null>(null);
+  const [actionError, setActionError] = useState("");
+  async function changePaused(agent: Agent, paused: boolean) {
+    setBusy(true);
+    setNotice("");
+    setActionError("");
+    try {
+      setRetryStop(null);
+      if (paused) {
+        const response = await agents.pauseAgent({ id: agent.id });
+        if (!response.stopAcknowledged) setRetryStop(agent);
+        setNotice(
+          response.stopAcknowledged
+            ? "Agent paused. Health checks continue."
+            : "Agent paused. Health checks continue, but the host did not acknowledge Stop. Retry pause to request cancellation again.",
+        );
+      } else {
+        await agents.resumeAgent({ id: agent.id });
+        setNotice("Agent resumed.");
+      }
+      page.refresh();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to update agent state.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function remove() {
     if (!deleting) return;
     setBusy(true);
     setDeleteError("");
     try {
       await agents.deleteAgent({ id: deleting.id });
+      if (retryStop?.id === deleting.id) setRetryStop(null);
       setDeleting(null);
       setNotice("Agent deleted.");
       page.reset();
@@ -56,23 +88,10 @@ export function AgentRegistry() {
       setBusy(false);
     }
   }
-  if (editing === null) {
-    return (
-      <AgentEditor
-        agent={null}
-        onClose={() => setEditing(undefined)}
-        onSaved={() => {
-          setEditing(undefined);
-          setNotice("Agent created.");
-          page.reset();
-        }}
-      />
-    );
-  }
   return (
     <section className="flex flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
       <div className="flex items-center justify-end gap-4">
-        <Button onClick={() => setEditing(null)}>
+        <Button onClick={onCreate}>
           <PlusIcon />
           Create agent
         </Button>
@@ -88,16 +107,33 @@ export function AgentRegistry() {
           </Button>
         </div>
       )}
+      {actionError && (
+        <p role="alert" className="text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
       {notice && (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}
         </p>
       )}
+      {retryStop && (
+        <Button
+          variant="outline"
+          disabled={busy}
+          onClick={() => void changePaused(retryStop, true)}
+        >
+          Retry stop
+        </Button>
+      )}
       <DataTable
         data={page.items}
         loading={page.loading}
         loaded={page.loaded}
-        onEdit={setEditing}
+        onEdit={onOpen}
+        busy={busy}
+        onPause={(agent) => void changePaused(agent, true)}
+        onResume={(agent) => void changePaused(agent, false)}
         onDelete={(agent) => {
           setDeleteError("");
           setDeleting(agent);
@@ -160,19 +196,6 @@ export function AgentRegistry() {
           </nav>
         </div>
       </div>
-      {editing !== undefined && (
-        <AgentEditor
-          key={editing?.id ?? "new"}
-          agent={editing}
-          onClose={() => setEditing(undefined)}
-          onSaved={(created) => {
-            setEditing(undefined);
-            setNotice(created ? "Agent created." : "Agent updated.");
-            if (created) page.reset();
-            else page.refresh();
-          }}
-        />
-      )}
       <AlertDialog
         open={!!deleting}
         onOpenChange={(open) => {
@@ -184,6 +207,7 @@ export function AgentRegistry() {
             <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the agent from your registry and deletes its stored signing key.
+              Conversation history is retained.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (

@@ -12,10 +12,28 @@ struct Rpc {
 pub fn router(agents: Agents) -> axum::Router {
     crate::rpc::mount(
         connectrpc::Router::new().add_service(Arc::new(Rpc { agents })),
-        256 * 1024,
+        8 * 1024 * 1024,
     )
 }
 impl AgentService for Rpc {
+    async fn upload_agent_avatar<'a>(
+        &'a self,
+        _: RequestContext,
+        request: ServiceRequest<'_, management::UploadAgentAvatarRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::UploadAgentAvatarResponse> + Send + use<'a>,
+    > {
+        let body = request.to_owned_message();
+        let agent = self
+            .agents
+            .upload_avatar(id(&body.id)?, &body.media_type, body.content.to_vec())
+            .await?;
+        Response::ok(management::UploadAgentAvatarResponse {
+            agent: project(&self.agents, agent).await?.into(),
+            ..Default::default()
+        })
+    }
+
     async fn create_agent<'a>(
         &'a self,
         _: RequestContext,
@@ -67,20 +85,20 @@ impl AgentService for Rpc {
     {
         let page = self
             .agents
-            .list(request.page_size, request.page_token)
+            .list_filtered(request.page_size, request.page_token, request.search)
             .await?;
 
         let ids = page.agents.iter().map(|agent| agent.id).collect::<Vec<_>>();
         let mut metrics = self.agents.metrics(&ids).await?;
         Response::ok(management::ListAgentsResponse {
-            agents: page
-                .agents
-                .into_iter()
-                .map(|agent| {
-                    let detail = metrics.remove(&agent.id);
-                    wire(agent, detail)
-                })
-                .collect(),
+            agents: futures::future::try_join_all(page.agents.into_iter().map(|agent| {
+                let detail = metrics.remove(&agent.id);
+                async move {
+                    let avatar_url = self.agents.avatar_url(&agent).await?;
+                    Ok::<_, crate::error::Error>(wire(agent, detail, avatar_url))
+                }
+            }))
+            .await?,
             next_page_token: page.next_page_token,
             ..Default::default()
         })
@@ -111,6 +129,31 @@ impl AgentService for Rpc {
             )
             .await?;
         Response::ok(management::UpdateAgentResponse {
+            agent: project(&self.agents, agent).await?.into(),
+            ..Default::default()
+        })
+    }
+    async fn pause_agent<'a>(
+        &'a self,
+        _: RequestContext,
+        request: ServiceRequest<'_, management::PauseAgentRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<management::PauseAgentResponse> + Send + use<'a>>
+    {
+        let (agent, stop_acknowledged) = self.agents.pause(id(request.id)?).await?;
+        Response::ok(management::PauseAgentResponse {
+            agent: project(&self.agents, agent).await?.into(),
+            stop_acknowledged,
+            ..Default::default()
+        })
+    }
+    async fn resume_agent<'a>(
+        &'a self,
+        _: RequestContext,
+        request: ServiceRequest<'_, management::ResumeAgentRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<management::ResumeAgentResponse> + Send + use<'a>>
+    {
+        let agent = self.agents.resume(id(request.id)?).await?;
+        Response::ok(management::ResumeAgentResponse {
             agent: project(&self.agents, agent).await?.into(),
             ..Default::default()
         })

@@ -30,6 +30,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CANCEL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__HEALTHZ_REQUEST_JSON_ANY);
         reg.register_json_any(super::__HEALTHZ_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__STOP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__STOP_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -64,5 +66,13 @@ pub use self::__buffa::view::HealthzRequestOwnedView;
 pub use self::__buffa::view::HealthzResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::HealthzResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StopRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::StopRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StopResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::StopResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

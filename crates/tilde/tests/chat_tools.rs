@@ -104,12 +104,12 @@ async fn scoped_catalog_dispatches_provider_formats_and_publishes_messages() {
             capabilities: tilde::iam::capabilities::Capabilities(std::collections::BTreeMap::from(
                 [(
                     tilde::iam::capabilities::Capability::ToolsInvoke,
-                    tilde::iam::capabilities::Reach::Any,
+                    tilde::iam::capabilities::Reach::All,
                 )],
             )),
             id: Uuid::new_v4(),
             name: "Tool fixture".into(),
-            endpoint_url: Some("http://127.0.0.1:9999".into()),
+            endpoint_url: "http://127.0.0.1:9999".into(),
             webhook_signing_key: SecretString::from("fixture-signing-key-with-at-least-32-bytes"),
         })
         .await

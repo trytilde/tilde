@@ -3,6 +3,12 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        account_name_label: Some("WhatsApp phone number".into()),
+        icon_url: Some(
+            "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/whatsapp/default.svg"
+                .into(),
+        ),
+        instructions: Some("Connect your Meta WhatsApp Business account to this agent.".into()),
         id: "whatsapp".into(),
         name: "WhatsApp".into(),
         kind: ProviderKind::BuiltIn,
@@ -23,6 +29,13 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Whatsapp;
 #[async_trait::async_trait]
 impl Runtime for Whatsapp {
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[
+            "Enter the credentials and IDs for your Meta WhatsApp Business account below.",
+            "Configure your Meta app webhook with the Webhook URL below and the same verify token you enter here.",
+        ]
+    }
+
     async fn validate(
         &self,
         service: &Connections,

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id,i.text FROM chat_inputs i JOIN chat_invocations v ON v.id=i.invocation_id LEFT JOIN chat_messages m ON m.id=i.id WHERE i.invocation_id=$1 AND NOT i.accepted AND (m.source_identity_id IS NULL OR chat_identity_allowed(v.agent_id,m.source_identity_id)) ORDER BY i.id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "text",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "de6cfd301b08ceac12f5b95ce6cc0ba05cab5d82b843233419dd4aac6d6c6d8b"
+}

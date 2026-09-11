@@ -55,6 +55,7 @@ pub fn router(
         .route("/connections/ui/{*path}", get(asset))
         .route("/catalog/{provider}/ui", get(provider_ui))
         .route("/connections/broker/{setup_id}", get(host))
+        .route("/identity/verify/{id}", get(identity_host))
         .with_state(state))
 }
 async fn host(State(state): State<Assets>, Path(setup_id): Path<String>) -> Response {
@@ -62,6 +63,12 @@ async fn host(State(state): State<Assets>, Path(setup_id): Path<String>) -> Resp
         return StatusCode::NOT_FOUND.into_response();
     }
     serve(&state, "_host/ui.html", None).await
+}
+async fn identity_host(State(state): State<Assets>, Path(id): Path<String>) -> Response {
+    if uuid::Uuid::parse_str(&id).is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    serve(&state, "_identity_host/ui.html", None).await
 }
 async fn provider_ui(State(state): State<Assets>, Path(provider): Path<String>) -> Response {
     if !provider

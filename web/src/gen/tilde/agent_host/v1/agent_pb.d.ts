@@ -17,6 +17,11 @@ export declare const file_tilde_agent_host_v1_agent: GenFile;
  */
 export declare type InvokeRequest = Message<"tilde.agent_host.v1.InvokeRequest"> & {
   /**
+   * @generated from field: int64 agent_generation = 11;
+   */
+  agentGeneration: bigint;
+
+  /**
    * @generated from field: string invocation_id = 1;
    */
   invocationId: string;
@@ -199,6 +204,42 @@ export declare type HealthzResponse = Message<"tilde.agent_host.v1.HealthzRespon
 export declare const HealthzResponseSchema: GenMessage<HealthzResponse>;
 
 /**
+ * Stop all work through this generation without shutting down health checks.
+ * Hosts must reject Invoke at or below a stopped generation, including late requests.
+ *
+ * @generated from message tilde.agent_host.v1.StopRequest
+ */
+export declare type StopRequest = Message<"tilde.agent_host.v1.StopRequest"> & {
+  /**
+   * @generated from field: string agent_id = 1;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: int64 through_generation = 2;
+   */
+  throughGeneration: bigint;
+};
+
+/**
+ * Describes the message tilde.agent_host.v1.StopRequest.
+ * Use `create(StopRequestSchema)` to create a new message.
+ */
+export declare const StopRequestSchema: GenMessage<StopRequest>;
+
+/**
+ * @generated from message tilde.agent_host.v1.StopResponse
+ */
+export declare type StopResponse = Message<"tilde.agent_host.v1.StopResponse"> & {
+};
+
+/**
+ * Describes the message tilde.agent_host.v1.StopResponse.
+ * Use `create(StopResponseSchema)` to create a new message.
+ */
+export declare const StopResponseSchema: GenMessage<StopResponse>;
+
+/**
  * @generated from service tilde.agent_host.v1.AgentService
  */
 export declare const AgentService: GenService<{
@@ -225,6 +266,14 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof CancelRequestSchema;
     output: typeof CancelResponseSchema;
+  },
+  /**
+   * @generated from rpc tilde.agent_host.v1.AgentService.Stop
+   */
+  stop: {
+    methodKind: "unary";
+    input: typeof StopRequestSchema;
+    output: typeof StopResponseSchema;
   },
   /**
    * @generated from rpc tilde.agent_host.v1.AgentService.Healthz

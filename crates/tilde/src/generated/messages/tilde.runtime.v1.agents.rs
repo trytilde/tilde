@@ -22,13 +22,16 @@ pub struct CreateAgentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
+    /// Required HTTP(S) endpoint for the agent-hosted service.
+    ///
     /// Field 4: `endpoint_url`
     #[serde(
         rename = "endpointUrl",
         alias = "endpoint_url",
-        skip_serializing_if = "::core::option::Option::is_none"
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
-    pub endpoint_url: ::core::option::Option<::buffa::alloc::string::String>,
+    pub endpoint_url: ::buffa::alloc::string::String,
     /// Required caller-generated shared secret. Stored encrypted and never returned.
     /// 32-1024 printable non-whitespace ASCII characters; no decoding or prefix requirement.
     ///
@@ -71,18 +74,6 @@ impl CreateAgentRequest {
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.CreateAgentRequest";
 }
-impl CreateAgentRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::endpoint_url`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_endpoint_url(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.endpoint_url = Some(value.into());
-        self
-    }
-}
 ::buffa::impl_default_instance!(CreateAgentRequest);
 impl ::buffa::MessageName for CreateAgentRequest {
     const PACKAGE: &'static str = "tilde.runtime.v1";
@@ -109,8 +100,8 @@ impl ::buffa::Message for CreateAgentRequest {
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
         }
-        if let Some(ref v) = self.endpoint_url {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        if !self.endpoint_url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.endpoint_url) as u64;
         }
         if !self.webhook_signing_key.is_empty() {
             size
@@ -142,8 +133,8 @@ impl ::buffa::Message for CreateAgentRequest {
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
         }
-        if let Some(ref v) = self.endpoint_url {
-            ::buffa::types::put_string_field(4u32, v, buf);
+        if !self.endpoint_url.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.endpoint_url, buf);
         }
         if !self.webhook_signing_key.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.webhook_signing_key, buf);
@@ -188,12 +179,7 @@ impl ::buffa::Message for CreateAgentRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::types::merge_string(
-                    self
-                        .endpoint_url
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
+                ::buffa::types::merge_string(&mut self.endpoint_url, buf)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -223,7 +209,7 @@ impl ::buffa::Message for CreateAgentRequest {
     fn clear(&mut self) {
         self.id.clear();
         self.name.clear();
-        self.endpoint_url = ::core::option::Option::None;
+        self.endpoint_url.clear();
         self.webhook_signing_key.clear();
         self.capabilities = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -992,7 +978,7 @@ pub struct UpdateAgentRequest {
     /// Field 2: `name`
     #[serde(rename = "name", skip_serializing_if = "::core::option::Option::is_none")]
     pub name: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Present empty string removes an endpoint; absence preserves the current value.
+    /// If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
     ///
     /// Field 4: `endpoint_url`
     #[serde(

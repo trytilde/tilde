@@ -24,6 +24,8 @@ try {
         ENGINE_KMS_KEY_ID: "",
         ENGINE_MANAGEMENT_ENABLED: String(management),
         ENGINE_WEB_ENABLED: String(web),
+        ENGINE_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
+        ENGINE_EVENT_INGRESS_PUBLIC_URL: "https://events.example.com",
         ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
         RUST_LOG: "tilde=info",
       };
@@ -70,11 +72,45 @@ try {
           ).status,
           401,
         );
+        const ingress = `http://${logs.match(/event_ingress_address=(127\.0\.0\.1:\d+)/)[1]}`;
+        for (const path of [
+          "/",
+          "/auth/login",
+          "/connections/callback",
+          "/tilde.management.v1.AgentService/ListAgents",
+        ]) {
+          assert.equal(
+            (await fetch(`${ingress}${path}`, { method: "POST" })).status,
+            404,
+            `Ingress must not expose ${path}`,
+          );
+        }
+        assert.equal(
+          (
+            await fetch(`${ingress}/connections/webhooks/00000000-0000-0000-0000-000000000001`, {
+              method: "POST",
+              headers: { Host: "events.example.com" },
+              body: "{}",
+            })
+          ).status,
+          400,
+          "Webhook reaches signature/connection validation even without management",
+        );
         if (management || web) {
           const origin = `http://${logs.match(/management_address=(127\.0\.0\.1:\d+)/)[1]}`;
           assert.equal(
             (await fetch(`${origin}/`, { headers: { Accept: "text/html" } })).status,
             web ? 200 : 404,
+          );
+          assert.equal(
+            (
+              await fetch(`${origin}/connections/webhooks/00000000-0000-0000-0000-000000000001`, {
+                method: "POST",
+                body: "{}",
+              })
+            ).status,
+            404,
+            "Management no longer mounts webhooks",
           );
           if (management) await loginManagement(origin);
           else {
@@ -112,7 +148,7 @@ try {
       }
     }
   console.log(
-    "PASS: all four management/web startup combinations, OIDC optional when disabled, occupied disabled port, runtime remains authenticated.",
+    "PASS: all four management/web modes; ingress remains active and isolated, management has no webhooks, runtime remains authenticated.",
   );
 } finally {
   await oidc.stop();

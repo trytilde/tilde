@@ -35,7 +35,7 @@ pub struct IncomingMessage {
     pub event_id: String,
     pub message_id: String,
     pub thread_id: String,
-    pub sender_id: String,
+    pub sender: crate::chat::access::identity::Identity,
     pub sender_name: String,
     pub attachments: Vec<RemoteAttachment>,
     pub text: String,
@@ -199,7 +199,7 @@ pub fn payload(body: &[u8]) -> ToolResult<Value> {
 pub fn at<'a>(v: &'a Value, path: &str) -> Option<&'a str> {
     v.pointer(path).and_then(Value::as_str)
 }
-pub(super) fn stable(connection: Uuid, kind: &str, key: &str) -> Uuid {
+pub(crate) fn stable(connection: Uuid, kind: &str, key: &str) -> Uuid {
     let digest = Sha256::digest(format!("{connection}:{kind}:{key}"));
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
@@ -211,7 +211,7 @@ impl Chat {
         if m.text.len() > 1024 * 1024
             || m.message_id.is_empty()
             || m.thread_id.is_empty()
-            || m.sender_id.is_empty()
+            || m.sender.value.is_empty()
         {
             return Err(ChatError::Invalid("Invalid inbound message".into()));
         }
@@ -226,15 +226,6 @@ impl Chat {
             .fetch_optional(&mut *tx)
             .await?
             .ok_or(ChatError::NotFound)?;
-        let thread = stable(
-            connection,
-            "thread",
-            &format!("{}:{}", owner.agent_id, m.thread_id),
-        );
-        let user = stable(connection, "user", &m.sender_id);
-        let participant = stable(connection, "participant", &format!("{thread}:{user}"));
-        let agent_participant = stable(connection, "agent", &thread.to_string());
-        let message = stable(connection, "message", &format!("{thread}:{}", m.message_id));
         if sqlx::query_file!("../../queries/chat/receipt_get.sql", connection, m.event_id)
             .fetch_optional(&mut *tx)
             .await?
@@ -242,6 +233,64 @@ impl Chat {
         {
             return Ok(());
         }
+        m.sender
+            .validate()
+            .map_err(|_| ChatError::Invalid("Invalid sender identity".into()))?;
+        let kind = crate::chat::access::identity::kind_name(m.sender.identity_type);
+        let value = &m.sender.value;
+        let user = stable(connection, "user", &format!("{kind}:{value}"));
+        sqlx::query_file!("../../queries/chat/channel_user.sql", user, value)
+            .execute(&mut *tx)
+            .await?;
+        let identity = sqlx::query_file!(
+            "../../queries/channel_access/identity_upsert.sql",
+            user,
+            connection,
+            kind,
+            value
+        )
+        .fetch_one(&mut *tx)
+        .await?
+        .id;
+        let accepted = sqlx::query_file!(
+            "../../queries/channel_access/allowed.sql",
+            owner.agent_id,
+            identity
+        )
+        .fetch_one(&mut *tx)
+        .await?
+        .allowed;
+        sqlx::query_file!(
+            "../../queries/channel_access/audit.sql",
+            connection,
+            m.event_id,
+            owner.agent_id,
+            identity,
+            owner.access_mode,
+            accepted
+        )
+        .execute(&mut *tx)
+        .await?;
+        if !accepted {
+            sqlx::query_file!(
+                "../../queries/chat/receipt_insert.sql",
+                connection,
+                m.event_id,
+                None::<Uuid>
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            return Ok(());
+        }
+        let thread = stable(
+            connection,
+            "thread",
+            &format!("{}:{}", owner.agent_id, m.thread_id),
+        );
+        let participant = stable(connection, "participant", &format!("{thread}:{user}"));
+        let agent_participant = stable(connection, "agent", &thread.to_string());
+        let message = stable(connection, "message", &format!("{thread}:{}", m.message_id));
         let created = sqlx::query_file!(
             "../../queries/chat/channel_thread_create.sql",
             thread,
@@ -264,9 +313,6 @@ impl Chat {
         )
         .execute(&mut *tx)
         .await?;
-        sqlx::query_file!("../../queries/chat/channel_user.sql", user, m.sender_name)
-            .execute(&mut *tx)
-            .await?;
         for (pid, uid, aid) in [
             (participant, Some(user), None),
             (agent_participant, None, Some(owner.agent_id)),
@@ -427,6 +473,13 @@ impl Chat {
                 reply,
                 crate::telemetry::context::capture().0,
                 crate::telemetry::context::capture().1
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query_file!(
+                "../../queries/channel_access/message_source.sql",
+                message,
+                identity
             )
             .execute(&mut *tx)
             .await?;

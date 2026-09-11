@@ -1,3 +1,4 @@
+import { BinaryPermission, TargetSelection } from "../dist/gen/tilde/types/v1/agent_pb.js";
 import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -183,6 +184,7 @@ async function start() {
   const env = {
     ...process.env,
     ...oidc.env,
+    ENGINE_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
     ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     ENGINE_ENCRYPTION_BACKEND: "seed",
@@ -257,12 +259,10 @@ try {
   const agent = (
     await client.agents.createAgent({
       capabilities: {
-        grants: Object.fromEntries(
-          ["tools.invoke", "work.read", "work.write", "run.update"].map((name) => [
-            name,
-            { mode: "any" },
-          ]),
-        ),
+        toolsInvoke: { mode: TargetSelection.ALL },
+        workRead: BinaryPermission.YES,
+        workWrite: BinaryPermission.YES,
+        runUpdate: BinaryPermission.YES,
       },
       name: "Coordinator",
       endpointUrl: endpoint,
@@ -272,12 +272,10 @@ try {
   const second = (
     await client.agents.createAgent({
       capabilities: {
-        grants: Object.fromEntries(
-          ["tools.invoke", "work.read", "work.write", "run.update"].map((name) => [
-            name,
-            { mode: "any" },
-          ]),
-        ),
+        toolsInvoke: { mode: TargetSelection.ALL },
+        workRead: BinaryPermission.YES,
+        workWrite: BinaryPermission.YES,
+        runUpdate: BinaryPermission.YES,
       },
       name: "Specialist",
       endpointUrl: endpoint,
@@ -492,6 +490,27 @@ try {
   await eventually(
     () => contexts.find((c) => c.invocationId === cancel.invocationId).signal.aborted,
   );
+  const pauseRun = await invoke("cancel me");
+  const pausedContext = await eventually(() =>
+    contexts.find((c) => c.invocationId === pauseRun.invocationId),
+  );
+  const paused = await client.agents.pauseAgent({ id: agent.id });
+  assert(paused.agent.paused && paused.stopAcknowledged);
+  await eventually(() => pausedContext.signal.aborted);
+  assert.equal((await client.chat.getRun({ id: pauseRun.id })).run.invocationStatus, "canceled");
+  assert((await runtime.healthz({})).ready);
+  await assert.rejects(invoke("cancel me"), (e) => e.code === Code.FailedPrecondition);
+  assert.equal((await client.agents.resumeAgent({ id: agent.id })).agent.paused, false);
+  const resumedRun = await invoke("cancel me");
+  const resumedContext = await eventually(() =>
+    contexts.find((c) => c.invocationId === resumedRun.invocationId),
+  );
+  assert(resumedContext.agentGeneration > pausedContext.agentGeneration);
+  assert((await client.agents.pauseAgent({ id: agent.id })).stopAcknowledged);
+  await eventually(() => resumedContext.signal.aborted);
+  await client.agents.deleteAgent({ id: agent.id });
+  await assert.rejects(client.agents.getAgent({ id: agent.id }), (e) => e.code === Code.NotFound);
+  assert((await client.chat.listMessages({ threadId: thread.id })).messages.length > 0);
   watchAbort.abort();
   await watcher;
   assert.deepEqual(errors, []);

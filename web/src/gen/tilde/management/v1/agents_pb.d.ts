@@ -29,9 +29,11 @@ export declare type CreateAgentRequest = Message<"tilde.management.v1.CreateAgen
   name: string;
 
   /**
-   * @generated from field: optional string endpoint_url = 4;
+   * Required HTTP(S) endpoint for the agent-hosted service.
+   *
+   * @generated from field: string endpoint_url = 4;
    */
-  endpointUrl?: string | undefined;
+  endpointUrl: string;
 
   /**
    * Required caller-generated shared secret. Stored encrypted and never returned.
@@ -106,6 +108,13 @@ export declare const GetAgentResponseSchema: GenMessage<GetAgentResponse>;
  */
 export declare type ListAgentsRequest = Message<"tilde.management.v1.ListAgentsRequest"> & {
   /**
+   * Case-insensitive name search, or an exact agent UUID.
+   *
+   * @generated from field: string search = 3;
+   */
+  search: string;
+
+  /**
    * @generated from field: uint32 page_size = 1;
    */
   pageSize: number;
@@ -158,7 +167,7 @@ export declare type UpdateAgentRequest = Message<"tilde.management.v1.UpdateAgen
   name?: string | undefined;
 
   /**
-   * Present empty string removes an endpoint; absence preserves the current value.
+   * If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
    *
    * @generated from field: optional string endpoint_url = 4;
    */
@@ -223,9 +232,132 @@ export declare type DeleteAgentResponse = Message<"tilde.management.v1.DeleteAge
 export declare const DeleteAgentResponseSchema: GenMessage<DeleteAgentResponse>;
 
 /**
+ * @generated from message tilde.management.v1.PauseAgentRequest
+ */
+export declare type PauseAgentRequest = Message<"tilde.management.v1.PauseAgentRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.PauseAgentRequest.
+ * Use `create(PauseAgentRequestSchema)` to create a new message.
+ */
+export declare const PauseAgentRequestSchema: GenMessage<PauseAgentRequest>;
+
+/**
+ * @generated from message tilde.management.v1.PauseAgentResponse
+ */
+export declare type PauseAgentResponse = Message<"tilde.management.v1.PauseAgentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+
+  /**
+   * Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
+   *
+   * @generated from field: bool stop_acknowledged = 2;
+   */
+  stopAcknowledged: boolean;
+};
+
+/**
+ * Describes the message tilde.management.v1.PauseAgentResponse.
+ * Use `create(PauseAgentResponseSchema)` to create a new message.
+ */
+export declare const PauseAgentResponseSchema: GenMessage<PauseAgentResponse>;
+
+/**
+ * @generated from message tilde.management.v1.ResumeAgentRequest
+ */
+export declare type ResumeAgentRequest = Message<"tilde.management.v1.ResumeAgentRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.ResumeAgentRequest.
+ * Use `create(ResumeAgentRequestSchema)` to create a new message.
+ */
+export declare const ResumeAgentRequestSchema: GenMessage<ResumeAgentRequest>;
+
+/**
+ * @generated from message tilde.management.v1.ResumeAgentResponse
+ */
+export declare type ResumeAgentResponse = Message<"tilde.management.v1.ResumeAgentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+};
+
+/**
+ * Describes the message tilde.management.v1.ResumeAgentResponse.
+ * Use `create(ResumeAgentResponseSchema)` to create a new message.
+ */
+export declare const ResumeAgentResponseSchema: GenMessage<ResumeAgentResponse>;
+
+/**
+ * Management-only image upload. PNG, JPEG, GIF or WebP, at most 5 MiB.
+ *
+ * @generated from message tilde.management.v1.UploadAgentAvatarRequest
+ */
+export declare type UploadAgentAvatarRequest = Message<"tilde.management.v1.UploadAgentAvatarRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: bytes content = 2;
+   */
+  content: Uint8Array;
+
+  /**
+   * @generated from field: string media_type = 3;
+   */
+  mediaType: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.UploadAgentAvatarRequest.
+ * Use `create(UploadAgentAvatarRequestSchema)` to create a new message.
+ */
+export declare const UploadAgentAvatarRequestSchema: GenMessage<UploadAgentAvatarRequest>;
+
+/**
+ * @generated from message tilde.management.v1.UploadAgentAvatarResponse
+ */
+export declare type UploadAgentAvatarResponse = Message<"tilde.management.v1.UploadAgentAvatarResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.Agent agent = 1;
+   */
+  agent?: Agent | undefined;
+};
+
+/**
+ * Describes the message tilde.management.v1.UploadAgentAvatarResponse.
+ * Use `create(UploadAgentAvatarResponseSchema)` to create a new message.
+ */
+export declare const UploadAgentAvatarResponseSchema: GenMessage<UploadAgentAvatarResponse>;
+
+/**
  * @generated from service tilde.management.v1.AgentService
  */
 export declare const AgentService: GenService<{
+  /**
+   * @generated from rpc tilde.management.v1.AgentService.UploadAgentAvatar
+   */
+  uploadAgentAvatar: {
+    methodKind: "unary";
+    input: typeof UploadAgentAvatarRequestSchema;
+    output: typeof UploadAgentAvatarResponseSchema;
+  },
   /**
    * @generated from rpc tilde.management.v1.AgentService.CreateAgent
    */
@@ -257,6 +389,22 @@ export declare const AgentService: GenService<{
     methodKind: "unary";
     input: typeof UpdateAgentRequestSchema;
     output: typeof UpdateAgentResponseSchema;
+  },
+  /**
+   * @generated from rpc tilde.management.v1.AgentService.PauseAgent
+   */
+  pauseAgent: {
+    methodKind: "unary";
+    input: typeof PauseAgentRequestSchema;
+    output: typeof PauseAgentResponseSchema;
+  },
+  /**
+   * @generated from rpc tilde.management.v1.AgentService.ResumeAgent
+   */
+  resumeAgent: {
+    methodKind: "unary";
+    input: typeof ResumeAgentRequestSchema;
+    output: typeof ResumeAgentResponseSchema;
   },
   /**
    * @generated from rpc tilde.management.v1.AgentService.DeleteAgent

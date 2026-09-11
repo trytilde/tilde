@@ -1,6 +1,14 @@
 //! Stable application errors. Provider/SQL details never become public RPC messages.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Configure S3 storage to upload agent avatars")]
+    AvatarStorageDisabled,
+    #[error("Avatar object storage operation failed")]
+    AvatarStorage,
+    #[error("Pause the agent before deleting it")]
+    AgentNotPaused,
+    #[error("Chat lifecycle operation failed")]
+    ChatLifecycle(#[from] crate::chat::ChatError),
     #[error("Connection chat capability already belongs to another agent")]
     ConnectionAssignmentConflict,
     #[error("Operation is not permitted")]
@@ -28,6 +36,12 @@ pub enum Error {
 impl From<Error> for connectrpc::ConnectError {
     fn from(error: Error) -> Self {
         match error {
+            Error::AvatarStorageDisabled => {
+                Self::failed_precondition("Configure S3 storage to upload agent avatars")
+            }
+            Error::AgentNotPaused => {
+                Self::failed_precondition("Pause the agent before deleting it")
+            }
             Error::ConnectionAssignmentConflict => {
                 Self::already_exists("Connection chat capability already belongs to another agent")
             }

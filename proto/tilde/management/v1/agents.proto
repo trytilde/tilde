@@ -3,6 +3,7 @@ package tilde.management.v1;
 import "tilde/types/v1/agent.proto";
 
 service AgentService {
+  rpc UploadAgentAvatar(UploadAgentAvatarRequest) returns (UploadAgentAvatarResponse);
   rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
   rpc GetAgent(GetAgentRequest) returns (GetAgentResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -11,6 +12,8 @@ service AgentService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  rpc PauseAgent(PauseAgentRequest) returns (PauseAgentResponse);
+  rpc ResumeAgent(ResumeAgentRequest) returns (ResumeAgentResponse);
   rpc DeleteAgent(DeleteAgentRequest) returns (DeleteAgentResponse);
 
 }
@@ -22,7 +25,8 @@ message CreateAgentRequest {
   string name = 2;
   reserved 3;
   reserved "description";
-  optional string endpoint_url = 4;
+  // Required HTTP(S) endpoint for the agent-hosted service.
+  string endpoint_url = 4;
   // Required caller-generated shared secret. Stored encrypted and never returned.
   // 32-1024 printable non-whitespace ASCII characters; no decoding or prefix requirement.
   string webhook_signing_key = 5 [debug_redact = true];
@@ -36,6 +40,8 @@ message GetAgentRequest { string id = 1; }
 message GetAgentResponse { tilde.types.v1.Agent agent = 1; }
 
 message ListAgentsRequest {
+  // Case-insensitive name search, or an exact agent UUID.
+  string search = 3;
   uint32 page_size = 1;
   string page_token = 2;
 }
@@ -50,7 +56,7 @@ message UpdateAgentRequest {
   optional string name = 2;
   reserved 3;
   reserved "description";
-  // Present empty string removes an endpoint; absence preserves the current value.
+  // If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
   optional string endpoint_url = 4;
   // Present empty map clears grants; absence preserves them.
   tilde.types.v1.Capabilities capabilities = 5;
@@ -61,3 +67,20 @@ message UpdateAgentResponse { tilde.types.v1.Agent agent = 1; }
 message DeleteAgentRequest { string id = 1; }
 
 message DeleteAgentResponse {}
+
+message PauseAgentRequest { string id = 1; }
+message PauseAgentResponse {
+  tilde.types.v1.Agent agent = 1;
+  // Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
+  bool stop_acknowledged = 2;
+}
+message ResumeAgentRequest { string id = 1; }
+message ResumeAgentResponse { tilde.types.v1.Agent agent = 1; }
+
+// Management-only image upload. PNG, JPEG, GIF or WebP, at most 5 MiB.
+message UploadAgentAvatarRequest {
+  string id = 1;
+  bytes content = 2;
+  string media_type = 3;
+}
+message UploadAgentAvatarResponse { tilde.types.v1.Agent agent = 1; }

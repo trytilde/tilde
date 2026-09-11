@@ -30,18 +30,18 @@ its port. Register that origin using exactly the same signing key. Run the
 following from an application depending on `@trytilde/sdk`:
 
 ```ts
-import { createManagementClient } from '@trytilde/sdk';
+import { createManagementClient, BinaryPermission, TargetSelection } from '@trytilde/sdk';
 import { randomUUID } from 'node:crypto';
 
 // A short-lived user session obtained through OIDC login, not an API key.
 const tilde = createManagementClient({ baseUrl: 'http://127.0.0.1:8080', accessToken: process.env.TILDE_ACCESS_TOKEN! });
 const { agent } = await tilde.agents.createAgent({
-  capabilities: { grants: {
-    'tools.invoke': { mode: 'only', ids: ['sendMessage'] },
-    'work.read': { mode: 'any' },
-    'work.write': { mode: 'any' },
-    'run.update': { mode: 'any' },
-  } },
+  capabilities: {
+    toolsInvoke: { mode: TargetSelection.SELECTED, ids: ['sendMessage'] },
+    workRead: BinaryPermission.YES,
+    workWrite: BinaryPermission.YES,
+    runUpdate: BinaryPermission.YES,
+  },
   name: 'Example',
   endpointUrl: 'http://127.0.0.1:3001',
   webhookSigningKey: process.env.AGENT_SIGNING_KEY!,
@@ -178,7 +178,7 @@ only the agent runtime API callback URL. The SDK renews these tokens while the
 invocation is live. Tokens and capabilities cannot be selected by the model.
 Configure grants when creating or updating an agent; every capability defaults
 to deny. For a native agent that sends messages and manages goals/tasks, grant
-`tools.invoke` (only `sendMessage`), `work.read`, `work.write` and `run.update`.
+`toolsInvoke` (selected `sendMessage`), `workRead`, `workWrite` and `runUpdate`.
 
 `ctx.agents.create/get/list/update/delete` call the registry using the current
 invocation token. `ctx.invokeAgent({agentId, objective})` starts work for an

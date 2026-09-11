@@ -1,3 +1,4 @@
+import { AgentAccessService } from "./gen/tilde/management/v1/access_pb.js";
 import { initializeTracing, invocationTracing, tracingInterceptor } from "./tracing.js";
 export { agentSpanProcessor } from "./tracing.js";
 import {
@@ -25,6 +26,7 @@ import { ChatService as RuntimeChatService } from "./gen/tilde/runtime/v1/chat_p
 import {
   AgentService as AgentHostService,
   InvokeRequestSchema,
+  StopRequestSchema,
   SteerRequestSchema,
   CancelRequestSchema,
   type InvokeRequest,
@@ -36,6 +38,7 @@ import {
 } from "./gen/tilde/types/v1/chat_pb.js";
 export * from "./gen/tilde/types/v1/chat_pb.js";
 export { RuntimeChatService, AgentHostService };
+export { BinaryPermission, TargetSelection } from "./gen/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
@@ -57,11 +60,13 @@ function transport(options: ClientOptions) {
   });
 }
 export class ManagementClient {
+  readonly access: RpcClient<typeof AgentAccessService>;
   readonly agents: RpcClient<typeof ManagementAgentService>;
   readonly chat: RpcClient<typeof ManagementChatService>;
   readonly connections: RpcClient<typeof ConnectionsService>;
   constructor(options: ClientOptions) {
     const rpc = transport(options);
+    this.access = connectClient(AgentAccessService, rpc);
     this.agents = connectClient(ManagementAgentService, rpc);
     this.chat = connectClient(ManagementChatService, rpc);
     this.connections = connectClient(ConnectionsService, rpc);
@@ -156,6 +161,7 @@ export class AgentContext {
   readonly runId: string;
   readonly threadId: string;
   readonly agentId: string;
+  readonly agentGeneration: bigint;
   readonly objective: string;
   private messageHistory: ChatMessage[];
   get messages(): readonly ChatMessage[] {
@@ -188,6 +194,7 @@ export class AgentContext {
     this.runId = request.runId;
     this.threadId = request.threadId;
     this.agentId = request.agentId;
+    this.agentGeneration = request.agentGeneration;
     this.objective = request.objective;
     this.messageHistory = request.messages;
     this.cachedMessages = request.cachedMessages;
@@ -606,11 +613,15 @@ export function createAgentServer(options: {
   initializeTracing(options.tracing === "existing");
   const active = new Map<string, { context: AgentContext; controller: AbortController }>();
   const finished = new Set<string>();
+  // Never evict generation fences while this host is running: late requests remain invalid.
+  const stoppedGenerations = new Map<string, bigint>();
   const handler = connectNodeAdapter({
     routes: (router) =>
       router.service(AgentHostService, {
         async *invoke(request, ctx) {
           verify(InvokeRequestSchema, request, ctx, options.signingKey, "Invoke");
+          if (request.agentGeneration <= (stoppedGenerations.get(request.agentId) ?? -1n))
+            throw new ConnectError("Agent is paused", Code.FailedPrecondition);
           if (active.has(request.invocationId) || finished.has(request.invocationId))
             throw new ConnectError("Invocation already accepted", Code.AlreadyExists);
           const controller = new AbortController();
@@ -632,6 +643,7 @@ export function createAgentServer(options: {
           const execution = telemetry.run(async () => {
             try {
               await context.refreshTools();
+              controller.signal.throwIfAborted();
               await options.run(context);
               output.end();
             } catch (error) {
@@ -673,6 +685,18 @@ export function createAgentServer(options: {
         async cancel(request, ctx) {
           verify(CancelRequestSchema, request, ctx, options.signingKey, "Cancel");
           active.get(request.invocationId)?.controller.abort(new StopLoop());
+          return {};
+        },
+        async stop(request, ctx) {
+          verify(StopRequestSchema, request, ctx, options.signingKey, "Stop");
+          const previous = stoppedGenerations.get(request.agentId) ?? -1n;
+          const through =
+            request.throughGeneration > previous ? request.throughGeneration : previous;
+          stoppedGenerations.set(request.agentId, through);
+          for (const { context, controller } of active.values()) {
+            if (context.agentId === request.agentId && context.agentGeneration <= through)
+              controller.abort(new StopLoop());
+          }
           return {};
         },
         async healthz(_request, ctx) {

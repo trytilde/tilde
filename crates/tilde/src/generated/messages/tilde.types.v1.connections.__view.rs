@@ -2644,6 +2644,14 @@ impl ::serde::Serialize for CustomCredentialSourceOwnedView {
 }
 #[derive(Clone, Debug, Default)]
 pub struct ProviderView<'a> {
+    /// Field 13: `account_name_label`
+    pub account_name_label: ::core::option::Option<&'a str>,
+    /// Field 11: `icon_url`
+    pub icon_url: ::core::option::Option<&'a str>,
+    /// Plain-text setup guidance rendered below the provider title.
+    ///
+    /// Field 12: `instructions`
+    pub instructions: ::core::option::Option<&'a str>,
     /// Field 1: `id`
     pub id: &'a str,
     /// Field 3: `name`
@@ -2688,6 +2696,27 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.account_name_label = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.icon_url = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.instructions = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -2848,6 +2877,9 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Provider {
+            account_name_label: self.account_name_label.map(|s| s.to_string()),
+            icon_url: self.icon_url.map(|s| s.to_string()),
+            instructions: self.instructions.map(|s| s.to_string()),
             id: self.id.to_string(),
             name: self.name.to_string(),
             connection_types: self
@@ -2948,6 +2980,15 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         for v in &self.categories {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.icon_url {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.instructions {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.account_name_label {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3004,6 +3045,15 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         for v in &self.categories {
             ::buffa::types::put_string_field(10u32, v, buf);
         }
+        if let Some(ref v) = self.icon_url {
+            ::buffa::types::put_string_field(11u32, v, buf);
+        }
+        if let Some(ref v) = self.instructions {
+            ::buffa::types::put_string_field(12u32, v, buf);
+        }
+        if let Some(ref v) = self.account_name_label {
+            ::buffa::types::put_string_field(13u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -3025,6 +3075,15 @@ impl<'__a> ::serde::Serialize for ProviderView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if let ::core::option::Option::Some(__v) = self.account_name_label {
+            __map.serialize_entry("accountNameLabel", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.icon_url {
+            __map.serialize_entry("iconUrl", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.instructions {
+            __map.serialize_entry("instructions", __v)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
             __map.serialize_entry("id", self.id)?;
         }
@@ -3138,6 +3197,23 @@ impl ProviderOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 13: `account_name_label`
+    #[must_use]
+    pub fn account_name_label(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().account_name_label
+    }
+    /// Field 11: `icon_url`
+    #[must_use]
+    pub fn icon_url(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().icon_url
+    }
+    /// Plain-text setup guidance rendered below the provider title.
+    ///
+    /// Field 12: `instructions`
+    #[must_use]
+    pub fn instructions(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().instructions
     }
     /// Field 1: `id`
     #[must_use]

@@ -3,6 +3,34 @@ use super::*;
 use crate::proto::tilde::types::v1 as types;
 pub struct Linq;
 impl Adapter for Linq {
+    fn identity_types(&self) -> &'static [types::IdentityType] {
+        &[types::IdentityType::PhoneNumber, types::IdentityType::Email]
+    }
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity> {
+        let recipient = provider_identity(value)?;
+        if recipient.identity_type != identity_type {
+            return Err(ConnectError::invalid_argument(
+                "This provider does not support that identity type",
+            ));
+        }
+        recipient.validate()?;
+        Ok(recipient)
+    }
+    fn send_verification<'a>(
+        &'a self,
+        a: &'a Access,
+        m: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>> {
+        Box::pin(async move {
+            a.json(a.post(a.url("linq_api","https://api.linqapp.com/api/partner/v3",&["chats"])?,"api_token")?.json(&json!({"from":a.secret("phone_number")?,"to":[m.value],"message":{"parts":[{"type":"text","value":m.text}]}}))).await?;
+            Ok(())
+        })
+    }
+
     fn webhook<'a>(
         &'a self,
         a: &'a Access,
@@ -82,7 +110,7 @@ impl Adapter for Linq {
                 thread_id: at(d, "/chat/id")
                     .ok_or_else(|| ConnectError::invalid_argument("Missing Linq chat"))?
                     .into(),
-                sender_id: sender.into(),
+                sender: provider_identity(sender)?,
                 sender_name: sender.into(),
                 text,
                 format: "text",
@@ -153,4 +181,18 @@ impl Adapter for Linq {
             sent(c, a, required(&v, "text")?, "text", chat, external, None).await
         })
     }
+}
+
+/// Canonical sender values belong to this provider adapter.
+fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {
+    let value = raw.trim();
+    let identity_type = if value.contains('@') {
+        types::IdentityType::Email
+    } else {
+        types::IdentityType::PhoneNumber
+    };
+    Ok(crate::chat::access::identity::Identity {
+        identity_type,
+        value: value.to_owned(),
+    })
 }

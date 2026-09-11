@@ -103,18 +103,22 @@ impl Harness {
             .create(CreateAgent {
                 id: Uuid::new_v4(),
                 name: "Live chat integration".into(),
-                endpoint_url: None,
+                endpoint_url: "http://127.0.0.1:9999".into(),
                 webhook_signing_key: SecretString::from(
                     "live-test-agent-signing-key-at-least-32-bytes",
                 ),
                 capabilities: tilde::iam::capabilities::Capabilities(BTreeMap::from([(
                     tilde::iam::capabilities::Capability::ToolsInvoke,
-                    tilde::iam::capabilities::Reach::Any,
+                    tilde::iam::capabilities::Reach::All,
                 )])),
             })
             .await?;
-        let connections =
-            Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into())?;
+        let connections = Connections::new(
+            db.pool.clone(),
+            crypto.clone(),
+            "http://127.0.0.1".into(),
+            "https://ingress.example".into(),
+        )?;
         connections.seed().await?;
         let typ = match provider {
             "slack" => "slack_app",
@@ -141,6 +145,10 @@ impl Harness {
             .id;
         let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into())
             .with_connections(connections.clone());
+        // Live provider fixtures exercise unrestricted inbound delivery explicitly.
+        tilde::chat::access::AgentAccess::new(connections.clone(), chat.clone())
+            .set_mode(connection, agent.id, types::ChannelAccessMode::Public)
+            .await?;
         let thread = chat
             .create_thread(chat::CreateThread {
                 title: "Live provider tool invocation".into(),

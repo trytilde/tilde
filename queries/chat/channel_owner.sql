@@ -1,1 +1,1 @@
-SELECT ca.agent_id FROM connection_agents ca JOIN connections c ON c.id=ca.connection_id WHERE ca.connection_id=$1 AND ca.capability='channel' AND c.status='ready';
+SELECT ca.agent_id,ca.access_mode,c.provider_id,c.type_id FROM connection_agents ca JOIN connections c ON c.id=ca.connection_id WHERE ca.connection_id=$1 AND ca.capability='channel' AND c.status='ready';

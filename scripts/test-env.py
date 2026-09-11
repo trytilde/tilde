@@ -41,13 +41,15 @@ with tempfile.TemporaryDirectory(prefix="tilde-env-") as directory:
         assert json.loads((root / "result.json").read_text())["PRECEDENCE"] == f"private-{mode}"
     loader.ROOT = root
     document = {"database_url":"must-not-migrate", "unrelated_secret":"must-not-migrate",
-                "linq_api_token":"dev-token", "test":{"linq_api_token":"test-token",
+                "ngrok_authtoken":"ngrok-fixture", "linq_api_token":"dev-token", "test":{"linq_api_token":"test-token",
                 "e2e_mcp_whatsapp_credential_json":json.dumps({"access_token":"meta-token"})}}
     with patch("sys.argv", ["load-secrets.py", "--stdin-json"]), patch("sys.stdin", io.StringIO(json.dumps(document))):
         loader.main()
     dev = (root / ".env.secrets").read_text()
     test = (root / ".env.secrets.test").read_text()
     assert "must-not-migrate" not in dev + test
+    assert 'NGROK_AUTHTOKEN="ngrok-fixture"' in dev
+    assert "NGROK_AUTHTOKEN" not in test
     assert 'LINQ_API_TOKEN="dev-token"' in dev
     assert 'LINQ_API_TOKEN="test-token"' in test
     assert 'CHAT_TEST_WHATSAPP_ACCESS_TOKEN="meta-token"' in test

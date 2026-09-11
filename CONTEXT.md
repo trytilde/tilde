@@ -14,6 +14,14 @@ identify the checked commit; a partially published release is retried at that co
 
 ## Connections
 
+For local provider callbacks, `task dev` optionally runs an ngrok CLI tunnel
+(`NGROK_ENABLED`, `NGROK_DOMAIN`, `NGROK_AUTHTOKEN`) to the event ingress API.
+Its HTTPS domain overrides `ENGINE_EVENT_INGRESS_PUBLIC_URL` while enabled, including
+explicit local URL settings, for all connection
+webhooks and provider manifests. Management owns setup links and OAuth callbacks
+on its own origin; ngrok is started only by the development launcher.
+Task owns tunnel shutdown, and the SOPS loader exports its token only for dev.
+
 Connections own self-managed credential lifecycle, encrypted Postgres storage and
 short-lived connection setup tokens. Providers have a BuiltIn, Configured or Remote kind and one current catalog definition;
 custom providers can declare static fields or standard OAuth flows at runtime.
@@ -30,6 +38,39 @@ template and served at `/catalog/<provider>/ui`. Static and OAuth methods use th
 shared `/catalog/_standard/ui` page and a canonical JSON Schema for rendering and
 server validation. Rust serves the setup host/assets and proxies Vite during development.
 Opaque-origin frames use a scoped MessagePort bridge; only the host holds the setup token.
+The agent's chat-provider pills list catalog connection types with the channel capability.
+Each menu offers an available existing connection or a new setup method. The new-connection
+dialog opens the hosted brokering iframe immediately. Creation assigns chat to the agent
+atomically using a temporary provider title; the iframe collects the actual account name
+alongside credentials. Providers own `account_name_label`. SetConnectionName authenticates
+the setup token and rotates its action before credential submission, keeping display names
+out of arbitrary credential fields. Setup pages share the sidebar's Tilde wordmark, followed
+by × and the provider icon, with “Connect {provider} to Tilde”, instructions, then fields.
+There is no user-facing Save draft control.
+
+Connection setup overviews remain provider catalog `instructions`. Ordered
+`setup_instructions` come from `Runtime::instructions(&ConnectionType)` on the
+adapter selected by provider and connection type. The iframe renders them below
+its overview. Channel-capable setups expose a read-only Webhook URL below the
+account name with a copy action, rather than generic webhook guidance appended
+to every setup. The field is not a credential or submitted form value.
+`Runtime::account_name_field(&ConnectionType)` optionally binds the account name
+to a credential field. The shared broker omits that field from the projected form,
+rejects client-supplied overrides, then injects the saved account name before full
+schema validation and encrypted staging. The canonical schema retains the field
+and its constraints. AgentMail binds `inbox_id`; Linq and Telnyx bind `phone_number`.
+Unmapped connection types keep account names separate from credentials.
+Assigned cards show that account name, provider branding, and a status-colored badge. Provider `icon_url`
+and plain-text `instructions` are persisted catalog metadata and included in broker state.
+Pills, cards and setup iframes use that icon URL; the iframe renders instructions directly
+beneath its title. The modal has no header or close icon and dismisses on an outside click,
+including while its initial setup request is in flight. Dismissal never cancels credentials.
+Built-in icons use theSVG's jsDelivr URLs where available and official provider favicons
+otherwise. Missing images receive a neutral frontend fallback.
+The outer frame is the trusted broker; provider code remains in its opaque-origin child.
+Completion/cancellation notifications are checked against the frame window, origin and
+connection ID. Embedded authorization redirects and manifest posts open a separate window;
+the original provider UI polls setup state through its existing bridge to follow callbacks.
 A connection setup token authorizes only its setup session. Browser clients open the
 returned brokering URL; the setup client does not send management bearer credentials.
 OAuth callback state is separate from the connection setup token.
@@ -88,11 +129,106 @@ identity; the migration retains existing ciphertext bindings without versioned p
 - Run: a durable objective that can wait across invocations.
 - Invocation: one active reasoning loop for an agent in a thread; stop ends only this loop.
 - Steering input: durable additional input delivered idempotently to an invocation.
-- Agent runtime: an agent-hosted ConnectRPC service for Invoke, Steer, Cancel and Healthz.
+- Agent runtime: an agent-hosted ConnectRPC service for Invoke, Steer, Cancel, Stop and Healthz.
 - Agent session: capability-scoped ConnectRPC callbacks to Tilde for message streaming and work tools.
 
 Provider tools are a dynamic catalog. Stop is always available in the SDK, and
 ordinary reasoning/return values never automatically become messages. Child jobs, compaction and budgets remain outside the current runtime.
+
+## Shared frontend theme
+
+The web app and bundled connection/identity-verification iframes import the same Tailwind
+foundation from `sdk/ts/packages/connection-ui/src/style.css`. Its light palette follows
+`tilde-marketing/campaign-manager/src/app/{globals,enterprise-home}.css`: paper, espresso,
+blue, butter, forest, purple haze and sienna. Semantic status colors map to those tokens.
+Default body, main-card and iframe surfaces are white; deep beige is scoped to the sidebar
+and the outer canvas behind the main content card.
+Geist, Geist Mono and Bricolage Grotesque fonts ship locally with connection-ui, so embedded
+forms and the main application share typography without third-party font requests.
+
+The sidebar reuses the marketing result cards' deep beige GrainGradient, with a static
+PaperTexture and frosted-glass overlay. Shader rendering is bounded, pauses offscreen or
+when the page is hidden, and respects reduced motion. A CSS background remains without WebGL.
+
+## Frontend routing
+
+TanStack Router owns browser navigation through file routes in `web/src/routes`.
+The Vite plugin generates `web/src/routeTree.gen.ts`; `_app` is the pathless
+authenticated layout, and public brokering lives outside it. Agent routes live in
+`_app/agent/`, with the shared editor and its tabs grouped in `$agentId/`.
+Standalone Connections and Chat pages are not exposed. Agent rows open `/agent/{id}/capabilities`;
+`/agent/{id}/chat-providers` and `/agent/{id}/iam` are sibling tab routes under a shared
+agent editor. Agent details are fetched by ID after the management session check,
+so direct URLs and refreshes do not depend on previously loading the registry. The
+shared editor preserves local state across tab navigation and browser Back/Forward. The dashboard header
+shows Agent Registry / agent-name breadcrumbs, updated from loaded and saved route data.
+Pages can contribute a DashboardNavigation slot beside the breadcrumbs; agent tabs use a
+React portal so their panel context and keyboard behavior remain intact. Sign out lives
+in the sidebar footer and notifies the existing authentication boundary after revocation.
+`/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
+separate public route outside the authenticated app layout. Connection setup and
+identity verification host modules live under `web/src/routes/connections/` with
+`-` prefixes to exclude them from route generation. Shared connection UI loading
+keeps embedded content mounted but hidden until ready, with bouncing dots and
+Motion fades that respect reduced motion preferences.
+
+## Agent access and identity verification
+
+The agent IAM tab uses management-only AgentAccessService RPCs. Access belongs to the
+agent/channel assignment, with private, public, and disabled modes. Existing assignments
+migrate as public; new assignments start private (GitHub starts disabled). Public still
+records every sender identity; private accepts only verified identities explicitly allowed
+for that agent; disabled accepts no provider traffic into agent conversations. Blocked
+callbacks retain a deduplicated access-decision audit without exposing their content to
+agent history. Mode/grant changes invalidate runtime access and cancel affected invocations.
+Queued messages and claims recheck current policies under the connection lock.
+
+An identity is a provider-owned string `value` with an `email`, `phone_number`, or `username`
+type, unique within the connected account. Core IAM never normalizes identity values;
+provider adapters construct inbound identities and validate verification recipients.
+Verification is independent of an agent's allow flag. Management creates a pending request
+and the provider privately delivers the secret approval link. Only its hash is stored.
+The link expires after ten minutes; resends supersede prior proofs and are throttled.
+Reading the page never approves. An explicit public Approve RPC consumes the delivered
+proof and grants only the bound identity/account/agent. Management clients never receive
+the token or approval URL. Removing the assignment invalidates its proofs and grants.
+
+`/identity/verify/{id}` hosts the public, no-login approval flow and a sandboxed shared React
+iframe; only the host holds the identity-verification token. AgentMail, Slack, Linq, Meta
+WhatsApp and Telnyx deliver verification messages through their existing credentials.
+WhatsApp can use an approved one-parameter template outside its customer-service window.
+GitHub supports public/disabled only in this pass because it has no private message API.
+Native/management invocations remain separate from provider-triggered runs; an outbound
+channel binding must not silently revoke a native invocation's existing authority.
+
+## Agent pause and deletion
+
+Management PauseAgent persists `paused`, cancels active invocations and revokes their
+runtime access before sending signed `AgentService.Stop` to the host. Health checks
+continue. Pending invocations and messages received while paused wait until ResumeAgent;
+explicit start/resume requests are rejected while paused. Interrupted runs remain waiting
+for explicit continuation. Unaccepted steering input is retained in a pending invocation.
+Pause returns `stop_acknowledged`; a failed host call leaves the agent paused and can be
+retried. Host cancellation is cooperative through the SDK AbortSignal.
+An internal generation advances on pause/resume. Invoke carries that generation and
+Stop fences all work through the paused generation, so delayed requests cannot cancel
+newly resumed work. Pause/resume are management-only operations.
+Deletion requires pause, erases the signing key and grants, removes connection assignments,
+and retires the registry entry and thread participation. Conversation and audit history
+remain readable; retired IDs cannot be reused. Paused state is independent of health.
+
+## Agent identity and avatars
+
+Creation requires a nonempty HTTP(S) endpoint in Rust and both RPC contracts; updates
+cannot clear it. Historical endpointless registrations can be read but need an endpoint
+before they can be updated. Retired records may clear their endpoint.
+Each agent has a stable random avatar seed, derived from its UUID at creation. The
+MIT-licensed Dispatch avatar renderer lives in `sdk/ts/packages/agent-avatar` and animates
+in the registry. Custom raster images are uploaded through management UploadAgentAvatar,
+stored in private S3 objects, and exposed by short-lived signed read URLs. Replacing an
+image preserves the generated seed and removes the old object after the database commit.
+S3 is configured with ENGINE_S3_*; task dev starts a local MinIO bucket. Agent capability
+targets use a stacked-avatar picker backed by management name search before pagination.
 
 ## Agent health and registry metrics
 
@@ -171,8 +307,14 @@ inspection, and can optionally host the same agent through Tilde ConnectRPC.
   five minutes. Existing tokens retain their snapshot until expiry; cancellation
   revokes agent actions for that invocation immediately. Trace ingestion alone
   retains the five-minute terminal upload window described above.
-- Capability: a known action mapped to None (default), Any, or Only target IDs
-  where appropriate. Agent actions are read/create/update/delete/invoke and
+- Capability: a known action mapped to No/Yes for agent creation, thread reads,
+  work reads/writes and own-run updates; other actions use None/All/Selected target
+  IDs. RPCs expose a typed field per capability: BinaryPermission for binary actions
+  and TargetPermission with a TargetSelection enum for targeted actions. Stored grants
+  and signed claims retain the typed Rust action map (`no`/`yes`, `none`/`all`/`selected`).
+  Missing grants deny; unknown enums and target IDs on non-selected modes are rejected.
+  The edit UI saves toggles immediately and selected agents on modal confirmation,
+  rolls back failed updates, and has no capability Save/Cancel footer. Agent actions are read/create/update/delete/invoke and
   grant_capabilities. Thread reads, work reads/writes, own-run updates and tool
   invocation are separate capabilities. Any thread/work grant still stays inside
   the invocation's thread/agent scope. Tool targets are catalog tool names.
@@ -194,7 +336,11 @@ management routes and React serving, defaulting to true. Management-off instance
 require no OIDC configuration. Packaged React assets share the management bind;
 that listener is absent when neither management nor embedded web is enabled.
 Development omits Vite when web is disabled and Dex when management is disabled.
-The agent runtime listener and background workers remain active in every mode.
+The agent runtime and event ingress listeners and background workers remain active
+in every mode. Event ingress defaults to `127.0.0.1:8082` and mounts only signed
+provider webhook routes; management never mounts webhook ingress.
+`ENGINE_EVENT_INGRESS_LISTEN` and `ENGINE_EVENT_INGRESS_PUBLIC_URL` control its
+bind and advertised webhook origin independently of management.
 
 Taskfile owns development startup, build/test sequencing and SQLx preparation.
 Task loads `.env`, validates Rust configuration before starting services, then runs
@@ -231,7 +377,7 @@ WhatsApp and Telnyx WhatsApp. They own dynamic tool definitions and provider wir
 formats. Tool names include the connection ID to distinguish multiple accounts. Meta
 read/typing actions are not advertised for Telnyx, and email has no reaction tool.
 Connection credentials resolve through the existing encrypted store and refresh path.
-Verified callbacks at `/connections/webhooks/{connection_id}` bypass management login
+Verified callbacks at `/connections/webhooks/{connection_id}` run only on event ingress
 and check provider signatures, timestamp windows where available, and account identity.
 Conversation/thread creation, participants, message and callback receipt commit together;
 duplicate deliveries cannot create duplicate messages. Historical channel threads retain
@@ -301,7 +447,7 @@ All previously permitted runtime registry operations remain available.
 Connection management and public setup commands are separate complete services. The
 ConnectionSetupService and native OAuth callback are composed outside management login;
 every setup command validates its connection setup token. Remote provider HandleSetup
-belongs to provider/v1; agent-host Invoke, Steer, Cancel and Healthz belong to agent_host/v1.
+belongs to provider/v1; agent-host Invoke, Steer, Cancel, Stop and Healthz belong to agent_host/v1.
 This changes protocol paths and generated clients, with no legacy namespace aliases.
 It retains the single binary, common domain implementations and central database migrations.
 

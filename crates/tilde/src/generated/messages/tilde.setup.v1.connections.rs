@@ -2190,9 +2190,383 @@ pub const __CANCEL_SETUP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetConnectionNameRequest {
+    /// Field 1: `setup_id`
+    #[serde(
+        rename = "setupId",
+        alias = "setup_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub setup_id: ::buffa::alloc::string::String,
+    /// Field 2: `connection_setup_token`
+    #[serde(
+        rename = "connectionSetupToken",
+        alias = "connection_setup_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_setup_token: ::buffa::alloc::string::String,
+    /// Field 3: `action_id`
+    #[serde(
+        rename = "actionId",
+        alias = "action_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub action_id: ::buffa::alloc::string::String,
+    /// Field 4: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetConnectionNameRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetConnectionNameRequest")
+            .field("setup_id", &self.setup_id)
+            .field("connection_setup_token", &::core::format_args!("[REDACTED]"))
+            .field("action_id", &self.action_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl SetConnectionNameRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.setup.v1.SetConnectionNameRequest";
+}
+::buffa::impl_default_instance!(SetConnectionNameRequest);
+impl ::buffa::MessageName for SetConnectionNameRequest {
+    const PACKAGE: &'static str = "tilde.setup.v1";
+    const NAME: &'static str = "SetConnectionNameRequest";
+    const FULL_NAME: &'static str = "tilde.setup.v1.SetConnectionNameRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.setup.v1.SetConnectionNameRequest";
+}
+impl ::buffa::Message for SetConnectionNameRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.setup_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.setup_id) as u64;
+        }
+        if !self.connection_setup_token.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.connection_setup_token)
+                        as u64;
+        }
+        if !self.action_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.action_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.setup_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.setup_id, buf);
+        }
+        if !self.connection_setup_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.connection_setup_token, buf);
+        }
+        if !self.action_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.action_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.setup_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_setup_token, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.action_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.setup_id.clear();
+        self.connection_setup_token.clear();
+        self.action_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetConnectionNameRequest {
+    const PROTO_FQN: &'static str = "tilde.setup.v1.SetConnectionNameRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetConnectionNameRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_CONNECTION_NAME_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.setup.v1.SetConnectionNameRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetConnectionNameRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetConnectionNameRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetConnectionNameResponse {
+    /// Field 1: `state`
+    #[serde(
+        rename = "state",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub state: ::buffa::MessageField<Brokering, ::buffa::Inline<Brokering>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetConnectionNameResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetConnectionNameResponse").field("state", &self.state).finish()
+    }
+}
+impl SetConnectionNameResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.setup.v1.SetConnectionNameResponse";
+}
+::buffa::impl_default_instance!(SetConnectionNameResponse);
+impl ::buffa::MessageName for SetConnectionNameResponse {
+    const PACKAGE: &'static str = "tilde.setup.v1";
+    const NAME: &'static str = "SetConnectionNameResponse";
+    const FULL_NAME: &'static str = "tilde.setup.v1.SetConnectionNameResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.setup.v1.SetConnectionNameResponse";
+}
+impl ::buffa::Message for SetConnectionNameResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.state.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.state.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.state.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.state.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.state.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.state = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetConnectionNameResponse {
+    const PROTO_FQN: &'static str = "tilde.setup.v1.SetConnectionNameResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetConnectionNameResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_CONNECTION_NAME_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.setup.v1.SetConnectionNameResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetConnectionNameResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetConnectionNameResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct Brokering {
+    /// Ordered setup steps for the selected connection type, below the provider overview.
+    ///
+    /// Field 26: `setup_instructions`
+    #[serde(
+        rename = "setupInstructions",
+        alias = "setup_instructions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub setup_instructions: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 24: `provider_name`
+    #[serde(
+        rename = "providerName",
+        alias = "provider_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub provider_name: ::buffa::alloc::string::String,
+    /// Field 25: `account_name_label`
+    #[serde(
+        rename = "accountNameLabel",
+        alias = "account_name_label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub account_name_label: ::buffa::alloc::string::String,
+    /// Field 22: `icon_url`
+    #[serde(
+        rename = "iconUrl",
+        alias = "icon_url",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub icon_url: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 23: `instructions`
+    #[serde(
+        rename = "instructions",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub instructions: ::core::option::Option<::buffa::alloc::string::String>,
     /// Field 1: `setup_id`
     #[serde(
         rename = "setupId",
@@ -2301,6 +2675,11 @@ pub struct Brokering {
 impl ::core::fmt::Debug for Brokering {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Brokering")
+            .field("setup_instructions", &self.setup_instructions)
+            .field("provider_name", &self.provider_name)
+            .field("account_name_label", &self.account_name_label)
+            .field("icon_url", &self.icon_url)
+            .field("instructions", &self.instructions)
             .field("setup_id", &self.setup_id)
             .field("connection_id", &self.connection_id)
             .field("action_id", &self.action_id)
@@ -2326,6 +2705,26 @@ impl Brokering {
     pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.setup.v1.Brokering";
 }
 impl Brokering {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::icon_url`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_icon_url(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.icon_url = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::instructions`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_instructions(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.instructions = Some(value.into());
+        self
+    }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::error_code`] to `Some(value)`, consuming and returning `self`.
@@ -2487,6 +2886,25 @@ impl ::buffa::Message for Brokering {
         if let Some(ref v) = self.webhook_url {
             size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.icon_url {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.instructions {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.provider_name.is_empty() {
+            size
+                += 2u64 + ::buffa::types::string_encoded_len(&self.provider_name) as u64;
+        }
+        if !self.account_name_label.is_empty() {
+            size
+                += 2u64
+                    + ::buffa::types::string_encoded_len(&self.account_name_label)
+                        as u64;
+        }
+        for v in &self.setup_instructions {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2603,6 +3021,21 @@ impl ::buffa::Message for Brokering {
         }
         if let Some(ref v) = self.webhook_url {
             ::buffa::types::put_string_field(21u32, v, buf);
+        }
+        if let Some(ref v) = self.icon_url {
+            ::buffa::types::put_string_field(22u32, v, buf);
+        }
+        if let Some(ref v) = self.instructions {
+            ::buffa::types::put_string_field(23u32, v, buf);
+        }
+        if !self.provider_name.is_empty() {
+            ::buffa::types::put_string_field(24u32, &self.provider_name, buf);
+        }
+        if !self.account_name_label.is_empty() {
+            ::buffa::types::put_string_field(25u32, &self.account_name_label, buf);
+        }
+        for v in &self.setup_instructions {
+            ::buffa::types::put_string_field(26u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2870,6 +3303,55 @@ impl ::buffa::Message for Brokering {
                     buf,
                 )?;
             }
+            22u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .icon_url
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .instructions
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            24u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.provider_name, buf)?;
+            }
+            25u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.account_name_label, buf)?;
+            }
+            26u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.setup_instructions.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2892,6 +3374,11 @@ impl ::buffa::Message for Brokering {
         self.type_id.clear();
         self.input_schema_json = ::core::option::Option::None;
         self.webhook_url = ::core::option::Option::None;
+        self.icon_url = ::core::option::Option::None;
+        self.instructions = ::core::option::Option::None;
+        self.provider_name.clear();
+        self.account_name_label.clear();
+        self.setup_instructions.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2919,6 +3406,21 @@ impl<'de> serde::Deserialize<'de> for Brokering {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<Brokering, A::Error> {
+                let mut __f_setup_instructions: ::core::option::Option<
+                    ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_provider_name: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_account_name_label: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_icon_url: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_instructions: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
                 let mut __f_setup_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -2963,6 +3465,78 @@ impl<'de> serde::Deserialize<'de> for Brokering {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
+                        "setupInstructions" | "setup_instructions" => {
+                            __f_setup_instructions = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::vec::Vec<
+                                        ::buffa::alloc::string::String,
+                                    >;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::null_as_default(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "providerName" | "provider_name" => {
+                            __f_provider_name = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "accountNameLabel" | "account_name_label" => {
+                            __f_account_name_label = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "iconUrl" | "icon_url" => {
+                            __f_icon_url = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
+                        "instructions" => {
+                            __f_instructions = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
                         "setupId" | "setup_id" => {
                             __f_setup_id = Some({
                                 struct _S;
@@ -3345,6 +3919,21 @@ impl<'de> serde::Deserialize<'de> for Brokering {
                     }
                 }
                 let mut __r = <Brokering as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_setup_instructions {
+                    __r.setup_instructions = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_provider_name {
+                    __r.provider_name = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_account_name_label {
+                    __r.account_name_label = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_icon_url {
+                    __r.icon_url = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_instructions {
+                    __r.instructions = v;
+                }
                 if let ::core::option::Option::Some(v) = __f_setup_id {
                     __r.setup_id = v;
                 }

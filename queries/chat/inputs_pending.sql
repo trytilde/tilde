@@ -1,1 +1,1 @@
-SELECT id,text FROM chat_inputs WHERE invocation_id=$1 AND NOT accepted ORDER BY id;
+SELECT i.id,i.text FROM chat_inputs i JOIN chat_invocations v ON v.id=i.invocation_id LEFT JOIN chat_messages m ON m.id=i.id WHERE i.invocation_id=$1 AND NOT i.accepted AND (m.source_identity_id IS NULL OR chat_identity_allowed(v.agent_id,m.source_identity_id)) ORDER BY i.id;

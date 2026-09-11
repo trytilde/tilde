@@ -32,8 +32,10 @@ pub fn management_router(
     connections: crate::connections::service::Connections,
     oidc: super::oidc::Oidc,
 ) -> Router {
+    let access = crate::chat::access::AgentAccess::new(connections.clone(), chat.clone());
     Router::new()
         .merge(crate::agent::rpc::management::router(agents))
+        .merge(crate::chat::access::rpc::management_router(access.clone()))
         .merge(crate::chat::rpc::management::router(chat.clone()))
         .merge(crate::connections::rpc::management::router(
             connections.clone(),
@@ -43,8 +45,16 @@ pub fn management_router(
             super::oidc::management_guard,
         ))
         .merge(oidc.router())
+        .merge(crate::chat::access::rpc::public_router(access))
         .merge(crate::connections::rpc::setup::router(connections.clone()))
-        .merge(crate::chat::providers::ingress::router(chat, connections))
+}
+/// Public provider events only. Each adapter authenticates its own webhook signature.
+/// Management RPCs, browser setup and OAuth callbacks never mount on this listener.
+pub fn event_ingress_router(
+    chat: Chat,
+    connections: crate::connections::service::Connections,
+) -> Router {
+    crate::chat::providers::ingress::router(chat, connections)
 }
 async fn agent_guard(State(chat): State<Chat>, mut request: Request, next: Next) -> Response {
     let token = request

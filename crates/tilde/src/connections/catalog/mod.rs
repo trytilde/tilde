@@ -78,7 +78,10 @@ pub async fn register(
             .and_then(|remote| remote.ui_url.as_deref()),
         remote_authorization,
         remote_authorization_id,
-        &provider.categories
+        &provider.categories,
+        provider.icon_url,
+        provider.instructions,
+        provider.account_name_label
     )
     .execute(&mut *tx)
     .await?;
@@ -253,6 +256,9 @@ pub async fn get(pool: &PgPool, id: &str) -> Result<Provider, Error> {
         });
     }
     let provider = Provider {
+        account_name_label: head.account_name_label,
+        icon_url: head.icon_url,
+        instructions: head.instructions,
         id: id.into(),
         name: head.name,
         categories: head.categories,

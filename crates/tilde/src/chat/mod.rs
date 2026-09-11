@@ -11,6 +11,8 @@
 //! provider-defined tool transport lives in `tools`, execution in `runtime`.
 use crate::chat as application;
 use crate::proto::tilde::types::v1 as types;
+pub mod access;
+pub(crate) mod agent_lifecycle;
 pub mod audit;
 pub mod providers;
 use audit::AttachmentRecords;

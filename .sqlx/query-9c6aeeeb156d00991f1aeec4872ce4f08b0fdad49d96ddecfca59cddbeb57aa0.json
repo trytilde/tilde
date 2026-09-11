@@ -1,0 +1,73 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, avatar_seed, avatar_key, paused, endpoint_url, created_at, updated_at, capabilities AS \"capabilities!: Json<Capabilities>\"\nFROM agents\nWHERE deleted_at IS NULL AND ($1::TIMESTAMPTZ IS NULL OR (created_at, id) < ($1, $2))\nAND ($4 = '' OR strpos(lower(name), lower($4)) > 0 OR id::text = $4)\nORDER BY created_at DESC, id DESC\nLIMIT $3;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "avatar_seed",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "avatar_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "paused",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9c6aeeeb156d00991f1aeec4872ce4f08b0fdad49d96ddecfca59cddbeb57aa0"
+}

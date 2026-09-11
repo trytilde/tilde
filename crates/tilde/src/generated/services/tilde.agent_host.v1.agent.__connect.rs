@@ -22,6 +22,14 @@ pub type OwnedCancelRequestView = ::buffa::view::OwnedView<
 pub type OwnedCancelResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<'static>,
 >;
+///Shorthand for `OwnedView<StopRequestView<'static>>`.
+pub type OwnedStopRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_host::v1::__buffa::view::StopRequestView<'static>,
+>;
+///Shorthand for `OwnedView<StopResponseView<'static>>`.
+pub type OwnedStopResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_host::v1::__buffa::view::StopResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<HealthzRequestView<'static>>`.
 pub type OwnedHealthzRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::agent_host::v1::__buffa::view::HealthzRequestView<'static>,
@@ -132,6 +140,40 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::StopResponse>
+for crate::proto::tilde::agent_host::v1::__buffa::view::StopResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::StopResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_host::v1::__buffa::view::StopResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::HealthzResponse>
 for crate::proto::tilde::agent_host::v1::__buffa::view::HealthzResponseView<'_> {
     fn encode(
@@ -183,6 +225,12 @@ pub const AGENT_SERVICE_STEER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::ser
 /// Static [`Spec`](::connectrpc::Spec) for the `Cancel` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_CANCEL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.agent_host.v1.AgentService/Cancel",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `Stop` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_STOP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_host.v1.AgentService/Stop",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -309,6 +357,29 @@ pub trait AgentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::agent_host::v1::CancelResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the Stop RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn stop<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::agent_host::v1::StopRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::agent_host::v1::StopResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -455,6 +526,35 @@ impl<S: AgentService> AgentServiceExt for S {
             .with_spec(AGENT_SERVICE_CANCEL_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
+                "Stop",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::agent_host::v1::__buffa::view::StopRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::agent_host::v1::StopRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.stop(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::agent_host::v1::StopResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_STOP_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
                 "Healthz",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -554,6 +654,12 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .with_spec(AGENT_SERVICE_CANCEL_SPEC),
                 )
             }
+            "Stop" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_STOP_SPEC),
+                )
+            }
             "Healthz" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -616,6 +722,28 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::agent_host::v1::CancelResponse,
+                        >(format)
+                })
+            }
+            "Stop" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::agent_host::v1::StopRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::agent_host::v1::__buffa::view::StopRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::agent_host::v1::StopRequest,
+                    >::from_parts(&req, &body);
+                    svc.stop(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::agent_host::v1::StopResponse,
                         >(format)
                 })
             }
@@ -911,6 +1039,47 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_CANCEL_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the Stop RPC. Sends a request to /tilde.agent_host.v1.AgentService/Stop.
+    pub async fn stop(
+        &self,
+        request: crate::proto::tilde::agent_host::v1::StopRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::agent_host::v1::__buffa::view::StopResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.stop_with_options(request, ::connectrpc::client::CallOptions::default())
+            .await
+    }
+    /// Call the Stop RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn stop_with_options(
+        &self,
+        request: crate::proto::tilde::agent_host::v1::StopRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::agent_host::v1::__buffa::view::StopResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_STOP_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )

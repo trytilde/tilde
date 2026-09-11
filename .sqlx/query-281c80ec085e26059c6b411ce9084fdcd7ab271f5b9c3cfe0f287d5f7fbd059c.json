@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_channel_identity_access(connection_id,agent_id,identity_id,allowed) VALUES($1,$2,$3,$4)\nON CONFLICT(connection_id,agent_id,identity_id) DO UPDATE SET allowed=excluded.allowed;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "281c80ec085e26059c6b411ce9084fdcd7ab271f5b9c3cfe0f287d5f7fbd059c"
+}

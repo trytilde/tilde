@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_channel_identities SET verified_at=COALESCE(verified_at,NOW()) WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4b5a99660f42e21b0e2205b5501fd8e34a05bcbbe277baa1fb612bff3ea62284"
+}

@@ -109,14 +109,14 @@ impl AgentService for Rpc {
         let ids = page.agents.iter().map(|agent| agent.id).collect::<Vec<_>>();
         let mut metrics = self.agents.metrics(&ids).await?;
         Response::ok(runtime_pb::ListAgentsResponse {
-            agents: page
-                .agents
-                .into_iter()
-                .map(|agent| {
-                    let detail = metrics.remove(&agent.id);
-                    wire(agent, detail)
-                })
-                .collect(),
+            agents: futures::future::try_join_all(page.agents.into_iter().map(|agent| {
+                let detail = metrics.remove(&agent.id);
+                async move {
+                    let avatar_url = self.agents.avatar_url(&agent).await?;
+                    Ok::<_, crate::error::Error>(wire(agent, detail, avatar_url))
+                }
+            }))
+            .await?,
             next_page_token: page.next_page_token,
             ..Default::default()
         })

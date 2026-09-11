@@ -3,6 +3,34 @@ use super::*;
 use crate::proto::tilde::types::v1 as types;
 pub struct Agentmail;
 impl Adapter for Agentmail {
+    fn identity_types(&self) -> &'static [types::IdentityType] {
+        &[types::IdentityType::Email]
+    }
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity> {
+        let recipient = provider_identity(value)?;
+        if recipient.identity_type != identity_type {
+            return Err(ConnectError::invalid_argument(
+                "This provider does not support that identity type",
+            ));
+        }
+        recipient.validate()?;
+        Ok(recipient)
+    }
+    fn send_verification<'a>(
+        &'a self,
+        a: &'a Access,
+        m: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>> {
+        Box::pin(async move {
+            a.json(a.post(a.url("agentmail_api","https://api.agentmail.to/v0",&["inboxes",a.secret("inbox_id")?,"messages","send"])?,"api_key")?.json(&json!({"to":[m.value],"subject":"Approve access to your assistant","text":m.text}))).await?;
+            Ok(())
+        })
+    }
+
     fn webhook<'a>(
         &'a self,
         a: &'a Access,
@@ -87,7 +115,7 @@ impl Adapter for Agentmail {
                 event_id: required(&p, "event_id")?.into(),
                 message_id: required(m, "message_id")?.into(),
                 thread_id: required(m, "thread_id")?.into(),
-                sender_id: sender.into(),
+                sender: provider_identity(sender)?,
                 sender_name: sender.into(),
                 text: optional(m, "html")
                     .or_else(|| optional(m, "text"))
@@ -215,4 +243,23 @@ impl Adapter for Agentmail {
             .await
         })
     }
+}
+
+/// Canonical sender values belong to this provider adapter.
+fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {
+    let value = raw.trim();
+    let value = if let Some((_, mailbox)) = value.rsplit_once('<') {
+        mailbox
+            .strip_suffix('>')
+            .ok_or_else(|| ConnectError::invalid_argument("Invalid AgentMail recipient"))?
+    } else {
+        value
+    };
+    if value.contains(['\r', '\n', ' ', '<', '>']) || value.matches('@').count() != 1 {
+        return Err(ConnectError::invalid_argument("Use an email address"));
+    }
+    Ok(crate::chat::access::identity::Identity {
+        identity_type: types::IdentityType::Email,
+        value: value.to_lowercase(),
+    })
 }

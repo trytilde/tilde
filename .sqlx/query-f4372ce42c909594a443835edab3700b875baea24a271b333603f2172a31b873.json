@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH eligible AS (\n SELECT i.id,a.generation FROM chat_invocations i JOIN agents a ON a.id=i.agent_id JOIN chat_runs r ON r.id=i.run_id\n WHERE i.id=$1 AND i.status='pending' AND NOT a.paused AND a.deleted_at IS NULL AND chat_channel_run_allowed(i.agent_id,i.thread_id,r.source_identity_id,r.channel_origin) FOR SHARE OF a\n)\nUPDATE chat_invocations i SET status='running',started_at=NOW(),lease_expires_at=NOW()+INTERVAL '30 seconds'\nFROM eligible e WHERE i.id=e.id AND i.status='pending'\nRETURNING i.id,i.run_id,i.thread_id,i.agent_id,i.traceparent,i.tracestate,e.generation AS \"generation!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "traceparent",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "tracestate",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "generation!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f4372ce42c909594a443835edab3700b875baea24a271b333603f2172a31b873"
+}

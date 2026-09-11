@@ -23,7 +23,7 @@ async fn create(agents: &Agents, caps: Capabilities) -> Uuid {
         .create(CreateAgent {
             id,
             name: "IAM fixture".into(),
-            endpoint_url: None,
+            endpoint_url: "http://127.0.0.1:9999".into(),
             webhook_signing_key: SecretString::from("test-key-with-more-than-thirty-two-bytes"),
             capabilities: caps,
         })
@@ -96,24 +96,24 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
     let caps = Capabilities(BTreeMap::from([
         (
             Capability::AgentsRead,
-            Reach::Only {
+            Reach::Selected {
                 ids: vec![target.to_string()],
             },
         ),
-        (Capability::AgentsCreate, Reach::Any),
+        (Capability::AgentsCreate, Reach::Yes),
         (
             Capability::AgentsUpdate,
-            Reach::Only {
+            Reach::Selected {
                 ids: vec![target.to_string()],
             },
         ),
         (
             Capability::AgentsGrant,
-            Reach::Only {
+            Reach::Selected {
                 ids: vec![target.to_string()],
             },
         ),
-        (Capability::ThreadRead, Reach::Any),
+        (Capability::ThreadRead, Reach::Yes),
     ]));
     let actor = create(&agents, caps.clone()).await;
     let (inv, thread, token) = invocation(&chat, &db.pool, actor).await;
@@ -148,7 +148,7 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
             .status(),
         403
     );
-    let grants = json!({"grants":{"agents.delete":{"mode":"any"}}});
+    let grants = json!({"agentsDelete":{"mode":"TARGET_SELECTION_ALL"}});
     assert_eq!(
         rpc(
             &http,
@@ -161,7 +161,7 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
         .status(),
         403
     );
-    let grants = json!({"grants":{"thread.read":{"mode":"any"}}});
+    let grants = json!({"threadRead":"BINARY_PERMISSION_YES"});
     assert_eq!(
         rpc(
             &http,
@@ -188,13 +188,13 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
             &url,
             "CreateAgent",
             token,
-            json!({"name":"child","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes"})
+            json!({"name":"child","endpointUrl":"https://child.example.com","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes"})
         )
         .await
         .status(),
         200
     );
-    assert_eq!(rpc(&http,&url,"CreateAgent",token,json!({"name":"child","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes","capabilities":grants})).await.status(),403);
+    assert_eq!(rpc(&http,&url,"CreateAgent",token,json!({"name":"child","endpointUrl":"https://child.example.com","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes","capabilities":grants})).await.status(),403);
     for path in [
         "/auth/login",
         "/auth/callback",
@@ -231,7 +231,7 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
             &url,
             "CreateAgent",
             empty.expose_secret(),
-            json!({"name":"denied","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes"})
+            json!({"name":"denied","endpointUrl":"https://denied.example.com","webhookSigningKey":"test-key-with-more-than-thirty-two-bytes"})
         )
         .await
         .status(),
@@ -327,7 +327,7 @@ async fn listeners_enforce_scopes_grants_and_live_invocation_state() {
 async fn agents_for_renewal(pool: &sqlx::PgPool, chat: &Chat, actor: Uuid, original: &str) {
     sqlx::query("UPDATE agents SET capabilities=$2 WHERE id=$1")
         .bind(actor)
-        .bind(json!({"agents.delete":{"mode":"any"},"thread.read":{"mode":"none"}}))
+        .bind(json!({"agents.delete":{"mode":"all"},"thread.read":{"mode":"no"}}))
         .execute(pool)
         .await
         .unwrap();
@@ -347,6 +347,7 @@ async fn connection_callback_bypasses_management_auth_but_requires_valid_state()
         db.pool.clone(),
         crypto.clone(),
         "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
     )
     .unwrap();
     let mut oauth = OAuth::standard("https://provider.example/token");
@@ -356,6 +357,9 @@ async fn connection_callback_bypasses_management_auth_but_requires_valid_state()
     connections
         .register_provider(
             Provider {
+                account_name_label: None,
+                icon_url: None,
+                instructions: None,
                 id: "custom/callback-test".into(),
                 name: "Callback test".into(),
                 kind: ProviderKind::Configured,
@@ -494,7 +498,7 @@ async fn management_and_runtime_contracts_are_distinct_and_cache_stays_in_runtim
     let chat = Chat::new(db.pool.clone(), crypto, "http://127.0.0.1".into());
     let agent = create(
         &agents,
-        Capabilities(BTreeMap::from([(Capability::ThreadRead, Reach::Any)])),
+        Capabilities(BTreeMap::from([(Capability::ThreadRead, Reach::Yes)])),
     )
     .await;
     let (_, thread, token) = invocation(&chat, &db.pool, agent).await;

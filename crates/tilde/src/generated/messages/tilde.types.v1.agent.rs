@@ -163,10 +163,352 @@ impl ::buffa::Enumeration for AgentHealthStatus {
         ]
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BinaryPermission {
+    BINARY_PERMISSION_UNSPECIFIED = 0i32,
+    BINARY_PERMISSION_NO = 1i32,
+    BINARY_PERMISSION_YES = 2i32,
+}
+impl BinaryPermission {
+    ///Idiomatic alias for [`Self::BINARY_PERMISSION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::BINARY_PERMISSION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BINARY_PERMISSION_NO`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const No: Self = Self::BINARY_PERMISSION_NO;
+    ///Idiomatic alias for [`Self::BINARY_PERMISSION_YES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Yes: Self = Self::BINARY_PERMISSION_YES;
+}
+impl ::core::default::Default for BinaryPermission {
+    fn default() -> Self {
+        Self::BINARY_PERMISSION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BinaryPermission {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BinaryPermission {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BinaryPermission;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(BinaryPermission)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BinaryPermission, E> {
+                <BinaryPermission as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BinaryPermission, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BinaryPermission as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BinaryPermission, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BinaryPermission as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BinaryPermission, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BinaryPermission {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BinaryPermission {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::BINARY_PERMISSION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::BINARY_PERMISSION_NO),
+            2i32 => ::core::option::Option::Some(Self::BINARY_PERMISSION_YES),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BINARY_PERMISSION_UNSPECIFIED => "BINARY_PERMISSION_UNSPECIFIED",
+            Self::BINARY_PERMISSION_NO => "BINARY_PERMISSION_NO",
+            Self::BINARY_PERMISSION_YES => "BINARY_PERMISSION_YES",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BINARY_PERMISSION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BINARY_PERMISSION_UNSPECIFIED)
+            }
+            "BINARY_PERMISSION_NO" => {
+                ::core::option::Option::Some(Self::BINARY_PERMISSION_NO)
+            }
+            "BINARY_PERMISSION_YES" => {
+                ::core::option::Option::Some(Self::BINARY_PERMISSION_YES)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BINARY_PERMISSION_UNSPECIFIED,
+            Self::BINARY_PERMISSION_NO,
+            Self::BINARY_PERMISSION_YES,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum TargetSelection {
+    TARGET_SELECTION_UNSPECIFIED = 0i32,
+    TARGET_SELECTION_NONE = 1i32,
+    TARGET_SELECTION_ALL = 2i32,
+    TARGET_SELECTION_SELECTED = 3i32,
+}
+impl TargetSelection {
+    ///Idiomatic alias for [`Self::TARGET_SELECTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::TARGET_SELECTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::TARGET_SELECTION_NONE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const None: Self = Self::TARGET_SELECTION_NONE;
+    ///Idiomatic alias for [`Self::TARGET_SELECTION_ALL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const All: Self = Self::TARGET_SELECTION_ALL;
+    ///Idiomatic alias for [`Self::TARGET_SELECTION_SELECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Selected: Self = Self::TARGET_SELECTION_SELECTED;
+}
+impl ::core::default::Default for TargetSelection {
+    fn default() -> Self {
+        Self::TARGET_SELECTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for TargetSelection {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for TargetSelection {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = TargetSelection;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(TargetSelection)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<TargetSelection, E> {
+                <TargetSelection as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<TargetSelection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TargetSelection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<TargetSelection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <TargetSelection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<TargetSelection, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TargetSelection {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for TargetSelection {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::TARGET_SELECTION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::TARGET_SELECTION_NONE),
+            2i32 => ::core::option::Option::Some(Self::TARGET_SELECTION_ALL),
+            3i32 => ::core::option::Option::Some(Self::TARGET_SELECTION_SELECTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::TARGET_SELECTION_UNSPECIFIED => "TARGET_SELECTION_UNSPECIFIED",
+            Self::TARGET_SELECTION_NONE => "TARGET_SELECTION_NONE",
+            Self::TARGET_SELECTION_ALL => "TARGET_SELECTION_ALL",
+            Self::TARGET_SELECTION_SELECTED => "TARGET_SELECTION_SELECTED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "TARGET_SELECTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::TARGET_SELECTION_UNSPECIFIED)
+            }
+            "TARGET_SELECTION_NONE" => {
+                ::core::option::Option::Some(Self::TARGET_SELECTION_NONE)
+            }
+            "TARGET_SELECTION_ALL" => {
+                ::core::option::Option::Some(Self::TARGET_SELECTION_ALL)
+            }
+            "TARGET_SELECTION_SELECTED" => {
+                ::core::option::Option::Some(Self::TARGET_SELECTION_SELECTED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::TARGET_SELECTION_UNSPECIFIED,
+            Self::TARGET_SELECTION_NONE,
+            Self::TARGET_SELECTION_ALL,
+            Self::TARGET_SELECTION_SELECTED,
+        ]
+    }
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Agent {
+    /// Stable random seed for the generated avatar; retained after custom uploads.
+    ///
+    /// Field 11: `avatar_seed`
+    #[serde(
+        rename = "avatarSeed",
+        alias = "avatar_seed",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub avatar_seed: ::buffa::alloc::string::String,
+    /// Short-lived signed URL for a custom avatar, when present.
+    ///
+    /// Field 12: `avatar_url`
+    #[serde(
+        rename = "avatarUrl",
+        alias = "avatar_url",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub avatar_url: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Paused agents remain health checked but receive no invocations.
+    ///
+    /// Field 10: `paused`
+    #[serde(
+        rename = "paused",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub paused: bool,
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -227,6 +569,9 @@ pub struct Agent {
 impl ::core::fmt::Debug for Agent {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Agent")
+            .field("avatar_seed", &self.avatar_seed)
+            .field("avatar_url", &self.avatar_url)
+            .field("paused", &self.paused)
             .field("id", &self.id)
             .field("name", &self.name)
             .field("endpoint_url", &self.endpoint_url)
@@ -245,6 +590,16 @@ impl Agent {
     pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.Agent";
 }
 impl Agent {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::avatar_url`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_avatar_url(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.avatar_url = Some(value.into());
+        self
+    }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
     ///Sets [`Self::endpoint_url`] to `Some(value)`, consuming and returning `self`.
@@ -317,6 +672,15 @@ impl ::buffa::Message for Agent {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.paused {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.avatar_seed.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.avatar_seed) as u64;
+        }
+        if let Some(ref v) = self.avatar_url {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -367,6 +731,15 @@ impl ::buffa::Message for Agent {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        if self.paused {
+            ::buffa::types::put_bool_field(10u32, self.paused, buf);
+        }
+        if !self.avatar_seed.is_empty() {
+            ::buffa::types::put_string_field(11u32, &self.avatar_seed, buf);
+        }
+        if let Some(ref v) = self.avatar_url {
+            ::buffa::types::put_string_field(12u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -451,6 +824,32 @@ impl ::buffa::Message for Agent {
                     ctx,
                 )?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.paused = ::buffa::types::decode_bool(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.avatar_seed, buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .avatar_url
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -466,6 +865,9 @@ impl ::buffa::Message for Agent {
         self.updated_at = ::buffa::MessageField::none();
         self.metrics = ::buffa::MessageField::none();
         self.capabilities = ::buffa::MessageField::none();
+        self.paused = false;
+        self.avatar_seed.clear();
+        self.avatar_url = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -987,19 +1389,110 @@ pub const __AGENT_HEALTH_HOUR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     from_json: ::buffa::type_registry::any_from_json::<AgentHealthHour>,
     is_wkt: false,
 };
+/// Missing fields deny access. Binary actions cannot carry target IDs.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Capabilities {
-    /// Field 1: `grants`
+    /// Field 2: `agents_read`
     #[serde(
-        rename = "grants",
-        skip_serializing_if = "::buffa::__private::HashMap::is_empty",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
+        rename = "agentsRead",
+        alias = "agents_read",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub grants: ::buffa::__private::HashMap<
-        ::buffa::alloc::string::String,
-        CapabilityScope,
+    pub agents_read: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Field 3: `agents_create`
+    #[serde(
+        rename = "agentsCreate",
+        alias = "agents_create",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub agents_create: ::buffa::EnumValue<BinaryPermission>,
+    /// Field 4: `agents_update`
+    #[serde(
+        rename = "agentsUpdate",
+        alias = "agents_update",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_update: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Field 5: `agents_delete`
+    #[serde(
+        rename = "agentsDelete",
+        alias = "agents_delete",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_delete: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Field 6: `agents_invoke`
+    #[serde(
+        rename = "agentsInvoke",
+        alias = "agents_invoke",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_invoke: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Field 7: `agents_grant_capabilities`
+    #[serde(
+        rename = "agentsGrantCapabilities",
+        alias = "agents_grant_capabilities",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_grant_capabilities: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Field 8: `thread_read`
+    #[serde(
+        rename = "threadRead",
+        alias = "thread_read",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub thread_read: ::buffa::EnumValue<BinaryPermission>,
+    /// Field 9: `work_read`
+    #[serde(
+        rename = "workRead",
+        alias = "work_read",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub work_read: ::buffa::EnumValue<BinaryPermission>,
+    /// Field 10: `work_write`
+    #[serde(
+        rename = "workWrite",
+        alias = "work_write",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub work_write: ::buffa::EnumValue<BinaryPermission>,
+    /// Field 11: `run_update`
+    #[serde(
+        rename = "runUpdate",
+        alias = "run_update",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub run_update: ::buffa::EnumValue<BinaryPermission>,
+    /// Field 12: `tools_invoke`
+    #[serde(
+        rename = "toolsInvoke",
+        alias = "tools_invoke",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub tools_invoke: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
     >,
     #[serde(skip)]
     #[doc(hidden)]
@@ -1007,7 +1500,19 @@ pub struct Capabilities {
 }
 impl ::core::fmt::Debug for Capabilities {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Capabilities").field("grants", &self.grants).finish()
+        f.debug_struct("Capabilities")
+            .field("agents_read", &self.agents_read)
+            .field("agents_create", &self.agents_create)
+            .field("agents_update", &self.agents_update)
+            .field("agents_delete", &self.agents_delete)
+            .field("agents_invoke", &self.agents_invoke)
+            .field("agents_grant_capabilities", &self.agents_grant_capabilities)
+            .field("thread_read", &self.thread_read)
+            .field("work_read", &self.work_read)
+            .field("work_write", &self.work_write)
+            .field("run_update", &self.run_update)
+            .field("tools_invoke", &self.tools_invoke)
+            .finish()
     }
 }
 impl Capabilities {
@@ -1037,12 +1542,84 @@ impl ::buffa::Message for Capabilities {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        size
-            += ::buffa::map_codec::message_field_len::<
-                ::buffa::map_codec::Str,
-                _,
-                _,
-            >(&self.grants, 1u64, __cache);
+        if self.agents_read.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_read.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        {
+            let val = self.agents_create.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.agents_update.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_update.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_delete.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_delete.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_invoke.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_invoke.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_grant_capabilities.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_grant_capabilities.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        {
+            let val = self.thread_read.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.work_read.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.work_write.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.run_update.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.tools_invoke.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.tools_invoke.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1053,11 +1630,84 @@ impl ::buffa::Message for Capabilities {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        ::buffa::map_codec::write_message_field::<
-            ::buffa::map_codec::Str,
-            _,
-            _,
-        >(&self.grants, 1u32, __cache, buf);
+        if self.agents_read.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_read.write_to(__cache, buf);
+        }
+        {
+            let val = self.agents_create.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.agents_update.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_update.write_to(__cache, buf);
+        }
+        if self.agents_delete.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_delete.write_to(__cache, buf);
+        }
+        if self.agents_invoke.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_invoke.write_to(__cache, buf);
+        }
+        if self.agents_grant_capabilities.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_grant_capabilities.write_to(__cache, buf);
+        }
+        {
+            let val = self.thread_read.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
+        }
+        {
+            let val = self.work_read.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
+        }
+        {
+            let val = self.work_write.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
+        }
+        {
+            let val = self.run_update.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(11u32, val, buf);
+            }
+        }
+        if self.tools_invoke.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                12u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.tools_invoke.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -1071,16 +1721,116 @@ impl ::buffa::Message for Capabilities {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
-            1u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                ::buffa::map_codec::merge_entry::<
-                    ::buffa::map_codec::Str,
-                    ::buffa::map_codec::Msg<_>,
-                    _,
-                >(&mut self.grants, buf, ctx)?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_read.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.agents_create = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_update.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_delete.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_invoke.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_grant_capabilities.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.thread_read = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.work_read = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.work_write = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.run_update = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.tools_invoke.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -1090,7 +1840,17 @@ impl ::buffa::Message for Capabilities {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.grants.clear();
+        self.agents_read = ::buffa::MessageField::none();
+        self.agents_create = ::buffa::EnumValue::from(0);
+        self.agents_update = ::buffa::MessageField::none();
+        self.agents_delete = ::buffa::MessageField::none();
+        self.agents_invoke = ::buffa::MessageField::none();
+        self.agents_grant_capabilities = ::buffa::MessageField::none();
+        self.thread_read = ::buffa::EnumValue::from(0);
+        self.work_read = ::buffa::EnumValue::from(0);
+        self.work_write = ::buffa::EnumValue::from(0);
+        self.run_update = ::buffa::EnumValue::from(0);
+        self.tools_invoke = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1126,16 +1886,16 @@ pub const __CAPABILITIES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct CapabilityScope {
-    /// none, any, or only. IDs are supported only for target-scoped actions.
-    ///
+pub struct TargetPermission {
     /// Field 1: `mode`
     #[serde(
         rename = "mode",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub mode: ::buffa::alloc::string::String,
+    pub mode: ::buffa::EnumValue<TargetSelection>,
+    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    ///
     /// Field 2: `ids`
     #[serde(
         rename = "ids",
@@ -1147,29 +1907,29 @@ pub struct CapabilityScope {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for CapabilityScope {
+impl ::core::fmt::Debug for TargetPermission {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CapabilityScope")
+        f.debug_struct("TargetPermission")
             .field("mode", &self.mode)
             .field("ids", &self.ids)
             .finish()
     }
 }
-impl CapabilityScope {
+impl TargetPermission {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.CapabilityScope";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.TargetPermission";
 }
-::buffa::impl_default_instance!(CapabilityScope);
-impl ::buffa::MessageName for CapabilityScope {
+::buffa::impl_default_instance!(TargetPermission);
+impl ::buffa::MessageName for TargetPermission {
     const PACKAGE: &'static str = "tilde.types.v1";
-    const NAME: &'static str = "CapabilityScope";
-    const FULL_NAME: &'static str = "tilde.types.v1.CapabilityScope";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.CapabilityScope";
+    const NAME: &'static str = "TargetPermission";
+    const FULL_NAME: &'static str = "tilde.types.v1.TargetPermission";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.TargetPermission";
 }
-impl ::buffa::Message for CapabilityScope {
+impl ::buffa::Message for TargetPermission {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -1182,8 +1942,11 @@ impl ::buffa::Message for CapabilityScope {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.mode.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.mode) as u64;
+        {
+            let val = self.mode.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         for v in &self.ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -1198,8 +1961,11 @@ impl ::buffa::Message for CapabilityScope {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.mode.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.mode, buf);
+        {
+            let val = self.mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         for v in &self.ids {
             ::buffa::types::put_string_field(2u32, v, buf);
@@ -1220,9 +1986,9 @@ impl ::buffa::Message for CapabilityScope {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                ::buffa::types::merge_string(&mut self.mode, buf)?;
+                self.mode = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1243,13 +2009,13 @@ impl ::buffa::Message for CapabilityScope {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.mode.clear();
+        self.mode = ::buffa::EnumValue::from(0);
         self.ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for CapabilityScope {
-    const PROTO_FQN: &'static str = "tilde.types.v1.CapabilityScope";
+impl ::buffa::ExtensionSet for TargetPermission {
+    const PROTO_FQN: &'static str = "tilde.types.v1.TargetPermission";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -1257,7 +2023,7 @@ impl ::buffa::ExtensionSet for CapabilityScope {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for CapabilityScope {
+impl ::buffa::json_helpers::ProtoElemJson for TargetPermission {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -1271,9 +2037,9 @@ impl ::buffa::json_helpers::ProtoElemJson for CapabilityScope {
     }
 }
 #[doc(hidden)]
-pub const __CAPABILITY_SCOPE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.types.v1.CapabilityScope",
-    to_json: ::buffa::type_registry::any_to_json::<CapabilityScope>,
-    from_json: ::buffa::type_registry::any_from_json::<CapabilityScope>,
+pub const __TARGET_PERMISSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.TargetPermission",
+    to_json: ::buffa::type_registry::any_to_json::<TargetPermission>,
+    from_json: ::buffa::type_registry::any_from_json::<TargetPermission>,
     is_wkt: false,
 };

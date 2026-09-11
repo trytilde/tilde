@@ -32,7 +32,7 @@ impl ConnectionsService for Rpc {
                 self.0
                     .assign(id(&request.connection_id)?, &assignment)
                     .await?,
-                &self.0.public_url,
+                &self.0.event_ingress_url,
             )
             .into(),
             ..Default::default()
@@ -56,7 +56,7 @@ impl ConnectionsService for Rpc {
                 self.0
                     .unassign(id(&request.connection_id)?, &assignment)
                     .await?,
-                &self.0.public_url,
+                &self.0.event_ingress_url,
             )
             .into(),
             ..Default::default()
@@ -139,7 +139,7 @@ impl ConnectionsService for Rpc {
             )
             .await?;
         Response::ok(management::StartConnectionResponse {
-            connection: connection_wire(started.connection, &self.0.public_url).into(),
+            connection: connection_wire(started.connection, &self.0.event_ingress_url).into(),
             brokering_url: started.brokering_url,
             ..Default::default()
         })
@@ -150,8 +150,11 @@ impl ConnectionsService for Rpc {
         request: ServiceRequest<'_, management::GetConnectionRequest>,
     ) -> ServiceResult<impl Encodable<management::GetConnectionResponse> + Send + use<'a>> {
         Response::ok(management::GetConnectionResponse {
-            connection: connection_wire(self.0.get(id(request.id)?).await?, &self.0.public_url)
-                .into(),
+            connection: connection_wire(
+                self.0.get(id(request.id)?).await?,
+                &self.0.event_ingress_url,
+            )
+            .into(),
             ..Default::default()
         })
     }
@@ -194,7 +197,7 @@ impl ConnectionsService for Rpc {
         Response::ok(management::ListConnectionsResponse {
             connections: connections
                 .into_iter()
-                .map(|c| connection_wire(c, &self.0.public_url))
+                .map(|c| connection_wire(c, &self.0.event_ingress_url))
                 .collect(),
             next_page_token: next,
             ..Default::default()
@@ -207,7 +210,7 @@ impl ConnectionsService for Rpc {
     ) -> ServiceResult<impl Encodable<management::ReconnectResponse> + Send + use<'a>> {
         let started = self.0.reconnect(id(request.id)?).await?;
         Response::ok(management::ReconnectResponse {
-            connection: connection_wire(started.connection, &self.0.public_url).into(),
+            connection: connection_wire(started.connection, &self.0.event_ingress_url).into(),
             brokering_url: started.brokering_url,
             ..Default::default()
         })

@@ -1,0 +1,26 @@
+{
+  "name": "@trytilde/agent-avatar",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/agent-avatar.d.ts",
+      "import": "./dist/agent-avatar.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "react": "19.2.8"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

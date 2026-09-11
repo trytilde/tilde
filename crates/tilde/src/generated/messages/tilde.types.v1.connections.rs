@@ -2273,6 +2273,28 @@ pub const __CUSTOM_CREDENTIAL_SOURCE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct Provider {
+    /// Field 13: `account_name_label`
+    #[serde(
+        rename = "accountNameLabel",
+        alias = "account_name_label",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub account_name_label: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 11: `icon_url`
+    #[serde(
+        rename = "iconUrl",
+        alias = "icon_url",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub icon_url: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Plain-text setup guidance rendered below the provider title.
+    ///
+    /// Field 12: `instructions`
+    #[serde(
+        rename = "instructions",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub instructions: ::core::option::Option<::buffa::alloc::string::String>,
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -2311,6 +2333,9 @@ pub struct Provider {
 impl ::core::fmt::Debug for Provider {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Provider")
+            .field("account_name_label", &self.account_name_label)
+            .field("icon_url", &self.icon_url)
+            .field("instructions", &self.instructions)
             .field("id", &self.id)
             .field("name", &self.name)
             .field("connection_types", &self.connection_types)
@@ -2325,6 +2350,38 @@ impl Provider {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.Provider";
+}
+impl Provider {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::account_name_label`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_account_name_label(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.account_name_label = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::icon_url`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_icon_url(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.icon_url = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::instructions`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_instructions(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.instructions = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(Provider);
 impl ::buffa::MessageName for Provider {
@@ -2391,6 +2448,15 @@ impl ::buffa::Message for Provider {
         for v in &self.categories {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.icon_url {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.instructions {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.account_name_label {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2445,6 +2511,15 @@ impl ::buffa::Message for Provider {
         }
         for v in &self.categories {
             ::buffa::types::put_string_field(10u32, v, buf);
+        }
+        if let Some(ref v) = self.icon_url {
+            ::buffa::types::put_string_field(11u32, v, buf);
+        }
+        if let Some(ref v) = self.instructions {
+            ::buffa::types::put_string_field(12u32, v, buf);
+        }
+        if let Some(ref v) = self.account_name_label {
+            ::buffa::types::put_string_field(13u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2556,6 +2631,42 @@ impl ::buffa::Message for Provider {
                 )?;
                 self.categories.push(__elem);
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .icon_url
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .instructions
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .account_name_label
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2569,6 +2680,9 @@ impl ::buffa::Message for Provider {
         self.connection_types.clear();
         self.kind = ::core::option::Option::None;
         self.categories.clear();
+        self.icon_url = ::core::option::Option::None;
+        self.instructions = ::core::option::Option::None;
+        self.account_name_label = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2596,6 +2710,15 @@ impl<'de> serde::Deserialize<'de> for Provider {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<Provider, A::Error> {
+                let mut __f_account_name_label: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_icon_url: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_instructions: ::core::option::Option<
+                    ::core::option::Option<::buffa::alloc::string::String>,
+                > = None;
                 let mut __f_id: ::core::option::Option<::buffa::alloc::string::String> = None;
                 let mut __f_name: ::core::option::Option<
                     ::buffa::alloc::string::String,
@@ -2611,6 +2734,30 @@ impl<'de> serde::Deserialize<'de> for Provider {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
+                        "accountNameLabel" | "account_name_label" => {
+                            __f_account_name_label = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
+                        "iconUrl" | "icon_url" => {
+                            __f_icon_url = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
+                        "instructions" => {
+                            __f_instructions = Some(
+                                map
+                                    .next_value::<
+                                        ::core::option::Option<::buffa::alloc::string::String>,
+                                    >()?,
+                            );
+                        }
                         "id" => {
                             __f_id = Some({
                                 struct _S;
@@ -2763,6 +2910,15 @@ impl<'de> serde::Deserialize<'de> for Provider {
                     }
                 }
                 let mut __r = <Provider as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_account_name_label {
+                    __r.account_name_label = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_icon_url {
+                    __r.icon_url = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_instructions {
+                    __r.instructions = v;
+                }
                 if let ::core::option::Option::Some(v) = __f_id {
                     __r.id = v;
                 }

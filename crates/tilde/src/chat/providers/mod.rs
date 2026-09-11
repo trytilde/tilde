@@ -66,6 +66,24 @@ impl Access {
 }
 /// Two operations; no universal message body or mandatory send method.
 pub trait Adapter: Send + Sync {
+    fn identity_types(&self) -> &'static [types::IdentityType];
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity>;
+    fn verification_supported(&self) -> bool {
+        true
+    }
+    fn supports_verification_template(&self) -> bool {
+        false
+    }
+    fn send_verification<'a>(
+        &'a self,
+        access: &'a Access,
+        message: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>>;
+
     fn tools(&self) -> Vec<types::ToolDefinition>;
     fn webhook<'a>(
         &'a self,
@@ -81,7 +99,7 @@ pub trait Adapter: Send + Sync {
         input: Value,
     ) -> BoxFuture<'a, ToolResult<Value>>;
 }
-fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
+pub(crate) fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     match (provider, typ) {
         ("slack", "slack_app") => Some(&slack::Slack),
         ("github", "github_app") => Some(&github::Github),
@@ -93,6 +111,14 @@ fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     }
 }
 impl Channels {
+    pub(crate) async fn access(&self, connection: Uuid) -> ToolResult<Access> {
+        Ok(Access {
+            connection_id: connection,
+            values: self.connections.resolve(connection).await?,
+            http: self.connections.http.clone(),
+            endpoints: self.connections.endpoints.clone(),
+        })
+    }
     pub fn new(connections: Connections) -> Self {
         Self { connections }
     }

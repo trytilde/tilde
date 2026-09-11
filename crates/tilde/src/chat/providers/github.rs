@@ -3,6 +3,38 @@ use super::*;
 use crate::proto::tilde::types::v1 as types;
 pub struct Github;
 impl Adapter for Github {
+    fn identity_types(&self) -> &'static [types::IdentityType] {
+        &[types::IdentityType::Username]
+    }
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity> {
+        let recipient = provider_identity(value)?;
+        if recipient.identity_type != identity_type {
+            return Err(ConnectError::invalid_argument(
+                "This provider does not support that identity type",
+            ));
+        }
+        recipient.validate()?;
+        Ok(recipient)
+    }
+    fn verification_supported(&self) -> bool {
+        false
+    }
+    fn send_verification<'a>(
+        &'a self,
+        _: &'a Access,
+        _: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>> {
+        Box::pin(async {
+            Err(ConnectError::failed_precondition(
+                "GitHub supports public or disabled routes; private identity verification is not available",
+            ))
+        })
+    }
+
     fn webhook<'a>(
         &'a self,
         a: &'a Access,
@@ -54,7 +86,7 @@ impl Adapter for Github {
                 event_id: header(h, "x-github-delivery")?.into(),
                 message_id: comment,
                 thread_id: format!("{repo}#{number}"),
-                sender_id: sender,
+                sender: provider_identity(at(&p, "/sender/login").unwrap_or(&sender))?,
                 sender_name: at(&p, "/sender/login").unwrap_or("GitHub user").into(),
                 text: at(&p, "/comment/body").unwrap_or("").into(),
                 format: "markdown",
@@ -157,4 +189,12 @@ impl Adapter for Github {
             }
         })
     }
+}
+
+/// Canonical sender values belong to this provider adapter.
+fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {
+    Ok(crate::chat::access::identity::Identity {
+        identity_type: types::IdentityType::Username,
+        value: raw.trim().to_lowercase(),
+    })
 }
