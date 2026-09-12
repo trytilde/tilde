@@ -24,8 +24,9 @@ async function start(key = seed) {
   const env = {
     ...process.env,
     ...oidc.env,
-    ENGINE_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
+    ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
     ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
+    ENGINE_AGENT_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
     DATABASE_URL: database,
     ENGINE_ENCRYPTION_BACKEND: "seed",
     ENGINE_ENCRYPTION_KEY: key,
@@ -52,7 +53,7 @@ async function start(key = seed) {
       const text = chunk.toString();
       output += text;
       logs += text;
-      const match = output.match(/address=(127\.0\.0\.1:\d+)/);
+      const match = output.match(/management_address=(127\.0\.0\.1:\d+)/);
       if (match) {
         clearTimeout(timer);
         resolve(`http://${match[1]}`);

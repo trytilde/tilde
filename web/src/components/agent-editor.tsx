@@ -1,5 +1,8 @@
+import { AgentLogs } from "@/features/logs/agent-logs";
+import { AgentTracing } from "@/features/tracing/agent-tracing";
 import { DashboardNavigation } from "./dashboard-breadcrumbs";
 import { InlineSaving, type InlineSavingState } from "./inline-saving";
+import { AgentDeployment } from "@/components/agent-deployment";
 import { AgentIam } from "@/components/agent-iam";
 import { AgentAvatar } from "./agent-avatar";
 import { AgentTargetPicker } from "./agent-target-picker";
@@ -15,7 +18,7 @@ import {
   BinaryPermission,
   TargetSelection,
 } from "@/gen/tilde/types/v1/agent_pb.js";
-import { agents } from "@/client";
+import { agents, deployments } from "@/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -104,7 +107,13 @@ const capabilityOptions: readonly CapabilityOption[] = [
   },
 ];
 
-export type AgentTab = "capabilities" | "chat-providers" | "iam";
+export type AgentTab =
+  | "capabilities"
+  | "chat-providers"
+  | "iam"
+  | "deployment"
+  | "tracing"
+  | "logs";
 
 export function AgentEditor({
   agent,
@@ -181,6 +190,7 @@ export function AgentEditor({
     await persistCapabilities(option.key, next);
   }
   const [name, setName] = useState(agent?.name ?? "");
+  const [creationMode, setCreationMode] = useState("gateway");
   const [endpoint, setEndpoint] = useState(agent?.endpointUrl ?? "");
   const [signingKey, setSigningKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -251,13 +261,21 @@ export function AgentEditor({
       {
         let created = createdAgent;
         if (!created) {
-          const response = await agents.createAgent({
-            capabilities,
-            id: id.current,
-            name,
-            endpointUrl: endpoint,
-            webhookSigningKey: signingKey,
-          });
+          const response =
+            creationMode === "sidecar"
+              ? await deployments.createSidecarAgent({
+                  capabilities,
+                  id: id.current,
+                  name,
+                  webhookSigningKey: signingKey,
+                })
+              : await agents.createAgent({
+                  capabilities,
+                  id: id.current,
+                  name,
+                  endpointUrl: endpoint,
+                  webhookSigningKey: signingKey,
+                });
           created = response.agent ?? null;
           if (!created) throw new Error("Agent creation returned no agent.");
           setCreatedAgent(created);
@@ -478,12 +496,6 @@ export function AgentEditor({
                     disabled={saving || metadataSaving}
                     onSave={(value) => saveMetadata("name", value)}
                   />
-                  <InlineAgentField
-                    label="Agent endpoint"
-                    value={endpoint}
-                    disabled={saving || metadataSaving}
-                    onSave={(value) => saveMetadata("endpointUrl", value)}
-                  />
                 </>
               ) : (
                 <>
@@ -500,17 +512,28 @@ export function AgentEditor({
                     placeholder="Agent name"
                     className="h-11 border-transparent bg-transparent p-0 text-3xl font-semibold shadow-none md:text-3xl"
                   />
-                  <Input
-                    form="agent-settings"
-                    aria-label="Agent endpoint"
-                    type="url"
-                    value={endpoint}
-                    onChange={(event) => setEndpoint(event.target.value)}
-                    required
-                    disabled={locked}
-                    placeholder="https://agent.example.com"
-                    className="border-transparent bg-transparent p-0 shadow-none"
-                  />
+                  <Tabs
+                    value={creationMode}
+                    onValueChange={(value) => setCreationMode(String(value))}
+                  >
+                    <TabsList aria-label="Deployment mode">
+                      <TabsTrigger value="gateway">Gateway</TabsTrigger>
+                      <TabsTrigger value="sidecar">Sidecar</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  {creationMode === "gateway" && (
+                    <Input
+                      form="agent-settings"
+                      aria-label="Agent endpoint"
+                      type="url"
+                      value={endpoint}
+                      onChange={(event) => setEndpoint(event.target.value)}
+                      required
+                      disabled={locked}
+                      placeholder="https://agent.example.com"
+                      className="border-transparent bg-transparent p-0 shadow-none"
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -537,6 +560,9 @@ export function AgentEditor({
                 <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
                 <TabsTrigger value="chat-providers">Chat providers</TabsTrigger>
                 <TabsTrigger value="iam">IAM</TabsTrigger>
+                <TabsTrigger value="tracing">Tracing</TabsTrigger>
+                <TabsTrigger value="logs">Logs</TabsTrigger>
+                <TabsTrigger value="deployment">Deployment</TabsTrigger>
               </TabsList>
             </DashboardNavigation>
             <TabsContent value="capabilities" keepMounted>
@@ -544,6 +570,15 @@ export function AgentEditor({
             </TabsContent>
             <TabsContent value="chat-providers" keepMounted>
               <AgentConnections agentId={agent.id} />
+            </TabsContent>
+            <TabsContent value="deployment">
+              <AgentDeployment agentId={agent.id} paused={agent.paused} />
+            </TabsContent>
+            <TabsContent value="logs">
+              {tab === "logs" && <AgentLogs agentId={agent.id} />}
+            </TabsContent>
+            <TabsContent value="tracing">
+              {tab === "tracing" && <AgentTracing agentId={agent.id} />}
             </TabsContent>
             <TabsContent value="iam" keepMounted>
               <AgentIam key={agent.id} agentId={agent.id} />

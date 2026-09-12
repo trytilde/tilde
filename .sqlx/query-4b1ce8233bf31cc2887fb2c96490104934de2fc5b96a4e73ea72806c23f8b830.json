@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sidecar_nodes SET ready=$3,agent_ready=$4,last_seen_at=NOW() WHERE agent_id=$1 AND instance_id=$2;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4b1ce8233bf31cc2887fb2c96490104934de2fc5b96a4e73ea72806c23f8b830"
+}

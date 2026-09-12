@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_runs SET status='failed' WHERE id=$1 AND status='active';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bc3d98b6008214ad4f4b571aad4b25e67236f64be136ccbac59ae9268d8fe62c"
+}

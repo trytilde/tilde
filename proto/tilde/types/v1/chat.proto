@@ -29,7 +29,7 @@ message ToolDefinition {
 
 message Typing { string participant_id = 1; bool typing = 2; google.protobuf.Timestamp expires_at = 3; }
 
-message Attachment { string id = 1; string thread_id = 2; string filename = 3; string media_type = 4; int64 size_bytes = 5; string sha256 = 6; }
+message Attachment { bool persisted = 7; string id = 1; string thread_id = 2; string filename = 3; string media_type = 4; int64 size_bytes = 5; string sha256 = 6; }
 
 message ToolCall {
  string id = 1; string name = 2; string provider_id = 3; string status = 4;
@@ -44,6 +44,7 @@ message MessageDelivery { string connection_id = 1; string external_message_id =
 message MessageChunk { string message_id = 1; string text_delta = 2; }
 
 message Activity {
+ string event_id = 13; string origin_instance_id = 14; int64 origin_sequence = 15; string origin_agent_id = 16;
  int64 sequence = 1; string kind = 2; string entity_id = 3; string text_delta = 4;
  google.protobuf.Timestamp created_at = 5; string participant_id = 6; string invocation_id = 7;
  oneof detail { Message message = 8; Participant participant = 9; Typing typing = 10; ToolCall tool_call = 11; MessageChunk message_chunk = 12; }

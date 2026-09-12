@@ -1,5 +1,6 @@
 [package]
 name = "tilde"
+default-run = "tilde"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,10 +17,12 @@ embedded-web = ["dep:rust-embed", "dep:mime_guess"]
 ignored = ["aes", "ghash", "polyval"]
 
 [dependencies]
+rcgen = { version = "0.11.3", features = ["x509-parser"] }
+toml = "0.8"
 rotel = { path = "../../vendor/rotel", default-features = false }
 opentelemetry = "0.32"
 opentelemetry_sdk = { version = "0.32", features = ["trace"] }
-opentelemetry-proto = { version = "0.32", features = ["gen-tonic", "trace", "with-serde"] }
+opentelemetry-proto = { version = "0.32", features = ["gen-tonic", "trace", "logs", "with-serde"] }
 prost = "0.14"
 tokio-util = "0.7"
 http-body = "1"
@@ -71,12 +74,19 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 ] }
 subtle = "2.6"
 thiserror = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "signal",
+  "net",
+  "process",
+  "fs",
+] }
 tower = { version = "0.5", features = ["util"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 zeroize = { version = "1", features = ["derive"] }
 rust-embed = { version = "8.12", optional = true, features = [
   "debug-embed",

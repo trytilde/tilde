@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id,c.generation,c.agent_id,c.thread_id,c.participant_id,c.owner_instance_id,c.payload,d.failure_mode\nFROM sidecar_commands c JOIN participant_assignments p ON p.thread_id=c.thread_id AND p.participant_id=c.participant_id AND p.generation=c.generation AND p.owner_instance_id=c.owner_instance_id\nJOIN agent_deployments d ON d.agent_id=c.agent_id JOIN agents a ON a.id=c.agent_id\nLEFT JOIN sidecar_nodes n ON n.agent_id=c.agent_id AND n.instance_id=c.owner_instance_id\nWHERE NOT EXISTS(SELECT 1 FROM chat_invocations old WHERE old.id=c.invocation_id AND old.status IN ('stopped','canceled')) AND NOT p.stopped AND NOT a.paused AND a.deleted_at IS NULL AND c.dispatched_at IS NOT NULL AND\n((c.acked_at IS NULL AND c.dispatched_at<NOW()-INTERVAL '5 seconds') OR\n (c.acked_at IS NOT NULL AND c.finished_at IS NULL AND (n.last_seen_at<NOW()-INTERVAL '15 seconds' OR NOT n.agent_ready OR n.instance_id IS NULL)))\nORDER BY c.observed_at LIMIT 100;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "owner_instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "payload",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 7,
+        "name": "failure_mode",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4a077961364be524283d3515815314ce512779f52009b05ed1c10244127ea8ce"
+}

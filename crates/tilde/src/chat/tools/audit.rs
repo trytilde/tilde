@@ -8,6 +8,9 @@ use uuid::Uuid;
 
 impl Chat {
     pub async fn report_tool_call(&self, scope: &Scope, tool: types::ToolCall) -> Result<()> {
+        if let Some(local) = self.local() {
+            return local.report_tool_call(scope, tool).await;
+        }
         if tool.name.is_empty()
             || tool.name.len() > 128
             || tool.input_json.len() > 1024 * 1024
@@ -23,7 +26,7 @@ impl Chat {
             }
         }
         let call = id(&tool.id)?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", scope.thread_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -116,7 +119,7 @@ impl Chat {
     }
     pub(crate) async fn expire_tool_calls(&self) -> Result<()> {
         for row in sqlx::query_file!("../../queries/chat/tool_interrupted.sql")
-            .fetch_all(&self.pool)
+            .fetch_all(self.pg()?)
             .await?
         {
             self.report_tool_call(

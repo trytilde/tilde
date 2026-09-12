@@ -121,6 +121,16 @@ async fn receive(
         match result {
             Webhook::Challenge(value) => Ok(Some(value)),
             Webhook::Messages(messages) => {
+                if sqlx::query_file!("../../queries/chat/channel_owner.sql", id)
+                    .fetch_optional(&s.connections.pool)
+                    .await
+                    .map_err(ChatError::from)?
+                    .is_some_and(|r| r.deployment_mode == "sidecar")
+                {
+                    return Err(ConnectError::failed_precondition(
+                        "sidecar_required: use the sidecar public-event-ingress endpoint",
+                    ));
+                }
                 for message in messages {
                     s.chat.ingest(id, message).await?;
                 }
@@ -215,7 +225,7 @@ impl Chat {
         {
             return Err(ChatError::Invalid("Invalid inbound message".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!(
             "../../queries/connections/connection_lock.sql",
             connection.to_string()

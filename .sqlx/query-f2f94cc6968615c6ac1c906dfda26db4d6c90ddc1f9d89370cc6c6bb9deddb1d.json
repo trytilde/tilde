@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id,i.identity_type,i.value,i.verified_at IS NOT NULL AS \"verified!\",COALESCE(a.allowed,FALSE) AS \"allowed!\" FROM chat_channel_identities i LEFT JOIN chat_channel_identity_access a ON a.connection_id=i.connection_id AND a.identity_id=i.id AND a.agent_id=$2 WHERE i.connection_id=$1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "identity_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "verified!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "allowed!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "f2f94cc6968615c6ac1c906dfda26db4d6c90ddc1f9d89370cc6c6bb9deddb1d"
+}

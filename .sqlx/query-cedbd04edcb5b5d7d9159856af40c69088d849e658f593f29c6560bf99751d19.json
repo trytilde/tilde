@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.thread_id,c.agent_id,d.retention_days,c.storage,a.paused,c.retirement_epoch FROM sidecar_conversations c JOIN agent_deployments d ON d.agent_id=c.agent_id JOIN agents a ON a.id=c.agent_id WHERE c.storage IN ('corrosion','retiring') AND (EXTRACT(EPOCH FROM NOW()-c.last_activity_at)>=d.retention_days*86400 OR c.storage='retiring' OR a.paused) AND NOT EXISTS(SELECT 1 FROM chat_invocations i WHERE i.thread_id=c.thread_id AND i.agent_id=c.agent_id AND i.status IN ('pending','running')) ORDER BY c.last_activity_at LIMIT 50;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "retention_days",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "storage",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "paused",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "retirement_epoch",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "cedbd04edcb5b5d7d9159856af40c69088d849e658f593f29c6560bf99751d19"
+}

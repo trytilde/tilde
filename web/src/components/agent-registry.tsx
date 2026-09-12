@@ -45,21 +45,16 @@ export function AgentRegistry({
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState("");
-  const [retryStop, setRetryStop] = useState<Agent | null>(null);
   const [actionError, setActionError] = useState("");
   async function changePaused(agent: Agent, paused: boolean) {
     setBusy(true);
     setNotice("");
     setActionError("");
     try {
-      setRetryStop(null);
       if (paused) {
-        const response = await agents.pauseAgent({ id: agent.id });
-        if (!response.stopAcknowledged) setRetryStop(agent);
+        await agents.pauseAgent({ id: agent.id });
         setNotice(
-          response.stopAcknowledged
-            ? "Agent paused. Health checks continue."
-            : "Agent paused. Health checks continue, but the host did not acknowledge Stop. Retry pause to request cancellation again.",
+          "Agent paused. Cancellation requested for running invocations. Health checks continue.",
         );
       } else {
         await agents.resumeAgent({ id: agent.id });
@@ -78,7 +73,6 @@ export function AgentRegistry({
     setDeleteError("");
     try {
       await agents.deleteAgent({ id: deleting.id });
-      if (retryStop?.id === deleting.id) setRetryStop(null);
       setDeleting(null);
       setNotice("Agent deleted.");
       page.reset();
@@ -117,15 +111,7 @@ export function AgentRegistry({
           {notice}
         </p>
       )}
-      {retryStop && (
-        <Button
-          variant="outline"
-          disabled={busy}
-          onClick={() => void changePaused(retryStop, true)}
-        >
-          Retry stop
-        </Button>
-      )}
+
       <DataTable
         data={page.items}
         loading={page.loading}

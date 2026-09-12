@@ -1,33 +1,15 @@
 #[expect(dead_code, reason = "shared test fixtures")]
 mod common;
-use axum::{Router, extract::State, http::HeaderMap, routing::post};
-use buffa::Message;
 use secrecy::{ExposeSecret, SecretString};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tilde::{
     agent::{Agents, CreateAgent},
     chat::{Chat, CreateThread, StartRun},
     encryption::Encryption,
     error::Error,
-    proto::tilde::{agent_host::v1 as host, types::v1 as types},
+    proto::tilde::types::v1 as types,
 };
 use uuid::Uuid;
-
-async fn stop(
-    State(calls): State<Arc<Mutex<Vec<host::StopRequest>>>>,
-    headers: HeaderMap,
-    body: axum::body::Bytes,
-) -> ([(&'static str, &'static str); 1], Vec<u8>) {
-    assert!(headers.contains_key("x-tilde-signature"));
-    calls
-        .lock()
-        .unwrap()
-        .push(host::StopRequest::decode_from_slice(&body).unwrap());
-    (
-        [("content-type", "application/proto")],
-        host::StopResponse::default().encode_to_vec(),
-    )
-}
 
 #[tokio::test]
 async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
@@ -39,13 +21,7 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
     );
     let agents = Agents::new(db.pool.clone(), crypto.clone());
     let chat = Chat::new(db.pool.clone(), crypto, "http://127.0.0.1:1".into());
-    let calls = Arc::new(Mutex::new(Vec::new()));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let endpoint = format!("http://{}", listener.local_addr().unwrap());
-    let app = Router::new()
-        .route("/tilde.agent_host.v1.AgentService/Stop", post(stop))
-        .with_state(calls.clone());
-    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let endpoint = "http://127.0.0.1:1".to_owned();
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
@@ -99,8 +75,8 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
         agents.delete(agent).await,
         Err(Error::AgentNotPaused)
     ));
-    let (paused, acknowledged) = agents.pause(agent).await.unwrap();
-    assert!(paused.paused && acknowledged);
+    let paused = agents.pause(agent).await.unwrap();
+    assert!(paused.paused);
     assert!(chat.tokens.verify(token.expose_secret()).await.is_err());
     assert_eq!(
         chat.run(claim.run_id).await.unwrap().invocation_status,
@@ -126,7 +102,7 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
         .is_err()
     );
     // Retrying pause reuses the fence; resume advances past it.
-    assert!(agents.pause(agent).await.unwrap().1);
+    assert!(agents.pause(agent).await.unwrap().paused);
     assert!(!agents.resume(agent).await.unwrap().paused);
     let resumed = sqlx::query_file!("../../queries/chat/invocation_claim.sql", pending)
         .fetch_one(&db.pool)
@@ -134,15 +110,6 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
         .unwrap();
     assert_eq!(resumed.generation, 2);
     agents.pause(agent).await.unwrap();
-    assert_eq!(
-        calls
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|r| r.through_generation)
-            .collect::<Vec<_>>(),
-        [1, 1, 3]
-    );
     agents.delete(agent).await.unwrap();
     agents.delete(agent).await.unwrap();
     assert!(matches!(agents.get(agent).await, Err(Error::NotFound)));
@@ -161,7 +128,6 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
         .await
         .unwrap();
     assert!(key.is_empty());
-    server.abort();
     db.close().await;
 }
 

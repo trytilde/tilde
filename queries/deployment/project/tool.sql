@@ -1,0 +1,1 @@
+INSERT INTO chat_tool_calls(id,thread_id,invocation_id,participant_id,name,provider_id,status,input_json,output_json,error) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(id) DO UPDATE SET status=EXCLUDED.status,output_json=EXCLUDED.output_json,error=EXCLUDED.error,updated_at=NOW();

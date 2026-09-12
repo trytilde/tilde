@@ -21,6 +21,26 @@ tasks:
       - task: setup
       - pnpm generate
 
+  build:corrosion:
+    desc: Build the pinned Corrosion binary included in gateway and sidecar distributions
+    cmds:
+      - scripts/build-corrosion.sh
+
+  dev:sidecar:
+    desc: Run sidecar with gateway-brokered registration from ENGINE_SIDECAR_* configuration
+    deps: [build:corrosion]
+    env:
+      ENGINE_CORROSION_BINARY: "{{.ROOT_DIR}}/.tools/corrosion"
+      ENGINE_SIDECAR_STATE_DIRECTORY: "{{.ROOT_DIR}}/.run/sidecar"
+    cmds:
+      - cargo run --bin tilde-sidecar
+
+  test:sidecar:
+    desc: Exercise real Corrosion peers and Postgres projection
+    deps: [build:corrosion]
+    cmds:
+      - scripts/with-postgres.sh cargo test -p tilde --test sidecars
+
   build:
     desc: Build the complete release binary with the React UI embedded
     cmds:
@@ -28,16 +48,21 @@ tasks:
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
-      - cargo build --locked --release --features embedded-web
+      - task: build:corrosion
+      - cargo build --locked --release --features embedded-web --bins
 
   dev:
     desc: Run agent runtime and event ingress, optional management API, Vite and dev ngrok
     vars:
-      INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.INGRESS_PORT | default "8082"}}{{end}}'
+      INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}{{end}}'
       DEV_ADDRESS: '{{.ADDRESS | default "127.0.0.1"}}'
       DEV_ISSUER: '{{if and .ENGINE_OIDC_ISSUER (ne .ENGINE_OIDC_ISSUER "http://127.0.0.1:5556")}}{{.ENGINE_OIDC_ISSUER}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:5556{{end}}'
       PUBLIC_PORT: '{{if eq (.ENGINE_WEB_ENABLED | default "true") "false"}}{{.API_PORT | default "8080"}}{{else}}{{.WEB_PORT | default "5173"}}{{end}}'
     env:
+      TILDE_LOCAL_LOGS: '{{if or .LOGS_CLICKHOUSE_URL (eq (.DEV_LOGS_ENABLED | default "1") "0")}}0{{else}}1{{end}}'
+      LOGS_CLICKHOUSE_URL: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_URL}}{{else if ne (.DEV_LOGS_ENABLED | default "1") "0"}}http://127.0.0.1:{{.LOGS_CLICKHOUSE_PORT | default "18123"}}{{end}}'
+      LOGS_CLICKHOUSE_USER: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_USER | default "default"}}{{else}}{{.LOGS_CLICKHOUSE_USER | default "tilde"}}{{end}}'
+      LOGS_CLICKHOUSE_PASSWORD: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_PASSWORD | default ""}}{{else}}{{.LOGS_CLICKHOUSE_PASSWORD | default "tilde-logs-dev"}}{{end}}'
       NGROK_ENABLED: '{{.NGROK_ENABLED | default "false"}}'
       NGROK_DOMAIN: '{{.NGROK_DOMAIN | default ""}}'
       ADDRESS: "{{.DEV_ADDRESS}}"
@@ -53,9 +78,9 @@ tasks:
       ENGINE_CONNECTION_SETUP_PUBLIC_URL: '{{.ENGINE_CONNECTION_SETUP_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
       ENGINE_MANAGEMENT_ENABLED: '{{.ENGINE_MANAGEMENT_ENABLED | default "true"}}'
       ENGINE_WEB_ENABLED: '{{.ENGINE_WEB_ENABLED | default "true"}}'
-      ENGINE_EVENT_INGRESS_LISTEN: '{{.DEV_ADDRESS}}:{{.INGRESS_PORT | default "8082"}}'
-      ENGINE_EVENT_INGRESS_PUBLIC_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}{{.INGRESS_URL}}{{else}}{{.ENGINE_EVENT_INGRESS_PUBLIC_URL | default .INGRESS_URL}}{{end}}'
-      INGRESS_PORT: '{{.INGRESS_PORT | default "8082"}}'
+      ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: '{{.DEV_ADDRESS}}:{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}'
+      ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}{{.INGRESS_URL}}{{else}}{{.ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL | default .INGRESS_URL}}{{end}}'
+      PUBLIC_EVENT_INGRESS_PORT: '{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}'
       API_PORT: '{{.API_PORT | default "8080"}}'
       WEB_PORT: '{{.WEB_PORT | default "5173"}}'
       ENGINE_MANAGEMENT_LISTEN: '{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}'
@@ -75,11 +100,24 @@ tasks:
       - bash scripts/dev-api.sh check-config
       - task: dev:postgres
       - task: dev:s3
+      - python3 scripts/dev-logs.py
       - |
         if [ "$ENGINE_MANAGEMENT_ENABLED" = true ] && [ "$ENGINE_OIDC_ISSUER" = "http://$ADDRESS:5556" ]; then
           POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-unused-dev-compose}" docker compose --profile dev up -d dex
         fi
       - task --parallel --failfast --output interleaved dev:api dev:web dev:connection-ui dev:ngrok
+
+  test:logs:
+    desc: Exercise log ingestion, ClickHouse reads, and independent forwarding
+    cmds:
+      - python3 scripts/test-dev-logs.py
+      - docker compose --profile logs up -d --wait logs-clickhouse
+      - >-
+        LOGS_TEST_CLICKHOUSE_URL="http://127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}"
+        LOGS_TEST_CLICKHOUSE_USER="${LOGS_CLICKHOUSE_USER:-tilde}"
+        LOGS_TEST_CLICKHOUSE_PASSWORD="${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
+        scripts/with-postgres.sh bash -c 'cargo sqlx migrate run --source migrations && SQLX_OFFLINE=false cargo test -p tilde --test logs -- --include-ignored'
+      - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
 
   dev:postgres:
     desc: Start loopback Postgres when using the default local development database
@@ -185,6 +223,7 @@ tasks:
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
+      - task: build:corrosion
       - cargo test --workspace
       - cargo build --features embedded-web
       - node web/scripts/test-client.mjs

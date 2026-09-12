@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE participant_assignments SET stopped=TRUE,generation=generation+1,updated_at=NOW() WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ad0a404b53ae513bfe1108e520bf27202055db1f81c90e5405ed718df647a2fe"
+}

@@ -75,9 +75,23 @@ pub fn start(
     parent.with_span(span)
 }
 
+/// Server-assigned ownership used by sidecar request middleware.
+#[derive(Clone)]
+pub struct AgentOwner(pub uuid::Uuid);
+
 /// Does not record headers, query strings, request bodies, or telemetry uploads.
 pub async fn request(request: Request, next: Next) -> Response {
-    if request.uri().path() == super::AGENT_TRACES_PATH {
+    if request.uri().path() == "/v1/logs"
+        || request
+            .uri()
+            .path()
+            .starts_with("/tilde.management.v1.LogsService/")
+        || request.uri().path() == super::AGENT_TRACES_PATH
+        || request
+            .uri()
+            .path()
+            .starts_with("/tilde.management.v1.TracingService/")
+    {
         return next.run(request).await;
     }
     let route = request
@@ -96,6 +110,10 @@ pub async fn request(request: Request, next: Next) -> Response {
             KeyValue::new("http.route", route),
         ],
     );
+    if let Some(owner) = request.extensions().get::<AgentOwner>() {
+        cx.span()
+            .set_attribute(KeyValue::new("tilde.agent.id", owner.0.to_string()));
+    }
     let response = next.run(request).with_context(cx.clone()).await;
     cx.span().set_attribute(KeyValue::new(
         "http.response.status_code",

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id,i.run_id,i.thread_id,i.agent_id,p.id AS participant_id,r.objective FROM chat_invocations i JOIN agents a ON a.id=i.agent_id JOIN chat_runs r ON r.id=i.run_id JOIN chat_participants p ON p.thread_id=i.thread_id AND p.agent_id=i.agent_id JOIN sidecar_conversations sc ON sc.thread_id=i.thread_id AND sc.agent_id=i.agent_id WHERE sc.storage='postgres' AND a.deployment_mode='sidecar' AND NOT a.paused AND a.deleted_at IS NULL AND i.status='pending' AND NOT EXISTS(SELECT 1 FROM sidecar_commands c WHERE c.invocation_id=i.id AND c.kind='invoke') ORDER BY i.id LIMIT 50;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "objective",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fe1ccbd4abeaa489effdcc051bb1d547bcbea6abcca47881dcf7269b584ece43"
+}

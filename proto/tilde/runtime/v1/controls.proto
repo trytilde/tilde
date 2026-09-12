@@ -1,0 +1,19 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/chat.proto";
+// Opened by the execution itself. No request is routed to a host instance.
+service InvocationControlService {
+  rpc WatchCommands(WatchCommandsRequest) returns (stream WatchCommandsResponse);
+  rpc AcknowledgeCommand(AcknowledgeCommandRequest) returns (AcknowledgeCommandResponse);
+}
+message WatchCommandsRequest {}
+enum InvocationCommandKind {
+  INVOCATION_COMMAND_KIND_UNSPECIFIED = 0;
+  INVOCATION_COMMAND_KIND_READY = 1;
+  INVOCATION_COMMAND_KIND_STEER = 2;
+  INVOCATION_COMMAND_KIND_STOP = 3;
+  INVOCATION_COMMAND_KIND_SUSPEND = 4;
+}
+message WatchCommandsResponse { string id = 1; InvocationCommandKind kind = 2; string input_id = 3; string text = 4; tilde.types.v1.Message message = 5; }
+message AcknowledgeCommandRequest { string id = 1; }
+message AcknowledgeCommandResponse {}

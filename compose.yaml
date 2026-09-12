@@ -72,9 +72,17 @@ services:
     ports:
       - "127.0.0.1:${ENGINE_PORT:-8080}:8080"
       - "127.0.0.1:${ENGINE_AGENT_RUNTIME_PORT:-8081}:8081"
-      - "127.0.0.1:${ENGINE_EVENT_INGRESS_PORT:-8082}:8082"
+      - "127.0.0.1:${ENGINE_PUBLIC_EVENT_INGRESS_PORT:-8082}:8082"
+    volumes: [log-queue:/var/lib/tilde/log-queue]
     environment:
       DATABASE_URL: postgres://engine:${POSTGRES_PASSWORD}@postgres:5432/engine
+      LOGS_CLICKHOUSE_URL: ${LOGS_CLICKHOUSE_CONTAINER_URL:-${LOGS_CLICKHOUSE_URL:-}}
+      LOGS_CLICKHOUSE_DATABASE: ${LOGS_CLICKHOUSE_DATABASE:-tilde_logs}
+      LOGS_CLICKHOUSE_USER: ${LOGS_CLICKHOUSE_USER:-default}
+      LOGS_CLICKHOUSE_PASSWORD: ${LOGS_CLICKHOUSE_PASSWORD:-}
+      LOGS_OTLP_ENDPOINT: ${LOGS_OTLP_ENDPOINT:-}
+      LOGS_OTLP_HEADERS: ${LOGS_OTLP_HEADERS:-}
+      LOGS_QUEUE_DIR: /var/lib/tilde/log-queue
       ENGINE_ENCRYPTION_BACKEND: ${ENGINE_ENCRYPTION_BACKEND:-seed}
       ENGINE_ENCRYPTION_KEY: ${ENGINE_ENCRYPTION_KEY:-}
       ENGINE_KMS_KEY_ID: ${ENGINE_KMS_KEY_ID:-}
@@ -88,7 +96,7 @@ services:
       ENGINE_MANAGEMENT_ENABLED: ${ENGINE_MANAGEMENT_ENABLED:-true}
       ENGINE_WEB_ENABLED: ${ENGINE_WEB_ENABLED:-true}
       ENGINE_MANAGEMENT_PUBLIC_URL: ${ENGINE_MANAGEMENT_PUBLIC_URL:-http://127.0.0.1:8080}
-      ENGINE_EVENT_INGRESS_PUBLIC_URL: ${ENGINE_EVENT_INGRESS_PUBLIC_URL:-http://127.0.0.1:8082}
+      ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: ${ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL:-http://127.0.0.1:8082}
       ENGINE_AGENT_RUNTIME_PUBLIC_URL: ${ENGINE_AGENT_RUNTIME_PUBLIC_URL:-http://127.0.0.1:8081}
       ENGINE_OIDC_ISSUER: ${ENGINE_OIDC_ISSUER:-}
       ENGINE_OIDC_CLIENT_ID: ${ENGINE_OIDC_CLIENT_ID:-}
@@ -98,6 +106,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  logs-clickhouse:
+    image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
+    profiles: [logs]
+    environment:
+      CLICKHOUSE_DB: ${LOGS_CLICKHOUSE_DATABASE:-tilde_logs}
+      CLICKHOUSE_USER: ${LOGS_CLICKHOUSE_USER:-tilde}
+      CLICKHOUSE_PASSWORD: ${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}:8123"]
+    volumes: [logs-clickhouse:/var/lib/clickhouse]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8123/ping]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
 volumes:
+  logs-clickhouse:
+  log-queue:
   minio-data:
   postgres-data:

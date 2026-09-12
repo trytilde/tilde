@@ -1,4 +1,4 @@
-INSERT INTO agents(id,name,webhook_signing_key) VALUES('00000000-0000-4000-8000-000000000001','Trace agent',decode(repeat('00',46),'hex'));
+INSERT INTO agents(id,name,endpoint_url,webhook_signing_key) VALUES('00000000-0000-4000-8000-000000000001','Trace agent','http://127.0.0.1:1',decode(repeat('00',46),'hex'));
 INSERT INTO chat_threads(id,title,primary_agent_id) VALUES('00000000-0000-4000-8000-000000000002','Trace thread','00000000-0000-4000-8000-000000000001');
 INSERT INTO chat_participants(id,thread_id,agent_id) VALUES('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001');
 INSERT INTO chat_runs(id,thread_id,agent_id,objective,idempotency_key) VALUES('00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','Trace test','trace');

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sidecar_conversations SET storage='retiring',retirement_epoch=COALESCE(retirement_epoch,$3) WHERE thread_id=$1 AND agent_id=$2 AND storage IN ('corrosion','retiring') RETURNING retirement_epoch;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "retirement_epoch",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "90de68bda82bfc743135e1f99fb5ba26cfc300ddce9790512b8bc4fd700a0c5c"
+}

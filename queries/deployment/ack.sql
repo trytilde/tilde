@@ -1,0 +1,1 @@
+UPDATE sidecar_commands SET acked_at=COALESCE(acked_at,NOW()) WHERE id=$1 AND generation=$2 AND agent_id=$3 AND owner_instance_id=$4 AND EXISTS(SELECT 1 FROM participant_assignments p WHERE p.thread_id=sidecar_commands.thread_id AND p.participant_id=sidecar_commands.participant_id AND p.generation=$2 AND p.owner_instance_id=$4 AND NOT p.stopped);

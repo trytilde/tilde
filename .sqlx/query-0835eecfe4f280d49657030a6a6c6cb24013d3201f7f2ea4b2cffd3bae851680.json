@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id,a.access_mode FROM connections c JOIN connection_agents a ON a.connection_id=c.id WHERE a.agent_id=$1 AND a.capability='channel';\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "access_mode",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0835eecfe4f280d49657030a6a6c6cb24013d3201f7f2ea4b2cffd3bae851680"
+}

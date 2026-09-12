@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployments SET token_hash=$2,encrypted_secrets=COALESCE(encrypted_secrets,$3) WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b831fc6ff59c7454f06984fb2f19385e856eb17f90c089a3bfc589c66e30cbce"
+}

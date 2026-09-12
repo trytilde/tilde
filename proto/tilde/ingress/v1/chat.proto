@@ -1,0 +1,102 @@
+syntax = "proto3";
+package tilde.ingress.v1;
+import "tilde/types/v1/chat.proto";
+
+// Management chat operations use explicit resource IDs and the management listener’s user authentication.
+
+service ChatService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
+  rpc PostMessage(PostMessageRequest) returns (PostMessageResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc StartRun(StartRunRequest) returns (StartRunResponse);
+  rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  rpc SuspendInvocation(SuspendInvocationRequest) returns (SuspendInvocationResponse);
+  rpc CancelInvocation(CancelInvocationRequest) returns (CancelInvocationResponse);
+  rpc SteerInvocation(SteerInvocationRequest) returns (SteerInvocationResponse);
+  rpc AddParticipant(AddParticipantRequest) returns (AddParticipantResponse);
+  rpc RemoveParticipant(RemoveParticipantRequest) returns (RemoveParticipantResponse);
+  rpc SetTyping(SetTypingRequest) returns (SetTypingResponse);
+  rpc ListActivity(ListActivityRequest) returns (ListActivityResponse);
+  rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
+  rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
+  rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
+}
+
+message CreateUserRequest { string name = 1; }
+
+message CreateUserResponse { tilde.types.v1.User user = 1; }
+
+message CreateThreadRequest { string title = 1; repeated tilde.types.v1.ParticipantRef participants = 2; string primary_agent_id = 3; }
+
+message CreateThreadResponse { tilde.types.v1.Thread thread = 1; }
+
+message ListThreadsRequest { optional string agent_id = 1; string page_token = 2; uint32 page_size = 3; }
+
+message ListThreadsResponse { repeated tilde.types.v1.Thread threads = 1; string next_page_token = 2; }
+
+message GetThreadRequest { string id = 1; }
+
+message GetThreadResponse { tilde.types.v1.Thread thread = 1; }
+
+message PostMessageRequest { string id = 1; string thread_id = 2; string participant_id = 3; string text = 4; repeated string addressed_participant_ids = 5; optional string in_reply_to_message_id = 6; repeated string attachment_ids = 7; }
+
+message PostMessageResponse { tilde.types.v1.Message message = 1; }
+
+message ListMessagesRequest { string thread_id = 1; uint32 limit = 2; string before_message_id = 3; }
+
+message ListMessagesResponse { repeated tilde.types.v1.Message messages = 1; string next_page_token = 2; }
+
+message StartRunRequest { string thread_id = 1; string agent_id = 2; string objective = 3; optional string goal_id = 4; string idempotency_key = 5; }
+
+message StartRunResponse { tilde.types.v1.Run run = 1; }
+
+message ResumeRunRequest { string id = 1; }
+
+message ResumeRunResponse { tilde.types.v1.Run run = 1; }
+
+message GetRunRequest { string id = 1; }
+
+message GetRunResponse { tilde.types.v1.Run run = 1; }
+
+message CancelInvocationRequest { string invocation_id = 1; }
+
+message CancelInvocationResponse {}
+
+message SteerInvocationRequest { string invocation_id = 1; string input_id = 2; string text = 3; }
+
+message SteerInvocationResponse {}
+
+message AddParticipantRequest { string thread_id = 1; tilde.types.v1.ParticipantRef participant = 2; }
+
+message AddParticipantResponse { tilde.types.v1.Thread thread = 1; }
+
+message RemoveParticipantRequest { string thread_id = 1; string participant_id = 2; }
+
+message RemoveParticipantResponse { tilde.types.v1.Thread thread = 1; }
+
+message SetTypingRequest { string thread_id = 1; string participant_id = 2; bool typing = 3; }
+
+message SetTypingResponse {}
+
+message ListActivityRequest { string thread_id = 1; string after_cursor = 2; uint32 limit = 3; }
+
+message ListActivityResponse { repeated tilde.types.v1.Activity events = 1; string next_cursor = 2; bool has_more = 3; }
+
+message UploadAttachmentRequest { string id = 1; string thread_id = 2; string filename = 3; string media_type = 4; bytes content = 5 [debug_redact = true]; }
+
+message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }
+
+message DownloadAttachmentRequest { string thread_id = 1; string attachment_id = 2; }
+
+message DownloadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; bytes content = 2 [debug_redact = true]; }
+
+message WatchThreadRequest { string thread_id = 1; string after_cursor = 2; }
+
+message WatchThreadResponse { tilde.types.v1.Activity activity = 1; string cursor = 2; }
+
+message SuspendInvocationRequest { string invocation_id = 1; }
+message SuspendInvocationResponse {}

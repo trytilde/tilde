@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT agent_id,instance_id,agent_ingress_url,public_ingress_url,runtime_url FROM sidecar_nodes WHERE agent_id=$1 AND last_seen_at>NOW()-INTERVAL '30 seconds' ORDER BY ready DESC,last_seen_at DESC;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_ingress_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "public_ingress_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "runtime_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b7db2acf3c582a60bc82c91f53c53021afb657f532d3322ed4ff0ce549c40b12"
+}

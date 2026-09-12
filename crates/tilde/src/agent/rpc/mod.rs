@@ -35,7 +35,7 @@ pub(super) fn wire(
     result
 }
 
-pub(super) async fn project(
+pub(crate) async fn project(
     agents: &Agents,
     agent: crate::agent::Agent,
 ) -> Result<types::Agent, Error> {

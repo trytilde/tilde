@@ -40,26 +40,20 @@ bytes = "1.11.1"
 read-restrict = "0.3.0"
 tower = { version = "0.5.2", features = ["retry", "timeout"] }
 tower-http = { version = "0.6.2", features = [
-    "limit",
-    "trace",
-    "compression-gzip",
-    "validate-request",
+  "limit",
+  "trace",
+  "compression-gzip",
+  "validate-request",
 ] }
 url = "2.5.4"
 hyper-rustls = { version = "0.27.5", features = ["http2"] }
 rustls = "0.23.20"
 rustls-pki-types = "1.10.0"
-pprof = { version = "0.14.0", features = [
-    "flamegraph",
-    "prost",
-    "prost-codec",
-], optional = true }
+pprof = { version = "0.14.0", features = ["flamegraph", "prost", "prost-codec"], optional = true }
 num_cpus = "1.16.0"
 hex = "0.4.3"
 serde_json = "1.0.135"
-opentelemetry-semantic-conventions = { version = "0.32.1", features = [
-    "semconv_experimental",
-] }
+opentelemetry-semantic-conventions = { version = "0.32.1", features = ["semconv_experimental"] }
 gethostname = "0.5.0"
 glob = { version = "0.3.1", optional = true }
 notify = { version = "8.0", optional = true }
@@ -82,11 +76,11 @@ hmac = "0.12"
 sha2 = "0.10"
 regex = "1.11.1"
 rdkafka = { version = "0.38", features = [
-    "tokio",
-    "libz-static",
-    "ssl-vendored",
-    "zstd",
-    "cmake-build",
+  "tokio",
+  "libz-static",
+  "ssl-vendored",
+  "zstd",
+  "cmake-build",
 ], optional = true }
 figment = { version = "0.10.19", default-features = false, features = ["env"] }
 parquet = { version = "59", optional = true }

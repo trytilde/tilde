@@ -3638,6 +3638,8 @@ impl ::serde::Serialize for TypingOwnedView {
 }
 #[derive(Clone, Debug, Default)]
 pub struct AttachmentView<'a> {
+    /// Field 7: `persisted`
+    pub persisted: bool,
     /// Field 1: `id`
     pub id: &'a str,
     /// Field 2: `thread_id`
@@ -3680,6 +3682,13 @@ impl<'a> ::buffa::MessageView<'a> for AttachmentView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.persisted = ::buffa::types::decode_bool(&mut cur)?;
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -3744,6 +3753,7 @@ impl<'a> ::buffa::MessageView<'a> for AttachmentView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Attachment {
+            persisted: self.persisted,
             id: self.id.to_string(),
             thread_id: self.thread_id.to_string(),
             filename: self.filename.to_string(),
@@ -3779,6 +3789,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AttachmentView<'a> {
         if !self.sha256.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.sha256) as u64;
         }
+        if self.persisted {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3808,6 +3821,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AttachmentView<'a> {
         if !self.sha256.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.sha256, buf);
         }
+        if self.persisted {
+            ::buffa::types::put_bool_field(7u32, self.persisted, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -3829,6 +3845,9 @@ impl<'__a> ::serde::Serialize for AttachmentView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if self.persisted {
+            __map.serialize_entry("persisted", &self.persisted)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
             __map.serialize_entry("id", self.id)?;
         }
@@ -3941,6 +3960,11 @@ impl AttachmentOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 7: `persisted`
+    #[must_use]
+    pub fn persisted(&self) -> bool {
+        self.0.reborrow().persisted
     }
     /// Field 1: `id`
     #[must_use]
@@ -5310,6 +5334,14 @@ impl ::serde::Serialize for MessageChunkOwnedView {
 }
 #[derive(Clone, Debug, Default)]
 pub struct ActivityView<'a> {
+    /// Field 13: `event_id`
+    pub event_id: &'a str,
+    /// Field 14: `origin_instance_id`
+    pub origin_instance_id: &'a str,
+    /// Field 15: `origin_sequence`
+    pub origin_sequence: i64,
+    /// Field 16: `origin_agent_id`
+    pub origin_agent_id: &'a str,
     /// Field 1: `sequence`
     pub sequence: i64,
     /// Field 2: `kind`
@@ -5359,6 +5391,34 @@ impl<'a> ::buffa::MessageView<'a> for ActivityView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.event_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.origin_instance_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.origin_sequence = ::buffa::types::decode_int64(&mut cur)?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.origin_agent_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -5599,6 +5659,10 @@ impl<'a> ::buffa::MessageView<'a> for ActivityView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Activity {
+            event_id: self.event_id.to_string(),
+            origin_instance_id: self.origin_instance_id.to_string(),
+            origin_sequence: self.origin_sequence,
+            origin_agent_id: self.origin_agent_id.to_string(),
             sequence: self.sequence,
             kind: self.kind.to_string(),
             entity_id: self.entity_id.to_string(),
@@ -5754,6 +5818,24 @@ impl<'a> ::buffa::ViewEncode<'a> for ActivityView<'a> {
                 }
             }
         }
+        if !self.event_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.event_id) as u64;
+        }
+        if !self.origin_instance_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.origin_instance_id)
+                        as u64;
+        }
+        if self.origin_sequence != 0i64 {
+            size
+                += 1u64 + ::buffa::types::int64_encoded_len(self.origin_sequence) as u64;
+        }
+        if !self.origin_agent_id.is_empty() {
+            size
+                += 2u64
+                    + ::buffa::types::string_encoded_len(&self.origin_agent_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -5837,6 +5919,18 @@ impl<'a> ::buffa::ViewEncode<'a> for ActivityView<'a> {
                 }
             }
         }
+        if !self.event_id.is_empty() {
+            ::buffa::types::put_string_field(13u32, &self.event_id, buf);
+        }
+        if !self.origin_instance_id.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.origin_instance_id, buf);
+        }
+        if self.origin_sequence != 0i64 {
+            ::buffa::types::put_int64_field(15u32, self.origin_sequence, buf);
+        }
+        if !self.origin_agent_id.is_empty() {
+            ::buffa::types::put_string_field(16u32, &self.origin_agent_id, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -5858,6 +5952,22 @@ impl<'__a> ::serde::Serialize for ActivityView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.event_id) {
+            __map.serialize_entry("eventId", self.event_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.origin_instance_id) {
+            __map.serialize_entry("originInstanceId", self.origin_instance_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_zero_i64(&self.origin_sequence) {
+            __map
+                .serialize_entry(
+                    "originSequence",
+                    &::buffa::json_helpers::ProtoJson(&self.origin_sequence),
+                )?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.origin_agent_id) {
+            __map.serialize_entry("originAgentId", self.origin_agent_id)?;
+        }
         if !::buffa::json_helpers::skip_if::is_zero_i64(&self.sequence) {
             __map
                 .serialize_entry(
@@ -5994,6 +6104,26 @@ impl ActivityOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 13: `event_id`
+    #[must_use]
+    pub fn event_id(&self) -> &'_ str {
+        self.0.reborrow().event_id
+    }
+    /// Field 14: `origin_instance_id`
+    #[must_use]
+    pub fn origin_instance_id(&self) -> &'_ str {
+        self.0.reborrow().origin_instance_id
+    }
+    /// Field 15: `origin_sequence`
+    #[must_use]
+    pub fn origin_sequence(&self) -> i64 {
+        self.0.reborrow().origin_sequence
+    }
+    /// Field 16: `origin_agent_id`
+    #[must_use]
+    pub fn origin_agent_id(&self) -> &'_ str {
+        self.0.reborrow().origin_agent_id
     }
     /// Field 1: `sequence`
     #[must_use]

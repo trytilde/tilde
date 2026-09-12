@@ -15,7 +15,8 @@ Local integration changes:
   compose authentication, admission control and timeouts on its existing listener.
 - Accept Send bodies without an unnecessary Sync bound, for Axum compatibility.
 - Add decoded-request validation to OTLPOutput before batching can split a request.
-  Tilde acknowledges bounded in-memory queue acceptance.
+  Expose optional request acknowledgements so Tilde can acknowledge durable queue
+  acceptance, and a validated discard path for disabled observability.
 - Bound decoded HTTP bodies to 4 MiB and reject malformed content-type headers
   without panicking.
 - Split large messages before offering them to the batch buffer, avoiding the
@@ -27,3 +28,7 @@ Local integration changes:
 Application-level token authorization and bounded collector forwarding are implemented in crates/tilde/src/tracing. Keep those policies
 out of the fork. Upgrade by comparing these files against the pinned upstream
 revision and running the tracing integration tests before changing the revision.
+
+Log integration re-exports the ClickHouse retry configuration, explicitly waits
+for async inserts before acknowledging delivery, and acknowledges validated empty
+OTLP requests without queueing a batch. Tilde reuses the RowBinary log exporter.

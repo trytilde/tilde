@@ -72,6 +72,9 @@ pub async fn append(
         .activity_sequence;
     let at = Utc::now();
     event.sequence = sequence;
+    if event.event_id.is_empty() {
+        event.event_id = Uuid::new_v5(&thread, &sequence.to_be_bytes()).to_string();
+    }
     event.created_at = timestamp(at).into();
     let bytes = event.encode_to_vec();
     sqlx::query_file!(
@@ -179,8 +182,11 @@ impl Chat {
         thread: Uuid,
         message: Uuid,
     ) -> Result<Option<types::Message>> {
+        if let Some(local) = self.local() {
+            return local.steering_message(thread, message).await;
+        }
         let row = sqlx::query_file!("../../queries/chat/steering_message.sql", thread, message)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?;
         if let Some(bytes) = row.and_then(|r| r.snapshot) {
             let event =
@@ -198,10 +204,13 @@ impl Chat {
         before: Option<Uuid>,
         limit: u32,
     ) -> Result<application::MessagePage> {
+        if let Some(local) = self.local() {
+            return local.message_page(thread, limit, before).await;
+        }
         self.thread(thread).await?;
         if let Some(before) = before
             && sqlx::query_file!("../../queries/chat/cache_message_get.sql", before, thread)
-                .fetch_optional(&self.pool)
+                .fetch_optional(self.pg()?)
                 .await?
                 .is_none()
         {
@@ -214,7 +223,7 @@ impl Chat {
             i64::from(size) + 1,
             before
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.pg()?)
         .await?;
         let more = rows.len() > size as usize;
         if more {
@@ -262,10 +271,13 @@ impl Chat {
         after: i64,
         limit: u32,
     ) -> Result<application::ActivityPage> {
+        if let Some(local) = self.local() {
+            return local.activity_page(thread, after, limit).await;
+        }
         if after < 0 {
             return Err(ChatError::Invalid("Invalid activity cursor".into()));
         }
-        self.thread(thread).await?;
+        let roster = self.thread(thread).await?;
         let size = if limit == 0 { 100 } else { limit.min(100) };
         let mut rows = sqlx::query_file!(
             "../../queries/chat/activity_list.sql",
@@ -273,7 +285,7 @@ impl Chat {
             after,
             i64::from(size) + 1
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.pg()?)
         .await?;
         let has_more = rows.len() > size as usize;
         if has_more {
@@ -281,7 +293,7 @@ impl Chat {
         }
         let mut events = Vec::new();
         for row in rows {
-            let event = if let Some(bytes) = row.snapshot {
+            let mut event = if let Some(bytes) = row.snapshot {
                 types::Activity::decode_from_slice(&bytes).map_err(|_| ChatError::Transport)?
             } else {
                 types::Activity {
@@ -293,6 +305,11 @@ impl Chat {
                     ..Default::default()
                 }
             };
+            if event.origin_agent_id.is_empty() {
+                event.origin_agent_id = roster.primary_agent_id.clone();
+                event.origin_instance_id = Uuid::nil().to_string();
+                event.origin_sequence = row.sequence;
+            }
             events.push(event);
         }
         Ok(application::ActivityPage {
@@ -303,6 +320,9 @@ impl Chat {
     }
     /// Leaving retains authorship/history. Rejoining reactivates the same participant identity.
     pub async fn add_participant(&self, r: application::AddParticipant) -> Result<types::Thread> {
+        if let Some(local) = self.local() {
+            return local.add_participant(r).await;
+        }
         let thread = id(&r.thread_id)?;
         let p = r.participant.ok_or(ChatError::NotFound)?;
         if p.user_id.is_some() == p.agent_id.is_some() {
@@ -310,7 +330,7 @@ impl Chat {
         }
         let user = p.user_id.as_deref().map(id).transpose()?;
         let agent = p.agent_id.as_deref().map(id).transpose()?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", thread)
             .fetch_one(&mut *tx)
             .await?;
@@ -357,7 +377,10 @@ impl Chat {
         thread: Uuid,
         participant: Uuid,
     ) -> Result<types::Thread> {
-        let mut tx = self.pool.begin().await?;
+        if let Some(local) = self.local() {
+            return local.remove_participant(thread, participant).await;
+        }
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", thread)
             .fetch_one(&mut *tx)
             .await?;
@@ -397,7 +420,10 @@ impl Chat {
         self.thread(thread).await
     }
     pub async fn typing(&self, thread: Uuid, participant: Uuid, typing: bool) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        if let Some(local) = self.local() {
+            return local.typing(thread, participant, typing).await;
+        }
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", thread)
             .fetch_one(&mut *tx)
             .await?;
@@ -451,10 +477,10 @@ impl Chat {
     /// Persist explicit not-typing when a sender disappears; replay can render the expiry itself.
     pub(crate) async fn expire_typing(&self) -> Result<()> {
         for row in sqlx::query_file!("../../queries/chat/typing_expired.sql")
-            .fetch_all(&self.pool)
+            .fetch_all(self.pg()?)
             .await?
         {
-            let mut tx = self.pool.begin().await?;
+            let mut tx = self.pg()?.begin().await?;
             sqlx::query_file!("../../queries/chat/thread_lock.sql", row.thread_id)
                 .fetch_one(&mut *tx)
                 .await?;
@@ -497,6 +523,9 @@ impl Chat {
         &self,
         mut r: application::UploadAttachment,
     ) -> Result<types::Attachment> {
+        if let Some(local) = self.local() {
+            return local.upload_attachment(r).await;
+        }
         use zeroize::Zeroize;
         let attachment = id(&r.id)?;
         let thread = id(&r.thread_id)?;
@@ -533,10 +562,10 @@ impl Chat {
             hash,
             sealed
         )
-        .execute(&self.pool)
+        .execute(self.pg()?)
         .await?;
         let row = sqlx::query_file!("../../queries/chat/attachment_get.sql", attachment, thread)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?
             .ok_or(ChatError::Conflict)?;
         if row.sha256 != hash || row.filename != r.filename || row.media_type != r.media_type {
@@ -557,11 +586,23 @@ impl Chat {
         thread: Uuid,
         attachment: Uuid,
     ) -> Result<application::AttachmentContent> {
+        if let Some(local) = self.local() {
+            return local.download_attachment(thread, attachment).await;
+        }
         let row = sqlx::query_file!("../../queries/chat/attachment_get.sql", attachment, thread)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?
             .ok_or(ChatError::NotFound)?;
-        let content = if let Some(content) = row.content {
+        let content = if let Some(object) = &row.object_key {
+            crate::deployment::attachments::download(
+                self.objects.as_ref().ok_or(ChatError::Transport)?,
+                &self.encryption,
+                attachment,
+                object,
+            )
+            .await
+            .map_err(|_| ChatError::Transport)?
+        } else if let Some(content) = row.content {
             let encoded = self
                 .encryption
                 .open(
@@ -611,7 +652,7 @@ impl Chat {
                 content.len() as i64,
                 hex::encode(Sha256::digest(&content))
             )
-            .execute(&self.pool)
+            .execute(self.pg()?)
             .await?;
             content
         };
@@ -621,6 +662,7 @@ impl Chat {
                 thread_id: thread.to_string(),
                 filename: row.filename,
                 media_type: row.media_type,
+                persisted: true,
                 size_bytes: content.len() as i64,
                 sha256: hex::encode(Sha256::digest(&content)),
                 ..Default::default()
@@ -634,11 +676,14 @@ impl Chat {
         scope: &Scope,
         messages: Vec<application::ConvertedMessage>,
     ) -> Result<()> {
+        if let Some(local) = self.local() {
+            return local.cache_converted_messages(scope, messages).await;
+        }
         if messages.len() > 100 {
             return Err(ChatError::Invalid("At most 100 cached messages".into()));
         }
         let mut total = 0;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", scope.thread_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -683,13 +728,16 @@ impl Chat {
         thread: Uuid,
         ids: &[String],
     ) -> Result<Vec<application::ConvertedMessage>> {
+        if let Some(local) = self.local() {
+            return local.hydrate_converted_messages(agent, thread, ids).await;
+        }
         if ids.len() > 100 {
             return Err(ChatError::Invalid("At most 100 message IDs".into()));
         }
         let ids = ids.iter().map(|v| id(v)).collect::<Result<Vec<_>>>()?;
         Ok(
             sqlx::query_file!("../../queries/chat/cache_hydrate.sql", agent, thread, &ids)
-                .fetch_all(&self.pool)
+                .fetch_all(self.pg()?)
                 .await?
                 .into_iter()
                 .map(|r| application::ConvertedMessage {

@@ -22,7 +22,8 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     Router::new()
         .merge(crate::agent::rpc::runtime::router(agents, chat.clone()))
         .merge(crate::chat::rpc::runtime::router(chat.clone()))
-        .layer(middleware::from_fn_with_state(chat, agent_guard))
+        .layer(middleware::from_fn_with_state(chat.clone(), agent_guard))
+        .merge(crate::chat::controls::router(chat))
 }
 
 /// User-facing APIs and provider setup/callbacks. Agent trace ingestion is deliberately absent.
@@ -32,9 +33,18 @@ pub fn management_router(
     connections: crate::connections::service::Connections,
     oidc: super::oidc::Oidc,
 ) -> Router {
+    let deployments = crate::deployment::Deployments::new(
+        chat.pg()
+            .expect("management routes require Postgres")
+            .clone(),
+        chat.encryption.clone(),
+        agents.clone(),
+        connections.clone(),
+    );
     let access = crate::chat::access::AgentAccess::new(connections.clone(), chat.clone());
     Router::new()
         .merge(crate::agent::rpc::management::router(agents))
+        .merge(crate::deployment::rpc::management_router(deployments))
         .merge(crate::chat::access::rpc::management_router(access.clone()))
         .merge(crate::chat::rpc::management::router(chat.clone()))
         .merge(crate::connections::rpc::management::router(
@@ -50,7 +60,7 @@ pub fn management_router(
 }
 /// Public provider events only. Each adapter authenticates its own webhook signature.
 /// Management RPCs, browser setup and OAuth callbacks never mount on this listener.
-pub fn event_ingress_router(
+pub fn public_event_ingress_router(
     chat: Chat,
     connections: crate::connections::service::Connections,
 ) -> Router {

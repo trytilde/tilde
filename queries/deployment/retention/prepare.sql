@@ -1,0 +1,1 @@
+UPDATE sidecar_conversations SET storage='retiring',retirement_epoch=COALESCE(retirement_epoch,$3) WHERE thread_id=$1 AND agent_id=$2 AND storage IN ('corrosion','retiring') RETURNING retirement_epoch;

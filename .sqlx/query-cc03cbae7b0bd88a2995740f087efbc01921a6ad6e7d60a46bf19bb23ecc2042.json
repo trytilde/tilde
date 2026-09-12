@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT MIN(next_attempt_at) AS deadline FROM sidecar_outbox WHERE delivered_at IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deadline",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cc03cbae7b0bd88a2995740f087efbc01921a6ad6e7d60a46bf19bb23ecc2042"
+}

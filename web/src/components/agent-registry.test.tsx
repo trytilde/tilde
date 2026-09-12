@@ -176,7 +176,7 @@ it("pauses from the row action, keeps editing separate, and offers resume and de
   }));
   rpc.pauseAgent.mockImplementation(async () => {
     paused = true;
-    return { stopAcknowledged: true };
+    return {};
   });
   rpc.resumeAgent.mockImplementation(async () => {
     paused = false;
@@ -204,17 +204,14 @@ it("pauses from the row action, keeps editing separate, and offers resume and de
   await screen.findByRole("heading", { name: "Ada" });
 });
 
-it("reports an unacknowledged stop and can retry it without resuming", async () => {
+it("reports asynchronous cancellation when paused", async () => {
   rpc.listAgents
     .mockResolvedValueOnce({ agents: [ada], nextPageToken: "" })
     .mockResolvedValue({ agents: [{ ...ada, paused: true }], nextPageToken: "" });
-  rpc.pauseAgent
-    .mockResolvedValueOnce({ stopAcknowledged: false })
-    .mockResolvedValue({ stopAcknowledged: true });
+  rpc.pauseAgent.mockResolvedValue({});
   render(<RegistryHarness />);
   fireEvent.click(await screen.findByRole("button", { name: "Pause Ada" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Retry stop" }));
-  await waitFor(() => expect(rpc.pauseAgent).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Retry stop" })).toBeNull());
-  expect(rpc.resumeAgent).not.toHaveBeenCalled();
+  await screen.findByText(/Cancellation requested for running invocations/);
+  expect(screen.queryByRole("button", { name: "Retry stop" })).toBeNull();
+  expect(rpc.pauseAgent).toHaveBeenCalledTimes(1);
 });

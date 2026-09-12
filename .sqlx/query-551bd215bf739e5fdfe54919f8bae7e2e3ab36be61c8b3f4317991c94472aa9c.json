@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agent_health(sidecar_event_id,agent_id,endpoint_url,checked_at,healthy,latency_ms,error_code) VALUES($1,$2,$3,$4,$5,$6,CASE WHEN $5 THEN NULL ELSE 'not_ready' END) ON CONFLICT(sidecar_event_id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "551bd215bf739e5fdfe54919f8bae7e2e3ab36be61c8b3f4317991c94472aa9c"
+}

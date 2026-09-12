@@ -36,6 +36,7 @@ impl ApiRequestBuilder {
             }
             if config.async_insert {
                 pairs.append_pair("async_insert", "1");
+                pairs.append_pair("wait_for_async_insert", "1");
             }
             if config.use_json {
                 pairs.append_pair("allow_experimental_json_type", "1");

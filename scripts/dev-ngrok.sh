@@ -22,4 +22,4 @@ case "$host" in
 esac
 # Forward only to event ingress. Management and browser setup remain private.
 # Do not pool this endpoint: callbacks must reach this developer's database.
-exec ngrok http "http://$host:${INGRESS_PORT:-8082}" --url "https://$NGROK_DOMAIN" --log stdout
+exec ngrok http "http://$host:${PUBLIC_EVENT_INGRESS_PORT:-8082}" --url "https://$NGROK_DOMAIN" --log stdout

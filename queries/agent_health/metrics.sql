@@ -1,4 +1,4 @@
-WITH selected AS (SELECT id, endpoint_url FROM agents WHERE deleted_at IS NULL AND id = ANY($1)),
+WITH selected AS (SELECT id, endpoint_url, deployment_mode FROM agents WHERE deleted_at IS NULL AND id = ANY($1)),
 sessions AS (
     SELECT p.agent_id, COUNT(*) AS count
     FROM chat_participants p JOIN selected a ON a.id = p.agent_id GROUP BY p.agent_id
@@ -21,11 +21,12 @@ SELECT a.id,
     COALESCE(s.count, 0)::BIGINT AS "thread_count!",
     (COALESCE(t.count, 0)::DOUBLE PRECISION / NULLIF(s.count, 0)) AS average_turns_per_thread,
     r.avg_ms AS average_response_ms,
-    h.healthy, h.checked_at
+    CASE WHEN a.deployment_mode='sidecar' THEN sh.healthy ELSE h.healthy END AS healthy, CASE WHEN a.deployment_mode='sidecar' THEN sh.checked_at ELSE h.checked_at END AS checked_at
 FROM selected a LEFT JOIN sessions s ON s.agent_id = a.id
 LEFT JOIN turns t ON t.agent_id = a.id LEFT JOIN responses r ON r.agent_id = a.id
 LEFT JOIN LATERAL (
     SELECT healthy, checked_at FROM agent_health
     WHERE agent_id = a.id AND endpoint_url = a.endpoint_url AND checked_at <= $2
     ORDER BY checked_at DESC, id DESC LIMIT 1
-) h ON TRUE;
+) h ON TRUE
+LEFT JOIN LATERAL (SELECT BOOL_OR(ready AND agent_ready AND last_seen_at>$2-INTERVAL '15 seconds') AS healthy,MAX(last_seen_at) AS checked_at FROM sidecar_nodes WHERE agent_id=a.id) sh ON TRUE;

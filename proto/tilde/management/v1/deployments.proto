@@ -1,0 +1,21 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/agent.proto";
+import "tilde/types/v1/deployment.proto";
+service DeploymentService {
+  rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse);
+  rpc SetDeployment(SetDeploymentRequest) returns (SetDeploymentResponse);
+  rpc IssueDeploymentToken(IssueDeploymentTokenRequest) returns (IssueDeploymentTokenResponse);
+  rpc CreateSidecarAgent(CreateSidecarAgentRequest) returns (CreateSidecarAgentResponse);
+  rpc IssueIngressToken(IssueIngressTokenRequest) returns (IssueIngressTokenResponse);
+}
+message GetDeploymentRequest { string agent_id = 1; }
+message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.SidecarNode nodes = 2; }
+message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.DeploymentMode mode = 2; optional string endpoint_url = 3; tilde.types.v1.SidecarFailureMode failure_mode = 4; uint32 retention_days = 5; }
+message SetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
+message IssueDeploymentTokenRequest { string agent_id = 1; }
+message IssueDeploymentTokenResponse { string token = 1 [debug_redact = true]; }
+message CreateSidecarAgentRequest { string id = 1; string name = 2; string webhook_signing_key = 3 [debug_redact = true]; tilde.types.v1.Capabilities capabilities = 4; }
+message CreateSidecarAgentResponse { tilde.types.v1.Agent agent = 1; }
+message IssueIngressTokenRequest { string agent_id = 1; optional string thread_id = 2; }
+message IssueIngressTokenResponse { string token = 1 [debug_redact = true]; uint32 expires_in = 2; }

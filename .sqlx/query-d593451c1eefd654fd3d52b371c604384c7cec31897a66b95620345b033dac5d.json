@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_message_deliveries(message_id,connection_id,destination,external_message_id,status) VALUES($1,$2,$3,$4,$5) ON CONFLICT(message_id) DO UPDATE SET status=EXCLUDED.status;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d593451c1eefd654fd3d52b371c604384c7cec31897a66b95620345b033dac5d"
+}

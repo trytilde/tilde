@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
 pub struct Native {
-    pub pool: sqlx::PgPool,
+    pub chat: Chat,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -33,12 +33,7 @@ impl Provider for Native {
         scope: &'a Scope,
     ) -> BoxFuture<'a, ToolResult<Vec<types::ToolDefinition>>> {
         Box::pin(async move {
-            if sqlx::query_file!("../../queries/chat/channel_binding.sql", scope.thread_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(ChatError::from)?
-                .is_some()
-            {
+            if self.chat.has_channel(scope.thread_id).await? {
                 return Ok(vec![]);
             }
             Ok(vec![types::ToolDefinition {
@@ -110,7 +105,21 @@ impl Context {
         reply: Option<&str>,
     ) -> ToolResult<MessageEvents> {
         self.authorize().await?;
-        let mut tx = self.chat.pool.begin().await.map_err(ChatError::from)?;
+        if let Some(local) = self.chat.local() {
+            local
+                .begin_message(&self.scope, message_id, recipients, reply)
+                .await?;
+            return Ok(MessageEvents {
+                chat: self.chat.clone(),
+                scope: self.scope.clone(),
+                capability: SecretString::from(self.capability.expose_secret()),
+                id: message_id,
+                total: 0,
+                attachments: 0,
+                armed: true,
+            });
+        }
+        let mut tx = self.chat.pg()?.begin().await.map_err(ChatError::from)?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", self.scope.thread_id)
             .fetch_one(&mut *tx)
             .await
@@ -162,7 +171,14 @@ impl MessageEvents {
             return Err(ConnectError::invalid_argument("At most 20 attachments"));
         }
         self.chat.scope(self.capability.expose_secret()).await?;
-        let mut tx = self.chat.pool.begin().await.map_err(ChatError::from)?;
+        if let Some(local) = self.chat.local() {
+            local
+                .attach_message(self.scope.thread_id, self.id, ids)
+                .await?;
+            self.attachments += ids.len();
+            return Ok(());
+        }
+        let mut tx = self.chat.pg()?.begin().await.map_err(ChatError::from)?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", self.scope.thread_id)
             .fetch_one(&mut *tx)
             .await
@@ -199,7 +215,12 @@ impl MessageEvents {
         if self.total > 1024 * 1024 {
             return Err(ConnectError::resource_exhausted("Message is too large"));
         }
-        let mut tx = self.chat.pool.begin().await.map_err(ChatError::from)?;
+        if let Some(local) = self.chat.local() {
+            return Ok(local
+                .append_message(self.scope.thread_id, self.id, text)
+                .await?);
+        }
+        let mut tx = self.chat.pg()?.begin().await.map_err(ChatError::from)?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", self.scope.thread_id)
             .fetch_one(&mut *tx)
             .await
@@ -233,7 +254,14 @@ impl MessageEvents {
             return Err(ConnectError::invalid_argument("Message needs content"));
         }
         self.chat.scope(self.capability.expose_secret()).await?;
-        let mut tx = self.chat.pool.begin().await.map_err(ChatError::from)?;
+        if let Some(local) = self.chat.local() {
+            let result = local
+                .finish_message(self.scope.thread_id, self.id, "complete")
+                .await?;
+            self.armed = false;
+            return Ok(result);
+        }
+        let mut tx = self.chat.pg()?.begin().await.map_err(ChatError::from)?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", self.scope.thread_id)
             .fetch_one(&mut *tx)
             .await

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.thread_id,e.sequence,p.agent_id AS \"agent_id!\" FROM chat_activity e JOIN chat_participants p ON p.thread_id=e.thread_id JOIN agents a ON a.id=p.agent_id WHERE a.deployment_mode='sidecar' AND a.deleted_at IS NULL AND (p.active OR e.kind='participant.left') AND NOT EXISTS(SELECT 1 FROM sidecar_bridge_receipts b WHERE b.thread_id=e.thread_id AND b.sequence=e.sequence AND b.agent_id=p.agent_id) ORDER BY e.created_at,e.thread_id,e.sequence LIMIT 50;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "sequence",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "74dd223aca18bb336aa2c7217dca61e4b5c2a48e325c733d7212f4402572c19c"
+}

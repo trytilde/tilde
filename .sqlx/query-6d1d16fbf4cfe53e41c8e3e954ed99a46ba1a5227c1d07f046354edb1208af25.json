@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sidecar_outbox(id,agent_id,kind,payload) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6d1d16fbf4cfe53e41c8e3e954ed99a46ba1a5227c1d07f046354edb1208af25"
+}

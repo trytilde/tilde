@@ -38,7 +38,7 @@ impl ChatService for Rpc {
             cursor,
             i64::from(size) + 1
         )
-        .fetch_all(&self.0.pool)
+        .fetch_all(self.0.pg()?)
         .await
         .map_err(crate::chat::ChatError::from)?;
         let more = rows.len() > size as usize;
@@ -187,6 +187,9 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::CreateThreadRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::CreateThreadResponse> + Send + use<'a>>
     {
+        self.0
+            .require_gateway_agent(id(request.primary_agent_id)?)
+            .await?;
         let _ = _ctx;
         Response::ok(management::CreateThreadResponse {
             thread: self
@@ -214,6 +217,13 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::PostMessageRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::PostMessageResponse> + Send + use<'a>>
     {
+        self.0
+            .require_gateway_agent(id(&self
+                .0
+                .thread(id(request.thread_id)?)
+                .await?
+                .primary_agent_id)?)
+            .await?;
         let _ = _ctx;
         Response::ok(management::PostMessageResponse {
             message: self.0.post(request.to_owned_message().into()).await?.into(),
@@ -248,6 +258,7 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::StartRunRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::StartRunResponse> + Send + use<'a>>
     {
+        self.0.require_gateway_agent(id(request.agent_id)?).await?;
         Response::ok(management::StartRunResponse {
             run: self
                 .0
@@ -279,6 +290,16 @@ impl ChatService for Rpc {
             run: self.0.run(id(request.id)?).await?.into(),
             ..Default::default()
         })
+    }
+    async fn suspend_invocation<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        r: ServiceRequest<'_, management::SuspendInvocationRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::SuspendInvocationResponse> + Send + use<'a>,
+    > {
+        self.0.suspend_invocation(id(r.invocation_id)?).await?;
+        Response::ok(management::SuspendInvocationResponse::default())
     }
     async fn cancel_invocation<'a>(
         &'a self,
@@ -319,7 +340,7 @@ impl ChatService for Rpc {
         let chat = self.0.clone();
         let mut changed = chat
             .activity_notifications
-            .subscribe(&chat.pool, "tilde_chat_activity")
+            .subscribe(chat.pg()?, "tilde_chat_activity")
             .await
             .map_err(crate::chat::ChatError::from)?;
         let mut cursor = request.after_sequence;

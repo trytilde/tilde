@@ -1,128 +1,194 @@
+import test from "node:test";
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { createServer as httpServer } from "node:http";
 import { createServer } from "node:http2";
-import { once } from "node:events";
+import { EventEmitter, once } from "node:events";
+import { randomUUID, createHash, createHmac } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { create, toBinary } from "@bufbuild/protobuf";
-import { createClient, Code } from "@connectrpc/connect";
+import { createClient } from "@connectrpc/connect";
 import { connectNodeAdapter, createConnectTransport } from "@connectrpc/connect-node";
-import { createAgentServer, AgentHostService, RuntimeChatService } from "../dist/index.js";
+import { createAgentHandler, AgentHostService, RuntimeChatService } from "../dist/index.js";
+import { InvokeRequestSchema } from "../dist/gen/tilde/agent_host/v1/agent_pb.js";
 import {
-  InvokeRequestSchema,
-  StopRequestSchema,
-} from "../dist/gen/tilde/agent_host/v1/agent_pb.js";
+  InvocationControlService,
+  InvocationCommandKind as Kind,
+} from "../dist/gen/tilde/runtime/v1/controls_pb.js";
 
-// Exercise signed HTTP/2 calls and cooperative cancellation without a model/provider service.
-test(
-  "Stop fences late invokes, leaves resumed work running, and keeps Healthz available",
+void test(
+  "separate stateless hosts consume invocation controls, replay steering, and checkpoint suspension",
   { timeout: 15000 },
-  async () => {
+  async (t) => {
     const key = "shared-test-key-0123456789abcdef0123456789";
+    const events = new EventEmitter();
+    const pending = new Map();
+    const acknowledged = new Set();
+    const contexts = new Map();
+    const checkpoints = [];
+    const failCheckpoint = new Set();
+    const hostRequests = [];
     const sessions = new Set();
-    const contexts = [];
     const callback = createServer(
       connectNodeAdapter({
-        routes: (router) =>
+        routes(router) {
           router.service(RuntimeChatService, {
             async listTools() {
               return { tools: [] };
             },
-          }),
+          });
+          router.service(InvocationControlService, {
+            async *watchCommands(_, ctx) {
+              const invocation = ctx.requestHeader.get("authorization").slice(7);
+              if (!(pending.get(invocation) ?? []).some((c) => c.kind === Kind.STOP))
+                yield { kind: Kind.READY };
+              while (!ctx.signal.aborted) {
+                for (const command of pending.get(invocation) ?? []) {
+                  if (!acknowledged.has(command.id)) yield command;
+                }
+                await new Promise((resolve) => {
+                  const done = () => {
+                    events.off(invocation, done);
+                    ctx.signal.removeEventListener("abort", done);
+                    resolve();
+                  };
+                  events.once(invocation, done);
+                  ctx.signal.addEventListener("abort", done, { once: true });
+                });
+              }
+            },
+            async acknowledgeCommand(request, ctx) {
+              const invocation = ctx.requestHeader.get("authorization").slice(7);
+              assert((pending.get(invocation) ?? []).some((c) => c.id === request.id));
+              acknowledged.add(request.id);
+              return {};
+            },
+          });
+        },
       }),
     );
-    const host = createAgentServer({
-      signingKey: key,
-      tracing: "existing",
-      async run(ctx) {
-        contexts.push(ctx);
-        await new Promise((resolve) =>
-          ctx.signal.addEventListener("abort", resolve, { once: true }),
-        );
-      },
+    callback.on("session", (session) => {
+      sessions.add(session);
+      session.on("close", () => sessions.delete(session));
     });
-    for (const server of [callback, host]) {
-      server.on("session", (session) => {
-        sessions.add(session);
-        session.on("close", () => sessions.delete(session));
+    callback.listen(0, "127.0.0.1");
+    await once(callback, "listening");
+    const hosts = [0, 1].map((index) => {
+      const handler = createAgentHandler({
+        signingKey: key,
+        tracing: "existing",
+        pathPrefix: "/api/agent",
+        async run(ctx) {
+          contexts.set(ctx.invocationId, { ctx, index });
+          await new Promise((resolve) =>
+            ctx.signal.addEventListener("abort", resolve, { once: true }),
+          );
+        },
+        async checkpoint(ctx) {
+          if (failCheckpoint.has(ctx.invocationId)) throw new Error("Storage unavailable");
+          checkpoints.push(ctx.invocationId);
+        },
       });
-      server.listen(0, "127.0.0.1");
-      await once(server, "listening");
+      return httpServer((req, res) => {
+        hostRequests.push(req.url);
+        return handler(req, res);
+      });
+    });
+    for (const host of hosts) {
+      host.listen(0, "127.0.0.1");
+      await once(host, "listening");
     }
-    const rpc = createClient(
-      AgentHostService,
-      createConnectTransport({
-        baseUrl: `http://127.0.0.1:${host.address().port}`,
-        httpVersion: "2",
-      }),
-    );
-    function signed(schema, value, method) {
+    t.after(() => {
+      for (const session of sessions) session.destroy();
+      callback.close();
+      for (const host of hosts) host.close();
+    });
+    async function eventually(check) {
+      for (let i = 0; i < 200; i++) {
+        const value = check();
+        if (value) return value;
+        await delay(10);
+      }
+      throw new Error("Condition not observed");
+    }
+    function invoke(index, invocation = randomUUID()) {
+      const request = {
+        agentId: randomUUID(),
+        threadId: randomUUID(),
+        invocationId: invocation,
+        runId: randomUUID(),
+        capability: invocation,
+        callbackUrl: `http://127.0.0.1:${callback.address().port}`,
+        commandId: invocation,
+      };
       const timestamp = String(Math.floor(Date.now() / 1000));
       const digest = createHash("sha256")
-        .update(toBinary(schema, create(schema, value)))
+        .update(toBinary(InvokeRequestSchema, create(InvokeRequestSchema, request)))
         .digest("hex");
-      return {
-        headers: {
-          "x-tilde-timestamp": timestamp,
-          "x-tilde-signature": createHmac("sha256", key)
-            .update(`${method}.${timestamp}.${digest}`)
-            .digest("hex"),
-        },
+      const headers = {
+        "x-tilde-timestamp": timestamp,
+        "x-tilde-signature": createHmac("sha256", key)
+          .update(`Invoke.${timestamp}.${digest}`)
+          .digest("hex"),
       };
-    }
-    const agent = randomUUID();
-    const other = randomUUID();
-    function invoke(agentId, generation) {
-      const request = {
-        agentId,
-        agentGeneration: generation,
-        invocationId: randomUUID(),
-        runId: randomUUID(),
-        threadId: randomUUID(),
-        callbackUrl: `http://127.0.0.1:${callback.address().port}`,
-        capability: "test-token",
-      };
-      return (async () => {
-        for await (const _ of rpc.invoke(request, signed(InvokeRequestSchema, request, "Invoke"))) {
-          /* drain */
+      const client = createClient(
+        AgentHostService,
+        createConnectTransport({
+          baseUrl: `http://127.0.0.1:${hosts[index].address().port}/api/agent`,
+          httpVersion: "1.1",
+        }),
+      );
+      const finished = (async () => {
+        for await (const _ of client.invoke(request, { headers })) {
         }
       })();
+      return { invocation, finished };
     }
-    async function stop(agentId, throughGeneration) {
-      const request = { agentId, throughGeneration };
-      return rpc.stop(request, signed(StopRequestSchema, request, "Stop"));
+    function command(invocation, kind, extra = {}) {
+      const value = { id: randomUUID(), kind, ...extra };
+      pending.set(invocation, [...(pending.get(invocation) ?? []), value]);
+      events.emit(invocation);
+      return value;
     }
-    async function entered(count) {
-      for (let i = 0; i < 100 && contexts.length < count; i++) await delay(10);
-      assert.equal(contexts.length, count);
-    }
-    try {
-      await assert.rejects(
-        rpc.stop({ agentId: agent, throughGeneration: 1n }),
-        (e) => e.code === Code.Unauthenticated,
+    const a = invoke(0),
+      b = invoke(1);
+    await eventually(() => contexts.size === 2);
+    const steer = command(a.invocation, Kind.STEER, {
+      inputId: randomUUID(),
+      text: "change direction",
+    });
+    await eventually(() => acknowledged.has(steer.id));
+    assert.equal(contexts.get(a.invocation).ctx.takeInputs()[0].text, "change direction");
+    acknowledged.delete(steer.id);
+    events.emit(a.invocation);
+    await eventually(() => acknowledged.has(steer.id));
+    assert.deepEqual(contexts.get(a.invocation).ctx.takeInputs(), []);
+    const stop = command(a.invocation, Kind.STOP);
+    await a.finished;
+    assert(contexts.get(a.invocation).ctx.signal.aborted);
+    assert(acknowledged.has(stop.id));
+    assert(!contexts.get(b.invocation).ctx.signal.aborted);
+    const suspend = command(b.invocation, Kind.SUSPEND);
+    await b.finished;
+    assert.deepEqual(checkpoints, [b.invocation]);
+    assert(acknowledged.has(suspend.id));
+    const failed = invoke(0);
+    await eventually(() => contexts.has(failed.invocation));
+    failCheckpoint.add(failed.invocation);
+    const failure = assert.rejects(failed.finished, /Suspension checkpoint failed/);
+    const failedSuspend = command(failed.invocation, Kind.SUSPEND);
+    await failure;
+    assert(!acknowledged.has(failedSuspend.id));
+    const late = randomUUID();
+    command(late, Kind.STOP);
+    await assert.rejects(invoke(1, late).finished);
+    assert(!contexts.has(late));
+    assert(hostRequests.every((path) => path.endsWith("/Invoke")));
+    for (const method of ["Stop", "Steer", "Cancel"]) {
+      const response = await fetch(
+        `http://127.0.0.1:${hosts[0].address().port}/api/agent/tilde.agent_host.v1.AgentService/${method}`,
+        { method: "POST" },
       );
-      const first = invoke(agent, 0n);
-      const unrelated = invoke(other, 0n);
-      await entered(2);
-      await stop(agent, 1n);
-      await first;
-      assert(contexts.find((c) => c.agentId === agent).signal.aborted);
-      assert(!contexts.find((c) => c.agentId === other).signal.aborted);
-      assert((await rpc.healthz({})).ready);
-      await assert.rejects(invoke(agent, 0n), (e) => e.code === Code.FailedPrecondition);
-      const resumed = invoke(agent, 2n);
-      await entered(3);
-      await stop(agent, 1n); // Delayed retry from before resume.
-      assert(!contexts[2].signal.aborted);
-      await stop(agent, 3n);
-      await resumed;
-      await stop(other, 1n);
-      await unrelated;
-      assert((await rpc.healthz({})).ready);
-    } finally {
-      for (const session of sessions) session.destroy();
-      host.close();
-      callback.close();
+      assert.equal(response.status, 404);
     }
   },
 );

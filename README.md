@@ -273,15 +273,89 @@ Seed mode needs no AWS configuration or network calls.
 
 See the [chat domain](CONTEXT.md#chat) and the [TypeScript SDK and example agent](sdk/ts/README.md).
 
+## Serverless agent execution
+
+Agents may export the SDK's `createAgentHandler` from a Node serverless route,
+including a Vercel deployment. The gateway invokes the deployment URL once; the
+running request opens an outbound invocation control stream to its callback URL.
+Steering, cancellation and suspension reach that exact execution through the stream,
+so subsequent requests do not need to land on the same host instance.
+
+The same protocol runs against a local sidecar. The SDK must establish its control
+subscription before user code executes. Suspension uses a framework checkpoint hook
+and ends execution; resume starts a new invocation. See the
+[SDK serverless setup](sdk/ts/README.md#serverless-invocation-controls).
+
+## Sidecar deployments
+
+Gateway-only deployments require no Corrosion configuration. To run an agent
+beside a sidecar, choose **Sidecar** in its **Deployment** tab, select the failure
+policy and retention days, and issue a deployment token. Use the same token for
+all replicas of that agent. Pause an existing agent before changing its mode;
+leaving sidecar mode waits for retained conversations to finish archiving.
+
+The release archive and container include `tilde`, `tilde-sidecar`, and a pinned
+`corrosion` binary. Put the binaries on `PATH`, or set `ENGINE_CORROSION_BINARY`.
+Run the sidecar next to your SDK-hosted agent process:
+
+```bash
+export ENGINE_SIDECAR_GATEWAY_URL=https://gateway.example:8083
+export ENGINE_SIDECAR_AGENT_TOKENS='<deployment-token>'
+export ENGINE_SIDECAR_AGENT_ENDPOINTS='<agent-id>=http://127.0.0.1:3000'
+export ENGINE_SIDECAR_ADVERTISE_ADDRESS=10.0.0.12
+export ENGINE_SIDECAR_STATE_DIRECTORY=/var/lib/tilde-sidecar
+tilde-sidecar
+```
+
+For multiple agents, separate tokens and `agent-id=endpoint` entries with commas.
+Each agent receives its own Corrosion database and peer cluster. Keep the state
+directory persistent. The gateway brokers peer discovery, encryption and TLS
+material during registration. Gateway and sidecar schema revisions must match.
+A joining replica checks replication progress before becoming ready.
+
+The sidecar serves agent runtime on port 8081, public event ingress on 8082, and
+agent event ingress on 8083. Agent routes are prefixed with `/agents/<agent-id>`;
+provider webhooks use `/agents/<agent-id>/connections/webhooks/<connection-id>`.
+Use `ENGINE_AGENT_RUNTIME_LISTEN`, `ENGINE_PUBLIC_EVENT_INGRESS_LISTEN`, and
+`ENGINE_AGENT_EVENT_INGRESS_LISTEN` to change binds. Allow private gateway-to-sidecar
+HTTP traffic and peer UDP traffic starting at `ENGINE_SIDECAR_GOSSIP_PORT` (default
+8787, incremented once per configured agent). Advertised addresses must be
+reachable by the other replicas and gateway. Use a load balancer to route your
+provider webhooks and native ingress requests to sidecars.
+
+Public gateway ingress rejects requests for sidecar-deployed agents. A sidecar
+serves retained conversations locally and proxies absent conversations through
+authenticated agent-event-ingress. Retired conversations remain in Postgres and
+are never copied back into Corrosion; their requests therefore incur gateway
+latency. Gateway archival runs continuously so management can inspect live history.
+Central IAM, registry changes and credential setup require the gateway.
+
+The owner of each conversation's agent participant executes its commands.
+Acknowledgements have a five-second deadline; owner health expires after fifteen
+seconds. Recovery follows the selected **Assign to new node** or **Stop** policy.
+The gateway serializes ownership changes in Postgres and publishes new generations.
+Replication is eventual: partitioned execution can overlap during failover, so
+application effects should use idempotency keys.
+
+Retention defaults to seven inactive days. Complete conversations are removed
+only after archival and peer acknowledgement; Postgres history remains available.
+Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until
+uploaded to gateway S3 storage. Pending uploads are not evicted. Configure the
+existing `ENGINE_S3_*` settings on the gateway for durable attachment storage.
+
+For local development use `task dev:sidecar`; `task test:sidecar` exercises real
+Corrosion peers, execution ownership and Postgres archival.
+
 ## IAM and API listeners
 
-One Tilde process serves three APIs:
+One Tilde gateway serves four APIs:
 
 | API | Default bind | Authentication |
 | --- | --- | --- |
 | Management API | `127.0.0.1:8080` | User bearer session from OIDC |
 | Agent runtime API | `127.0.0.1:8081` | Signed invocation connect token |
-| Event ingress API | `127.0.0.1:8082` | Provider webhook signatures |
+| Public event ingress API | `127.0.0.1:8082` | Provider signatures or scoped ingress tokens |
+| Agent event ingress API | `127.0.0.1:8083` | Agent deployment tokens and original caller scope |
 
 Every user admitted by the configured OIDC provider has unrestricted management
 access. There is no role model or API-key support. Configure the provider's login
@@ -405,8 +479,8 @@ NGROK_AUTHTOKEN=your-token
 
 `task secrets:load` also loads `ngrok_authtoken` from SOPS into the private dev
 dotenv file. Run `task dev`; ngrok forwards only to event ingress at
-`ADDRESS:INGRESS_PORT` (default port `8082`). The launcher sets
-`ENGINE_EVENT_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any configured
+`ADDRESS:PUBLIC_EVENT_INGRESS_PORT` (default port `8082`). The launcher sets
+`ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any configured
 ingress public URL while ngrok is enabled. This also updates the webhook URLs
 displayed and copied in connection setup iframes. The dashboard, setup UI and OAuth redirects remain
 on management; ngrok never forwards to management or the agent runtime API.
@@ -417,8 +491,8 @@ the connection; starting the listener does not rewrite provider registrations.
 `/connections/webhooks/{connection_id}` is served only on event ingress, which
 remains active when management and web are disabled. Deployments can expose this
 listener while keeping management private. Configure its bind with
-`ENGINE_EVENT_INGRESS_LISTEN` or `--event-ingress-listen`, and its externally
-reachable origin with `ENGINE_EVENT_INGRESS_PUBLIC_URL`.
+`ENGINE_PUBLIC_EVENT_INGRESS_LISTEN` or `--event-ingress-listen`, and its externally
+reachable origin with `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL`.
 
 Ngrok is disabled by default and belongs only to Task's dev launcher; the packaged
 Rust server never starts it. It stops with Ctrl+C or a dev service failure.
@@ -458,27 +532,33 @@ also start the default local database separately.
 
 ## Invocation tracing
 
-Tilde embeds Rotel to forward platform and agent spans to your collector. Enable
-tracing by setting the complete OTLP/HTTP protobuf traces URL:
+Langfuse stores platform and agent traces. Configure it on the gateway:
 
 ```sh
-ENGINE_TRACING_EXPORT_ENDPOINT=https://collector.example.com/v1/traces
-ENGINE_TRACING_EXPORT_HEADERS='Authorization=Bearer your-collector-token'
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+# Optional browser-facing origin for self-hosted Langfuse:
+# LANGFUSE_PUBLIC_URL=https://langfuse.example.com
 ```
 
-Without an endpoint, tracing is disabled. Agents send OTLP/HTTP to `/v1/traces`
-on `ENGINE_AGENT_RUNTIME_PUBLIC_URL` with their connect token. The TypeScript SDK
-propagates context across model/tool instrumentation and streamed callbacks.
-Webhook/API ancestry survives durable message scheduling and invocation dispatch.
+Agents upload OTLP to `/v1/traces` on their runtime listener with their invocation
+token. Sidecars retain accepted spans in Corrosion and replicate them between HA
+peers. The gateway subscribes, takes over delivery, and forwards to Langfuse.
+Only the gateway has Langfuse credentials. The management tracing tab reads from
+Langfuse; Postgres does not retain permanent trace history.
 
-Rotel batches asynchronously through bounded queues. Ingestion success means
-acceptance into memory; collector failures retry for up to five minutes per batch.
-Overload returns retryable 503 responses. There is no local trace storage or replay,
-and queued telemetry may be lost on process failure or exhausted retry budgets.
-Final agent uploads remain authorized for five minutes after invocation end.
+The sidecar relay and gateway delivery queue are bounded. Corrosion rows are
+removed after gateway acceptance, and gateway payloads are cleared after delivery.
+Temporary gateway replay receipts suppress repeated batches; delivery retries use
+Postgres notifications and scheduled deadlines. Overload returns retryable errors.
+Gateway delivery records expire after seven days. Conversation retention settings
+do not delete Langfuse history.
 
-See [tracing implementation](crates/tilde/src/tracing/README.md) for queue limits,
-authentication and delivery semantics. Postgres trace storage is a separate follow-up.
+Without Langfuse configuration, tracing is disabled. Final agent uploads remain
+authorized for five minutes after invocation end. See the
+[tracing implementation](crates/tilde/src/tracing/README.md) for delivery and
+scope details.
 
 Agent creation requires an HTTP(S) endpoint. Custom avatar uploads use the `ENGINE_S3_*`
 settings in `.env.example`; `task dev` starts MinIO and creates the private avatar bucket.
@@ -486,3 +566,28 @@ settings in `.env.example`; `task dev` starts MinIO and creates the private avat
 When setting `ADDRESS` for Tailscale, `task dev` uses that address for signed avatar URLs.
 For other deployments, set `ENGINE_S3_PUBLIC_ENDPOINT` if the browser-facing storage URL
 is different from `ENGINE_S3_ENDPOINT`; Docker Compose also accepts `ENGINE_S3_CONTAINER_ENDPOINT`.
+
+## Agent logs
+
+`task dev` also starts a dedicated local ClickHouse service for agent log history.
+The **Logs** tab on an agent supports time/severity/message filters, invocation and
+trace correlation, record inspection, pagination, and a bounded live view.
+Send instrumented OTel logs to the runtime callback URL plus `/v1/logs`, using the
+agent connect token as a Bearer credential. Standard OTLP/HTTP JSON and protobuf
+are supported; application stdout capture requires OTel instrumentation.
+
+Set `DEV_LOGS_ENABLED=0` to skip local ClickHouse. To use an existing database, set
+`LOGS_CLICKHOUSE_URL`, `LOGS_CLICKHOUSE_DATABASE`, `LOGS_CLICKHOUSE_USER`, and
+`LOGS_CLICKHOUSE_PASSWORD` in `.env`. Tilde creates the log table in that database.
+Optional `LOGS_OTLP_ENDPOINT` and `LOGS_OTLP_HEADERS` forward to another collector
+independently of local storage. Without a storage URL, the history UI is disabled;
+forwarding can remain enabled. Without either destination, valid authenticated
+uploads are discarded.
+
+Logs are batched into bounded, persistent disk delivery queues under
+`LOGS_QUEUE_DIR`; use a distinct persistent volume for each gateway. Historical
+logs never pass through application Postgres. Pending delivery expires after 24
+hours, history after seven days. External forwarding can drop copies if its queue
+fills while local storage continues. See the [logs boundary](crates/tilde/src/logs/README.md)
+for limits, overload behavior, and sidecar semantics. Run `task test:logs` to test
+against a disposable Postgres database and isolated ClickHouse database.

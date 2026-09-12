@@ -4,6 +4,9 @@ include!("tilde.management.v1.access.rs");
 include!("tilde.management.v1.agents.rs");
 include!("tilde.management.v1.chat.rs");
 include!("tilde.management.v1.connections.rs");
+include!("tilde.management.v1.deployments.rs");
+include!("tilde.management.v1.logs.rs");
+include!("tilde.management.v1.tracing.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -25,6 +28,9 @@ pub mod __buffa {
         include!("tilde.management.v1.agents.__view.rs");
         include!("tilde.management.v1.chat.__view.rs");
         include!("tilde.management.v1.connections.__view.rs");
+        include!("tilde.management.v1.deployments.__view.rs");
+        include!("tilde.management.v1.logs.__view.rs");
+        include!("tilde.management.v1.tracing.__view.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -90,6 +96,8 @@ pub mod __buffa {
         reg.register_json_any(super::__DOWNLOAD_ATTACHMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__WATCH_THREAD_REQUEST_JSON_ANY);
         reg.register_json_any(super::__WATCH_THREAD_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SUSPEND_INVOCATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SUSPEND_INVOCATION_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROVIDER_REQUEST_JSON_ANY);
@@ -110,6 +118,34 @@ pub mod __buffa {
         reg.register_json_any(super::__RECONNECT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DISCONNECT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DISCONNECT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_DEPLOYMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ISSUE_DEPLOYMENT_TOKEN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ISSUE_DEPLOYMENT_TOKEN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SIDECAR_AGENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SIDECAR_AGENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ISSUE_INGRESS_TOKEN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ISSUE_INGRESS_TOKEN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_LOGS_STATUS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_LOGS_STATUS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LOG_FILTER_JSON_ANY);
+        reg.register_json_any(super::__LIST_LOGS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LOG_ATTRIBUTE_JSON_ANY);
+        reg.register_json_any(super::__LOG_RECORD_JSON_ANY);
+        reg.register_json_any(super::__LIST_LOGS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACING_STATUS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACING_STATUS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__OBSERVATION_FILTER_JSON_ANY);
+        reg.register_json_any(super::__LIST_OBSERVATIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_SESSION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__TRACE_ATTRIBUTE_JSON_ANY);
+        reg.register_json_any(super::__OBSERVATION_JSON_ANY);
+        reg.register_json_any(super::__LIST_OBSERVATIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_SESSION_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -361,6 +397,14 @@ pub use self::__buffa::view::WatchThreadResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::WatchThreadResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::SuspendInvocationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendInvocationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendInvocationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendInvocationResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ListProvidersRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListProvidersRequestOwnedView;
@@ -440,5 +484,117 @@ pub use self::__buffa::view::DisconnectRequestOwnedView;
 pub use self::__buffa::view::DisconnectResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::DisconnectResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetDeploymentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueDeploymentTokenRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueDeploymentTokenRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueDeploymentTokenResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueDeploymentTokenResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSidecarAgentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSidecarAgentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSidecarAgentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSidecarAgentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueIngressTokenRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueIngressTokenRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueIngressTokenResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::IssueIngressTokenResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetLogsStatusRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetLogsStatusRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetLogsStatusResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetLogsStatusResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LogFilterView;
+#[doc(inline)]
+pub use self::__buffa::view::LogFilterOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListLogsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListLogsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LogAttributeView;
+#[doc(inline)]
+pub use self::__buffa::view::LogAttributeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LogRecordView;
+#[doc(inline)]
+pub use self::__buffa::view::LogRecordOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListLogsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListLogsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTracingStatusRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTracingStatusRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTracingStatusResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTracingStatusResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ObservationFilterView;
+#[doc(inline)]
+pub use self::__buffa::view::ObservationFilterOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListObservationsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListObservationsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSessionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSessionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TraceAttributeView;
+#[doc(inline)]
+pub use self::__buffa::view::TraceAttributeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ObservationView;
+#[doc(inline)]
+pub use self::__buffa::view::ObservationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListObservationsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListObservationsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSessionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSessionResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

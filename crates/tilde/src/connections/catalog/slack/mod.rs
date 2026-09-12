@@ -239,7 +239,7 @@ impl Runtime for Slack {
                 &service.callback_url(setup)?,
                 &format!(
                     "{}/connections/webhooks/{}",
-                    service.event_ingress_url, setup.connection_id
+                    service.public_event_ingress_url, setup.connection_id
                 ),
             )
             .await?;

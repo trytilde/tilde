@@ -1730,26 +1730,13 @@ pub struct PauseAgentResponse {
         super::super::types::v1::Agent,
         ::buffa::Inline<super::super::types::v1::Agent>,
     >,
-    /// Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
-    ///
-    /// Field 2: `stop_acknowledged`
-    #[serde(
-        rename = "stopAcknowledged",
-        alias = "stop_acknowledged",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub stop_acknowledged: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for PauseAgentResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("PauseAgentResponse")
-            .field("agent", &self.agent)
-            .field("stop_acknowledged", &self.stop_acknowledged)
-            .finish()
+        f.debug_struct("PauseAgentResponse").field("agent", &self.agent).finish()
     }
 }
 impl PauseAgentResponse {
@@ -1787,9 +1774,6 @@ impl ::buffa::Message for PauseAgentResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.stop_acknowledged {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1807,9 +1791,6 @@ impl ::buffa::Message for PauseAgentResponse {
                 buf,
             );
             self.agent.write_to(__cache, buf);
-        }
-        if self.stop_acknowledged {
-            ::buffa::types::put_bool_field(2u32, self.stop_acknowledged, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1835,13 +1816,6 @@ impl ::buffa::Message for PauseAgentResponse {
                     ctx,
                 )?;
             }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.stop_acknowledged = ::buffa::types::decode_bool(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1851,7 +1825,6 @@ impl ::buffa::Message for PauseAgentResponse {
     }
     fn clear(&mut self) {
         self.agent = ::buffa::MessageField::none();
-        self.stop_acknowledged = false;
         self.__buffa_unknown_fields.clear();
     }
 }

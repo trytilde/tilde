@@ -7,7 +7,12 @@ import { AgentEditor } from "./agent-editor";
 
 const updateAgent = vi.hoisted(() => vi.fn());
 const createAgent = vi.hoisted(() => vi.fn());
-vi.mock("@/client", () => ({ agents: { updateAgent, createAgent } }));
+const getDeployment = vi.hoisted(() => vi.fn());
+const setDeployment = vi.hoisted(() => vi.fn());
+vi.mock("@/client", () => ({
+  agents: { updateAgent, createAgent },
+  deployments: { getDeployment, setDeployment },
+}));
 vi.mock("./agent-connections", () => ({
   AgentConnections: () => <p>Connected chat providers</p>,
 }));
@@ -65,16 +70,20 @@ it("autosaves typed capabilities and keeps header saves independent", async () =
   expect(updateAgent).toHaveBeenLastCalledWith({ id: agent.id, name: "Ada Lovelace" });
   expect(onSaved).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Edit agent endpoint" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Agent endpoint" }), {
+  getDeployment.mockResolvedValue({
+    deployment: { mode: 1, endpointUrl: agent.endpointUrl, failureMode: 1, retentionDays: 7 },
+    nodes: [],
+  });
+  setDeployment.mockImplementation(async (values) => ({ deployment: values }));
+  fireEvent.click(screen.getByRole("tab", { name: "Deployment" }));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Agent endpoint URL" }), {
     target: { value: "https://new.example.com" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByText("https://new.example.com");
-  expect(updateAgent).toHaveBeenLastCalledWith({
-    id: agent.id,
-    endpointUrl: "https://new.example.com",
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Save deployment" }));
+  await screen.findByText("Deployment saved.");
+  expect(setDeployment).toHaveBeenLastCalledWith(
+    expect.objectContaining({ agentId: agent.id, endpointUrl: "https://new.example.com" }),
+  );
 
   fireEvent.click(screen.getByRole("tab", { name: "Chat providers" }));
   expect(screen.getByRole("tabpanel").textContent).toContain("Connected chat providers");

@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id,i.run_id,i.thread_id,i.agent_id,p.id AS participant_id,a.capabilities AS \"capabilities!: Json<Capabilities>\",i.status,i.lease_expires_at\nFROM chat_invocations i JOIN agents a ON a.id=i.agent_id JOIN chat_participants p ON p.thread_id=i.thread_id AND p.agent_id=i.agent_id\nWHERE i.id=$1 AND i.agent_id=$2 AND p.active AND NOT a.paused AND a.deleted_at IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "participant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "lease_expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "41f18471968a9f0450ac3d1b77e080503b4771264be95afc7c10d48188e86532"
+}

@@ -3,3 +3,6 @@ include!("tilde.management.v1.access.__connect.rs");
 include!("tilde.management.v1.agents.__connect.rs");
 include!("tilde.management.v1.chat.__connect.rs");
 include!("tilde.management.v1.connections.__connect.rs");
+include!("tilde.management.v1.deployments.__connect.rs");
+include!("tilde.management.v1.logs.__connect.rs");
+include!("tilde.management.v1.tracing.__connect.rs");

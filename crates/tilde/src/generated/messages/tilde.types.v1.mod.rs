@@ -4,6 +4,8 @@ include!("tilde.types.v1.access.rs");
 include!("tilde.types.v1.agent.rs");
 include!("tilde.types.v1.chat.rs");
 include!("tilde.types.v1.connections.rs");
+include!("tilde.types.v1.deployment.rs");
+include!("tilde.types.v1.runtime_event.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -25,11 +27,14 @@ pub mod __buffa {
         include!("tilde.types.v1.agent.__view.rs");
         include!("tilde.types.v1.chat.__view.rs");
         include!("tilde.types.v1.connections.__view.rs");
+        include!("tilde.types.v1.deployment.__view.rs");
+        include!("tilde.types.v1.runtime_event.__view.rs");
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
             include!("tilde.types.v1.chat.__view_oneof.rs");
             include!("tilde.types.v1.connections.__view_oneof.rs");
+            include!("tilde.types.v1.runtime_event.__view_oneof.rs");
         }
     }
     pub mod oneof {
@@ -37,6 +42,7 @@ pub mod __buffa {
         use super::*;
         include!("tilde.types.v1.chat.__oneof.rs");
         include!("tilde.types.v1.connections.__oneof.rs");
+        include!("tilde.types.v1.runtime_event.__oneof.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -79,6 +85,22 @@ pub mod __buffa {
         reg.register_json_any(super::__REMOTE_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CAPABILITY_ASSIGNMENT_JSON_ANY);
         reg.register_json_any(super::__ASSOCIATED_AGENT_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_JSON_ANY);
+        reg.register_json_any(super::__SIDECAR_NODE_JSON_ANY);
+        reg.register_json_any(super::__PARTICIPANT_ASSIGNMENT_JSON_ANY);
+        reg.register_json_any(super::__INVOCATION_STATE_JSON_ANY);
+        reg.register_json_any(super::__RUNTIME_EVENT_JSON_ANY);
+        reg.register_json_any(super::__AGENT_COMMAND_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_COMMAND_JSON_ANY);
+        reg.register_json_any(super::__STEER_COMMAND_JSON_ANY);
+        reg.register_json_any(super::__CONVERTED_MESSAGE_STATE_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_DECISION_JSON_ANY);
+        reg.register_json_any(super::__ASSIGNMENT_CHANGE_JSON_ANY);
+        reg.register_json_any(super::__ATTACHMENT_SOURCE_JSON_ANY);
+        reg.register_json_any(super::__ATTACHMENT_TRANSFER_JSON_ANY);
+        reg.register_json_any(super::__PROVIDER_EVENT_JSON_ANY);
+        reg.register_json_any(super::__PROVIDER_ATTACHMENT_JSON_ANY);
+        reg.register_json_any(super::__BRIDGE_SNAPSHOT_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -237,5 +259,69 @@ pub use self::__buffa::view::CapabilityAssignmentOwnedView;
 pub use self::__buffa::view::AssociatedAgentView;
 #[doc(inline)]
 pub use self::__buffa::view::AssociatedAgentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SidecarNodeView;
+#[doc(inline)]
+pub use self::__buffa::view::SidecarNodeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ParticipantAssignmentView;
+#[doc(inline)]
+pub use self::__buffa::view::ParticipantAssignmentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvocationStateView;
+#[doc(inline)]
+pub use self::__buffa::view::InvocationStateOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RuntimeEventView;
+#[doc(inline)]
+pub use self::__buffa::view::RuntimeEventOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentCommandView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentCommandOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeCommandView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeCommandOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SteerCommandView;
+#[doc(inline)]
+pub use self::__buffa::view::SteerCommandOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConvertedMessageStateView;
+#[doc(inline)]
+pub use self::__buffa::view::ConvertedMessageStateOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelDecisionView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelDecisionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignmentChangeView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignmentChangeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AttachmentSourceView;
+#[doc(inline)]
+pub use self::__buffa::view::AttachmentSourceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AttachmentTransferView;
+#[doc(inline)]
+pub use self::__buffa::view::AttachmentTransferOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderEventView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderEventOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderAttachmentView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderAttachmentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BridgeSnapshotView;
+#[doc(inline)]
+pub use self::__buffa::view::BridgeSnapshotOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

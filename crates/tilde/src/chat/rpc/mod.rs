@@ -1,4 +1,5 @@
 //! Audience-specific contracts share the Chat application service and canonical entities.
+pub mod ingress;
 pub mod management;
 pub mod runtime;
 use crate::chat::{Chat, Scope};

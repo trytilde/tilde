@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.status,r.status AS run_status FROM chat_invocations i JOIN chat_runs r ON r.id=i.run_id WHERE i.id=$1 AND i.agent_id=$2 AND i.thread_id=$3 AND i.run_id=$4;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_status",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "3030becb0ec926c136f2da671db409383f342ee8416ad40b13177092b25d671a"
+}

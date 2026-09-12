@@ -252,7 +252,7 @@ impl Runtime for Github {
                 state.expose_secret(),
                 &format!(
                     "{}/connections/webhooks/{}",
-                    service.event_ingress_url, setup.connection_id
+                    service.public_event_ingress_url, setup.connection_id
                 ),
             )?,
             "github_install" => Action::Redirect {
@@ -290,7 +290,7 @@ impl Runtime for Github {
             "validate",
             &format!(
                 "{}/connections/webhooks/{}",
-                service.event_ingress_url, setup.connection_id
+                service.public_event_ingress_url, setup.connection_id
             ),
         )?;
         service.transition(setup, "github_manifest").await

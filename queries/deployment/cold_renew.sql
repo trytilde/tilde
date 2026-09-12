@@ -1,0 +1,1 @@
+UPDATE chat_invocations i SET lease_expires_at=NOW()+INTERVAL '30 seconds' FROM sidecar_commands c JOIN sidecar_conversations sc ON sc.thread_id=c.thread_id AND sc.agent_id=c.agent_id WHERE c.invocation_id=i.id AND c.agent_id=$1 AND c.owner_instance_id=$2 AND c.kind='invoke' AND c.acked_at IS NOT NULL AND c.finished_at IS NULL AND sc.storage='postgres' AND i.status='running';

@@ -1,0 +1,1 @@
+INSERT INTO chat_messages(id,thread_id,participant_id,text,status,in_reply_to_message_id,created_at,format,subject) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET text=EXCLUDED.text,status=EXCLUDED.status,format=EXCLUDED.format,subject=EXCLUDED.subject;

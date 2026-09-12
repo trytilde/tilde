@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id,c.generation,c.payload FROM sidecar_commands c JOIN participant_assignments p ON p.thread_id=c.thread_id AND p.participant_id=c.participant_id LEFT JOIN sidecar_conversations t ON t.thread_id=c.thread_id AND t.agent_id=c.agent_id WHERE c.agent_id=$1 AND c.owner_instance_id=$2 AND c.acked_at IS NULL AND c.finished_at IS NULL AND c.kind='invoke' AND t.storage='postgres' AND c.generation=p.generation AND c.owner_instance_id=p.owner_instance_id ORDER BY c.observed_at,c.id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "payload",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b42c67b0a62c7f2dcf5175e96b24c997433f1500970c845f29616d8e802e449d"
+}

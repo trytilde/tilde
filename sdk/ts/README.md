@@ -210,3 +210,44 @@ Runtime thread reads, attachment operations and typing derive scope from the con
 `AgentContext.getMessages()` returns canonical `messages` and a separate `cachedMessages`
 collection. Initial conversions are available through `AgentContext.cachedMessages`.
 Canonical messages have no cache field, including those returned to management callers.
+
+## Serverless invocation controls
+
+`createAgentHandler()` exposes the same implementation as `createAgentServer()`
+as a Node HTTP request handler. Use it in a serverless route instead of starting
+an HTTP server. `pathPrefix` must match the deployed endpoint prefix:
+
+```ts
+import { createAgentHandler } from '@trytilde/sdk';
+
+export default createAgentHandler({
+  signingKey: process.env.AGENT_SIGNING_KEY!,
+  pathPrefix: '/api/agent',
+  async run(context) {
+    // Restore framework state by context.threadId, then run your agent.
+    // Pass context.signal to model and tool calls.
+  },
+  async checkpoint(context) {
+    // Quiesce your framework and persist its state before resolving.
+  },
+});
+```
+
+Mount a catch-all route below that prefix so ConnectRPC method paths reach the
+handler; preserve the raw request stream (disable framework body parsing). The
+handler supports HTTP/1 requests, including those behind a serverless ingress.
+No session affinity is required for control requests.
+
+Each running invocation opens `InvocationControlService.WatchCommands` to its
+callback URL before user code starts. Steering is accepted into that execution's
+input queue and acknowledged. Stop aborts its signal. Suspend runs the optional
+checkpoint hook, acknowledges it, and ends the request; resume is a fresh invocation
+that restores framework state. Already-persisted conversation state remains in Tilde;
+the hook owns any additional framework checkpoint. It must not merely copy mutable
+state while the framework continues executing.
+
+Unacknowledged input replays after reconnect and is deduplicated by input ID.
+Control connections use the current renewed invocation token. A sustained connection
+failure aborts the local execution. Cancellation is cooperative: custom code must
+honor the signal. The host has only Invoke and Healthz; inbound Stop/Steer/Cancel
+methods and synchronous pause acknowledgements no longer exist.

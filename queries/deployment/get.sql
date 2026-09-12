@@ -1,0 +1,1 @@
+SELECT a.id,a.deployment_mode,a.endpoint_url,a.paused,a.generation,d.failure_mode,d.retention_days,d.token_hash,d.encrypted_secrets,d.cluster_id FROM agents a JOIN agent_deployments d ON d.agent_id=a.id WHERE a.id=$1 AND a.deleted_at IS NULL;

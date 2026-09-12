@@ -603,7 +603,7 @@ async fn channel_send_and_callback(selected_provider: &str) {
     let origin = format!("http://{}", listener.local_addr().unwrap());
     let router =
         tilde::chat::rpc::runtime::router_with_tools(chat.clone(), Registry::for_chat(&chat))
-            .merge(tilde::iam::listeners::event_ingress_router(
+            .merge(tilde::iam::listeners::public_event_ingress_router(
                 chat.clone(),
                 connections.clone(),
             ));

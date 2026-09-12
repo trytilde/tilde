@@ -13,16 +13,27 @@ const tabPaths = {
   capabilities: "/agent/$agentId/capabilities",
   "chat-providers": "/agent/$agentId/chat-providers",
   iam: "/agent/$agentId/iam",
+  tracing: "/agent/$agentId/tracing",
+  logs: "/agent/$agentId/logs",
+  deployment: "/agent/$agentId/deployment",
 } as const;
 function AgentPage(): JSX.Element {
   const { agentId } = Route.useParams();
   const tab: AgentTab = useRouterState({
     select: (state) =>
-      state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
-        ? "iam"
-        : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/chat-providers")
-          ? "chat-providers"
-          : "capabilities",
+      state.matches.some((match) => match.routeId === "/_app/agent/$agentId/logs")
+        ? "logs"
+        : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/tracing")
+          ? "tracing"
+          : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/deployment")
+            ? "deployment"
+            : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
+              ? "iam"
+              : state.matches.some(
+                    (match) => match.routeId === "/_app/agent/$agentId/chat-providers",
+                  )
+                ? "chat-providers"
+                : "capabilities",
   });
   const navigate = Route.useNavigate();
   // The shared route remains mounted while child routes select the editor's tab.

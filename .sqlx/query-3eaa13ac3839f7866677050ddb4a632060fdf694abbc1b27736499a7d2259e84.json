@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sidecar_conversations(thread_id,agent_id,storage) VALUES($1,$2,'corrosion') ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3eaa13ac3839f7866677050ddb4a632060fdf694abbc1b27736499a7d2259e84"
+}

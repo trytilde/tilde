@@ -16,7 +16,7 @@ identify the checked commit; a partially published release is retried at that co
 
 For local provider callbacks, `task dev` optionally runs an ngrok CLI tunnel
 (`NGROK_ENABLED`, `NGROK_DOMAIN`, `NGROK_AUTHTOKEN`) to the event ingress API.
-Its HTTPS domain overrides `ENGINE_EVENT_INGRESS_PUBLIC_URL` while enabled, including
+Its HTTPS domain overrides `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL` while enabled, including
 explicit local URL settings, for all connection
 webhooks and provider manifests. Management owns setup links and OAuth callbacks
 on its own origin; ngrok is started only by the development launcher.
@@ -203,16 +203,27 @@ channel binding must not silently revoke a native invocation's existing authorit
 
 ## Agent pause and deletion
 
-Management PauseAgent persists `paused`, cancels active invocations and revokes their
-runtime access before sending signed `AgentService.Stop` to the host. Health checks
-continue. Pending invocations and messages received while paused wait until ResumeAgent;
-explicit start/resume requests are rejected while paused. Interrupted runs remain waiting
-for explicit continuation. Unaccepted steering input is retained in a pending invocation.
-Pause returns `stop_acknowledged`; a failed host call leaves the agent paused and can be
-retried. Host cancellation is cooperative through the SDK AbortSignal.
-An internal generation advances on pause/resume. Invoke carries that generation and
-Stop fences all work through the paused generation, so delayed requests cannot cancel
-newly resumed work. Pause/resume are management-only operations.
+Management PauseAgent persists `paused`, cancels active invocations and revokes
+ordinary runtime access. Executions observe cancellation through their own outbound
+control subscriptions. Pause reports the durable state change; it does not claim
+synchronous host acknowledgement. Pending work waits for ResumeAgent. Each invocation
+must establish its control subscription before running user code, so late requests
+cannot bypass pause/revocation even on a different serverless instance.
+
+`InvocationControlService` on the runtime listener streams scoped steering, stop and
+suspend controls. It allows a narrowly scoped terminal-token window to acknowledge
+stops without restoring ordinary RPC access. PostgreSQL LISTEN/NOTIFY or Corrosion
+subscriptions wake delivery; unacknowledged steering replays after reconnect. SDK
+input IDs deduplicate delivery. Control subscriptions are renewed with current tokens
+and the SDK aborts work after a prolonged loss of the control connection.
+
+SuspendInvocation transitions the run through `suspending`; the SDK checkpoint hook
+must quiesce and persist framework state before returning. Execution then exits into
+`waiting`. ResumeRun starts a new invocation and carries unconsumed input forward.
+Framework code restores its checkpoint using the stable conversation ID. The host
+service now exposes only Invoke and Healthz. The inbound Steer, Cancel and Stop RPCs,
+per-host stop fences, synchronous pause receipt and redundant sidecar push jobs are
+removed. HTTP/1 serverless handlers and standalone hosts use the same SDK lifecycle.
 Deletion requires pause, erases the signing key and grants, removes connection assignments,
 and retires the registry entry and thread participation. Conversation and audit history
 remain readable; retired IDs cannot be reused. Paused state is independent of health.
@@ -273,16 +284,18 @@ qualify if they were valid at termination. Other actions and renewal still requi
 live invocation state and unexpired tokens. No separate telemetry credential exists.
 
 Message and invocation rows retain W3C trace context across durable dispatch.
-Platform request/response-stream spans, invocation execution, and SDK agent/callback
-spans enter a bounded Rotel batching pipeline and forward to an environment-configured
-OTLP/HTTP collector. No trace payloads or export queues are stored in Postgres.
-Ingestion acknowledges in-memory queue acceptance. Retry budgets and queues are bounded;
-process failure or exhausted retries can lose queued telemetry. The destination must
-tolerate duplicate delivery. Tracing is disabled without an export endpoint, and the
-SDK skips export for unsampled invocations. Authenticated uploads remain scoped through
-application invocation records. Postgres trace persistence is a separate follow-up.
-The SDK batches and rotates bearer credentials per invocation; its OTLP URL preserves
-the runtime callback path prefix. Trace viewing/query APIs are not implemented.
+Langfuse is the trace system of record. Sidecars accept scoped OTLP into Corrosion;
+HA replicas share that temporary relay through gossip. The gateway subscribes to
+those rows, normalizes ownership, and accepts them into its bounded delivery queue
+before removing the Corrosion copy. It forwards to Langfuse and clears delivered
+payloads. Postgres holds only temporary delivery payloads and expiring replay
+receipts, never permanent trace history. Delivery wakes through LISTEN/NOTIFY and
+uses scheduled retry deadlines. Langfuse credentials remain at the gateway.
+
+Management trace reads query Langfuse. Without Langfuse configuration, tracing is
+disabled. Invocation tokens authorize agent uploads, including the terminal upload
+grace period; management tokens cannot authorize ingestion. The SDK batches per
+invocation and preserves the runtime callback path prefix in its OTLP URL.
 
 `sdk/ts/langsmith-agent` is an isolated AI SDK 6 / LangSmith demo. It loads the
 OpenAI key from SOPS, sends synthetic recipe/tool traces to LangSmith for UI
@@ -339,7 +352,7 @@ Development omits Vite when web is disabled and Dex when management is disabled.
 The agent runtime and event ingress listeners and background workers remain active
 in every mode. Event ingress defaults to `127.0.0.1:8082` and mounts only signed
 provider webhook routes; management never mounts webhook ingress.
-`ENGINE_EVENT_INGRESS_LISTEN` and `ENGINE_EVENT_INGRESS_PUBLIC_URL` control its
+`ENGINE_PUBLIC_EVENT_INGRESS_LISTEN` and `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL` control its
 bind and advertised webhook origin independently of management.
 
 Taskfile owns development startup, build/test sequencing and SQLx preparation.
@@ -447,7 +460,7 @@ All previously permitted runtime registry operations remain available.
 Connection management and public setup commands are separate complete services. The
 ConnectionSetupService and native OAuth callback are composed outside management login;
 every setup command validates its connection setup token. Remote provider HandleSetup
-belongs to provider/v1; agent-host Invoke, Steer, Cancel, Stop and Healthz belong to agent_host/v1.
+belongs to provider/v1; agent-host Invoke and Healthz belong to agent_host/v1. Invocation controls are outbound runtime subscriptions.
 This changes protocol paths and generated clients, with no legacy namespace aliases.
 It retains the single binary, common domain implementations and central database migrations.
 
@@ -468,30 +481,86 @@ notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
 refreshes every 30 seconds; it does not yet have a registry subscription API.
 
-## Sidecar deployment decisions (planned, not implemented)
+## Agent deployments and Corrosion
 
-Gateway-only deployment remains supported. An agent may instead register HA
-sidecars using one gateway-issued token shared by those replicas. Sidecar
-configuration accepts a comma-separated list of agent tokens so one process can
-serve multiple agents; per-replica credential exchange is not required.
+Agents select gateway or sidecar deployment in the Deployment settings tab.
+Gateway mode has an agent endpoint and uses Postgres. Sidecar mode registers
+replicas with one shared token per agent. `tilde-sidecar` accepts comma-separated
+agent tokens and an agent-ID-to-local-endpoint map; it supervises one isolated
+Corrosion process, database and mutual-TLS peer cluster per registered agent.
+Gateway and sidecar distributions bundle the same pinned Corrosion binary. The
+gateway connects to those clusters as a client, and does not run a peer.
 
-Management owns central IAM, grants, registry administration and connection setup.
-The complete agent runtime API is available on one agent-facing sidecar port,
-with permissions enforced locally from gateway authority. A separate external
-event API accepts authenticated provider webhooks and application triggers at
-either gateway or sidecar, forwarding commands to the executing agent as needed.
-Health observations, telemetry and committed runtime events flow back to the
-gateway. Replication between separate databases is distinct from LISTEN/NOTIFY
-within a shared database and has not been implemented.
+Four audiences use separate listeners: management, agent runtime, public event
+ingress, and agent event ingress. Sidecars expose the last three. Public ingress
+contains provider webhooks and native conversation commands. Sidecar deployments
+reject public gateway invocation traffic; authenticated agent-event-ingress accepts
+sidecar control, attachment transfer and caller-scoped fallback. Central IAM,
+registry changes and credential setup stay at the gateway. Sidecars enforce
+replicated permissions and serve assigned connection credentials locally.
 
-An active invocation needs one execution owner; subscriptions may be served by
-any instance with access to its events. Assigning an entire conversation to one
-sidecar group is not an accepted requirement. Cross-database event ordering,
-invocation claims and provider-event deduplication still need coordination design.
+Ownership is `(thread, agent participant)` and points to a sidecar process
+incarnation. The first receiving replica creates the initial assignment; any
+replica accepts durable commands, but only the owner dispatches. The host SDK
+acknowledges acceptance and serializes execution by `(agent, thread)`, while
+unrelated threads remain concurrent. Gateway recovery locks the Postgres
+participant assignment, increments its generation, and commits an encrypted
+assignment outbox before publishing to Corrosion. Missing acknowledgements and
+unhealthy owners follow the configured reassign/stop policy. Old generations
+cannot update canonical execution state. Temporary overlap during partitions is
+possible; external effects need application idempotency.
 
-Sidecar attachment bytes should live only in bounded memory or tmpfs and be sent
-to the gateway for upload to S3. Attachment identity remains stable across local
-and gateway copies. Local availability precedes S3 durability; eviction of pending
-uploads and acknowledgement semantics must respect that distinction. The current
-implementation still stores encrypted bytes in Postgres; sidecar storage and the
-S3 upload path are not implemented yet.
+Corrosion subscriptions continuously project typed events, health samples and
+commands into Postgres. Traces pass through the gateway to Langfuse. The management UI therefore sees live conversation
+history. Cross-instance Postgres subscriptions use LISTEN/NOTIFY, while Corrosion
+peers use streaming query subscriptions. Stable origin cursors permit reconnects,
+out-of-order events and the transition to Postgres without repeating history.
+Mixed-deployment rooms copy shared history through the gateway; bootstrap copies
+do not replay historical messages as fresh agent input.
+
+Conversations are retained as complete aggregates until their configured inactivity
+window expires (default seven days). The gateway fences local writes, waits for
+peer acknowledgements, verifies archival and attachment durability, then removes
+the whole aggregate and records permanent Postgres placement. An absent local
+conversation proxies through agent-event-ingress with the original caller scope.
+The gateway serves retired conversations directly from Postgres and never restores
+them into Corrosion. Archived runs still execute in the assigned sidecar through
+the gateway command stream. Mode changes require pause and completed archival;
+existing history remains in Postgres when moving an agent into sidecar mode.
+
+Attachment bytes live in bounded sidecar memory until the gateway encrypts and
+uploads them to S3. Replicated metadata distinguishes temporary availability from
+persistence. Persisted bytes can be downloaded through the gateway by any replica.
+Health retention only removes local records confirmed in Postgres. Trace relay
+rows are removed after gateway acceptance; Langfuse controls trace history retention.
+Conversation retention does not delete Langfuse traces or permanent Postgres history.
+
+## Langfuse observability integration
+
+Gateway configuration owns LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY,
+LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Only tracing_enabled is
+included in sidecar configuration. Disabled telemetry is validated and discarded;
+configured outages retain a bounded relay. Corrosion traces contain base64 raw
+OTLP, not encrypted content. Gateway projection accepts them into the shared
+transient telemetry_delivery queue and then deletes replicated payloads. Stable
+payload receipts deduplicate HA/reconnect replay; Langfuse owns all trace history.
+The old sidecar_traces archive is removed. Platform spans use a process-wide
+provider routed to the correct local agent, preserving invocation context and
+terminal trace-token grace. The agent Tracing tab queries scoped Langfuse public
+APIs through management-only RPCs. No Langfuse credentials reach agents or browsers.
+
+## Agent log history
+
+OTel logs use Rotel and the same verified invocation scope and terminal grace as
+traces. ClickHouse owns log history in a standard OTel Map schema with explicit
+agent, invocation, thread, and record identities. Gateway disk queues independently
+buffer local history and optional external OTLP delivery; application Postgres
+never stores bulk logs. Queue limits, 24-hour pending expiry, and seven-day history
+retention bound resource use. Sidecars replicate immutable log batches through
+Corrosion until durable gateway acceptance and receive enablement only.
+
+The management-only LogsService enforces agent scoping and fixed-window cursor
+pagination. The agent Logs tab provides filters, record inspection, native trace
+links, and a bounded live view. Local ClickHouse is enabled by default for task dev,
+uses Compose defaults and .env overrides, and can be opted out independently of
+Langfuse with DEV_LOGS_ENABLED=0.

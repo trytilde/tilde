@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sidecar_conversations SET storage='corrosion',retirement_epoch=NULL WHERE thread_id=$1 AND agent_id=$2 AND storage='retiring';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9c8eba46d3e3b8e9d3116753b70fb5edb3547261510903c9754fc7cef9ba01cb"
+}

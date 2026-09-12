@@ -10,8 +10,10 @@ pub mod agent;
 pub mod config;
 pub mod connections;
 pub mod database;
+pub mod deployment;
 pub mod encryption;
 pub mod error;
+pub mod logs;
 pub mod network;
 
 pub mod chat;

@@ -24,7 +24,7 @@ pub struct Connections {
     /// Browser-facing setup pages and OAuth redirects on management.
     pub(crate) public_url: String,
     /// Provider webhook delivery only, independently exposed from management.
-    pub(crate) event_ingress_url: String,
+    pub(crate) public_event_ingress_url: String,
     pub(crate) http: Http,
     pub(crate) endpoints: Endpoints,
 }
@@ -33,13 +33,13 @@ impl Connections {
         pool: PgPool,
         crypto: Arc<Encryption>,
         public_url: String,
-        event_ingress_url: String,
+        public_event_ingress_url: String,
     ) -> Result<Self, Error> {
         Self::with_endpoints(
             pool,
             crypto,
             public_url,
-            event_ingress_url,
+            public_event_ingress_url,
             Endpoints::default(),
         )
     }
@@ -48,10 +48,10 @@ impl Connections {
         pool: PgPool,
         crypto: Arc<Encryption>,
         public_url: String,
-        event_ingress_url: String,
+        public_event_ingress_url: String,
         endpoints: Endpoints,
     ) -> Result<Self, Error> {
-        for origin in [&public_url, &event_ingress_url] {
+        for origin in [&public_url, &public_event_ingress_url] {
             let url = url::Url::parse(origin).map_err(|_| invalid("Invalid public URL"))?;
             if !matches!(url.scheme(), "http" | "https")
                 || url.host_str().is_none()
@@ -71,7 +71,7 @@ impl Connections {
             pool,
             crypto,
             public_url: public_url.trim_end_matches('/').into(),
-            event_ingress_url: event_ingress_url.trim_end_matches('/').into(),
+            public_event_ingress_url: public_event_ingress_url.trim_end_matches('/').into(),
             http: Http::new()?,
             endpoints,
         })
@@ -523,7 +523,7 @@ impl Connections {
             webhook_url: connection.channel_capable.then(|| {
                 format!(
                     "{}/connections/webhooks/{}",
-                    self.event_ingress_url, connection.id
+                    self.public_event_ingress_url, connection.id
                 )
             }),
             setup_id: setup.id,

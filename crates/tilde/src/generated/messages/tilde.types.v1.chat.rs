@@ -2414,6 +2414,13 @@ pub const __TYPING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::typ
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Attachment {
+    /// Field 7: `persisted`
+    #[serde(
+        rename = "persisted",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub persisted: bool,
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -2466,6 +2473,7 @@ pub struct Attachment {
 impl ::core::fmt::Debug for Attachment {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Attachment")
+            .field("persisted", &self.persisted)
             .field("id", &self.id)
             .field("thread_id", &self.thread_id)
             .field("filename", &self.filename)
@@ -2520,6 +2528,9 @@ impl ::buffa::Message for Attachment {
         if !self.sha256.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.sha256) as u64;
         }
+        if self.persisted {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2547,6 +2558,9 @@ impl ::buffa::Message for Attachment {
         }
         if !self.sha256.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.sha256, buf);
+        }
+        if self.persisted {
+            ::buffa::types::put_bool_field(7u32, self.persisted, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2603,6 +2617,13 @@ impl ::buffa::Message for Attachment {
                 )?;
                 ::buffa::types::merge_string(&mut self.sha256, buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.persisted = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2617,6 +2638,7 @@ impl ::buffa::Message for Attachment {
         self.media_type.clear();
         self.size_bytes = 0i64;
         self.sha256.clear();
+        self.persisted = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3459,6 +3481,38 @@ pub const __MESSAGE_CHUNK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct Activity {
+    /// Field 13: `event_id`
+    #[serde(
+        rename = "eventId",
+        alias = "event_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub event_id: ::buffa::alloc::string::String,
+    /// Field 14: `origin_instance_id`
+    #[serde(
+        rename = "originInstanceId",
+        alias = "origin_instance_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub origin_instance_id: ::buffa::alloc::string::String,
+    /// Field 15: `origin_sequence`
+    #[serde(
+        rename = "originSequence",
+        alias = "origin_sequence",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub origin_sequence: i64,
+    /// Field 16: `origin_agent_id`
+    #[serde(
+        rename = "originAgentId",
+        alias = "origin_agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub origin_agent_id: ::buffa::alloc::string::String,
     /// Field 1: `sequence`
     #[serde(
         rename = "sequence",
@@ -3524,6 +3578,10 @@ pub struct Activity {
 impl ::core::fmt::Debug for Activity {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Activity")
+            .field("event_id", &self.event_id)
+            .field("origin_instance_id", &self.origin_instance_id)
+            .field("origin_sequence", &self.origin_sequence)
+            .field("origin_agent_id", &self.origin_agent_id)
             .field("sequence", &self.sequence)
             .field("kind", &self.kind)
             .field("entity_id", &self.entity_id)
@@ -3635,6 +3693,24 @@ impl ::buffa::Message for Activity {
                 }
             }
         }
+        if !self.event_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.event_id) as u64;
+        }
+        if !self.origin_instance_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.origin_instance_id)
+                        as u64;
+        }
+        if self.origin_sequence != 0i64 {
+            size
+                += 1u64 + ::buffa::types::int64_encoded_len(self.origin_sequence) as u64;
+        }
+        if !self.origin_agent_id.is_empty() {
+            size
+                += 2u64
+                    + ::buffa::types::string_encoded_len(&self.origin_agent_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3714,6 +3790,18 @@ impl ::buffa::Message for Activity {
                     x.write_to(__cache, buf);
                 }
             }
+        }
+        if !self.event_id.is_empty() {
+            ::buffa::types::put_string_field(13u32, &self.event_id, buf);
+        }
+        if !self.origin_instance_id.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.origin_instance_id, buf);
+        }
+        if self.origin_sequence != 0i64 {
+            ::buffa::types::put_int64_field(15u32, self.origin_sequence, buf);
+        }
+        if !self.origin_agent_id.is_empty() {
+            ::buffa::types::put_string_field(16u32, &self.origin_agent_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3881,6 +3969,34 @@ impl ::buffa::Message for Activity {
                     );
                 }
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.event_id, buf)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.origin_instance_id, buf)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.origin_sequence = ::buffa::types::decode_int64(buf)?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.origin_agent_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3897,6 +4013,10 @@ impl ::buffa::Message for Activity {
         self.participant_id.clear();
         self.invocation_id.clear();
         self.detail = ::core::option::Option::None;
+        self.event_id.clear();
+        self.origin_instance_id.clear();
+        self.origin_sequence = 0i64;
+        self.origin_agent_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3924,6 +4044,16 @@ impl<'de> serde::Deserialize<'de> for Activity {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<Activity, A::Error> {
+                let mut __f_event_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_origin_instance_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_origin_sequence: ::core::option::Option<i64> = None;
+                let mut __f_origin_agent_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
                 let mut __f_sequence: ::core::option::Option<i64> = None;
                 let mut __f_kind: ::core::option::Option<
                     ::buffa::alloc::string::String,
@@ -3951,6 +4081,75 @@ impl<'de> serde::Deserialize<'de> for Activity {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
+                        "eventId" | "event_id" => {
+                            __f_event_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "originInstanceId" | "origin_instance_id" => {
+                            __f_origin_instance_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "originSequence" | "origin_sequence" => {
+                            __f_origin_sequence = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "originAgentId" | "origin_agent_id" => {
+                            __f_origin_agent_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "sequence" => {
                             __f_sequence = Some({
                                 struct _S;
@@ -4193,6 +4392,18 @@ impl<'de> serde::Deserialize<'de> for Activity {
                     }
                 }
                 let mut __r = <Activity as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_event_id {
+                    __r.event_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_origin_instance_id {
+                    __r.origin_instance_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_origin_sequence {
+                    __r.origin_sequence = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_origin_agent_id {
+                    __r.origin_agent_id = v;
+                }
                 if let ::core::option::Option::Some(v) = __f_sequence {
                     __r.sequence = v;
                 }

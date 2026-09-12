@@ -3,6 +3,7 @@
 include!("tilde.runtime.v1.agents.rs");
 include!("tilde.runtime.v1.cache.rs");
 include!("tilde.runtime.v1.chat.rs");
+include!("tilde.runtime.v1.controls.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -23,6 +24,7 @@ pub mod __buffa {
         include!("tilde.runtime.v1.agents.__view.rs");
         include!("tilde.runtime.v1.cache.__view.rs");
         include!("tilde.runtime.v1.chat.__view.rs");
+        include!("tilde.runtime.v1.controls.__view.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -75,6 +77,10 @@ pub mod __buffa {
         reg.register_json_any(super::__UPDATE_TASK_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SET_RUN_STATUS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_RUN_STATUS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__WATCH_COMMANDS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -273,5 +279,21 @@ pub use self::__buffa::view::SetRunStatusRequestOwnedView;
 pub use self::__buffa::view::SetRunStatusResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetRunStatusResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WatchCommandsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::WatchCommandsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WatchCommandsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::WatchCommandsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeCommandRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeCommandRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeCommandResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

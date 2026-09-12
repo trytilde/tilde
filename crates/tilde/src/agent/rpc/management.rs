@@ -139,10 +139,9 @@ impl AgentService for Rpc {
         request: ServiceRequest<'_, management::PauseAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::PauseAgentResponse> + Send + use<'a>>
     {
-        let (agent, stop_acknowledged) = self.agents.pause(id(request.id)?).await?;
+        let agent = self.agents.pause(id(request.id)?).await?;
         Response::ok(management::PauseAgentResponse {
             agent: project(&self.agents, agent).await?.into(),
-            stop_acknowledged,
             ..Default::default()
         })
     }

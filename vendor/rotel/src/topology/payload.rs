@@ -123,6 +123,17 @@ impl MessageMetadata {
         }
     }
 
+    /// Reject an invalid ingress batch without asking the client to retry it.
+    pub async fn reject(&self, code: u16) {
+        if let MessageMetadataInner::Forwarder(fm) = &self.data {
+            if self.claim_response() {
+                if let Some(tx) = &fm.ack_chan {
+                    let _ = tx.send(ForwarderAcknowledgement::Rejected(code)).await;
+                }
+            }
+        }
+    }
+
     /// Get the inner metadata data
     pub fn inner(&self) -> &MessageMetadataInner {
         &self.data
@@ -603,6 +614,7 @@ pub struct KmsgNack {
 }
 
 pub enum ForwarderAcknowledgement {
+    Rejected(u16),
     Ack(ForwarderPayloadDetails),
     Nack(ForwarderPayloadDetails),
 }

@@ -81,10 +81,12 @@ export function invocationTracing(
   // No destination on Tilde means its invocation context is not sampled.
   const flags = headers.get("traceparent")?.split("-")[3];
   if (!flags || !(Number.parseInt(flags, 16) & 1)) {
+    // Preserve correlation for OTel logs even when trace export is disabled.
+    const parent = propagator.extract(ROOT_CONTEXT, headers, getter);
     return {
-      context: ROOT_CONTEXT,
+      context: parent,
       run<T>(fn: () => T): T {
-        return context.with(ROOT_CONTEXT, fn);
+        return context.with(parent, fn);
       },
       async end(_failed: boolean) {},
     };

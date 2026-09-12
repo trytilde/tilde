@@ -3241,10 +3241,6 @@ pub struct PauseAgentResponseView<'a> {
     pub agent: ::buffa::MessageFieldView<
         super::super::super::super::types::v1::__buffa::view::AgentView<'a>,
     >,
-    /// Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
-    ///
-    /// Field 2: `stop_acknowledged`
-    pub stop_acknowledged: bool,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for PauseAgentResponseView<'a> {
@@ -3296,13 +3292,6 @@ impl<'a> ::buffa::MessageView<'a> for PauseAgentResponseView<'a> {
                     }
                 }
             }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                view.stop_acknowledged = ::buffa::types::decode_bool(&mut cur)?;
-            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -3334,7 +3323,6 @@ impl<'a> ::buffa::MessageView<'a> for PauseAgentResponseView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
-            stop_acknowledged: self.stop_acknowledged,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -3354,9 +3342,6 @@ impl<'a> ::buffa::ViewEncode<'a> for PauseAgentResponseView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.stop_acknowledged {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3375,9 +3360,6 @@ impl<'a> ::buffa::ViewEncode<'a> for PauseAgentResponseView<'a> {
                 buf,
             );
             self.agent.write_to(__cache, buf);
-        }
-        if self.stop_acknowledged {
-            ::buffa::types::put_bool_field(2u32, self.stop_acknowledged, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3404,9 +3386,6 @@ impl<'__a> ::serde::Serialize for PauseAgentResponseView<'__a> {
             if let ::core::option::Option::Some(__v) = self.agent.as_option() {
                 __map.serialize_entry("agent", __v)?;
             }
-        }
-        if self.stop_acknowledged {
-            __map.serialize_entry("stopAcknowledged", &self.stop_acknowledged)?;
         }
         __map.end()
     }
@@ -3511,13 +3490,6 @@ impl PauseAgentResponseOwnedView {
         super::super::super::super::types::v1::__buffa::view::AgentView<'_>,
     > {
         &self.0.reborrow().agent
-    }
-    /// Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
-    ///
-    /// Field 2: `stop_acknowledged`
-    #[must_use]
-    pub fn stop_acknowledged(&self) -> bool {
-        self.0.reborrow().stop_acknowledged
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<PauseAgentResponseView<'static>>>

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_runs SET source_identity_id=$2,channel_origin=$3,idempotency_key=$4 WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cd045b4a84ee7a9ad499dc7bcee5ba4327c05dc83f8e5daafeeb2ca3786a973a"
+}

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.deployment_mode,ca.agent_id,ca.access_mode,c.provider_id,c.type_id FROM connection_agents ca JOIN connections c ON c.id=ca.connection_id JOIN agents a ON a.id=ca.agent_id WHERE ca.connection_id=$1 AND ca.capability='channel' AND c.status='ready';\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deployment_mode",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "access_mode",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "provider_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "type_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8afeb835ae19c29a92cfc8f9f9dd9cecb09e990581c3b5b2084bc5833f0b6dbe"
+}

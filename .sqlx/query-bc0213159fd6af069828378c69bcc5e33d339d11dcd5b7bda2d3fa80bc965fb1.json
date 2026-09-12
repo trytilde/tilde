@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM(octet_length(payload)),0)::bigint AS \"bytes!\" FROM telemetry_delivery WHERE payload IS NOT NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bytes!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bc0213159fd6af069828378c69bcc5e33d339d11dcd5b7bda2d3fa80bc965fb1"
+}

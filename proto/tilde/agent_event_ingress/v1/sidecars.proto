@@ -1,0 +1,47 @@
+syntax = "proto3";
+package tilde.agent_event_ingress.v1;
+import "tilde/types/v1/agent.proto";
+import "tilde/types/v1/access.proto";
+import "tilde/types/v1/runtime_event.proto";
+import "tilde/agent_host/v1/agent.proto";
+import "tilde/types/v1/deployment.proto";
+// This complete service mounts only on agent-event-ingress. Every call authenticates
+// an agent deployment token, never a browser session or agent invocation token.
+service SidecarService {
+  rpc LocateConversation(LocateConversationRequest) returns (LocateConversationResponse);
+  rpc IngestProviderEvent(IngestProviderEventRequest) returns (IngestProviderEventResponse);
+  rpc WatchCommands(WatchCommandsRequest) returns (stream WatchCommandsResponse);
+  rpc GetInvocation(GetInvocationRequest) returns (GetInvocationResponse);
+  rpc AcknowledgeCommand(AcknowledgeCommandRequest) returns (AcknowledgeCommandResponse);
+  rpc CompleteCommand(CompleteCommandRequest) returns (CompleteCommandResponse);
+  rpc ReportActivity(ReportActivityRequest) returns (ReportActivityResponse);
+  rpc RegisterSidecar(RegisterSidecarRequest) returns (RegisterSidecarResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetConfiguration(GetConfigurationRequest) returns (GetConfigurationResponse);
+}
+message RegisterSidecarRequest { string instance_id = 1; string public_ingress_url = 2; string agent_ingress_url = 3; string runtime_url = 4; string gossip_address = 5; string local_agent_endpoint = 6; }
+message RegisterSidecarResponse { string corrosion_token = 11 [debug_redact = true]; string agent_id = 1; string cluster_id = 2; repeated tilde.types.v1.SidecarNode peers = 3; string encryption_key = 4 [debug_redact = true]; string token_signing_key = 5 [debug_redact = true]; string tls_certificate = 6; string tls_private_key = 7 [debug_redact = true]; string tls_ca = 8; uint32 retention_days = 9; string schema_revision = 10; }
+message HeartbeatRequest { string instance_id = 1; bool ready = 2; bool agent_ready = 3; }
+message HeartbeatResponse { bool paused = 1; int64 agent_generation = 2; uint32 retention_days = 3; }
+message GetConfigurationRequest {}
+message CredentialField { string name = 1; string value = 2 [debug_redact = true]; }
+message ConnectionConfiguration { tilde.types.v1.ChannelAccessMode access_mode = 9; repeated IdentityGrant identities = 10; int64 expires_at = 11; string id = 1; string provider_id = 2; string type_id = 3; string name = 4; string status = 5; string account_label = 6; int64 credential_version = 7; repeated CredentialField credentials = 8; }
+message GetConfigurationResponse { bool logs_enabled = 6; bool tracing_enabled = 5; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; string webhook_signing_key = 3 [debug_redact = true]; repeated ConnectionConfiguration connections = 4; }
+
+message IdentityGrant { string id = 1; tilde.types.v1.IdentityType identity_type = 2; string value = 3; bool verified = 4; bool allowed = 5; }
+
+message WatchCommandsRequest { string instance_id = 1; }
+message WatchCommandsResponse { tilde.types.v1.AgentCommand command = 1; }
+message GetInvocationRequest { string command_id = 1; uint64 generation = 2; string instance_id = 3; }
+message GetInvocationResponse { tilde.agent_host.v1.InvokeRequest invocation = 1; }
+message AcknowledgeCommandRequest { string command_id = 1; uint64 generation = 2; string instance_id = 3; }
+message AcknowledgeCommandResponse {}
+message CompleteCommandRequest { string command_id = 1; uint64 generation = 2; string instance_id = 3; string status = 4; repeated string pending_input_ids = 5; }
+message CompleteCommandResponse {}
+message ReportActivityRequest { string command_id = 1; uint64 generation = 2; string instance_id = 3; string reasoning_delta = 4; }
+message ReportActivityResponse {}
+
+message LocateConversationRequest { string thread_id = 1; }
+message LocateConversationResponse { string storage = 1; }
+message IngestProviderEventRequest { string connection_id = 1; tilde.types.v1.ProviderEvent event = 2; }
+message IngestProviderEventResponse {}

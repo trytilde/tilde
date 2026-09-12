@@ -7,29 +7,17 @@ import "tilde/types/v1/chat.proto";
 
 service AgentService {
   rpc Invoke(InvokeRequest) returns (stream InvokeResponse);
-  rpc Steer(SteerRequest) returns (SteerResponse);
-  rpc Cancel(CancelRequest) returns (CancelResponse);
-  rpc Stop(StopRequest) returns (StopResponse);
   rpc Healthz(HealthzRequest) returns (HealthzResponse);
 }
 
-message InvokeRequest { int64 agent_generation = 11; string invocation_id = 1; string run_id = 2; string thread_id = 3; string agent_id = 4; string objective = 5; string callback_url = 6; string capability = 7 [debug_redact = true]; repeated tilde.types.v1.Message messages = 8; tilde.types.v1.Thread thread = 9;  repeated tilde.runtime.v1.CachedAgentRepresentation cached_messages = 10; }
+message InvokeRequest { string command_id = 12; uint64 assignment_generation = 13; string owner_instance_id = 14; int64 agent_generation = 11; string invocation_id = 1; string run_id = 2; string thread_id = 3; string agent_id = 4; string objective = 5; string callback_url = 6; string capability = 7 [debug_redact = true]; repeated tilde.types.v1.Message messages = 8; tilde.types.v1.Thread thread = 9;  repeated tilde.runtime.v1.CachedAgentRepresentation cached_messages = 10; }
 
-message InvokeResponse { string reasoning_delta = 1; bool stopped = 2; repeated string pending_input_ids = 3; }
+message InvokeResponse { string accepted_command_id = 4; string reasoning_delta = 1; bool stopped = 2; repeated string pending_input_ids = 3; }
 
-message SteerRequest { string invocation_id = 1; string input_id = 2; string text = 3; tilde.types.v1.Message message = 4; }
 
-message SteerResponse {}
 
-message CancelRequest { string invocation_id = 1; }
 
-message CancelResponse {}
 
 message HealthzRequest {}
 
 message HealthzResponse { bool ready = 1; }
-
-// Stop all work through this generation without shutting down health checks.
-// Hosts must reject Invoke at or below a stopped generation, including late requests.
-message StopRequest { string agent_id = 1; int64 through_generation = 2; }
-message StopResponse {}

@@ -71,8 +71,6 @@ message DeleteAgentResponse {}
 message PauseAgentRequest { string id = 1; }
 message PauseAgentResponse {
   tilde.types.v1.Agent agent = 1;
-  // Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
-  bool stop_acknowledged = 2;
 }
 message ResumeAgentRequest { string id = 1; }
 message ResumeAgentResponse { tilde.types.v1.Agent agent = 1; }

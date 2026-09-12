@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE telemetry_delivery SET attempts=LEAST(attempts+1,20),retry_at=NOW()+make_interval(secs=>$2::integer) WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "519dfedafd3ad61745c66b316bb66394a9dd1d481f9fa10e79720347a8524689"
+}

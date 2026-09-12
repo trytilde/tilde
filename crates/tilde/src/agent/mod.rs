@@ -282,7 +282,7 @@ impl Agents {
     }
 }
 
-fn validate_name(name: &str) -> Result<String, Error> {
+pub(crate) fn validate_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 200 {
         return Err(Error::Invalid(
@@ -291,7 +291,7 @@ fn validate_name(name: &str) -> Result<String, Error> {
     }
     Ok(name.into())
 }
-fn validate_endpoint(value: String) -> Result<String, Error> {
+pub(crate) fn validate_endpoint(value: String) -> Result<String, Error> {
     if value.trim().is_empty() {
         return Err(Error::Invalid("An agent endpoint is required".into()));
     }
@@ -309,7 +309,7 @@ fn validate_endpoint(value: String) -> Result<String, Error> {
     }
     Ok(url.to_string())
 }
-fn validate_webhook_signing_key(value: &str) -> Result<(), Error> {
+pub(crate) fn validate_webhook_signing_key(value: &str) -> Result<(), Error> {
     if !(32..=1024).contains(&value.len()) || !value.bytes().all(|byte| byte.is_ascii_graphic()) {
         return Err(Error::Invalid(
             "Webhook signing key is required: supply 32-1024 printable non-whitespace ASCII characters generated securely by the caller".into()

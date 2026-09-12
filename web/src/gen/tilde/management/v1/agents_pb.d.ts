@@ -255,13 +255,6 @@ export declare type PauseAgentResponse = Message<"tilde.management.v1.PauseAgent
    * @generated from field: tilde.types.v1.Agent agent = 1;
    */
   agent?: Agent | undefined;
-
-  /**
-   * Pause is persisted even if the host cannot acknowledge Stop. Retry Pause to retry Stop.
-   *
-   * @generated from field: bool stop_acknowledged = 2;
-   */
-  stopAcknowledged: boolean;
 };
 
 /**

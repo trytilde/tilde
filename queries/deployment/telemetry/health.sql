@@ -1,0 +1,1 @@
+INSERT INTO agent_health(sidecar_event_id,agent_id,endpoint_url,checked_at,healthy,latency_ms,error_code) VALUES($1,$2,$3,$4,$5,$6,CASE WHEN $5 THEN NULL ELSE 'not_ready' END) ON CONFLICT(sidecar_event_id) DO NOTHING;

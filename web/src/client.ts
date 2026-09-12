@@ -18,3 +18,21 @@ export const connections = createClient(
   ConnectionsService,
   createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
 );
+
+import { DeploymentService } from "./gen/tilde/management/v1/deployments_pb.js";
+export const deployments = createClient(
+  DeploymentService,
+  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
+);
+
+import { TracingService } from "./gen/tilde/management/v1/tracing_pb.js";
+export const traces = createClient(
+  TracingService,
+  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
+);
+
+import { LogsService } from "./gen/tilde/management/v1/logs_pb.js";
+export const logs = createClient(
+  LogsService,
+  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
+);

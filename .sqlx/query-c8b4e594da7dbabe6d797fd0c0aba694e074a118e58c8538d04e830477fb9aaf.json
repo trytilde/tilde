@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id FROM chat_invocations i JOIN agents a ON a.id=i.agent_id JOIN chat_runs r ON r.id=i.run_id WHERE i.status='pending' AND chat_channel_run_allowed(i.agent_id,i.thread_id,r.source_identity_id,r.channel_origin) AND a.deployment_mode='gateway' AND NOT a.paused AND a.deleted_at IS NULL LIMIT 50;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c8b4e594da7dbabe6d797fd0c0aba694e074a118e58c8538d04e830477fb9aaf"
+}

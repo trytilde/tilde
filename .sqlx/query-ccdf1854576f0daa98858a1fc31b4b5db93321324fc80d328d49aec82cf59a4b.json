@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO telemetry_delivery(id,payload) VALUES($1,$2) ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ccdf1854576f0daa98858a1fc31b4b5db93321324fc80d328d49aec82cf59a4b"
+}

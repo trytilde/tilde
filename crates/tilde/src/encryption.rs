@@ -189,6 +189,20 @@ impl SealedSecret {
 }
 
 impl Encryption {
+    /// Agent-scoped keys supplied by the authenticated deployment bootstrap use
+    /// the same encryption format and zeroizing key ownership as Postgres keys.
+    pub fn from_agent_key(key_id: Uuid, encoded: SecretString) -> Result<Self, Error> {
+        let key = Zeroizing::new(
+            STANDARD
+                .decode(encoded.expose_secret())
+                .map_err(|_| Error::Encryption)?,
+        );
+        if key.len() != 32 {
+            return Err(Error::Encryption);
+        }
+        Ok(Self { key_id, key })
+    }
+
     /// Unlock the persisted data key or initialize it once under a database lock.
     pub async fn initialize(pool: &PgPool, protection: KeyProtection) -> Result<Self, Error> {
         let mut tx = pool.begin().await?;

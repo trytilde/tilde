@@ -86,7 +86,7 @@ impl AvatarStore {
         ));
         url
     }
-    async fn write(
+    pub(crate) async fn write(
         &self,
         method: Method,
         key: &str,
@@ -130,7 +130,40 @@ impl AvatarStore {
             .to_string())
     }
 }
+impl AvatarStore {
+    pub(crate) async fn read(&self, key: &str) -> Result<Vec<u8>, Error> {
+        let mut request = self
+            .http
+            .get(self.object_url(&self.endpoint, key))
+            .build()
+            .map_err(|_| Error::AvatarStorage)?;
+        self.signer()
+            .await?
+            .sign_request_at(&mut request, &[], SystemTime::now())
+            .map_err(|_| Error::AvatarStorage)?;
+        let mut response = self
+            .http
+            .execute(request)
+            .await
+            .map_err(|_| Error::AvatarStorage)?;
+        if !response.status().is_success() {
+            return Err(Error::AvatarStorage);
+        }
+        let mut bytes = vec![];
+        while let Some(chunk) = response.chunk().await.map_err(|_| Error::AvatarStorage)? {
+            if bytes.len() + chunk.len() > 192 * 1024 * 1024 {
+                return Err(Error::AvatarStorage);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok(bytes)
+    }
+}
 impl Agents {
+    pub fn object_store(&self) -> Option<&AvatarStore> {
+        self.avatars.as_ref()
+    }
+
     pub fn with_avatar_store(mut self, store: AvatarStore) -> Self {
         self.avatars = Some(store);
         self
@@ -170,14 +203,13 @@ impl Agents {
             }
         };
         tx.commit().await?;
-        if let Some(old) = current.avatar_key {
-            if store
+        if let Some(old) = current.avatar_key
+            && store
                 .write(Method::DELETE, &old, media_type, vec![])
                 .await
                 .is_err()
-            {
-                tracing::warn!(agent_id = %id, "Unable to remove previous avatar object");
-            }
+        {
+            tracing::warn!(agent_id = %id, "Unable to remove previous avatar object");
         }
         Ok(agent)
     }

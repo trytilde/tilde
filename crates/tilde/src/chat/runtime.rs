@@ -72,6 +72,23 @@ pub(crate) fn client<M: buffa::Message>(
 impl Chat {
     /// Persist one invocation per explicit objective. A duplicate request cannot start a second loop.
     pub async fn start_run(&self, r: application::StartRun) -> Result<types::Run> {
+        if let Some(local) = self.local() {
+            return local.start_run(r).await;
+        }
+        if let Some(deployments) = &self.deployments
+            && let Some(run) = deployments
+                .start_retained_run(&r)
+                .await
+                .map_err(|e| match e {
+                    crate::error::Error::ChatLifecycle(e) => e,
+                    crate::error::Error::Denied => ChatError::Denied,
+                    crate::error::Error::NotFound => ChatError::NotFound,
+                    crate::error::Error::Conflict => ChatError::Conflict,
+                    _ => ChatError::Transport,
+                })?
+        {
+            return Ok(run);
+        }
         text(&r.objective)?;
         text(&r.idempotency_key)?;
         let thread = id(&r.thread_id)?;
@@ -87,7 +104,7 @@ impl Chat {
         }
         let run = Uuid::new_v4();
         let invocation = Uuid::new_v4();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         super::access::lock_thread_route(&mut tx, thread).await?;
         sqlx::query_file!("../../queries/chat/agent_available.sql", agent)
             .fetch_optional(&mut *tx)
@@ -171,10 +188,13 @@ impl Chat {
     }
     /// Explicitly resume waiting/failed work with a new invocation identity; no ambiguous automatic goal selection.
     pub async fn resume_run(&self, run: Uuid) -> Result<types::Run> {
+        if let Some(local) = self.local() {
+            return local.resume_run(run).await;
+        }
         let old = self.run(run).await?;
         let agent = id(&old.agent_id)?;
         let thread = id(&old.thread_id)?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         super::access::lock_thread_route(&mut tx, thread).await?;
         sqlx::query_file!("../../queries/chat/agent_available.sql", agent)
             .fetch_optional(&mut *tx)
@@ -199,17 +219,24 @@ impl Chat {
         )
         .execute(&mut *tx)
         .await?;
+        sqlx::query_file!(
+            "../../queries/chat/input_move.sql",
+            id(&old.invocation_id)?,
+            invocation
+        )
+        .execute(&mut *tx)
+        .await?;
         activity(&mut tx, thread, "invocation.pending", invocation, "").await?;
         tx.commit().await?;
         self.run(run).await
     }
     async fn route_pending(&self) -> Result<bool> {
         let messages = sqlx::query_file!("../../queries/chat/route_pending.sql")
-            .fetch_all(&self.pool)
+            .fetch_all(self.pg()?)
             .await?;
         let more = messages.len() == 50;
         for message in messages {
-            let mut tx = self.pool.begin().await?;
+            let mut tx = self.pg()?.begin().await?;
             super::access::lock_thread_route(&mut tx, message.thread_id).await?;
             if !sqlx::query_file!(
                 "../../queries/channel_access/message_allowed.sql",
@@ -310,8 +337,11 @@ impl Chat {
     }
     /// Return durable work and the latest invocation independently.
     pub async fn run(&self, run: Uuid) -> Result<types::Run> {
+        if let Some(local) = self.local() {
+            return local.run(run).await;
+        }
         let r = sqlx::query_file!("../../queries/chat/run_get.sql", run)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?
             .ok_or(ChatError::NotFound)?;
         Ok(types::Run {
@@ -328,10 +358,13 @@ impl Chat {
     }
     /// Persist steering first; the worker retries until the current host acknowledges it.
     pub async fn steer_invocation(&self, r: application::SteerInvocation) -> Result<()> {
+        if let Some(local) = self.local() {
+            return local.steer_invocation(r).await;
+        }
         text(&r.text)?;
         let invocation = id(&r.invocation_id)?;
         let input = id(&r.input_id)?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         let row = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
             .fetch_optional(&mut *tx)
             .await?
@@ -356,38 +389,27 @@ impl Chat {
         tx.commit().await?;
         Ok(())
     }
-    /// Revoke callbacks immediately and persist cancellation; the runtime receives a signed Cancel RPC.
+    /// Revoke callbacks immediately and persist cancellation; the execution observes cancellation on its control stream.
     pub async fn cancel_invocation(&self, invocation: Uuid) -> Result<()> {
-        let row = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
-            .fetch_optional(&self.pool)
-            .await?
-            .ok_or(ChatError::NotFound)?;
-        self.finish(invocation, "canceled").await?;
-        if row.status == "running" {
-            let endpoint = row.endpoint_url.ok_or(ChatError::Transport)?;
-            let key = self.signing_key(row.agent_id, &row.webhook_signing_key)?;
-            let request = host::CancelRequest {
-                invocation_id: invocation.to_string(),
-                ..Default::default()
-            };
-            tokio::time::timeout(
-                Duration::from_secs(5),
-                client(&endpoint, key.expose_secret(), "Cancel", &request)?.cancel(request),
-            )
-            .await
-            .map_err(|_| ChatError::Transport)?
-            .map_err(|_| ChatError::Transport)?;
+        if let Some(local) = self.local() {
+            return local.cancel_invocation(invocation).await;
         }
+        self.finish(invocation, "canceled").await?;
         Ok(())
     }
     pub(crate) async fn finish(&self, invocation: Uuid, status: &str) -> Result<()> {
         let existing = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
-            .fetch_one(&self.pool)
+            .fetch_one(self.pg()?)
             .await?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", existing.thread_id)
             .fetch_one(&mut *tx)
             .await?;
+        let suspending = sqlx::query_file!("../../queries/chat/run_state.sql", existing.run_id)
+            .fetch_one(&mut *tx)
+            .await?
+            .status
+            == "suspending";
         if let Some(row) = sqlx::query_file!(
             "../../queries/chat/invocation_finish.sql",
             invocation,
@@ -412,7 +434,7 @@ impl Chat {
                 status,
             )
             .await?;
-            if status == "stopped" {
+            if status == "stopped" && !suspending {
                 super::agent_lifecycle::requeue_inputs(&mut tx, invocation, row.run_id).await?;
             }
         }
@@ -422,12 +444,12 @@ impl Chat {
     async fn execute(&self, invocation: Uuid) -> Result<()> {
         let Some(target) =
             sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
-                .fetch_optional(&self.pool)
+                .fetch_optional(self.pg()?)
                 .await?
         else {
             return Ok(());
         };
-        let mut claim = self.pool.begin().await?;
+        let mut claim = self.pg()?.begin().await?;
         super::access::lock_thread_route(&mut claim, target.thread_id).await?;
         let Some(scope) = sqlx::query_file!("../../queries/chat/invocation_claim.sql", invocation)
             .fetch_optional(&mut *claim)
@@ -452,17 +474,14 @@ impl Chat {
         );
         let _end = crate::telemetry::context::EndOnDrop(cx.clone());
         let result=async {
-            sqlx::query_file!("../../queries/tracing/execution_context.sql",invocation,crate::telemetry::context::capture().0).execute(&self.pool).await?;
+            sqlx::query_file!("../../queries/tracing/execution_context.sql",invocation,crate::telemetry::context::capture().0).execute(self.pg()?).await?;
             let capability = self.tokens.issue(scope.agent_id, invocation, scope.thread_id, scope.run_id).await?;
-            let row=sqlx::query_file!("../../queries/chat/invocation_endpoint.sql",invocation).fetch_one(&self.pool).await?;
+            let row=sqlx::query_file!("../../queries/chat/invocation_endpoint.sql",invocation).fetch_one(self.pg()?).await?;
             let endpoint=row.endpoint_url.ok_or(ChatError::Transport)?;let key=self.signing_key(row.agent_id,&row.webhook_signing_key)?;
             let messages=self.messages(scope.thread_id,100).await?;
             let cached=self.hydrate_converted_messages(scope.agent_id,scope.thread_id,&messages.iter().map(|m|m.id.clone()).collect::<Vec<_>>()).await?;
             let request=host::InvokeRequest{agent_generation:scope.generation,invocation_id:invocation.to_string(),run_id:scope.run_id.to_string(),thread_id:scope.thread_id.to_string(),agent_id:scope.agent_id.to_string(),objective:row.objective,callback_url:self.callback_url.clone(),capability:capability.expose_secret().to_owned(),messages, cached_messages:cached.into_iter().map(|c|runtime_pb::CachedAgentRepresentation{message_id:c.message_id,message_json:c.message_json,..Default::default()}).collect(),thread:self.thread(scope.thread_id).await?.into(),..Default::default()};
             let mut stream=tokio::time::timeout(Duration::from_secs(10),client(&endpoint,key.expose_secret(),"Invoke",&request)?.invoke(request)).await.map_err(|_|ChatError::Transport)?.map_err(|_|ChatError::Transport)?;
-            let mut inputs = self.input_notifications.subscribe(&self.pool, "tilde_chat_input").await?;
-            inputs.mark_changed();
-            let mut input_retry = None;
             let mut heartbeat=tokio::time::interval(Duration::from_secs(2));
             loop {
                 tokio::select! {
@@ -470,30 +489,16 @@ impl Chat {
                         let Some(message)=message.map_err(|_|ChatError::Transport)? else{break;};
                         let view=message.view();
                         for pending in &view.pending_input_ids {
-                            sqlx::query_file!("../../queries/chat/input_unaccept.sql",invocation,id(pending)?).execute(&self.pool).await?;
+                            sqlx::query_file!("../../queries/chat/input_unaccept.sql",invocation,id(pending)?).execute(self.pg()?).await?;
                         }
                         if !view.reasoning_delta.is_empty() {
-                            let mut tx=self.pool.begin().await?;activity(&mut tx,scope.thread_id,"reasoning.delta",invocation,view.reasoning_delta).await?;tx.commit().await?;
+                            let mut tx=self.pg()?.begin().await?;activity(&mut tx,scope.thread_id,"reasoning.delta",invocation,view.reasoning_delta).await?;tx.commit().await?;
                         }
                     },
                     _=heartbeat.tick()=>{
-                        if sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql",invocation).execute(&self.pool).await?.rows_affected()==0 {return Ok(());}
+                        if sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql",invocation).execute(self.pg()?).await?.rows_affected()==0 {return Ok(());}
                     },
-                    _ = async {
-                        if let Some(deadline) = input_retry { tokio::time::sleep_until(deadline).await; }
-                        else { let _ = inputs.changed().await; }
-                    } => {
-                        inputs.borrow_and_update();
-                        input_retry = None;
-                        let pending = sqlx::query_file!("../../queries/chat/inputs_pending.sql",invocation).fetch_all(&self.pool).await?;
-                        if pending.len() > 8 { inputs.mark_changed(); }
-                        for input in pending.into_iter().take(8) {
-                            let request=host::SteerRequest{invocation_id:invocation.to_string(),input_id:input.id.to_string(),text:input.text,message:self.steering_message(scope.thread_id,input.id).await?.into(),..Default::default()};
-                            let sent=tokio::time::timeout(Duration::from_secs(1),client(&endpoint,key.expose_secret(),"Steer",&request)?.steer(request)).await;
-                            if matches!(sent,Ok(Ok(_))) {sqlx::query_file!("../../queries/chat/input_accept.sql",invocation,input.id).execute(&self.pool).await?;}
-                            else { input_retry = Some(tokio::time::Instant::now() + Duration::from_secs(1)); }
-                        }
-                    }
+
                 }
             } Ok(())
         }.with_context(cx.clone()).await;
@@ -510,7 +515,7 @@ impl Chat {
         result
     }
     async fn expire_invocations(&self) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         let rows = sqlx::query_file!("../../queries/chat/invocation_expire.sql")
             .fetch_all(&mut *tx)
             .await?;
@@ -525,12 +530,18 @@ impl Chat {
     }
     /// Supervise bounded, independent invocations. Expired execution is failed, never blindly replayed.
     pub async fn worker(self, shutdown: tokio::sync::watch::Receiver<bool>) {
+        if let Some(local) = self.local() {
+            return local.as_ref().clone().worker(shutdown).await;
+        }
+        let Ok(pool) = self.pg() else {
+            return;
+        };
         let mut shutdown = shutdown;
         let mut workers = tokio::task::JoinSet::new();
         let mut changed = loop {
             tokio::select! {
                 _ = shutdown.changed() => return,
-                result = self.work_notifications.subscribe(&self.pool, "tilde_chat_work") => {
+                result = self.work_notifications.subscribe(pool, "tilde_chat_work") => {
                     match result {
                         Ok(changed) => break changed,
                         Err(_) => tracing::warn!("Unable to listen for agent work"),
@@ -553,7 +564,7 @@ impl Chat {
                     let _ = self.expire_messages().await;
                     let _ = self.expire_typing().await;
                     let _ = self.expire_tool_calls().await;
-                    let _ = sqlx::query_file!("../../queries/channel_access/cleanup.sql").execute(&self.pool).await;
+                    let _ = sqlx::query_file!("../../queries/channel_access/cleanup.sql").execute(pool).await;
                     continue;
                 }
                 _ = workers.join_next(), if !workers.is_empty() => {}
@@ -574,7 +585,7 @@ impl Chat {
             }
             if workers.len() < 32 {
                 match sqlx::query_file!("../../queries/chat/invocations_pending.sql")
-                    .fetch_all(&self.pool)
+                    .fetch_all(pool)
                     .await
                 {
                     Ok(rows) => {

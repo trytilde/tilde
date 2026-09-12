@@ -18,7 +18,10 @@ import { Route as ConnectionsBrokerSetupIdRouteImport } from './routes/connectio
 import { Route as AppAgentAgentIdIndexRouteImport } from './routes/_app/agent/$agentId/index'
 import { Route as AppAgentAgentIdCapabilitiesRouteImport } from './routes/_app/agent/$agentId/capabilities'
 import { Route as AppAgentAgentIdChatProvidersRouteImport } from './routes/_app/agent/$agentId/chat-providers'
+import { Route as AppAgentAgentIdDeploymentRouteImport } from './routes/_app/agent/$agentId/deployment'
 import { Route as AppAgentAgentIdIamRouteImport } from './routes/_app/agent/$agentId/iam'
+import { Route as AppAgentAgentIdLogsRouteImport } from './routes/_app/agent/$agentId/logs'
+import { Route as AppAgentAgentIdTracingRouteImport } from './routes/_app/agent/$agentId/tracing'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -67,9 +70,25 @@ const AppAgentAgentIdChatProvidersRoute =
     path: '/chat-providers',
     getParentRoute: () => AppAgentAgentIdRouteRoute,
   } as any)
+const AppAgentAgentIdDeploymentRoute =
+  AppAgentAgentIdDeploymentRouteImport.update({
+    id: '/deployment',
+    path: '/deployment',
+    getParentRoute: () => AppAgentAgentIdRouteRoute,
+  } as any)
 const AppAgentAgentIdIamRoute = AppAgentAgentIdIamRouteImport.update({
   id: '/iam',
   path: '/iam',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
+const AppAgentAgentIdLogsRoute = AppAgentAgentIdLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
+const AppAgentAgentIdTracingRoute = AppAgentAgentIdTracingRouteImport.update({
+  id: '/tracing',
+  path: '/tracing',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
 
@@ -81,7 +100,10 @@ export interface FileRoutesByFullPath {
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
+  '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
+  '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
   '/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -91,7 +113,10 @@ export interface FileRoutesByTo {
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
+  '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
+  '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
   '/agent/$agentId': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRoutesById {
@@ -104,7 +129,10 @@ export interface FileRoutesById {
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
   '/_app/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/_app/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
+  '/_app/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/_app/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
+  '/_app/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/_app/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
   '/_app/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -117,7 +145,10 @@ export interface FileRouteTypes {
     | '/connections/broker/$setupId'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
+    | '/agent/$agentId/deployment'
     | '/agent/$agentId/iam'
+    | '/agent/$agentId/logs'
+    | '/agent/$agentId/tracing'
     | '/agent/$agentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -127,7 +158,10 @@ export interface FileRouteTypes {
     | '/connections/broker/$setupId'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
+    | '/agent/$agentId/deployment'
     | '/agent/$agentId/iam'
+    | '/agent/$agentId/logs'
+    | '/agent/$agentId/tracing'
     | '/agent/$agentId'
   id:
     | '__root__'
@@ -139,7 +173,10 @@ export interface FileRouteTypes {
     | '/connections/broker/$setupId'
     | '/_app/agent/$agentId/capabilities'
     | '/_app/agent/$agentId/chat-providers'
+    | '/_app/agent/$agentId/deployment'
     | '/_app/agent/$agentId/iam'
+    | '/_app/agent/$agentId/logs'
+    | '/_app/agent/$agentId/tracing'
     | '/_app/agent/$agentId/'
   fileRoutesById: FileRoutesById
 }
@@ -213,11 +250,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAgentAgentIdChatProvidersRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
+    '/_app/agent/$agentId/deployment': {
+      id: '/_app/agent/$agentId/deployment'
+      path: '/deployment'
+      fullPath: '/agent/$agentId/deployment'
+      preLoaderRoute: typeof AppAgentAgentIdDeploymentRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
     '/_app/agent/$agentId/iam': {
       id: '/_app/agent/$agentId/iam'
       path: '/iam'
       fullPath: '/agent/$agentId/iam'
       preLoaderRoute: typeof AppAgentAgentIdIamRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
+    '/_app/agent/$agentId/logs': {
+      id: '/_app/agent/$agentId/logs'
+      path: '/logs'
+      fullPath: '/agent/$agentId/logs'
+      preLoaderRoute: typeof AppAgentAgentIdLogsRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
+    '/_app/agent/$agentId/tracing': {
+      id: '/_app/agent/$agentId/tracing'
+      path: '/tracing'
+      fullPath: '/agent/$agentId/tracing'
+      preLoaderRoute: typeof AppAgentAgentIdTracingRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
   }
@@ -226,14 +284,20 @@ declare module '@tanstack/react-router' {
 interface AppAgentAgentIdRouteRouteChildren {
   AppAgentAgentIdCapabilitiesRoute: typeof AppAgentAgentIdCapabilitiesRoute
   AppAgentAgentIdChatProvidersRoute: typeof AppAgentAgentIdChatProvidersRoute
+  AppAgentAgentIdDeploymentRoute: typeof AppAgentAgentIdDeploymentRoute
   AppAgentAgentIdIamRoute: typeof AppAgentAgentIdIamRoute
+  AppAgentAgentIdLogsRoute: typeof AppAgentAgentIdLogsRoute
+  AppAgentAgentIdTracingRoute: typeof AppAgentAgentIdTracingRoute
   AppAgentAgentIdIndexRoute: typeof AppAgentAgentIdIndexRoute
 }
 
 const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
   AppAgentAgentIdCapabilitiesRoute: AppAgentAgentIdCapabilitiesRoute,
   AppAgentAgentIdChatProvidersRoute: AppAgentAgentIdChatProvidersRoute,
+  AppAgentAgentIdDeploymentRoute: AppAgentAgentIdDeploymentRoute,
   AppAgentAgentIdIamRoute: AppAgentAgentIdIamRoute,
+  AppAgentAgentIdLogsRoute: AppAgentAgentIdLogsRoute,
+  AppAgentAgentIdTracingRoute: AppAgentAgentIdTracingRoute,
   AppAgentAgentIdIndexRoute: AppAgentAgentIdIndexRoute,
 }
 

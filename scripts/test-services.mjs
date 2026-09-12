@@ -24,9 +24,10 @@ try {
         ENGINE_KMS_KEY_ID: "",
         ENGINE_MANAGEMENT_ENABLED: String(management),
         ENGINE_WEB_ENABLED: String(web),
-        ENGINE_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
-        ENGINE_EVENT_INGRESS_PUBLIC_URL: "https://events.example.com",
+        ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
+        ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: "https://events.example.com",
         ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
+        ENGINE_AGENT_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
         RUST_LOG: "tilde=info",
       };
       for (const name of [
@@ -72,7 +73,7 @@ try {
           ).status,
           401,
         );
-        const ingress = `http://${logs.match(/event_ingress_address=(127\.0\.0\.1:\d+)/)[1]}`;
+        const ingress = `http://${logs.match(/public_event_ingress_address=(127\.0\.0\.1:\d+)/)[1]}`;
         for (const path of [
           "/",
           "/auth/login",

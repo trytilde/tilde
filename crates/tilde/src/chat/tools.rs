@@ -74,9 +74,13 @@ impl Registry {
         Self { providers }
     }
     pub fn for_chat(chat: &Chat) -> Self {
-        let mut providers: Vec<Arc<dyn Provider>> = vec![Arc::new(native::Native {
-            pool: chat.pool.clone(),
-        })];
+        let mut providers: Vec<Arc<dyn Provider>> =
+            vec![Arc::new(native::Native { chat: chat.clone() })];
+        if let Some(local) = chat.local() {
+            providers.push(Arc::new(
+                crate::deployment::runtime::providers::LocalChannels(local.clone()),
+            ));
+        }
         if let Some(channels) = &chat.channels {
             providers.push(channels.clone().provider());
         }
