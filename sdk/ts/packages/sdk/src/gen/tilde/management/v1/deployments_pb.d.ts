@@ -72,11 +72,6 @@ export declare type SetDeploymentRequest = Message<"tilde.management.v1.SetDeplo
    * @generated from field: tilde.types.v1.SidecarFailureMode failure_mode = 4;
    */
   failureMode: SidecarFailureMode;
-
-  /**
-   * @generated from field: uint32 retention_days = 5;
-   */
-  retentionDays: number;
 };
 
 /**

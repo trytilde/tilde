@@ -4,16 +4,10 @@ use connectrpc::{
     ConnectError, RequestContext, Response, ServiceRequest, ServiceResult, ServiceStream,
 };
 use std::sync::Arc;
-struct Rpc(Chat, Option<crate::deployment::gateway::Client>);
+struct Rpc(Chat);
 pub fn router(chat: Chat) -> axum::Router {
-    router_with_gateway(chat, None)
-}
-pub fn router_with_gateway(
-    chat: Chat,
-    gateway: Option<crate::deployment::gateway::Client>,
-) -> axum::Router {
     crate::rpc::mount(
-        connectrpc::Router::new().add_service(Arc::new(Rpc(chat, gateway))),
+        connectrpc::Router::new().add_service(Arc::new(Rpc(chat))),
         192 * 1024 * 1024,
     )
 }
@@ -291,39 +285,18 @@ impl ChatService for Rpc {
     }
     async fn watch_thread(
         &self,
-        __ctx: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::WatchThreadRequest>,
     ) -> ServiceResult<
         ServiceStream<impl connectrpc::Encodable<management::WatchThreadResponse> + Send + use<>>,
     > {
         let thread = id(request.thread_id)?;
-        let mut cursor = request.after_cursor.to_owned();
-        let mut stream = self.0.watch_ingress(thread, &cursor).await?;
-        let gateway = self.1.clone();
-        let agent = self.0.local().map(|r| r.agent_id);
-        let token = __ctx
-            .headers()
-            .get(http::header::AUTHORIZATION)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .map(secrecy::SecretString::from);
+        let mut stream = self.0.watch_ingress(thread, request.after_cursor).await?;
         Response::stream_ok(async_stream::try_stream! {
-            use futures::StreamExt;use secrecy::ExposeSecret;
+            use futures::StreamExt;
             while let Some(value)=stream.next().await {
-                match value {
-                    Ok((activity,next))=>{cursor=next;yield management::WatchThreadResponse{activity:activity.into(),cursor:cursor.clone(),..Default::default()};},
-                    Err(crate::chat::ChatError::Archived)=>{
-                        let gateway=gateway.as_ref().ok_or(crate::chat::ChatError::Archived)?;let agent=agent.ok_or(crate::chat::ChatError::Archived)?;
-                        let token=token.as_ref().ok_or(crate::chat::ChatError::Denied)?;
-                        let request=management::WatchThreadRequest{thread_id:thread.to_string(),after_cursor:cursor.clone(),..Default::default()};
-                        // The retirement commit follows the Corrosion delete. Give
-                        // that already-authorized handover a short bounded retry.
-                        let path=format!("agents/{agent}/proxy/tilde.ingress.v1.ChatService/WatchThread");
-                        let remote=gateway.stream::<_,management::WatchThreadResponse>(&path,&request,Some(token.expose_secret())).await;
-                        let mut remote=match remote{Ok(stream)=>stream,Err(_)=>{tokio::time::sleep(std::time::Duration::from_millis(100)).await;gateway.stream::<_,management::WatchThreadResponse>(&path,&request,Some(token.expose_secret())).await?}};
-                        while let Some(value)=remote.next().await{yield value?;}break;
-                    },Err(error)=>Err(error)?,
-                }
+                let (activity,cursor)=value?;
+                yield management::WatchThreadResponse{activity:activity.into(),cursor,..Default::default()};
             }
         })
     }

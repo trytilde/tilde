@@ -1,12 +1,10 @@
 //! Execution-owned control streams. Terminal credentials can only observe/ack
 //! their own stop; this service never grants revoked application capabilities.
 use super::{Chat, ChatError, Result, id};
-use crate::proto::tilde::types::v1 as types;
 use crate::{iam::tokens::Claims, proto::tilde::runtime::v1 as wire};
 use connectrpc::{RequestContext, Response, ServiceRequest, ServiceResult, ServiceStream};
 use futures::{Stream, StreamExt};
 use secrecy::{ExposeSecret, SecretString};
-use serde_json::json;
 use std::{pin::Pin, sync::Arc, time::Duration};
 use uuid::Uuid;
 use wire::{InvocationCommandKind as Kind, WatchCommandsResponse as Command};
@@ -29,44 +27,25 @@ fn terminal(invocation: Uuid, kind: Kind) -> Command {
 impl Chat {
     pub async fn suspend_invocation(&self, invocation: Uuid) -> Result<()> {
         if let Some(local) = self.local() {
-            let v = local.invocation(invocation).await?;
-            if v.status != "running" {
-                return Err(ChatError::Conflict);
-            }
-            let scope = super::Scope {
-                id: invocation,
-                run_id: id(&v.run_id)?,
-                thread_id: id(&v.thread_id)?,
-                agent_id: local.agent_id,
-                participant_id: id(&v.participant_id)?,
-                capabilities: Default::default(),
-            };
-            let _guard = local.mutation.lock().await;
-            if local.invocation(invocation).await?.status != "running" {
-                return Err(ChatError::Conflict);
-            }
-            let mut run = local.run(scope.run_id).await?;
-            run.status = "suspending".into();
-            return local
-                .commit(
-                    scope.thread_id,
-                    vec![
-                        crate::deployment::corrosion::client::statement(
-                            "UPDATE runs SET status=?,payload=? WHERE id=?",
-                            vec![
-                                json!(run.status),
-                                json!(local.seal(scope.run_id, "run", &run)?),
-                                json!(run.id),
-                            ],
-                        ),
-                        local.event(scope.thread_id, "run.updated", run.into())?,
-                    ],
-                )
-                .await;
+            return local.suspend_invocation(invocation).await;
         }
         let row = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
             .fetch_one(self.pg()?)
             .await?;
+        if let Some(()) = self
+            .forward_control(
+                row.agent_id,
+                row.thread_id,
+                "SuspendInvocation",
+                &crate::proto::tilde::ingress::v1::SuspendInvocationRequest {
+                    invocation_id: invocation.to_string(),
+                    ..Default::default()
+                },
+            )
+            .await?
+        {
+            return Ok(());
+        }
         if row.status != "running" {
             return Err(ChatError::Conflict);
         }
@@ -110,11 +89,18 @@ impl Chat {
             if local.run(claims.run_id).await?.status == "suspending" {
                 return Ok(vec![terminal(claims.invocation_id, Kind::Suspend)]);
             }
-            for row in local.client.query::<crate::deployment::runtime::execution::CommandRow>("SELECT * FROM commands WHERE thread_id=? AND kind='steer' AND acked_at IS NULL AND finished_at IS NULL ORDER BY created_at,id",vec![json!(claims.thread_id)]).await? {
-                let command:types::AgentCommand=local.open(id(&row.id)?,"command",&row.payload)?;
-                if let Some(types::agent_command::Action::Steer(input))=command.action && input.invocation_id==claims.invocation_id.to_string() {
-                    commands.push(Command{id:command.id,kind:Kind::Steer.into(),input_id:input.input_id,text:input.text,message:input.message,..Default::default()});
-                }
+            for (id, input) in local
+                .pending_steering(claims.thread_id, claims.invocation_id)
+                .await?
+            {
+                commands.push(Command {
+                    id,
+                    kind: Kind::Steer.into(),
+                    input_id: input.input_id,
+                    text: input.text,
+                    message: input.message,
+                    ..Default::default()
+                });
             }
         } else {
             let state = sqlx::query_file!(
@@ -153,36 +139,18 @@ impl Chat {
     }
     async fn control_changes(&self, claims: &Claims) -> Result<Changes> {
         if let Some(local) = self.local() {
-            let queries = [
-                (
-                    "SELECT * FROM invocations WHERE id=?",
-                    json!(claims.invocation_id),
-                ),
-                (
-                    "SELECT * FROM commands WHERE thread_id=?",
-                    json!(claims.thread_id),
-                ),
-                (
-                    "SELECT * FROM assignments WHERE thread_id=?",
-                    json!(claims.thread_id),
-                ),
-                (
-                    "SELECT * FROM configuration WHERE agent_id=?",
-                    json!(claims.sub),
-                ),
-                ("SELECT * FROM runs WHERE id=?", json!(claims.run_id)),
-            ];
-            let mut streams: Vec<Changes> = vec![];
-            for (sql, value) in queries {
-                streams.push(Box::pin(
-                    local
-                        .client
-                        .subscribe::<serde_json::Value>(sql, vec![value])
-                        .await?
-                        .map(|r| r.map(|_| ())),
-                ));
-            }
-            Ok(Box::pin(futures::stream::select_all(streams)))
+            let thread = claims.thread_id;
+            let mut changes = local.changes();
+            Ok(Box::pin(async_stream::try_stream! {
+                loop {
+                    match changes.recv().await {
+                        Ok(changed) if changed == thread => yield (),
+                        Ok(_) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => yield (),
+                        Err(_) => break,
+                    }
+                }
+            }))
         } else {
             let notifications = self.control_notifications.clone();
             let mut changed = notifications
@@ -198,58 +166,53 @@ impl Chat {
         let commands = self.control_commands(&claims, token).await?;
         let command = commands.iter().find(|c| c.id == key.to_string());
         if let Some(local) = self.local() {
-            let acknowledged = local
-                .client
-                .query::<crate::deployment::runtime::IdRow>(
-                    "SELECT id FROM control_receipts WHERE id=? AND invocation_id=?",
-                    vec![json!(key), json!(claims.invocation_id)],
-                )
-                .await?;
-            if !acknowledged.is_empty() {
-                return Ok(());
-            }
-            let _command = command.ok_or(ChatError::Denied)?;
-            local.commit(claims.thread_id,vec![crate::deployment::corrosion::client::statement("INSERT INTO control_receipts(id,thread_id,invocation_id,acknowledged_at) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(key),json!(claims.thread_id),json!(claims.invocation_id),json!(chrono::Utc::now().timestamp_millis())]),crate::deployment::corrosion::client::statement("UPDATE commands SET acked_at=?,finished_at=? WHERE id=? AND thread_id=? AND kind='steer'",vec![json!(chrono::Utc::now().timestamp_millis()),json!(chrono::Utc::now().timestamp_millis()),json!(key),json!(claims.thread_id)]),local.event(claims.thread_id,"command.acknowledged",types::Activity{kind:"command.acknowledged".into(),entity_id:key.to_string(),invocation_id:claims.invocation_id.to_string(),..Default::default()}.into())?]).await?;
-        } else {
-            let mut tx = self.pg()?.begin().await?;
-            if command.is_none() {
-                let exists = sqlx::query_file!(
-                    "../../queries/chat/controls/receipt.sql",
-                    claims.invocation_id,
-                    key
-                )
-                .fetch_one(&mut *tx)
+            return if local
+                .acknowledge_control(claims.thread_id, claims.invocation_id, key)
                 .await?
-                .exists;
-                return if exists {
-                    Ok(())
-                } else {
-                    Err(ChatError::Denied)
-                };
-            }
-            let command = command.ok_or(ChatError::Denied)?;
-            if command.kind.as_known() == Some(Kind::Steer) {
-                sqlx::query_file!(
-                    "../../queries/chat/input_accept.sql",
-                    claims.invocation_id,
-                    key
-                )
-                .execute(&mut *tx)
-                .await?;
-            }
-            if sqlx::query_file!(
-                "../../queries/chat/controls/ack.sql",
+            {
+                Ok(())
+            } else {
+                Err(ChatError::Denied)
+            };
+        }
+        let mut tx = self.pg()?.begin().await?;
+        if command.is_none() {
+            let exists = sqlx::query_file!(
+                "../../queries/chat/controls/receipt.sql",
                 claims.invocation_id,
                 key
             )
-            .fetch_optional(&mut *tx)
+            .fetch_one(&mut *tx)
             .await?
-            .is_some()
-            {
-                super::activity(&mut tx, claims.thread_id, "command.acknowledged", key, "").await?;
-            }
-            tx.commit().await?;
+            .exists;
+            return if exists {
+                Ok(())
+            } else {
+                Err(ChatError::Denied)
+            };
         }
+        let command = command.ok_or(ChatError::Denied)?;
+        if command.kind.as_known() == Some(Kind::Steer) {
+            sqlx::query_file!(
+                "../../queries/chat/input_accept.sql",
+                claims.invocation_id,
+                key
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+        if sqlx::query_file!(
+            "../../queries/chat/controls/ack.sql",
+            claims.invocation_id,
+            key
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .is_some()
+        {
+            super::activity(&mut tx, claims.thread_id, "command.acknowledged", key, "").await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 }

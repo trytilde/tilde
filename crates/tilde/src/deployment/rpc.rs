@@ -1,11 +1,12 @@
 use super::{Deployments, id};
+use crate::error::Error;
 use crate::proto::tilde::{agent_event_ingress::v1 as ingress, management::v1 as management};
 use crate::services::tilde::{
     agent_event_ingress::v1::SidecarService, management::v1::DeploymentService,
 };
 use connectrpc::{RequestContext, Response, ServiceRequest, ServiceResult};
 use secrecy::{ExposeSecret, SecretString};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 struct Rpc(Deployments);
 pub fn management_router(service: Deployments) -> axum::Router {
@@ -14,19 +15,11 @@ pub fn management_router(service: Deployments) -> axum::Router {
         1024 * 1024,
     )
 }
-pub fn agent_event_ingress_router(service: Deployments) -> axum::Router {
+/// The complete sidecar-facing surface; every call authenticates a deployment token.
+pub fn sidecar_router(service: Deployments) -> axum::Router {
     crate::rpc::mount(
-        connectrpc::Router::new().add_service(Arc::new(Control(service.clone()))),
+        connectrpc::Router::new().add_service(Arc::new(Control(service))),
         192 * 1024 * 1024,
-    )
-    .merge(super::attachments::router(service.clone()))
-    .merge(
-        axum::Router::new()
-            .route(
-                "/agents/{agent}/registry/{target}",
-                axum::routing::get(agent_reference),
-            )
-            .with_state(service),
     )
 }
 impl DeploymentService for Rpc {
@@ -61,7 +54,6 @@ impl DeploymentService for Rpc {
                     r.failure_mode.as_known().ok_or_else(|| {
                         connectrpc::ConnectError::invalid_argument("Invalid failure policy")
                     })?,
-                    r.retention_days,
                 )
                 .await?
                 .into(),
@@ -151,7 +143,7 @@ impl DeploymentService for Rpc {
         )
         .execute(&self.0.pool)
         .await
-        .map_err(crate::error::Error::from)?
+        .map_err(Error::from)?
         .rows_affected();
         if rows == 0 {
             return Err(connectrpc::ConnectError::already_exists(
@@ -184,204 +176,197 @@ impl Control {
     }
 }
 impl SidecarService for Control {
-    async fn locate_conversation<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::LocateConversationRequest>,
-    ) -> ServiceResult<
-        impl connectrpc::Encodable<ingress::LocateConversationResponse> + Send + use<'a>,
-    > {
-        Response::ok(ingress::LocateConversationResponse {
-            storage: self
-                .0
-                .locate(self.agent(&ctx).await?, id(r.thread_id)?)
-                .await?,
-            ..Default::default()
-        })
-    }
-    async fn ingest_provider_event<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::IngestProviderEventRequest>,
-    ) -> ServiceResult<
-        impl connectrpc::Encodable<ingress::IngestProviderEventResponse> + Send + use<'a>,
-    > {
-        let body = r.to_owned_message();
-        self.0
-            .ingest_archived(
-                self.agent(&ctx).await?,
-                id(&body.connection_id)?,
-                body.event.into_option().ok_or_else(|| {
-                    connectrpc::ConnectError::invalid_argument("Provider event required")
-                })?,
-            )
-            .await?;
-        Response::ok(ingress::IngestProviderEventResponse::default())
-    }
-
-    async fn watch_commands(
+    async fn watch(
         &self,
         ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::WatchCommandsRequest>,
+        r: ServiceRequest<'_, ingress::WatchRequest>,
     ) -> ServiceResult<
         connectrpc::ServiceStream<
-            impl connectrpc::Encodable<ingress::WatchCommandsResponse> + Send + use<>,
+            impl connectrpc::Encodable<ingress::WatchResponse> + Send + use<>,
         >,
     > {
         let agent = self.agent(&ctx).await?;
-        let instance = id(r.instance_id)?;
+        let request = r.to_owned_message();
+        let instance = self.0.register(agent, &request).await?;
         let service = self.0.clone();
-        let notifications = crate::database::notifications::Notifications::default();
-        let mut changes = notifications
-            .subscribe(&service.pool, "tilde_sidecar_commands")
+        let mut configuration = service
+            .channels
+            .configuration
+            .subscribe(&service.pool, "tilde_sidecar_configuration")
             .await
-            .map_err(crate::error::Error::from)?;
+            .map_err(Error::from)?;
+        let mut assignments = service
+            .channels
+            .assignments
+            .subscribe(&service.pool, "tilde_sidecar_assignments")
+            .await
+            .map_err(Error::from)?;
+        let mut directives = service
+            .channels
+            .directives
+            .subscribe(&service.pool, "tilde_sidecar_directives")
+            .await
+            .map_err(Error::from)?;
+        configuration.borrow_and_update();
+        assignments.borrow_and_update();
+        directives.borrow_and_update();
         Response::stream_ok(async_stream::try_stream! {
-            let _notifications=notifications;let mut delivered=std::collections::BTreeSet::new();
+            let mut since = chrono::Utc::now();
+            let snapshot = service.snapshot(agent).await?;
+            yield ingress::WatchResponse { frame: Some(snapshot.into()), ..Default::default() };
+            let mut sent = std::collections::BTreeSet::new();
+            for directive in service.pending_directives(agent, instance).await? {
+                sent.insert(directive.id.clone());
+                yield ingress::WatchResponse { frame: Some(directive.into()), ..Default::default() };
+            }
+            enum Wake { Configuration, Assignments, Directives, Ping, Closed }
             loop {
-                changes.borrow_and_update();
-                let pending = service.pending_commands(agent,instance).await?;
-                let keys = pending.iter().map(|c| (c.id.clone(),c.generation)).collect::<std::collections::BTreeSet<_>>();
-                delivered.retain(|key| keys.contains(key));
-                for command in pending {
-                    if delivered.insert((command.id.clone(),command.generation)) { yield ingress::WatchCommandsResponse{command:command.into(),..Default::default()}; }
+                let wake = tokio::select! {
+                    changed = configuration.changed() => if changed.is_ok() { Wake::Configuration } else { Wake::Closed },
+                    changed = assignments.changed() => if changed.is_ok() { Wake::Assignments } else { Wake::Closed },
+                    changed = directives.changed() => if changed.is_ok() { Wake::Directives } else { Wake::Closed },
+                    _ = tokio::time::sleep(Duration::from_secs(10)) => Wake::Ping,
+                };
+                match wake {
+                    Wake::Closed => break,
+                    Wake::Ping => yield ingress::WatchResponse { frame: Some(ingress::Ping::default().into()), ..Default::default() },
+                    Wake::Configuration => {
+                        configuration.borrow_and_update();
+                        yield ingress::WatchResponse { frame: Some(service.configuration(agent).await?.into()), ..Default::default() };
+                    }
+                    Wake::Assignments => {
+                        assignments.borrow_and_update();
+                        for (assignment, updated_at) in service.assignments_since(agent, since).await? {
+                            since = since.max(updated_at);
+                            yield ingress::WatchResponse { frame: Some(assignment.into()), ..Default::default() };
+                        }
+                    }
+                    Wake::Directives => {
+                        directives.borrow_and_update();
+                        let pending = service.pending_directives(agent, instance).await?;
+                        let ids: std::collections::BTreeSet<String> = pending.iter().map(|d| d.id.clone()).collect();
+                        sent.retain(|id| ids.contains(id));
+                        for directive in pending {
+                            if sent.insert(directive.id.clone()) {
+                                yield ingress::WatchResponse { frame: Some(directive.into()), ..Default::default() };
+                            }
+                        }
+                    }
                 }
-                if changes.changed().await.is_err(){break;}
             }
         })
     }
-    async fn get_invocation<'a>(
+    async fn publish<'a>(
         &'a self,
         ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::GetInvocationRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::GetInvocationResponse> + Send + use<'a>>
+        r: ServiceRequest<'_, ingress::PublishRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ingress::PublishResponse> + Send + use<'a>> {
+        let agent = self.agent(&ctx).await?;
+        let request = r.to_owned_message();
+        let instance = id(&request.instance_id)?;
+        Response::ok(self.0.publish(agent, instance, request).await?)
+    }
+    async fn hydrate<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::HydrateRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ingress::HydrateResponse> + Send + use<'a>> {
+        let agent = self.agent(&ctx).await?;
+        let request = r.to_owned_message();
+        let instance = if request.instance_id.is_empty() {
+            None
+        } else {
+            Some(id(&request.instance_id)?)
+        };
+        Response::ok(self.0.hydrate(agent, instance, request).await?)
+    }
+    async fn forward<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::ForwardRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ingress::ForwardResponse> + Send + use<'a>> {
+        let agent = self.agent(&ctx).await?;
+        let request = r.to_owned_message();
+        let thread = if request.thread_id.is_empty() {
+            None
+        } else {
+            Some(id(&request.thread_id)?)
+        };
+        let result = match request.work {
+            Some(ingress::forward_request::Work::Call(call)) => {
+                self.0.forward(agent, thread, *call).await?
+            }
+            Some(ingress::forward_request::Work::ProviderEvent(event)) => {
+                let event = *event;
+                self.0
+                    .forward_provider_event(
+                        agent,
+                        id(&event.connection_id)?,
+                        event.event.into_option().ok_or_else(|| {
+                            connectrpc::ConnectError::invalid_argument("Provider event required")
+                        })?,
+                    )
+                    .await?;
+                ingress::CallResult {
+                    status: 204,
+                    ..Default::default()
+                }
+            }
+            None => {
+                return Err(connectrpc::ConnectError::invalid_argument(
+                    "Forward requires work",
+                ));
+            }
+        };
+        Response::ok(ingress::ForwardResponse {
+            result: result.into(),
+            ..Default::default()
+        })
+    }
+    async fn upload_attachment<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::UploadAttachmentRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ingress::UploadAttachmentResponse> + Send + use<'a>>
     {
-        Response::ok(ingress::GetInvocationResponse {
-            invocation: self
+        let agent = self.agent(&ctx).await?;
+        let request = r.to_owned_message();
+        let attachment = request.attachment.into_option().ok_or_else(|| {
+            connectrpc::ConnectError::invalid_argument("Attachment metadata required")
+        })?;
+        Response::ok(ingress::UploadAttachmentResponse {
+            attachment: self
                 .0
-                .invocation_request(
-                    self.agent(&ctx).await?,
-                    id(r.instance_id)?,
-                    id(r.command_id)?,
-                    r.generation as i64,
-                )
+                .store_attachment(agent, attachment, request.content)
                 .await?
                 .into(),
             ..Default::default()
         })
     }
-    async fn acknowledge_command<'a>(
+    async fn download_attachment<'a>(
         &'a self,
         ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::AcknowledgeCommandRequest>,
+        r: ServiceRequest<'_, ingress::DownloadAttachmentRequest>,
     ) -> ServiceResult<
-        impl connectrpc::Encodable<ingress::AcknowledgeCommandResponse> + Send + use<'a>,
+        impl connectrpc::Encodable<ingress::DownloadAttachmentResponse> + Send + use<'a>,
     > {
-        self.0
-            .acknowledge(
-                self.agent(&ctx).await?,
-                id(r.instance_id)?,
-                id(r.command_id)?,
-                r.generation as i64,
-            )
-            .await?;
-        Response::ok(ingress::AcknowledgeCommandResponse::default())
-    }
-    async fn complete_command<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::CompleteCommandRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::CompleteCommandResponse> + Send + use<'a>>
-    {
-        let body = r.to_owned_message();
-        self.0
-            .complete(
-                self.agent(&ctx).await?,
-                id(&body.instance_id)?,
-                id(&body.command_id)?,
-                body.generation as i64,
-                &body.status,
-                &body.pending_input_ids,
-            )
-            .await?;
-        Response::ok(ingress::CompleteCommandResponse::default())
-    }
-    async fn report_activity<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::ReportActivityRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::ReportActivityResponse> + Send + use<'a>>
-    {
-        self.0
-            .report_reasoning(
-                self.agent(&ctx).await?,
-                id(r.instance_id)?,
-                id(r.command_id)?,
-                r.generation as i64,
-                r.reasoning_delta,
-            )
-            .await?;
-        Response::ok(ingress::ReportActivityResponse::default())
-    }
-
-    async fn register_sidecar<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::RegisterSidecarRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::RegisterSidecarResponse> + Send + use<'a>>
-    {
-        Response::ok(
-            self.0
-                .register(self.agent(&ctx).await?, r.to_owned_message())
+        let agent = self.agent(&ctx).await?;
+        Response::ok(ingress::DownloadAttachmentResponse {
+            content: self
+                .0
+                .fetch_attachment(agent, id(r.thread_id)?, id(r.attachment_id)?)
                 .await?,
-        )
-    }
-    async fn heartbeat<'a>(
-        &'a self,
-        ctx: RequestContext,
-        r: ServiceRequest<'_, ingress::HeartbeatRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::HeartbeatResponse> + Send + use<'a>>
-    {
-        Response::ok(
-            self.0
-                .heartbeat(self.agent(&ctx).await?, r.to_owned_message())
-                .await?,
-        )
-    }
-    async fn get_configuration<'a>(
-        &'a self,
-        ctx: RequestContext,
-        _: ServiceRequest<'_, ingress::GetConfigurationRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<ingress::GetConfigurationResponse> + Send + use<'a>>
-    {
-        Response::ok(self.0.configuration(self.agent(&ctx).await?).await?)
-    }
-}
-
-async fn agent_reference(
-    axum::extract::State(service): axum::extract::State<Deployments>,
-    axum::extract::Path((agent, target)): axum::extract::Path<(Uuid, Uuid)>,
-    headers: http::HeaderMap,
-) -> axum::response::Response {
-    use axum::response::IntoResponse;
-    let result = async {
-        let token = headers
-            .get(http::header::AUTHORIZATION)
-            .and_then(|h| h.to_str().ok())
-            .and_then(|h| h.strip_prefix("Bearer "))
-            .ok_or(crate::error::Error::Denied)?;
-        if service.authenticate(token).await? != agent {
-            return Err(crate::error::Error::Denied);
-        }
-        let target = service.agents.get(target).await?;
-        Ok::<_, crate::error::Error>(super::gateway::AgentReference {
-            id: target.id,
-            name: target.name,
+            ..Default::default()
         })
     }
-    .await;
-    match result {
-        Ok(reference) => axum::Json(reference).into_response(),
-        Err(error) => connectrpc::ConnectError::from(error).into_response(),
+    async fn resolve_participant<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::ResolveParticipantRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<ingress::ResolveParticipantResponse> + Send + use<'a>,
+    > {
+        self.agent(&ctx).await?;
+        Response::ok(self.0.resolve_participant(r.to_owned_message()).await?)
     }
 }

@@ -20,6 +20,6 @@ case "$host" in
   0.0.0.0) host=127.0.0.1 ;;
   ::|'[::]') host='[::1]' ;;
 esac
-# Forward only to event ingress. Management and browser setup remain private.
+# Forward to the engine port. Only ingress routes accept unauthenticated provider traffic.
 # Do not pool this endpoint: callbacks must reach this developer's database.
-exec ngrok http "http://$host:${PUBLIC_EVENT_INGRESS_PORT:-8082}" --url "https://$NGROK_DOMAIN" --log stdout
+exec ngrok http "http://$host:${API_PORT:-8080}" --url "https://$NGROK_DOMAIN" --log stdout

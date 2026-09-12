@@ -1,129 +1,89 @@
-///Shorthand for `OwnedView<LocateConversationRequestView<'static>>`.
-pub type OwnedLocateConversationRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationRequestView<
+///Shorthand for `OwnedView<WatchRequestView<'static>>`.
+pub type OwnedWatchRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<LocateConversationResponseView<'static>>`.
-pub type OwnedLocateConversationResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationResponseView<
+///Shorthand for `OwnedView<WatchResponseView<'static>>`.
+pub type OwnedWatchResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<IngestProviderEventRequestView<'static>>`.
-pub type OwnedIngestProviderEventRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventRequestView<
+///Shorthand for `OwnedView<PublishRequestView<'static>>`.
+pub type OwnedPublishRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<IngestProviderEventResponseView<'static>>`.
-pub type OwnedIngestProviderEventResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventResponseView<
+///Shorthand for `OwnedView<PublishResponseView<'static>>`.
+pub type OwnedPublishResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<WatchCommandsRequestView<'static>>`.
-pub type OwnedWatchCommandsRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsRequestView<
+///Shorthand for `OwnedView<HydrateRequestView<'static>>`.
+pub type OwnedHydrateRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<WatchCommandsResponseView<'static>>`.
-pub type OwnedWatchCommandsResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsResponseView<
+///Shorthand for `OwnedView<HydrateResponseView<'static>>`.
+pub type OwnedHydrateResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<GetInvocationRequestView<'static>>`.
-pub type OwnedGetInvocationRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationRequestView<
+///Shorthand for `OwnedView<ForwardRequestView<'static>>`.
+pub type OwnedForwardRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<GetInvocationResponseView<'static>>`.
-pub type OwnedGetInvocationResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationResponseView<
+///Shorthand for `OwnedView<ForwardResponseView<'static>>`.
+pub type OwnedForwardResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<AcknowledgeCommandRequestView<'static>>`.
-pub type OwnedAcknowledgeCommandRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandRequestView<
+///Shorthand for `OwnedView<UploadAttachmentRequestView<'static>>`.
+pub type OwnedUploadAttachmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<AcknowledgeCommandResponseView<'static>>`.
-pub type OwnedAcknowledgeCommandResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandResponseView<
+///Shorthand for `OwnedView<UploadAttachmentResponseView<'static>>`.
+pub type OwnedUploadAttachmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<CompleteCommandRequestView<'static>>`.
-pub type OwnedCompleteCommandRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandRequestView<
+///Shorthand for `OwnedView<DownloadAttachmentRequestView<'static>>`.
+pub type OwnedDownloadAttachmentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<CompleteCommandResponseView<'static>>`.
-pub type OwnedCompleteCommandResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandResponseView<
+///Shorthand for `OwnedView<DownloadAttachmentResponseView<'static>>`.
+pub type OwnedDownloadAttachmentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<ReportActivityRequestView<'static>>`.
-pub type OwnedReportActivityRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityRequestView<
+///Shorthand for `OwnedView<ResolveParticipantRequestView<'static>>`.
+pub type OwnedResolveParticipantRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<ReportActivityResponseView<'static>>`.
-pub type OwnedReportActivityResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityResponseView<
+///Shorthand for `OwnedView<ResolveParticipantResponseView<'static>>`.
+pub type OwnedResolveParticipantResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantResponseView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<RegisterSidecarRequestView<'static>>`.
-pub type OwnedRegisterSidecarRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<RegisterSidecarResponseView<'static>>`.
-pub type OwnedRegisterSidecarResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarResponseView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<HeartbeatRequestView<'static>>`.
-pub type OwnedHeartbeatRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<HeartbeatResponseView<'static>>`.
-pub type OwnedHeartbeatResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatResponseView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<GetConfigurationRequestView<'static>>`.
-pub type OwnedGetConfigurationRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<GetConfigurationResponseView<'static>>`.
-pub type OwnedGetConfigurationResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationResponseView<
-        'static,
-    >,
->;
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::LocateConversationResponse,
->
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationResponseView<
-    '_,
-> {
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_event_ingress::v1::WatchResponse>
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -131,11 +91,9 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversat
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::LocateConversationResponse,
->
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_event_ingress::v1::WatchResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<
         'static,
     >,
 > {
@@ -161,9 +119,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventResponse,
+    crate::proto::tilde::agent_event_ingress::v1::PublishResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishResponseView<
     '_,
 > {
     fn encode(
@@ -174,10 +132,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderE
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventResponse,
+    crate::proto::tilde::agent_event_ingress::v1::PublishResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishResponseView<
         'static,
     >,
 > {
@@ -203,9 +161,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::WatchCommandsResponse,
+    crate::proto::tilde::agent_event_ingress::v1::HydrateResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateResponseView<
     '_,
 > {
     fn encode(
@@ -216,10 +174,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsRe
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::WatchCommandsResponse,
+    crate::proto::tilde::agent_event_ingress::v1::HydrateResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateResponseView<
         'static,
     >,
 > {
@@ -245,9 +203,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::GetInvocationResponse,
+    crate::proto::tilde::agent_event_ingress::v1::ForwardResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardResponseView<
     '_,
 > {
     fn encode(
@@ -258,10 +216,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationRe
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::GetInvocationResponse,
+    crate::proto::tilde::agent_event_ingress::v1::ForwardResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardResponseView<
         'static,
     >,
 > {
@@ -287,9 +245,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandResponse,
+    crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentResponseView<
     '_,
 > {
     fn encode(
@@ -300,10 +258,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeComm
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandResponse,
+    crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentResponseView<
         'static,
     >,
 > {
@@ -329,9 +287,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::CompleteCommandResponse,
+    crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentResponseView<
     '_,
 > {
     fn encode(
@@ -342,10 +300,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommand
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::CompleteCommandResponse,
+    crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentResponseView<
         'static,
     >,
 > {
@@ -371,9 +329,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::ReportActivityResponse,
+    crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
 >
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityResponseView<
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantResponseView<
     '_,
 > {
     fn encode(
@@ -384,136 +342,10 @@ for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityR
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::ReportActivityResponse,
+    crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarResponse,
->
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::HeartbeatResponse,
->
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::HeartbeatResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::GetConfigurationResponse,
->
-for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::agent_event_ingress::v1::GetConfigurationResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationResponseView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantResponseView<
         'static,
     >,
 > {
@@ -540,68 +372,50 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const SIDECAR_SERVICE_SERVICE_NAME: &str = "tilde.agent_event_ingress.v1.SidecarService";
-/// Static [`Spec`](::connectrpc::Spec) for the `LocateConversation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_LOCATE_CONVERSATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/LocateConversation",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `IngestProviderEvent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_INGEST_PROVIDER_EVENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/IngestProviderEvent",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `WatchCommands` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_WATCH_COMMANDS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/WatchCommands",
+/// Static [`Spec`](::connectrpc::Spec) for the `Watch` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_WATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/Watch",
         ::connectrpc::StreamType::ServerStream,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `GetInvocation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_GET_INVOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/GetInvocation",
+/// Static [`Spec`](::connectrpc::Spec) for the `Publish` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_PUBLISH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/Publish",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `AcknowledgeCommand` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_ACKNOWLEDGE_COMMAND_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/AcknowledgeCommand",
+/// Static [`Spec`](::connectrpc::Spec) for the `Hydrate` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_HYDRATE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/Hydrate",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `CompleteCommand` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_COMPLETE_COMMAND_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/CompleteCommand",
+/// Static [`Spec`](::connectrpc::Spec) for the `Forward` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_FORWARD_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/Forward",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `ReportActivity` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_REPORT_ACTIVITY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/ReportActivity",
+/// Static [`Spec`](::connectrpc::Spec) for the `UploadAttachment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_UPLOAD_ATTACHMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/UploadAttachment",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `RegisterSidecar` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_REGISTER_SIDECAR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/RegisterSidecar",
+/// Static [`Spec`](::connectrpc::Spec) for the `DownloadAttachment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_DOWNLOAD_ATTACHMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/DownloadAttachment",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `Heartbeat` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_HEARTBEAT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/Heartbeat",
+/// Static [`Spec`](::connectrpc::Spec) for the `ResolveParticipant` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/ResolveParticipant",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `GetConfiguration` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SIDECAR_SERVICE_GET_CONFIGURATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_event_ingress.v1.SidecarService/GetConfiguration",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// This complete service mounts only on agent-event-ingress. Every call authenticates
-/// an agent deployment token, never a browser session or agent invocation token.
+/// Sidecars dial the gateway; every call authenticates one agent deployment token.
+/// The gateway never opens a connection to a sidecar.
 ///
 /// # Implementing handlers
 ///
@@ -652,76 +466,31 @@ pub const SIDECAR_SERVICE_GET_CONFIGURATION_SPEC: ::connectrpc::Spec = ::connect
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait SidecarService: Send + Sync + 'static {
-    /// Handle the LocateConversation RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn locate_conversation<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::LocateConversationResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Handle the IngestProviderEvent RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn ingest_provider_event<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Handle the WatchCommands RPC.
+    /// Held open for the life of a replica: a snapshot first, then configuration,
+    /// ownership and directives as they change.
     ///
     /// `request` is borrowed from the request body and is valid for the
     /// duration of the call (until the response stream is returned);
     /// message fields are read directly on it (zero-copy). Data the
     /// returned stream needs must be copied out or converted via
     /// `.to_owned_message()`.
-    fn watch_commands(
+    fn watch(
         &self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+            crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             ::connectrpc::ServiceStream<
                 impl ::connectrpc::Encodable<
-                    crate::proto::tilde::agent_event_ingress::v1::WatchCommandsResponse,
+                    crate::proto::tilde::agent_event_ingress::v1::WatchResponse,
                 > + Send + use<Self>,
             >,
         >,
     > + Send;
-    /// Handle the GetInvocation RPC.
+    /// Batched replica frames. The response acknowledges events and answers claims.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -730,21 +499,21 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn get_invocation<'a>(
+    fn publish<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+            crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::GetInvocationResponse,
+                crate::proto::tilde::agent_event_ingress::v1::PublishResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the AcknowledgeCommand RPC.
+    /// Conversation state a replica does not hold in memory, optionally claiming ownership.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -753,21 +522,21 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn acknowledge_command<'a>(
+    fn hydrate<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+            crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandResponse,
+                crate::proto::tilde::agent_event_ingress::v1::HydrateResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the CompleteCommand RPC.
+    /// Execute one ingress call on the replica that owns the conversation.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -776,21 +545,21 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn complete_command<'a>(
+    fn forward<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+            crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::CompleteCommandResponse,
+                crate::proto::tilde::agent_event_ingress::v1::ForwardResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the ReportActivity RPC.
+    /// Handle the UploadAttachment RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -799,21 +568,21 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn report_activity<'a>(
+    fn upload_attachment<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+            crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::ReportActivityResponse,
+                crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the RegisterSidecar RPC.
+    /// Handle the DownloadAttachment RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -822,21 +591,21 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn register_sidecar<'a>(
+    fn download_attachment<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
+            crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarResponse,
+                crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the Heartbeat RPC.
+    /// Handle the ResolveParticipant RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -845,40 +614,17 @@ pub trait SidecarService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn heartbeat<'a>(
+    fn resolve_participant<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
+            crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::HeartbeatResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Handle the GetConfiguration RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn get_configuration<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_event_ingress::v1::GetConfigurationResponse,
+                crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -914,77 +660,19 @@ impl<S: SidecarService> SidecarServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
-            .route_view(
-                SIDECAR_SERVICE_SERVICE_NAME,
-                "LocateConversation",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.locate_conversation(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::LocateConversationResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(SIDECAR_SERVICE_LOCATE_CONVERSATION_SPEC)
-            .route_view(
-                SIDECAR_SERVICE_SERVICE_NAME,
-                "IngestProviderEvent",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.ingest_provider_event(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(SIDECAR_SERVICE_INGEST_PROVIDER_EVENT_SPEC)
             .route_view_server_stream::<
                 _,
                 _,
-                crate::proto::tilde::agent_event_ingress::v1::WatchCommandsResponse,
+                crate::proto::tilde::agent_event_ingress::v1::WatchResponse,
             >(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "WatchCommands",
+                "Watch",
                 ::connectrpc::view_streaming_handler_fn({
                     let svc = ::std::sync::Arc::clone(&self);
                     move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchRequestView<
                                 'static,
                             >,
                         >|
@@ -992,23 +680,23 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.watch_commands(ctx, sreq).await
+                            svc.watch(ctx, sreq).await
                         }
                     }
                 }),
             )
-            .with_spec(SIDECAR_SERVICE_WATCH_COMMANDS_SPEC)
+            .with_spec(SIDECAR_SERVICE_WATCH_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "GetInvocation",
+                "Publish",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishRequestView<
                                 'static,
                             >,
                         >,
@@ -1017,27 +705,27 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_invocation(ctx, sreq)
+                            svc.publish(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::GetInvocationResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::PublishResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_GET_INVOCATION_SPEC)
+            .with_spec(SIDECAR_SERVICE_PUBLISH_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "AcknowledgeCommand",
+                "Hydrate",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateRequestView<
                                 'static,
                             >,
                         >,
@@ -1046,27 +734,27 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.acknowledge_command(ctx, sreq)
+                            svc.hydrate(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::HydrateResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_ACKNOWLEDGE_COMMAND_SPEC)
+            .with_spec(SIDECAR_SERVICE_HYDRATE_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "CompleteCommand",
+                "Forward",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardRequestView<
                                 'static,
                             >,
                         >,
@@ -1075,27 +763,27 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.complete_command(ctx, sreq)
+                            svc.forward(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::CompleteCommandResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::ForwardResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_COMPLETE_COMMAND_SPEC)
+            .with_spec(SIDECAR_SERVICE_FORWARD_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "ReportActivity",
+                "UploadAttachment",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentRequestView<
                                 'static,
                             >,
                         >,
@@ -1104,27 +792,27 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.report_activity(ctx, sreq)
+                            svc.upload_attachment(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::ReportActivityResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_REPORT_ACTIVITY_SPEC)
+            .with_spec(SIDECAR_SERVICE_UPLOAD_ATTACHMENT_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "RegisterSidecar",
+                "DownloadAttachment",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentRequestView<
                                 'static,
                             >,
                         >,
@@ -1133,27 +821,27 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.register_sidecar(ctx, sreq)
+                            svc.download_attachment(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_REGISTER_SIDECAR_SPEC)
+            .with_spec(SIDECAR_SERVICE_DOWNLOAD_ATTACHMENT_SPEC)
             .route_view(
                 SIDECAR_SERVICE_SERVICE_NAME,
-                "Heartbeat",
+                "ResolveParticipant",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatRequestView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantRequestView<
                                 'static,
                             >,
                         >,
@@ -1162,47 +850,18 @@ impl<S: SidecarService> SidecarServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
+                                crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.heartbeat(ctx, sreq)
+                            svc.resolve_participant(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::HeartbeatResponse,
+                                    crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(SIDECAR_SERVICE_HEARTBEAT_SPEC)
-            .route_view(
-                SIDECAR_SERVICE_SERVICE_NAME,
-                "GetConfiguration",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_configuration(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::agent_event_ingress::v1::GetConfigurationResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(SIDECAR_SERVICE_GET_CONFIGURATION_SPEC)
+            .with_spec(SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1257,64 +916,46 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("tilde.agent_event_ingress.v1.SidecarService/")?;
         match method {
-            "LocateConversation" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_LOCATE_CONVERSATION_SPEC),
-                )
-            }
-            "IngestProviderEvent" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_INGEST_PROVIDER_EVENT_SPEC),
-                )
-            }
-            "WatchCommands" => {
+            "Watch" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::server_streaming()
-                        .with_spec(SIDECAR_SERVICE_WATCH_COMMANDS_SPEC),
+                        .with_spec(SIDECAR_SERVICE_WATCH_SPEC),
                 )
             }
-            "GetInvocation" => {
+            "Publish" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_GET_INVOCATION_SPEC),
+                        .with_spec(SIDECAR_SERVICE_PUBLISH_SPEC),
                 )
             }
-            "AcknowledgeCommand" => {
+            "Hydrate" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_ACKNOWLEDGE_COMMAND_SPEC),
+                        .with_spec(SIDECAR_SERVICE_HYDRATE_SPEC),
                 )
             }
-            "CompleteCommand" => {
+            "Forward" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_COMPLETE_COMMAND_SPEC),
+                        .with_spec(SIDECAR_SERVICE_FORWARD_SPEC),
                 )
             }
-            "ReportActivity" => {
+            "UploadAttachment" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_REPORT_ACTIVITY_SPEC),
+                        .with_spec(SIDECAR_SERVICE_UPLOAD_ATTACHMENT_SPEC),
                 )
             }
-            "RegisterSidecar" => {
+            "DownloadAttachment" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_REGISTER_SIDECAR_SPEC),
+                        .with_spec(SIDECAR_SERVICE_DOWNLOAD_ATTACHMENT_SPEC),
                 )
             }
-            "Heartbeat" => {
+            "ResolveParticipant" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_HEARTBEAT_SPEC),
-                )
-            }
-            "GetConfiguration" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SIDECAR_SERVICE_GET_CONFIGURATION_SPEC),
+                        .with_spec(SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC),
                 )
             }
             _ => None,
@@ -1333,201 +974,135 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "LocateConversation" => {
+            "Publish" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
                     >::from_parts(&req, &body);
-                    svc.locate_conversation(ctx, req)
+                    svc.publish(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::LocateConversationResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::PublishResponse,
                         >(format)
                 })
             }
-            "IngestProviderEvent" => {
+            "Hydrate" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
                     >::from_parts(&req, &body);
-                    svc.ingest_provider_event(ctx, req)
+                    svc.hydrate(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::HydrateResponse,
                         >(format)
                 })
             }
-            "GetInvocation" => {
+            "Forward" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
                     >::from_parts(&req, &body);
-                    svc.get_invocation(ctx, req)
+                    svc.forward(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::GetInvocationResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::ForwardResponse,
                         >(format)
                 })
             }
-            "AcknowledgeCommand" => {
+            "UploadAttachment" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
                     >::from_parts(&req, &body);
-                    svc.acknowledge_command(ctx, req)
+                    svc.upload_attachment(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentResponse,
                         >(format)
                 })
             }
-            "CompleteCommand" => {
+            "DownloadAttachment" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
                     >::from_parts(&req, &body);
-                    svc.complete_command(ctx, req)
+                    svc.download_attachment(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::CompleteCommandResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentResponse,
                         >(format)
                 })
             }
-            "ReportActivity" => {
+            "ResolveParticipant" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
                     >::from_parts(&req, &body);
-                    svc.report_activity(ctx, req)
+                    svc.resolve_participant(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::ReportActivityResponse,
-                        >(format)
-                })
-            }
-            "RegisterSidecar" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
-                    >::from_parts(&req, &body);
-                    svc.register_sidecar(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarResponse,
-                        >(format)
-                })
-            }
-            "Heartbeat" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
-                    >::from_parts(&req, &body);
-                    svc.heartbeat(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::HeartbeatResponse,
-                        >(format)
-                })
-            }
-            "GetConfiguration" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-                    >::from_parts(&req, &body);
-                    svc.get_configuration(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::agent_event_ingress::v1::GetConfigurationResponse,
+                            crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
                         >(format)
                 })
             }
@@ -1547,26 +1122,26 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "WatchCommands" => {
+            "Watch" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
                     >(request, format)?;
-                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsRequestView<
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+                        crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
                     >::from_parts(&req, &body);
-                    let resp = svc.watch_commands(ctx, req).await?;
+                    let resp = svc.watch(ctx, req).await?;
                     Ok(
                         resp
                             .map_body(|s| ::connectrpc::dispatcher::codegen::encode_response_stream::<
-                                crate::proto::tilde::agent_event_ingress::v1::WatchCommandsResponse,
+                                crate::proto::tilde::agent_event_ingress::v1::WatchResponse,
                                 _,
                                 _,
                             >(s, format)),
@@ -1627,7 +1202,7 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = SidecarServiceClient::new(conn, config);
-/// let response = client.locate_conversation(request).await?;
+/// let response = client.watch(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -1639,7 +1214,7 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = SidecarServiceClient::new(http, config);
-/// let response = client.locate_conversation(request).await?;
+/// let response = client.watch(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -1649,7 +1224,7 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.locate_conversation(request).await?;
+/// let resp = client.watch(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -1657,7 +1232,7 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.locate_conversation(request).await?.into_owned();
+/// let owned = client.watch(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -1688,124 +1263,31 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the LocateConversation RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/LocateConversation.
-    pub async fn locate_conversation(
+    /// Call the Watch RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Watch.
+    pub async fn watch(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.locate_conversation_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the LocateConversation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn locate_conversation_with_options(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::LocateConversationRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::LocateConversationResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                SIDECAR_SERVICE_LOCATE_CONVERSATION_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the IngestProviderEvent RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/IngestProviderEvent.
-    pub async fn ingest_provider_event(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.ingest_provider_event_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the IngestProviderEvent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn ingest_provider_event_with_options(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::IngestProviderEventRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::IngestProviderEventResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                SIDECAR_SERVICE_INGEST_PROVIDER_EVENT_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the WatchCommands RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/WatchCommands.
-    pub async fn watch_commands(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
     ) -> Result<
         ::connectrpc::client::ServerStream<
             T::ResponseBody,
-            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsResponseView<
+            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<
                 'static,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.watch_commands_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
+        self.watch_with_options(request, ::connectrpc::client::CallOptions::default())
             .await
     }
-    /// Call the WatchCommands RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn watch_commands_with_options(
+    /// Call the Watch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn watch_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::WatchCommandsRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::WatchRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::ServerStream<
             T::ResponseBody,
-            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchCommandsResponseView<
+            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<
                 'static,
             >,
         >,
@@ -1814,42 +1296,38 @@ where
         ::connectrpc::client::call_server_stream(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_WATCH_COMMANDS_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
+                SIDECAR_SERVICE_WATCH_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the GetInvocation RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/GetInvocation.
-    pub async fn get_invocation(
+    /// Call the Publish RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Publish.
+    pub async fn publish(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.get_invocation_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
+        self.publish_with_options(request, ::connectrpc::client::CallOptions::default())
             .await
     }
-    /// Call the GetInvocation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_invocation_with_options(
+    /// Call the Publish RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn publish_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::GetInvocationRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::PublishRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetInvocationResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::PublishResponseView<
                     'static,
                 >,
             >,
@@ -1859,42 +1337,39 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_GET_INVOCATION_SPEC
+                SIDECAR_SERVICE_PUBLISH_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the AcknowledgeCommand RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/AcknowledgeCommand.
-    pub async fn acknowledge_command(
+    /// Call the Hydrate RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Hydrate.
+    pub async fn hydrate(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.acknowledge_command_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
+        self.hydrate_with_options(request, ::connectrpc::client::CallOptions::default())
             .await
     }
-    /// Call the AcknowledgeCommand RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn acknowledge_command_with_options(
+    /// Call the Hydrate RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn hydrate_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::AcknowledgeCommandRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::HydrateRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::AcknowledgeCommandResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HydrateResponseView<
                     'static,
                 >,
             >,
@@ -1904,42 +1379,39 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_ACKNOWLEDGE_COMMAND_SPEC
+                SIDECAR_SERVICE_HYDRATE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the CompleteCommand RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/CompleteCommand.
-    pub async fn complete_command(
+    /// Call the Forward RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Forward.
+    pub async fn forward(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.complete_command_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
+        self.forward_with_options(request, ::connectrpc::client::CallOptions::default())
             .await
     }
-    /// Call the CompleteCommand RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn complete_command_with_options(
+    /// Call the Forward RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn forward_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::CompleteCommandRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::ForwardRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::CompleteCommandResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ForwardResponseView<
                     'static,
                 >,
             >,
@@ -1949,42 +1421,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_COMPLETE_COMMAND_SPEC
+                SIDECAR_SERVICE_FORWARD_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the ReportActivity RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/ReportActivity.
-    pub async fn report_activity(
+    /// Call the UploadAttachment RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/UploadAttachment.
+    pub async fn upload_attachment(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.report_activity_with_options(
+        self.upload_attachment_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ReportActivity RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn report_activity_with_options(
+    /// Call the UploadAttachment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn upload_attachment_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::ReportActivityRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::UploadAttachmentRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ReportActivityResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::UploadAttachmentResponseView<
                     'static,
                 >,
             >,
@@ -1994,42 +1466,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_REPORT_ACTIVITY_SPEC
+                SIDECAR_SERVICE_UPLOAD_ATTACHMENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the RegisterSidecar RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/RegisterSidecar.
-    pub async fn register_sidecar(
+    /// Call the DownloadAttachment RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/DownloadAttachment.
+    pub async fn download_attachment(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.register_sidecar_with_options(
+        self.download_attachment_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the RegisterSidecar RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn register_sidecar_with_options(
+    /// Call the DownloadAttachment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn download_attachment_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::RegisterSidecarRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::DownloadAttachmentRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RegisterSidecarResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::DownloadAttachmentResponseView<
                     'static,
                 >,
             >,
@@ -2039,42 +1511,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_REGISTER_SIDECAR_SPEC
+                SIDECAR_SERVICE_DOWNLOAD_ATTACHMENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the Heartbeat RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Heartbeat.
-    pub async fn heartbeat(
+    /// Call the ResolveParticipant RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/ResolveParticipant.
+    pub async fn resolve_participant(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.heartbeat_with_options(
+        self.resolve_participant_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the Heartbeat RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn heartbeat_with_options(
+    /// Call the ResolveParticipant RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn resolve_participant_with_options(
         &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::HeartbeatRequest,
+        request: crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::HeartbeatResponseView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::ResolveParticipantResponseView<
                     'static,
                 >,
             >,
@@ -2084,52 +1556,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                SIDECAR_SERVICE_HEARTBEAT_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the GetConfiguration RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/GetConfiguration.
-    pub async fn get_configuration(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.get_configuration_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the GetConfiguration RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_configuration_with_options(
-        &self,
-        request: crate::proto::tilde::agent_event_ingress::v1::GetConfigurationRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::GetConfigurationResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                SIDECAR_SERVICE_GET_CONFIGURATION_SPEC
+                SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

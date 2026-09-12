@@ -339,14 +339,6 @@ pub struct SetDeploymentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub failure_mode: ::buffa::EnumValue<super::super::types::v1::SidecarFailureMode>,
-    /// Field 5: `retention_days`
-    #[serde(
-        rename = "retentionDays",
-        alias = "retention_days",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub retention_days: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -358,7 +350,6 @@ impl ::core::fmt::Debug for SetDeploymentRequest {
             .field("mode", &self.mode)
             .field("endpoint_url", &self.endpoint_url)
             .field("failure_mode", &self.failure_mode)
-            .field("retention_days", &self.retention_days)
             .finish()
     }
 }
@@ -419,10 +410,6 @@ impl ::buffa::Message for SetDeploymentRequest {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
-        if self.retention_days != 0u32 {
-            size
-                += 1u64 + ::buffa::types::uint32_encoded_len(self.retention_days) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -450,9 +437,6 @@ impl ::buffa::Message for SetDeploymentRequest {
             if val != 0 {
                 ::buffa::types::put_int32_field(4u32, val, buf);
             }
-        }
-        if self.retention_days != 0u32 {
-            ::buffa::types::put_uint32_field(5u32, self.retention_days, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -502,13 +486,6 @@ impl ::buffa::Message for SetDeploymentRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.retention_days = ::buffa::types::decode_uint32(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -521,7 +498,6 @@ impl ::buffa::Message for SetDeploymentRequest {
         self.mode = ::buffa::EnumValue::from(0);
         self.endpoint_url = ::core::option::Option::None;
         self.failure_mode = ::buffa::EnumValue::from(0);
-        self.retention_days = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }

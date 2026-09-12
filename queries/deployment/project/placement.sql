@@ -1,1 +1,0 @@
-INSERT INTO sidecar_conversations(thread_id,agent_id,last_activity_at) VALUES($1,$2,$3) ON CONFLICT(thread_id,agent_id) DO UPDATE SET last_activity_at=GREATEST(sidecar_conversations.last_activity_at,EXCLUDED.last_activity_at);

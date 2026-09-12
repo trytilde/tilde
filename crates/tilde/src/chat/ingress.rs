@@ -1,11 +1,10 @@
-//! Origin-aware replay receipts tolerate out-of-order gossip. Contiguous positions
-//! compress into ranges; a late event fills a gap instead of being skipped by a
-//! high-water mark. Postgres positions let the same cursor survive retirement.
+//! Origin-aware replay receipts tolerate out-of-order delivery. Contiguous
+//! positions compress into ranges; a late event fills a gap instead of being
+//! skipped by a high-water mark. Postgres positions serve the same cursor at the gateway.
 use super::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::{collections::BTreeMap, pin::Pin};
 pub type ActivityStream = Pin<Box<dyn Stream<Item = Result<(types::Activity, String)>> + Send>>;
 #[derive(Default, Serialize, Deserialize)]
@@ -85,27 +84,7 @@ impl Chat {
             if agent.is_some_and(|id| id != local.agent_id) {
                 return Err(ChatError::Denied);
             }
-            let mut rows = local
-                .client
-                .query::<crate::deployment::runtime::IdRow>(
-                    "SELECT id FROM threads WHERE id>? ORDER BY id LIMIT ?",
-                    vec![json!(after), json!(size + 1)],
-                )
-                .await?;
-            let more = rows.len() > size as usize;
-            if more {
-                rows.pop();
-            }
-            let next = if more {
-                rows.last().map(|r| r.id.clone()).unwrap_or_default()
-            } else {
-                String::new()
-            };
-            let mut threads = vec![];
-            for r in rows {
-                threads.push(local.thread(id(&r.id)?).await?);
-            }
-            return Ok((threads, next));
+            return local.list_threads(after, size as usize).await;
         }
         let cursor = if after.is_empty() {
             None
@@ -142,27 +121,24 @@ impl Chat {
         limit: u32,
     ) -> Result<(Vec<types::Activity>, String, bool)> {
         let mut cursor = Cursor::decode(after)?;
-        let size = if limit == 0 { 100 } else { limit.min(100) };
+        let size = if limit == 0 { 100 } else { limit.min(100) } as usize;
         if let Some(local) = self.local() {
-            self.thread(thread).await?;
-            let ranges =
-                serde_json::to_string(&cursor.origins).map_err(|_| ChatError::Transport)?;
-            let mut rows=local.client.query::<crate::deployment::runtime::EventRow>("SELECT * FROM events e WHERE thread_id=? AND NOT EXISTS(SELECT 1 FROM json_each(?) origins JOIN json_each(origins.value) ranges WHERE origins.key=(CASE WHEN e.origin_agent_id='' THEN e.agent_id ELSE e.origin_agent_id END)||'/'||e.origin_instance_id AND e.origin_sequence BETWEEN json_extract(ranges.value,'$[0]') AND json_extract(ranges.value,'$[1]')) ORDER BY created_at,id LIMIT ?",vec![json!(thread),json!(ranges),json!(size+1)]).await?;
-            let more = rows.len() > size as usize;
-            if more {
-                rows.pop();
-            }
             let mut events = vec![];
-            for row in rows {
-                let value: types::RuntimeEvent = local.open(id(&row.id)?, "event", &row.payload)?;
-                let event = crate::deployment::runtime::messages::event_activity(value);
+            let mut more = false;
+            for event in local.activities(thread).await? {
+                if events.len() == size {
+                    more = true;
+                    break;
+                }
                 if cursor.accept(&event) {
                     events.push(event);
                 }
             }
             return Ok((events, cursor.encode(), more));
         }
-        let page = self.activity_page(thread, cursor.postgres, size).await?;
+        let page = self
+            .activity_page(thread, cursor.postgres, size as u32)
+            .await?;
         cursor.postgres = page.next_sequence;
         let events = page
             .events
@@ -176,18 +152,20 @@ impl Chat {
         if let Some(local) = self.local() {
             let local = local.clone();
             let mut cursor = Cursor::decode(after)?;
-            let mut stream = local
-                .client
-                .subscribe::<crate::deployment::runtime::EventRow>(
-                    "SELECT * FROM events WHERE thread_id=?",
-                    vec![json!(thread)],
-                )
-                .await?;
+            let mut changes = local.changes();
             return Ok(Box::pin(async_stream::try_stream! {
-                while let Some(row)=stream.next().await{let row=row?;
-                    if row.deleted{if !local.exists(thread).await?{Err(ChatError::Archived)?;}continue;}
-                    let value:types::RuntimeEvent=local.open(id(&row.value.id)?,"event",&row.value.payload)?;
-                    let event=crate::deployment::runtime::messages::event_activity(value);if cursor.accept(&event){yield(event,cursor.encode());}
+                loop {
+                    for event in local.activities(thread).await? {
+                        if cursor.accept(&event) { yield (event, cursor.encode()); }
+                    }
+                    loop {
+                        match changes.recv().await {
+                            Ok(changed) if changed == thread => break,
+                            Ok(_) => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => break,
+                            Err(_) => return,
+                        }
+                    }
                 }
             }));
         }

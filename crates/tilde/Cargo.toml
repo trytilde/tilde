@@ -17,8 +17,6 @@ embedded-web = ["dep:rust-embed", "dep:mime_guess"]
 ignored = ["aes", "ghash", "polyval"]
 
 [dependencies]
-rcgen = { version = "0.11.3", features = ["x509-parser"] }
-toml = "0.8"
 rotel = { path = "../../vendor/rotel", default-features = false }
 opentelemetry = "0.32"
 opentelemetry_sdk = { version = "0.32", features = ["trace"] }

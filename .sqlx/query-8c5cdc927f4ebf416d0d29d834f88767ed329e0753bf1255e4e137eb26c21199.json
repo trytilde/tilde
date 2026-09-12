@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sidecar_nodes(agent_id,instance_id,public_url,runtime_url) VALUES($1,$2,$3,$4) ON CONFLICT(agent_id,instance_id) DO UPDATE SET public_url=EXCLUDED.public_url,runtime_url=EXCLUDED.runtime_url,last_seen_at=NOW();\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c5cdc927f4ebf416d0d29d834f88767ed329e0753bf1255e4e137eb26c21199"
+}

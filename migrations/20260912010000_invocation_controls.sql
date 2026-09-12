@@ -14,4 +14,3 @@ DROP TRIGGER chat_input_retry_notify ON chat_inputs;
 ALTER TABLE chat_runs DROP CONSTRAINT chat_runs_status_check;
 ALTER TABLE chat_runs ADD CONSTRAINT chat_runs_status_check CHECK(status IN ('active','suspending','waiting','completed','failed','canceled'));
 
-ALTER TABLE sidecar_commands ADD COLUMN input_id UUID;

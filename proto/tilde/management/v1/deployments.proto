@@ -11,7 +11,7 @@ service DeploymentService {
 }
 message GetDeploymentRequest { string agent_id = 1; }
 message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.SidecarNode nodes = 2; }
-message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.DeploymentMode mode = 2; optional string endpoint_url = 3; tilde.types.v1.SidecarFailureMode failure_mode = 4; uint32 retention_days = 5; }
+message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.DeploymentMode mode = 2; optional string endpoint_url = 3; tilde.types.v1.SidecarFailureMode failure_mode = 4; }
 message SetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
 message IssueDeploymentTokenRequest { string agent_id = 1; }
 message IssueDeploymentTokenResponse { string token = 1 [debug_redact = true]; }

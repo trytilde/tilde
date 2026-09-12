@@ -91,7 +91,7 @@ pub struct Chat {
 #[derive(Clone)]
 pub enum RuntimeStore {
     Postgres(PgPool),
-    Corrosion(Arc<crate::deployment::runtime::Runtime>),
+    Sidecar(Arc<crate::deployment::runtime::Runtime>),
 }
 #[derive(Clone)]
 pub struct Scope {
@@ -142,22 +142,13 @@ impl Chat {
             channels: None,
             deployments: None,
             tokens: crate::iam::tokens::Tokens::sidecar(runtime.clone()),
-            encryption: runtime.encryption.clone(),
+            encryption: Arc::new(
+                Encryption::from_agent_key(runtime.agent_id, crate::deployment::random_secret())
+                    .expect("random agent key"),
+            ),
             callback_url: runtime.callback_url.clone(),
-            store: RuntimeStore::Corrosion(runtime),
+            store: RuntimeStore::Sidecar(runtime),
         }
-    }
-    pub(crate) async fn require_gateway_agent(&self, agent: Uuid) -> Result<()> {
-        let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
-            .fetch_optional(self.pg()?)
-            .await?
-            .ok_or(ChatError::NotFound)?;
-        if row.deployment_mode == "sidecar" {
-            return Err(ChatError::Invalid(
-                "sidecar_required: use this agent's sidecar endpoint".into(),
-            ));
-        }
-        Ok(())
     }
     pub(crate) async fn has_channel(&self, thread: Uuid) -> Result<bool> {
         if let Some(local) = self.local() {
@@ -176,7 +167,7 @@ impl Chat {
     }
     pub(crate) fn local(&self) -> Option<&Arc<crate::deployment::runtime::Runtime>> {
         match &self.store {
-            RuntimeStore::Corrosion(runtime) => Some(runtime),
+            RuntimeStore::Sidecar(runtime) => Some(runtime),
             _ => None,
         }
     }
@@ -234,6 +225,22 @@ impl Chat {
     pub async fn create_thread(&self, r: application::CreateThread) -> Result<types::Thread> {
         if let Some(local) = self.local() {
             return local.create_thread(r).await;
+        }
+        let forwarded: Option<crate::proto::tilde::ingress::v1::CreateThreadResponse> = self
+            .forward_sidecar(
+                id(&r.primary_agent_id)?,
+                None,
+                "CreateThread",
+                &crate::proto::tilde::ingress::v1::CreateThreadRequest {
+                    title: r.title.clone(),
+                    participants: r.participants.clone(),
+                    primary_agent_id: r.primary_agent_id.clone(),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        if let Some(response) = forwarded {
+            return response.thread.into_option().ok_or(ChatError::Transport);
         }
         text(&r.title)?;
         if r.participants.is_empty() || r.participants.len() > 100 {
@@ -396,6 +403,9 @@ impl Chat {
     pub async fn post(&self, r: application::PostMessage) -> Result<types::Message> {
         if let Some(local) = self.local() {
             return local.post(r).await;
+        }
+        if let Some(message) = self.forward_post(&r).await? {
+            return Ok(message);
         }
         if r.text.is_empty() {
             if r.attachment_ids.is_empty() {

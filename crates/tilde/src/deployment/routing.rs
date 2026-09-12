@@ -65,7 +65,7 @@ pub async fn thread(
             if let Some(local) = chat.local() {
                 id(&local.invocation(invocation).await?.thread_id)?
             } else {
-                sqlx::query_file!("../../queries/deployment/invocation_thread.sql", invocation)
+                sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
                     .fetch_optional(chat.pg()?)
                     .await?
                     .ok_or(ChatError::NotFound)?

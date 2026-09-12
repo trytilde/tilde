@@ -187,9 +187,6 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::CreateThreadRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::CreateThreadResponse> + Send + use<'a>>
     {
-        self.0
-            .require_gateway_agent(id(request.primary_agent_id)?)
-            .await?;
         let _ = _ctx;
         Response::ok(management::CreateThreadResponse {
             thread: self
@@ -217,13 +214,6 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::PostMessageRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::PostMessageResponse> + Send + use<'a>>
     {
-        self.0
-            .require_gateway_agent(id(&self
-                .0
-                .thread(id(request.thread_id)?)
-                .await?
-                .primary_agent_id)?)
-            .await?;
         let _ = _ctx;
         Response::ok(management::PostMessageResponse {
             message: self.0.post(request.to_owned_message().into()).await?.into(),
@@ -258,7 +248,6 @@ impl ChatService for Rpc {
         request: ServiceRequest<'_, management::StartRunRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::StartRunResponse> + Send + use<'a>>
     {
-        self.0.require_gateway_agent(id(request.agent_id)?).await?;
         Response::ok(management::StartRunResponse {
             run: self
                 .0

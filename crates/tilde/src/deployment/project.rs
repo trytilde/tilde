@@ -1,542 +1,433 @@
-//! Continuous Corrosion -> Postgres projection. Archive insert, canonical state
-//! and activity commit together. Corrosion deletes are retention, never PG deletes.
-use super::{
-    Deployments,
-    corrosion::Client,
-    runtime::{EventRow, Runtime, RuntimeOptions},
+//! Events published by owning replicas become canonical Postgres state. Receipts
+//! deduplicate replays; ownership generations fence stale replicas; completed
+//! messages are relayed to other sidecar participants of the same room.
+use super::{Deployments, id};
+use crate::proto::tilde::{
+    agent_event_ingress::v1 as wire,
+    types::v1::{self as types, runtime_event::State},
 };
-use crate::proto::tilde::types::v1::{self as types, runtime_event::State};
-use crate::{
-    chat::{self},
-    encryption::{Encryption, SecretBinding},
-    error::Error,
-};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-use buffa::Message;
+use crate::{chat, error::Error};
 use chrono::{DateTime, Utc};
-use futures::StreamExt;
-use secrecy::SecretString;
 use sqlx::{Postgres, Transaction};
-use std::{sync::Arc, time::Duration};
+use std::collections::BTreeMap;
 use uuid::Uuid;
-use zeroize::Zeroizing;
-fn uuid(value: &str) -> Result<Uuid, Error> {
-    super::id(value)
+pub enum Outcome {
+    Projected,
+    Duplicate,
+    Fenced(u64),
 }
 fn at(value: i64) -> Result<DateTime<Utc>, Error> {
     DateTime::from_timestamp_millis(value)
         .ok_or_else(|| Error::Invalid("Invalid event timestamp".into()))
 }
 impl Deployments {
-    /// The remote handle is an adapter for queries/decryption only; it never
-    /// dispatches agent work or becomes a participant owner.
-    pub async fn peer(&self, agent: Uuid) -> Result<Option<Runtime>, Error> {
+    /// Apply one batch in order. Any failure rejects the whole batch; the
+    /// replica resends it and receipts make the replay harmless.
+    pub async fn publish(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+        request: wire::PublishRequest,
+    ) -> Result<wire::PublishResponse, Error> {
+        let mut acks: BTreeMap<Uuid, i64> = BTreeMap::new();
+        let mut claims = vec![];
+        let mut fences: BTreeMap<Uuid, u64> = BTreeMap::new();
+        for frame in request.frames {
+            match frame.frame {
+                Some(wire::upstream::Frame::Heartbeat(heartbeat)) => {
+                    self.heartbeat(agent, instance, &heartbeat).await?
+                }
+                Some(wire::upstream::Frame::Claim(claim)) => claims.push(
+                    self.claim(
+                        agent,
+                        instance,
+                        id(&claim.thread_id)?,
+                        id(&claim.participant_id)?,
+                    )
+                    .await?,
+                ),
+                Some(wire::upstream::Frame::Event(event)) => {
+                    let inner = event
+                        .event
+                        .into_option()
+                        .ok_or_else(|| Error::Invalid("Event frame requires an event".into()))?;
+                    let thread = id(&inner.thread_id)?;
+                    let sequence = inner.origin_sequence;
+                    match self
+                        .project_event(agent, instance, event.generation, inner)
+                        .await?
+                    {
+                        Outcome::Fenced(current) => {
+                            fences.insert(thread, current);
+                        }
+                        Outcome::Projected | Outcome::Duplicate => {
+                            acks.entry(thread)
+                                .and_modify(|s| *s = (*s).max(sequence))
+                                .or_insert(sequence);
+                        }
+                    }
+                }
+                Some(wire::upstream::Frame::DirectiveResult(result)) => {
+                    self.directive_result(
+                        agent,
+                        instance,
+                        id(&result.id)?,
+                        &result.result.into_option().unwrap_or_default(),
+                    )
+                    .await?;
+                }
+                Some(wire::upstream::Frame::Telemetry(telemetry)) => {
+                    self.accept_telemetry(agent, *telemetry).await?
+                }
+                None => {}
+            }
+        }
         let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
             .fetch_one(&self.pool)
             .await?;
-        let secrets = self.open_secrets(
-            agent,
-            row.encrypted_secrets.as_deref().ok_or(Error::Denied)?,
-        )?;
-        for node in sqlx::query_file!("../../queries/deployment/project/node_available.sql", agent)
-            .fetch_all(&self.pool)
-            .await?
-        {
-            let client = Client::new(
-                &format!("{}/corrosion", node.agent_ingress_url.trim_end_matches('/')),
-                secrets.api_token.clone(),
-            )?;
-            if client
-                .query::<serde_json::Value>("SELECT 1 AS ready", vec![])
-                .await
-                .is_err()
-            {
-                continue;
-            }
-            return Ok(Some(Runtime::new(
-                client,
-                RuntimeOptions {
-                    agent_id: agent,
-                    instance_id: node.instance_id,
-                    encryption: Arc::new(Encryption::from_agent_key(
-                        agent,
-                        secrets.encryption_key.clone(),
-                    )?),
-                    signing_key: secrets.signing_key,
-                    host_key: SecretString::from(""),
-                    local_endpoint: String::new(),
-                    callback_url: String::new(),
-                },
-            )));
-        }
-        Ok(None)
+        Ok(wire::PublishResponse {
+            acks: acks
+                .into_iter()
+                .map(|(thread, sequence)| wire::ThreadAck {
+                    thread_id: thread.to_string(),
+                    sequence,
+                    ..Default::default()
+                })
+                .collect(),
+            claims,
+            fences: fences
+                .into_iter()
+                .map(|(thread, generation)| wire::Fence {
+                    thread_id: thread.to_string(),
+                    generation,
+                    ..Default::default()
+                })
+                .collect(),
+            paused: row.paused,
+            agent_generation: row.generation,
+            ..Default::default()
+        })
     }
     pub async fn project_event(
         &self,
-        source: &Runtime,
+        agent: Uuid,
+        instance: Uuid,
+        generation: u64,
         event: types::RuntimeEvent,
-    ) -> Result<(), Error> {
-        if event.archive_origin {
-            return Ok(());
-        }
-        let event_id = uuid(&event.id)?;
-        let agent = uuid(&event.agent_id)?;
-        let origin = uuid(&event.origin_instance_id)?;
-        if agent != source.agent_id || event.origin_sequence < 1 {
+    ) -> Result<Outcome, Error> {
+        let event_id = id(&event.id)?;
+        if id(&event.agent_id)? != agent
+            || id(&event.origin_instance_id)? != instance
+            || event.origin_sequence < 1
+        {
             return Err(Error::Denied);
         }
-        // Replays remain valid after the conversation has been retired and
-        // source dependencies removed. The transactional insert still resolves
-        // races between simultaneous projectors below.
-        let archived_id = [event_id];
-        if sqlx::query_file!(
-            "../../queries/deployment/retention/archived_ids.sql",
-            agent,
-            &archived_id
-        )
-        .fetch_one(&self.pool)
-        .await?
-        .count
-            != 0
-        {
-            return Ok(());
-        }
-        let thread = uuid(&event.thread_id)?;
+        let thread = id(&event.thread_id)?;
         let created = at(event.created_at)?;
-        // Initial dependency hydration precedes the transaction. Peers commit a
-        // complete thread aggregate before exposing its existence row.
-        let bootstrap = if !thread.is_nil()
-            && !sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
-                .fetch_one(&self.pool)
-                .await?
-                .exists
-        {
-            Some(source.thread(thread).await?)
-        } else {
-            None
-        };
-        #[derive(serde::Deserialize)]
-        struct RunOrigin {
-            source_identity_id: String,
-            channel_origin: i64,
-            idempotency_key: String,
-        }
-        let run_origin = if let Some(State::Run(run)) = &event.state {
-            source
-                .client
-                .query::<RunOrigin>(
-                    "SELECT source_identity_id,channel_origin,idempotency_key FROM runs WHERE id=?",
-                    vec![serde_json::json!(run.id)],
-                )
-                .await?
-                .pop()
-        } else {
-            None
-        };
-        let execution = match &event.state {
-            Some(State::Invocation(value)) => Some((**value).clone()),
-            Some(State::Run(value)) if !value.invocation_id.is_empty() => {
-                Some(source.invocation(uuid(&value.invocation_id)?).await?)
-            }
-            Some(State::Goal(_) | State::Task(_) | State::ToolCall(_))
-                if !event.invocation_id.is_empty() =>
-            {
-                Some(source.invocation(uuid(&event.invocation_id)?).await?)
-            }
-            _ => None,
-        };
-        let bytes = Zeroizing::new(event.encode_to_vec());
-        let encoded = SecretString::from(STANDARD.encode(bytes.as_slice()));
-        let sealed = self
-            .encryption
-            .seal(
-                SecretBinding {
-                    resource_kind: "sidecar_archive",
-                    resource_id: event_id,
-                    name: "event",
-                },
-                &encoded,
-            )?
-            .into_bytes();
         let mut tx = self.pool.begin().await?;
+        if !thread.is_nil() {
+            chat::access::lock_thread_route(&mut tx, thread).await?;
+            if let Some(current) =
+                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
+                    .fetch_optional(&mut *tx)
+                    .await?
+            {
+                let current_generation = current.generation as u64;
+                if generation < current_generation
+                    || (generation == current_generation
+                        && (current.owner_instance_id != instance || current.stopped))
+                {
+                    return Ok(Outcome::Fenced(current_generation));
+                }
+            }
+        }
         if sqlx::query_file!(
-            "../../queries/deployment/project/archive.sql",
+            "../../queries/deployment/event_receipt.sql",
             event_id,
             agent,
             (!thread.is_nil()).then_some(thread),
-            origin,
+            instance,
             event.origin_sequence,
-            event.kind,
-            sealed,
             created
         )
         .fetch_optional(&mut *tx)
         .await?
         .is_none()
         {
-            return Ok(());
+            return Ok(Outcome::Duplicate);
         }
-        if let Some(root) = bootstrap {
-            self.project_thread(&mut tx, &root).await?;
+        if !thread.is_nil()
+            && !sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
+                .fetch_one(&mut *tx)
+                .await?
+                .exists
+        {
+            let placeholder = match &event.state {
+                Some(State::Thread(value)) => (**value).clone(),
+                _ => types::Thread {
+                    id: thread.to_string(),
+                    primary_agent_id: agent.to_string(),
+                    ..Default::default()
+                },
+            };
+            self.project_thread(&mut tx, &placeholder).await?;
         }
-        if !thread.is_nil() {
-            sqlx::query_file!("../../queries/chat/thread_lock.sql", thread)
+        match &event.state {
+            Some(State::User(value)) => {
+                sqlx::query_file!(
+                    "../../queries/deployment/project/user.sql",
+                    id(&value.id)?,
+                    value.name
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::Thread(value)) => {
+                if id(&value.id)? != thread {
+                    return Err(Error::Denied);
+                }
+                self.project_thread(&mut tx, value).await?;
+            }
+            Some(State::Participant(value)) => {
+                self.project_participant(&mut tx, thread, value).await?
+            }
+            Some(State::Message(value)) => {
+                if id(&value.thread_id)? != thread {
+                    return Err(Error::Denied);
+                }
+                let key = id(&value.id)?;
+                sqlx::query_file!(
+                    "../../queries/deployment/project/message.sql",
+                    key,
+                    thread,
+                    id(&value.participant_id)?,
+                    value.text,
+                    value.status,
+                    value
+                        .in_reply_to_message_id
+                        .as_deref()
+                        .map(id)
+                        .transpose()?,
+                    created,
+                    value.format,
+                    value.subject
+                )
+                .execute(&mut *tx)
+                .await?;
+                if let Some(delivery) = value.delivery.as_option() {
+                    sqlx::query_file!(
+                        "../../queries/deployment/project/delivery.sql",
+                        key,
+                        id(&delivery.connection_id)?,
+                        delivery.destination,
+                        delivery.external_message_id,
+                        delivery.status
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                }
+                for target in &value.addressed_participant_ids {
+                    sqlx::query_file!(
+                        "../../queries/chat/message_target.sql",
+                        key,
+                        thread,
+                        id(target)?
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                }
+                // The publishing agent already routed this message locally.
+                sqlx::query_file!("../../queries/deployment/project/dispatch.sql", key, agent)
+                    .execute(&mut *tx)
+                    .await?;
+                for attachment in &value.attachments {
+                    self.project_attachment(&mut tx, thread, attachment).await?;
+                    sqlx::query_file!(
+                        "../../queries/chat/attachment_attach.sql",
+                        thread,
+                        key,
+                        id(&attachment.id)?
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                }
+            }
+            Some(State::Goal(value)) => {
+                sqlx::query_file!(
+                    "../../queries/deployment/project/goal.sql",
+                    id(&value.id)?,
+                    thread,
+                    agent,
+                    value.objective,
+                    value.status
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::Task(value)) => {
+                let key = id(&value.id)?;
+                sqlx::query_file!(
+                    "../../queries/deployment/project/task.sql",
+                    key,
+                    thread,
+                    agent,
+                    value.title,
+                    value.status,
+                    value.goal_id.as_deref().map(id).transpose()?,
+                    value.blocked_reason
+                )
+                .execute(&mut *tx)
+                .await?;
+                for dep in &value.dependency_ids {
+                    sqlx::query_file!(
+                        "../../queries/chat/dependency_create.sql",
+                        thread,
+                        agent,
+                        key,
+                        id(dep)?
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                }
+            }
+            Some(State::Run(value)) => {
+                if id(&value.thread_id)? != thread || id(&value.agent_id)? != agent {
+                    return Err(Error::Denied);
+                }
+                sqlx::query_file!(
+                    "../../queries/deployment/project/run.sql",
+                    id(&value.id)?,
+                    thread,
+                    agent,
+                    value.objective,
+                    value.status,
+                    value.goal_id.as_deref().map(id).transpose()?,
+                    value.id
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::Invocation(value)) => {
+                if id(&value.thread_id)? != thread || id(&value.agent_id)? != agent {
+                    return Err(Error::Denied);
+                }
+                sqlx::query_file!(
+                    "../../queries/deployment/project/invocation.sql",
+                    id(&value.id)?,
+                    id(&value.run_id)?,
+                    thread,
+                    agent,
+                    value.status,
+                    created,
+                    if value.lease_expires_at > 0 {
+                        Some(at(value.lease_expires_at)?)
+                    } else {
+                        None
+                    }
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::Assignment(value)) => {
+                // Ownership is decided at the gateway; replicas only echo it.
+                if id(&value.thread_id)? != thread || id(&value.agent_id)? != agent {
+                    return Err(Error::Denied);
+                }
+            }
+            Some(State::Attachment(value)) => {
+                self.project_attachment(&mut tx, thread, value).await?
+            }
+            Some(State::AttachmentSource(value)) => {
+                self.project_attachment(&mut tx, thread, &value.attachment)
+                    .await?
+            }
+            Some(State::ConvertedMessage(value)) => {
+                sqlx::query_file!(
+                    "../../queries/chat/cache_upsert.sql",
+                    agent,
+                    id(&value.message_id)?,
+                    serde_json::from_str::<serde_json::Value>(&value.message_json)
+                        .map_err(|_| Error::Invalid("Invalid converted message".into()))?
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::ToolCall(value)) => {
+                sqlx::query_file!(
+                    "../../queries/deployment/project/tool.sql",
+                    id(&value.id)?,
+                    thread,
+                    id(&event.invocation_id)?,
+                    id(&event.participant_id)?,
+                    value.name,
+                    value.provider_id,
+                    value.status,
+                    value.input_json,
+                    value.output_json,
+                    value.error
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Some(State::ChannelDecision(value)) => {
+                let connection = id(&value.connection_id)?;
+                let identity = id(&value.identity_id)?;
+                let mode = match value.access_mode.as_known() {
+                    Some(types::ChannelAccessMode::Public) => "public",
+                    Some(types::ChannelAccessMode::Disabled) => "disabled",
+                    _ => "private",
+                };
+                sqlx::query_file!(
+                    "../../queries/deployment/project/user.sql",
+                    identity,
+                    value.value
+                )
+                .execute(&mut *tx)
+                .await?;
+                sqlx::query_file!(
+                    "../../queries/channel_access/identity_upsert.sql",
+                    identity,
+                    connection,
+                    chat::access::identity::kind_name(
+                        value.identity_type.as_known().ok_or(Error::Denied)?
+                    ),
+                    value.value
+                )
                 .fetch_one(&mut *tx)
                 .await?;
-        }
-        let assignment = if thread.is_nil() {
-            None
-        } else {
-            sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
-                .fetch_optional(&mut *tx)
-                .await?
-        };
-        // The receiving replica is not necessarily the execution owner. Fence
-        // using the invocation's immutable assignment generation, never the
-        // replica that happened to accept and replicate this callback.
-        let current = execution.as_ref().is_none_or(|v| {
-            assignment.as_ref().is_none_or(|a| {
-                v.owner_instance_id == a.owner_instance_id.to_string()
-                    && v.generation == a.generation as u64
-                    && !a.stopped
-            })
-        });
-        let entity = match &event.state {
-            Some(State::User(v)) => Some(("user", v.id.as_str())),
-            Some(State::Thread(v)) => Some(("thread", v.id.as_str())),
-            Some(State::Participant(v)) => Some(("participant", v.id.as_str())),
-            Some(State::Message(v)) => Some(("message", v.id.as_str())),
-            Some(State::Run(v)) => Some(("run", v.id.as_str())),
-            Some(State::Invocation(v)) => Some(("invocation", v.id.as_str())),
-            Some(State::Goal(v)) => Some(("goal", v.id.as_str())),
-            Some(State::Task(v)) => Some(("task", v.id.as_str())),
-            Some(State::ToolCall(v)) => Some(("tool", v.id.as_str())),
-            Some(State::Attachment(v)) => Some(("attachment", v.id.as_str())),
-            Some(State::ConvertedMessage(v)) => Some(("converted", v.message_id.as_str())),
-            _ => None,
-        };
-        let current = if current {
-            if let Some((kind, key)) = entity {
                 sqlx::query_file!(
-                    "../../queries/deployment/project/version.sql",
+                    "../../queries/channel_access/audit.sql",
+                    connection,
+                    value.event_id,
                     agent,
-                    kind,
-                    uuid(key)?,
-                    origin,
-                    event.origin_sequence,
-                    created
+                    identity,
+                    mode,
+                    value.accepted
                 )
-                .fetch_optional(&mut *tx)
-                .await?
-                .is_some()
-            } else {
-                true
+                .execute(&mut *tx)
+                .await?;
             }
-        } else {
-            false
-        };
-        if current {
-            match &event.state {
-                Some(State::User(value)) => {
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/user.sql",
-                        uuid(&value.id)?,
-                        value.name
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::Thread(value)) => {
-                    if uuid(&value.id)? != thread {
-                        return Err(Error::Denied);
-                    }
-                    self.project_thread(&mut tx, value).await?;
-                }
-                Some(State::Participant(value)) => {
-                    self.project_participant(&mut tx, thread, value).await?
-                }
-                Some(State::Message(value)) => {
-                    if uuid(&value.thread_id)? != thread {
-                        return Err(Error::Denied);
-                    }
-                    let key = uuid(&value.id)?;
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/message.sql",
-                        key,
-                        thread,
-                        uuid(&value.participant_id)?,
-                        value.text,
-                        value.status,
-                        value
-                            .in_reply_to_message_id
-                            .as_deref()
-                            .map(uuid)
-                            .transpose()?,
-                        created,
-                        value.format,
-                        value.subject
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                    if let Some(delivery) = value.delivery.as_option() {
-                        sqlx::query_file!(
-                            "../../queries/deployment/project/delivery.sql",
-                            key,
-                            uuid(&delivery.connection_id)?,
-                            delivery.destination,
-                            delivery.external_message_id,
-                            delivery.status
-                        )
-                        .execute(&mut *tx)
-                        .await?;
-                    }
-                    // Imported messages already belong to the sidecar's durable
-                    // dispatch path. Archival must never re-invoke historical input.
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/dispatch_ready.sql",
-                        thread,
-                        agent,
-                        key
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                    for attachment in &value.attachments {
-                        self.project_attachment(&mut tx, thread, attachment).await?;
-                        sqlx::query_file!(
-                            "../../queries/chat/attachment_attach.sql",
-                            thread,
-                            key,
-                            uuid(&attachment.id)?
-                        )
-                        .execute(&mut *tx)
-                        .await?;
-                    }
-                }
-                Some(State::Goal(value)) => {
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/goal.sql",
-                        uuid(&value.id)?,
-                        thread,
-                        agent,
-                        value.objective,
-                        value.status
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::Task(value)) => {
-                    let key = uuid(&value.id)?;
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/task.sql",
-                        key,
-                        thread,
-                        agent,
-                        value.title,
-                        value.status,
-                        value.goal_id.as_deref().map(uuid).transpose()?,
-                        value.blocked_reason
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                    for dep in &value.dependency_ids {
-                        sqlx::query_file!(
-                            "../../queries/chat/dependency_create.sql",
-                            thread,
-                            agent,
-                            key,
-                            uuid(dep)?
-                        )
-                        .execute(&mut *tx)
-                        .await?;
-                    }
-                }
-                Some(State::Run(value)) => {
-                    if uuid(&value.thread_id)? != thread || uuid(&value.agent_id)? != agent {
-                        return Err(Error::Denied);
-                    }
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/run.sql",
-                        uuid(&value.id)?,
-                        thread,
-                        agent,
-                        value.objective,
-                        value.status,
-                        value.goal_id.as_deref().map(uuid).transpose()?,
-                        value.id
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                    if let Some(origin) = &run_origin {
-                        sqlx::query_file!(
-                            "../../queries/deployment/project/run_origin.sql",
-                            uuid(&value.id)?,
-                            if origin.source_identity_id.is_empty() {
-                                None
-                            } else {
-                                Some(uuid(&origin.source_identity_id)?)
-                            },
-                            origin.channel_origin != 0,
-                            origin.idempotency_key
-                        )
-                        .execute(&mut *tx)
-                        .await?;
-                        if let Ok(message) = uuid(&origin.idempotency_key) {
-                            sqlx::query_file!(
-                                "../../queries/deployment/project/dispatch_ready.sql",
-                                thread,
-                                agent,
-                                message
-                            )
-                            .execute(&mut *tx)
-                            .await?;
-                        }
-                    }
-                }
-                Some(State::Invocation(value)) => {
-                    if uuid(&value.thread_id)? != thread || uuid(&value.agent_id)? != agent {
-                        return Err(Error::Denied);
-                    }
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/invocation.sql",
-                        uuid(&value.id)?,
-                        uuid(&value.run_id)?,
-                        thread,
-                        agent,
-                        value.status,
-                        created,
-                        if value.lease_expires_at > 0 {
-                            Some(at(value.lease_expires_at)?)
-                        } else {
-                            None
-                        }
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::Assignment(value)) => {
-                    if uuid(&value.thread_id)? != thread || uuid(&value.agent_id)? != agent {
-                        return Err(Error::Denied);
-                    }
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/assignment.sql",
-                        thread,
-                        uuid(&value.participant_id)?,
-                        agent,
-                        uuid(&value.owner_instance_id)?,
-                        value.generation as i64,
-                        value.stopped
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::Attachment(value)) => {
-                    self.project_attachment(&mut tx, thread, value).await?;
-                    self.queue_attachment(&mut tx, agent, thread, value).await?;
-                }
-                Some(State::AttachmentSource(value)) => {
-                    self.project_attachment(&mut tx, thread, &value.attachment)
-                        .await?;
-                    self.queue_attachment(&mut tx, agent, thread, &value.attachment)
-                        .await?;
-                }
-                Some(State::ConvertedMessage(value)) => {
-                    sqlx::query_file!(
-                        "../../queries/chat/cache_upsert.sql",
-                        agent,
-                        uuid(&value.message_id)?,
-                        serde_json::from_str::<serde_json::Value>(&value.message_json)
-                            .map_err(|_| Error::Invalid("Invalid converted message".into()))?
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::ToolCall(value)) => {
-                    let invocation = uuid(&event.invocation_id)?;
-                    let participant = uuid(&event.participant_id)?;
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/tool.sql",
-                        uuid(&value.id)?,
-                        thread,
-                        invocation,
-                        participant,
-                        value.name,
-                        value.provider_id,
-                        value.status,
-                        value.input_json,
-                        value.output_json,
-                        value.error
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::ChannelDecision(value)) => {
-                    let connection = uuid(&value.connection_id)?;
-                    let identity = uuid(&value.identity_id)?;
-                    let mode = match value.access_mode.as_known() {
-                        Some(types::ChannelAccessMode::Public) => "public",
-                        Some(types::ChannelAccessMode::Disabled) => "disabled",
-                        _ => "private",
-                    };
-                    sqlx::query_file!(
-                        "../../queries/deployment/project/user.sql",
-                        identity,
-                        value.value
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                    sqlx::query_file!(
-                        "../../queries/channel_access/identity_upsert.sql",
-                        identity,
-                        connection,
-                        crate::chat::access::identity::kind_name(
-                            value.identity_type.as_known().ok_or(Error::Denied)?
-                        ),
-                        value.value
-                    )
-                    .fetch_one(&mut *tx)
-                    .await?;
-                    sqlx::query_file!(
-                        "../../queries/channel_access/audit.sql",
-                        connection,
-                        value.event_id,
-                        agent,
-                        identity,
-                        mode,
-                        value.accepted
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-                Some(State::Activity(_) | State::Typing(_)) => {}
-                None => return Err(Error::Invalid("Event requires typed state".into())),
-            }
+            Some(State::Activity(_) | State::Typing(_)) => {}
+            None => return Err(Error::Invalid("Event requires typed state".into())),
         }
         if !thread.is_nil() {
-            sqlx::query_file!(
-                "../../queries/deployment/project/placement.sql",
-                thread,
-                agent,
-                created
-            )
-            .execute(&mut *tx)
-            .await?;
             let activity = super::runtime::messages::event_activity(event);
             chat::audit::append(&mut tx, thread, activity).await?;
         }
         tx.commit().await?;
-        Ok(())
+        Ok(Outcome::Projected)
     }
     async fn project_thread(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         thread: &types::Thread,
     ) -> Result<(), Error> {
-        let key = uuid(&thread.id)?;
+        let key = id(&thread.id)?;
         sqlx::query_file!(
             "../../queries/deployment/project/thread.sql",
             key,
             thread.title,
-            uuid(&thread.primary_agent_id)?
+            id(&thread.primary_agent_id)?
         )
         .execute(&mut **tx)
         .await?;
@@ -544,9 +435,9 @@ impl Deployments {
             sqlx::query_file!(
                 "../../queries/chat/channel_thread_bind.sql",
                 key,
-                uuid(&channel.connection_id)?,
+                id(&channel.connection_id)?,
                 channel.external_id,
-                uuid(&thread.primary_agent_id)?
+                id(&thread.primary_agent_id)?
             )
             .execute(&mut **tx)
             .await?;
@@ -565,7 +456,7 @@ impl Deployments {
         if let Some(user) = value.user_id.as_deref() {
             sqlx::query_file!(
                 "../../queries/deployment/project/user.sql",
-                uuid(user)?,
+                id(user)?,
                 value.name
             )
             .execute(&mut **tx)
@@ -573,10 +464,10 @@ impl Deployments {
         }
         sqlx::query_file!(
             "../../queries/deployment/project/participant.sql",
-            uuid(&value.id)?,
+            id(&value.id)?,
             thread,
-            value.user_id.as_deref().map(uuid).transpose()?,
-            value.agent_id.as_deref().map(uuid).transpose()?,
+            value.user_id.as_deref().map(id).transpose()?,
+            value.agent_id.as_deref().map(id).transpose()?,
             value.active
         )
         .execute(&mut **tx)
@@ -589,12 +480,12 @@ impl Deployments {
         thread: Uuid,
         value: &types::Attachment,
     ) -> Result<(), Error> {
-        if uuid(&value.thread_id)? != thread {
+        if id(&value.thread_id)? != thread {
             return Err(Error::Denied);
         }
         sqlx::query_file!(
             "../../queries/deployment/project/attachment.sql",
-            uuid(&value.id)?,
+            id(&value.id)?,
             thread,
             value.filename,
             value.media_type,
@@ -605,128 +496,65 @@ impl Deployments {
         .await?;
         Ok(())
     }
-    async fn queue_attachment(
-        &self,
-        tx: &mut Transaction<'_, Postgres>,
-        agent: Uuid,
-        thread: Uuid,
-        value: &types::Attachment,
-    ) -> Result<(), Error> {
-        let key = uuid(&value.id)?;
-        let outbox = Uuid::new_v5(&key, b"s3-upload");
-        let transfer = types::AttachmentTransfer {
-            attachment_id: value.id.clone(),
-            thread_id: thread.to_string(),
-            ..Default::default()
-        };
-        let payload = self.seal_record(outbox, "attachment", &transfer)?;
-        sqlx::query_file!(
-            "../../queries/deployment/attachment_outbox.sql",
-            outbox,
-            agent,
-            payload,
-            key
-        )
-        .execute(&mut **tx)
-        .await?;
-        Ok(())
-    }
-    pub async fn replicate_agent(
-        &self,
-        agent: Uuid,
-        mut shutdown: tokio::sync::watch::Receiver<bool>,
-    ) {
-        loop {
-            if *shutdown.borrow() {
-                return;
-            }
-            if let Ok(Some(source)) = self.peer(agent).await {
-                let command_source = source.clone();
-                let command_service = self.clone();
-                let command_shutdown = shutdown.clone();
-                let mut command_task = tokio::spawn(async move {
-                    command_service
-                        .replicate_commands(&command_source, command_shutdown)
-                        .await
-                });
-                let telemetry_service = self.clone();
-                let telemetry_source = source.clone();
-                let telemetry_shutdown = shutdown.clone();
-                let mut telemetry_task = tokio::spawn(async move {
-                    telemetry_service
-                        .replicate_telemetry(&telemetry_source, telemetry_shutdown)
-                        .await
-                });
-                if let Ok(mut events) = source
-                    .client
-                    .subscribe::<EventRow>(
-                        "SELECT * FROM events ORDER BY origin_instance_id,origin_sequence",
-                        vec![],
-                    )
-                    .await
-                {
-                    let mut deferred = std::collections::VecDeque::new();
-                    let mut retry = tokio::time::interval(Duration::from_secs(1));
-                    loop {
-                        tokio::select! {
-                            _=shutdown.changed()=>{command_task.abort();telemetry_task.abort();return;},
-                            _=&mut command_task=>break,
-                            _=&mut telemetry_task=>break,
-                            _=retry.tick(),if !deferred.is_empty()=>{
-                                let batch=deferred.iter().take(25).copied().collect::<Vec<Uuid>>();
-                                for key in batch {
-                                    deferred.pop_front();
-                                    let result=async {
-                                        let row=source.client.query::<super::runtime::Payload>("SELECT payload FROM events WHERE id=?",vec![serde_json::json!(key)]).await?.pop().ok_or(Error::NotFound)?;
-                                        let event=source.open(key,"event",&row.payload)?;
-                                        self.project_event(&source,event).await
-                                    }.await;
-                                    if result.is_err(){deferred.push_back(key);}
-                                }
-                            },
-                            event=events.next()=>match event{
-                                Some(Ok(row)) if !row.deleted=>{
-                                    let result=async{let event=source.open::<types::RuntimeEvent>(uuid(&row.value.id)?,"event",&row.value.payload)?;self.project_event(&source,event).await}.await;
-                                    if let Err(error)=result{tracing::warn!(agent_id=%agent,error=%error,"Sidecar projection awaits dependencies or retry");if let Ok(key)=uuid(&row.value.id)&& !deferred.contains(&key){deferred.push_back(key);}}
-                                },Some(Ok(_))=>{},_=>break,
-                            }
-                        }
-                    }
-                }
-                command_task.abort();
-                telemetry_task.abort();
-            }
-            tokio::select! {_=shutdown.changed()=>return,_=tokio::time::sleep(Duration::from_secs(1))=>{}}
+    /// Hand completed messages to the other sidecar agents in a room.
+    pub async fn relay_pending(&self) -> Result<bool, Error> {
+        let rows = sqlx::query_file!("../../queries/deployment/relay_pending.sql")
+            .fetch_all(&self.pool)
+            .await?;
+        let more = rows.len() == 50;
+        let chat = self.chat();
+        for row in rows {
+            let Some((instance, generation)) =
+                self.owner_for(row.agent_id, Some(row.thread_id)).await?
+            else {
+                continue;
+            };
+            let relay = wire::RelayMessage {
+                thread: chat.thread(row.thread_id).await?.into(),
+                message: chat.message(row.message_id).await?.into(),
+                ..Default::default()
+            };
+            self.direct(
+                row.agent_id,
+                instance,
+                Some(row.thread_id),
+                generation,
+                relay.into(),
+            )
+            .await?;
+            sqlx::query_file!(
+                "../../queries/deployment/project/dispatch.sql",
+                row.message_id,
+                row.agent_id
+            )
+            .execute(&self.pool)
+            .await?;
         }
+        Ok(more)
     }
-    pub async fn worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    pub async fn relay_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
         let notifications = crate::database::notifications::Notifications::default();
-        let mut tasks = tokio::task::JoinSet::new();
-        let mut agents = std::collections::BTreeSet::new();
-        let mut changes = match notifications
-            .subscribe(&self.pool, "tilde_sidecar_configuration")
+        let mut changed = match notifications
+            .subscribe(&self.pool, "tilde_chat_activity")
             .await
         {
             Ok(v) => v,
             Err(_) => return,
         };
-        changes.mark_changed();
+        changed.mark_changed();
+        let mut retry = None;
         loop {
-            tokio::select! {
-                _=shutdown.changed()=>break,
-                _=tasks.join_next(),if !tasks.is_empty()=>{},
-                value=changes.changed()=>{
-                    if value.is_err(){break;}
-                    if let Ok(rows)=sqlx::query_file!("../../queries/deployment/project/candidates.sql").fetch_all(&self.pool).await{for row in rows{if let Ok(Some(peer))=self.peer(row.id).await
-                        && let Ok(mut configuration)=self.configuration(row.id).await {
-                            let _=peer.configure(&configuration).await;
-                            super::runtime::providers::clear_secrets(&mut configuration);
-                        }
-                    if agents.insert(row.id){let service=self.clone();let rx=shutdown.clone();tasks.spawn(async move{service.replicate_agent(row.id,rx).await;});}}}
+            tokio::select! {_=shutdown.changed()=>return,_=changed.changed()=>{},_=async{if let Some(at)=retry{tokio::time::sleep_until(at).await}else{std::future::pending().await}}=>{}}
+            changed.borrow_and_update();
+            retry = None;
+            match self.relay_pending().await {
+                Ok(true) => changed.mark_changed(),
+                Ok(false) => {}
+                Err(_) => {
+                    tracing::warn!("Sidecar message relay will retry");
+                    retry = Some(tokio::time::Instant::now() + std::time::Duration::from_secs(1));
                 }
             }
         }
-        tasks.abort_all();
-        while tasks.join_next().await.is_some() {}
     }
 }

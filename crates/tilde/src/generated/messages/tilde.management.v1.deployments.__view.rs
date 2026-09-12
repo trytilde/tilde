@@ -620,8 +620,6 @@ pub struct SetDeploymentRequestView<'a> {
     pub failure_mode: ::buffa::EnumValue<
         super::super::super::super::types::v1::SidecarFailureMode,
     >,
-    /// Field 5: `retention_days`
-    pub retention_days: u32,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for SetDeploymentRequestView<'a> {
@@ -684,13 +682,6 @@ impl<'a> ::buffa::MessageView<'a> for SetDeploymentRequestView<'a> {
                     ::buffa::types::decode_int32(&mut cur)?,
                 );
             }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                view.retention_days = ::buffa::types::decode_uint32(&mut cur)?;
-            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -723,7 +714,6 @@ impl<'a> ::buffa::MessageView<'a> for SetDeploymentRequestView<'a> {
             mode: self.mode,
             endpoint_url: self.endpoint_url.map(|s| s.to_string()),
             failure_mode: self.failure_mode,
-            retention_days: self.retention_days,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -753,10 +743,6 @@ impl<'a> ::buffa::ViewEncode<'a> for SetDeploymentRequestView<'a> {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
-        if self.retention_days != 0u32 {
-            size
-                += 1u64 + ::buffa::types::uint32_encoded_len(self.retention_days) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -785,9 +771,6 @@ impl<'a> ::buffa::ViewEncode<'a> for SetDeploymentRequestView<'a> {
             if val != 0 {
                 ::buffa::types::put_int32_field(4u32, val, buf);
             }
-        }
-        if self.retention_days != 0u32 {
-            ::buffa::types::put_uint32_field(5u32, self.retention_days, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -821,13 +804,6 @@ impl<'__a> ::serde::Serialize for SetDeploymentRequestView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.failure_mode) {
             __map.serialize_entry("failureMode", &self.failure_mode)?;
-        }
-        if !::buffa::json_helpers::skip_if::is_zero_u32(&self.retention_days) {
-            __map
-                .serialize_entry(
-                    "retentionDays",
-                    &::buffa::json_helpers::ProtoJson(&self.retention_days),
-                )?;
         }
         __map.end()
     }
@@ -947,11 +923,6 @@ impl SetDeploymentRequestOwnedView {
         &self,
     ) -> ::buffa::EnumValue<super::super::super::super::types::v1::SidecarFailureMode> {
         self.0.reborrow().failure_mode
-    }
-    /// Field 5: `retention_days`
-    #[must_use]
-    pub fn retention_days(&self) -> u32 {
-        self.0.reborrow().retention_days
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<SetDeploymentRequestView<'static>>>

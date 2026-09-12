@@ -15,7 +15,6 @@ type Fields = {
   mode: DeploymentMode;
   endpointUrl: string;
   failureMode: SidecarFailureMode;
-  retentionDays: number;
 };
 export function AgentDeployment({ agentId, paused }: { agentId: string; paused: boolean }) {
   const form = useForm<Fields>({
@@ -23,7 +22,6 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
       mode: DeploymentMode.GATEWAY,
       endpointUrl: "",
       failureMode: SidecarFailureMode.REASSIGN,
-      retentionDays: 7,
     },
   });
   const [loadedMode, setLoadedMode] = useState<DeploymentMode>();
@@ -48,7 +46,6 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
           mode: deployment.mode,
           endpointUrl: deployment.endpointUrl ?? "",
           failureMode: deployment.failureMode,
-          retentionDays: deployment.retentionDays,
         });
         setLoadedMode(deployment.mode);
         setNodes(nodes);
@@ -157,32 +154,6 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
                   </TabsList>
                 </Tabs>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="retention-days">Sidecar retention (days)</Label>
-                <Input
-                  id="retention-days"
-                  type="number"
-                  min={1}
-                  max={4294967295}
-                  step={1}
-                  {...form.register("retentionDays", {
-                    valueAsNumber: true,
-                    required: true,
-                    min: 1,
-                    max: 4294967295,
-                    validate: Number.isInteger,
-                  })}
-                />
-                {form.formState.errors.retentionDays && (
-                  <p role="alert" className="text-sm text-destructive">
-                    Enter a whole number of days between 1 and 4294967295.
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Conversations leave sidecar storage after this many inactive days. Full history
-                  stays available through the gateway, and retired conversations continue there.
-                </p>
-              </div>
             </>
           )}
           <Button type="submit" disabled={form.formState.isSubmitting}>
@@ -212,7 +183,7 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
                   spellCheck={false}
                   onFocus={(event) => event.currentTarget.select()}
                 />
-                <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">{`ENGINE_SIDECAR_GATEWAY_URL=https://gateway.example:8083\nENGINE_SIDECAR_AGENT_TOKENS=<deployment-token>\nENGINE_SIDECAR_AGENT_ENDPOINTS=${agentId}=http://127.0.0.1:3000\nENGINE_SIDECAR_ADVERTISE_ADDRESS=<private-ip>\ntilde-sidecar`}</pre>
+                <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">{`ENGINE_SIDECAR_GATEWAY_URL=https://gateway.example\nENGINE_SIDECAR_AGENT_TOKENS=<deployment-token>\nENGINE_SIDECAR_AGENT_ENDPOINTS=${agentId}=http://127.0.0.1:3000\ntilde-sidecar`}</pre>
               </>
             )}
           </div>

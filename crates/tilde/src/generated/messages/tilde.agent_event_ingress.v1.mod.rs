@@ -19,54 +19,185 @@ pub mod __buffa {
         #[allow(unused_imports)]
         use super::*;
         include!("tilde.agent_event_ingress.v1.sidecars.__view.rs");
+        pub mod oneof {
+            #[allow(unused_imports)]
+            use super::*;
+            include!("tilde.agent_event_ingress.v1.sidecars.__view_oneof.rs");
+        }
+    }
+    pub mod oneof {
+        #[allow(unused_imports)]
+        use super::*;
+        include!("tilde.agent_event_ingress.v1.sidecars.__oneof.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
-        reg.register_json_any(super::__REGISTER_SIDECAR_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REGISTER_SIDECAR_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__HEARTBEAT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__HEARTBEAT_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_CONFIGURATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WATCH_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WATCH_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SNAPSHOT_JSON_ANY);
+        reg.register_json_any(super::__PING_JSON_ANY);
+        reg.register_json_any(super::__DIRECTIVE_JSON_ANY);
+        reg.register_json_any(super::__RELAY_MESSAGE_JSON_ANY);
+        reg.register_json_any(super::__INGRESS_CALL_JSON_ANY);
+        reg.register_json_any(super::__CALL_RESULT_JSON_ANY);
+        reg.register_json_any(super::__PROVIDER_EVENT_DIRECTIVE_JSON_ANY);
+        reg.register_json_any(super::__RECOVER_RUN_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPSTREAM_JSON_ANY);
+        reg.register_json_any(super::__HEARTBEAT_JSON_ANY);
+        reg.register_json_any(super::__CLAIM_JSON_ANY);
+        reg.register_json_any(super::__EVENT_JSON_ANY);
+        reg.register_json_any(super::__DIRECTIVE_RESULT_JSON_ANY);
+        reg.register_json_any(super::__TELEMETRY_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__THREAD_ACK_JSON_ANY);
+        reg.register_json_any(super::__CLAIM_RESULT_JSON_ANY);
+        reg.register_json_any(super::__FENCE_JSON_ANY);
+        reg.register_json_any(super::__HYDRATE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__EXTERNAL_KEY_JSON_ANY);
+        reg.register_json_any(super::__HYDRATE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FORWARD_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__FORWARD_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_ATTACHMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_ATTACHMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DOWNLOAD_ATTACHMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DOWNLOAD_ATTACHMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RESOLVE_PARTICIPANT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RESOLVE_PARTICIPANT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREDENTIAL_FIELD_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_CONFIGURATION_JSON_ANY);
         reg.register_json_any(super::__GET_CONFIGURATION_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_GRANT_JSON_ANY);
-        reg.register_json_any(super::__WATCH_COMMANDS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_INVOCATION_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_INVOCATION_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__COMPLETE_COMMAND_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__COMPLETE_COMMAND_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__REPORT_ACTIVITY_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REPORT_ACTIVITY_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LOCATE_CONVERSATION_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LOCATE_CONVERSATION_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__INGEST_PROVIDER_EVENT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__INGEST_PROVIDER_EVENT_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
-pub use self::__buffa::view::RegisterSidecarRequestView;
+pub use self::__buffa::view::WatchRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::RegisterSidecarRequestOwnedView;
+pub use self::__buffa::view::WatchRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::RegisterSidecarResponseView;
+pub use self::__buffa::view::WatchResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::RegisterSidecarResponseOwnedView;
+pub use self::__buffa::view::WatchResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::HeartbeatRequestView;
+pub use self::__buffa::view::SnapshotView;
 #[doc(inline)]
-pub use self::__buffa::view::HeartbeatRequestOwnedView;
+pub use self::__buffa::view::SnapshotOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::HeartbeatResponseView;
+pub use self::__buffa::view::PingView;
 #[doc(inline)]
-pub use self::__buffa::view::HeartbeatResponseOwnedView;
+pub use self::__buffa::view::PingOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetConfigurationRequestView;
+pub use self::__buffa::view::DirectiveView;
 #[doc(inline)]
-pub use self::__buffa::view::GetConfigurationRequestOwnedView;
+pub use self::__buffa::view::DirectiveOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayMessageView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayMessageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::IngressCallView;
+#[doc(inline)]
+pub use self::__buffa::view::IngressCallOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CallResultView;
+#[doc(inline)]
+pub use self::__buffa::view::CallResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderEventDirectiveView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderEventDirectiveOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RecoverRunView;
+#[doc(inline)]
+pub use self::__buffa::view::RecoverRunOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpstreamView;
+#[doc(inline)]
+pub use self::__buffa::view::UpstreamOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HeartbeatView;
+#[doc(inline)]
+pub use self::__buffa::view::HeartbeatOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EventView;
+#[doc(inline)]
+pub use self::__buffa::view::EventOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DirectiveResultView;
+#[doc(inline)]
+pub use self::__buffa::view::DirectiveResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TelemetryView;
+#[doc(inline)]
+pub use self::__buffa::view::TelemetryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ThreadAckView;
+#[doc(inline)]
+pub use self::__buffa::view::ThreadAckOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimResultView;
+#[doc(inline)]
+pub use self::__buffa::view::ClaimResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FenceView;
+#[doc(inline)]
+pub use self::__buffa::view::FenceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HydrateRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::HydrateRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ExternalKeyView;
+#[doc(inline)]
+pub use self::__buffa::view::ExternalKeyOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HydrateResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::HydrateResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ForwardRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ForwardRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ForwardResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ForwardResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadAttachmentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadAttachmentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadAttachmentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadAttachmentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DownloadAttachmentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DownloadAttachmentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DownloadAttachmentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DownloadAttachmentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ResolveParticipantRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ResolveParticipantRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ResolveParticipantResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ResolveParticipantResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CredentialFieldView;
 #[doc(inline)]
@@ -83,61 +214,5 @@ pub use self::__buffa::view::GetConfigurationResponseOwnedView;
 pub use self::__buffa::view::IdentityGrantView;
 #[doc(inline)]
 pub use self::__buffa::view::IdentityGrantOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::WatchCommandsRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::WatchCommandsRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::WatchCommandsResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::WatchCommandsResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetInvocationRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetInvocationRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetInvocationResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetInvocationResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AcknowledgeCommandRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::AcknowledgeCommandRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AcknowledgeCommandResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CompleteCommandRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::CompleteCommandRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CompleteCommandResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::CompleteCommandResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ReportActivityRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ReportActivityRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ReportActivityResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ReportActivityResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::LocateConversationRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::LocateConversationRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::LocateConversationResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::LocateConversationResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::IngestProviderEventRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::IngestProviderEventRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::IngestProviderEventResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::IngestProviderEventResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

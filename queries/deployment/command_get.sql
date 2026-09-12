@@ -1,1 +1,0 @@
-SELECT c.id,c.generation,c.agent_id,c.thread_id,c.participant_id,c.owner_instance_id,c.invocation_id,c.kind,c.payload,c.acked_at,c.finished_at FROM sidecar_commands c WHERE c.id=$1 AND c.generation=$2 AND c.agent_id=$3 AND c.owner_instance_id=$4;

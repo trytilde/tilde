@@ -2,183 +2,286 @@
 // @generated from file tilde/agent_event_ingress/v1/sidecars.proto (package tilde.agent_event_ingress.v1, syntax proto3)
 /* eslint-disable */
 
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
 import { file_tilde_types_v1_agent } from "../../types/v1/agent_pb.js";
 import { file_tilde_types_v1_access } from "../../types/v1/access_pb.js";
+import { file_tilde_types_v1_chat } from "../../types/v1/chat_pb.js";
 import { file_tilde_types_v1_runtime_event } from "../../types/v1/runtime_event_pb.js";
-import { file_tilde_agent_host_v1_agent } from "../../agent_host/v1/agent_pb.js";
 import { file_tilde_types_v1_deployment } from "../../types/v1/deployment_pb.js";
 
 /**
  * Describes the file tilde/agent_event_ingress/v1/sidecars.proto.
  */
 export const file_tilde_agent_event_ingress_v1_sidecars = /*@__PURE__*/
-  fileDesc("Cit0aWxkZS9hZ2VudF9ldmVudF9pbmdyZXNzL3YxL3NpZGVjYXJzLnByb3RvEhx0aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxIq8BChZSZWdpc3RlclNpZGVjYXJSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJEhoKEnB1YmxpY19pbmdyZXNzX3VybBgCIAEoCRIZChFhZ2VudF9pbmdyZXNzX3VybBgDIAEoCRITCgtydW50aW1lX3VybBgEIAEoCRIWCg5nb3NzaXBfYWRkcmVzcxgFIAEoCRIcChRsb2NhbF9hZ2VudF9lbmRwb2ludBgGIAEoCSK+AgoXUmVnaXN0ZXJTaWRlY2FyUmVzcG9uc2USHAoPY29ycm9zaW9uX3Rva2VuGAsgASgJQgOAAQESEAoIYWdlbnRfaWQYASABKAkSEgoKY2x1c3Rlcl9pZBgCIAEoCRIqCgVwZWVycxgDIAMoCzIbLnRpbGRlLnR5cGVzLnYxLlNpZGVjYXJOb2RlEhsKDmVuY3J5cHRpb25fa2V5GAQgASgJQgOAAQESHgoRdG9rZW5fc2lnbmluZ19rZXkYBSABKAlCA4ABARIXCg90bHNfY2VydGlmaWNhdGUYBiABKAkSHAoPdGxzX3ByaXZhdGVfa2V5GAcgASgJQgOAAQESDgoGdGxzX2NhGAggASgJEhYKDnJldGVudGlvbl9kYXlzGAkgASgNEhcKD3NjaGVtYV9yZXZpc2lvbhgKIAEoCSJLChBIZWFydGJlYXRSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJEg0KBXJlYWR5GAIgASgIEhMKC2FnZW50X3JlYWR5GAMgASgIIlUKEUhlYXJ0YmVhdFJlc3BvbnNlEg4KBnBhdXNlZBgBIAEoCBIYChBhZ2VudF9nZW5lcmF0aW9uGAIgASgDEhYKDnJldGVudGlvbl9kYXlzGAMgASgNIhkKF0dldENvbmZpZ3VyYXRpb25SZXF1ZXN0IjMKD0NyZWRlbnRpYWxGaWVsZBIMCgRuYW1lGAEgASgJEhIKBXZhbHVlGAIgASgJQgOAAQEi7QIKF0Nvbm5lY3Rpb25Db25maWd1cmF0aW9uEjYKC2FjY2Vzc19tb2RlGAkgASgOMiEudGlsZGUudHlwZXMudjEuQ2hhbm5lbEFjY2Vzc01vZGUSPwoKaWRlbnRpdGllcxgKIAMoCzIrLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSWRlbnRpdHlHcmFudBISCgpleHBpcmVzX2F0GAsgASgDEgoKAmlkGAEgASgJEhMKC3Byb3ZpZGVyX2lkGAIgASgJEg8KB3R5cGVfaWQYAyABKAkSDAoEbmFtZRgEIAEoCRIOCgZzdGF0dXMYBSABKAkSFQoNYWNjb3VudF9sYWJlbBgGIAEoCRIaChJjcmVkZW50aWFsX3ZlcnNpb24YByABKAMSQgoLY3JlZGVudGlhbHMYCCADKAsyLS50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkNyZWRlbnRpYWxGaWVsZCL3AQoYR2V0Q29uZmlndXJhdGlvblJlc3BvbnNlEhQKDGxvZ3NfZW5hYmxlZBgGIAEoCBIXCg90cmFjaW5nX2VuYWJsZWQYBSABKAgSJAoFYWdlbnQYASABKAsyFS50aWxkZS50eXBlcy52MS5BZ2VudBIYChBhZ2VudF9nZW5lcmF0aW9uGAIgASgDEiAKE3dlYmhvb2tfc2lnbmluZ19rZXkYAyABKAlCA4ABARJKCgtjb25uZWN0aW9ucxgEIAMoCzI1LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ29ubmVjdGlvbkNvbmZpZ3VyYXRpb24iggEKDUlkZW50aXR5R3JhbnQSCgoCaWQYASABKAkSMwoNaWRlbnRpdHlfdHlwZRgCIAEoDjIcLnRpbGRlLnR5cGVzLnYxLklkZW50aXR5VHlwZRINCgV2YWx1ZRgDIAEoCRIQCgh2ZXJpZmllZBgEIAEoCBIPCgdhbGxvd2VkGAUgASgIIisKFFdhdGNoQ29tbWFuZHNSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJIkYKFVdhdGNoQ29tbWFuZHNSZXNwb25zZRItCgdjb21tYW5kGAEgASgLMhwudGlsZGUudHlwZXMudjEuQWdlbnRDb21tYW5kIlMKFEdldEludm9jYXRpb25SZXF1ZXN0EhIKCmNvbW1hbmRfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoBBITCgtpbnN0YW5jZV9pZBgDIAEoCSJPChVHZXRJbnZvY2F0aW9uUmVzcG9uc2USNgoKaW52b2NhdGlvbhgBIAEoCzIiLnRpbGRlLmFnZW50X2hvc3QudjEuSW52b2tlUmVxdWVzdCJYChlBY2tub3dsZWRnZUNvbW1hbmRSZXF1ZXN0EhIKCmNvbW1hbmRfaWQYASABKAkSEgoKZ2VuZXJhdGlvbhgCIAEoBBITCgtpbnN0YW5jZV9pZBgDIAEoCSIcChpBY2tub3dsZWRnZUNvbW1hbmRSZXNwb25zZSKAAQoWQ29tcGxldGVDb21tYW5kUmVxdWVzdBISCgpjb21tYW5kX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAQSEwoLaW5zdGFuY2VfaWQYAyABKAkSDgoGc3RhdHVzGAQgASgJEhkKEXBlbmRpbmdfaW5wdXRfaWRzGAUgAygJIhkKF0NvbXBsZXRlQ29tbWFuZFJlc3BvbnNlIm0KFVJlcG9ydEFjdGl2aXR5UmVxdWVzdBISCgpjb21tYW5kX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAQSEwoLaW5zdGFuY2VfaWQYAyABKAkSFwoPcmVhc29uaW5nX2RlbHRhGAQgASgJIhgKFlJlcG9ydEFjdGl2aXR5UmVzcG9uc2UiLgoZTG9jYXRlQ29udmVyc2F0aW9uUmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkiLQoaTG9jYXRlQ29udmVyc2F0aW9uUmVzcG9uc2USDwoHc3RvcmFnZRgBIAEoCSJhChpJbmdlc3RQcm92aWRlckV2ZW50UmVxdWVzdBIVCg1jb25uZWN0aW9uX2lkGAEgASgJEiwKBWV2ZW50GAIgASgLMh0udGlsZGUudHlwZXMudjEuUHJvdmlkZXJFdmVudCIdChtJbmdlc3RQcm92aWRlckV2ZW50UmVzcG9uc2UylgoKDlNpZGVjYXJTZXJ2aWNlEocBChJMb2NhdGVDb252ZXJzYXRpb24SNy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkxvY2F0ZUNvbnZlcnNhdGlvblJlcXVlc3QaOC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkxvY2F0ZUNvbnZlcnNhdGlvblJlc3BvbnNlEooBChNJbmdlc3RQcm92aWRlckV2ZW50EjgudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5Jbmdlc3RQcm92aWRlckV2ZW50UmVxdWVzdBo5LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSW5nZXN0UHJvdmlkZXJFdmVudFJlc3BvbnNlEnoKDVdhdGNoQ29tbWFuZHMSMi50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLldhdGNoQ29tbWFuZHNSZXF1ZXN0GjMudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5XYXRjaENvbW1hbmRzUmVzcG9uc2UwARJ4Cg1HZXRJbnZvY2F0aW9uEjIudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5HZXRJbnZvY2F0aW9uUmVxdWVzdBozLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuR2V0SW52b2NhdGlvblJlc3BvbnNlEocBChJBY2tub3dsZWRnZUNvbW1hbmQSNy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkFja25vd2xlZGdlQ29tbWFuZFJlcXVlc3QaOC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkFja25vd2xlZGdlQ29tbWFuZFJlc3BvbnNlEn4KD0NvbXBsZXRlQ29tbWFuZBI0LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ29tcGxldGVDb21tYW5kUmVxdWVzdBo1LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ29tcGxldGVDb21tYW5kUmVzcG9uc2USewoOUmVwb3J0QWN0aXZpdHkSMy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlcG9ydEFjdGl2aXR5UmVxdWVzdBo0LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuUmVwb3J0QWN0aXZpdHlSZXNwb25zZRJ+Cg9SZWdpc3RlclNpZGVjYXISNC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlZ2lzdGVyU2lkZWNhclJlcXVlc3QaNS50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlZ2lzdGVyU2lkZWNhclJlc3BvbnNlEmwKCUhlYXJ0YmVhdBIuLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSGVhcnRiZWF0UmVxdWVzdBovLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSGVhcnRiZWF0UmVzcG9uc2USgQEKEEdldENvbmZpZ3VyYXRpb24SNS50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkdldENvbmZpZ3VyYXRpb25SZXF1ZXN0GjYudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5HZXRDb25maWd1cmF0aW9uUmVzcG9uc2ViBnByb3RvMw", [file_tilde_types_v1_agent, file_tilde_types_v1_access, file_tilde_types_v1_runtime_event, file_tilde_agent_host_v1_agent, file_tilde_types_v1_deployment]);
+  fileDesc("Cit0aWxkZS9hZ2VudF9ldmVudF9pbmdyZXNzL3YxL3NpZGVjYXJzLnByb3RvEhx0aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxIkwKDFdhdGNoUmVxdWVzdBITCgtpbnN0YW5jZV9pZBgBIAEoCRISCgpwdWJsaWNfdXJsGAIgASgJEhMKC3J1bnRpbWVfdXJsGAMgASgJItQCCg1XYXRjaFJlc3BvbnNlEjoKCHNuYXBzaG90GAEgASgLMiYudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5TbmFwc2hvdEgAEk8KDWNvbmZpZ3VyYXRpb24YAiABKAsyNi50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkdldENvbmZpZ3VyYXRpb25SZXNwb25zZUgAEjsKCmFzc2lnbm1lbnQYAyABKAsyJS50aWxkZS50eXBlcy52MS5QYXJ0aWNpcGFudEFzc2lnbm1lbnRIABI8CglkaXJlY3RpdmUYBCABKAsyJy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkRpcmVjdGl2ZUgAEjIKBHBpbmcYBSABKAsyIi50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlBpbmdIAEIHCgVmcmFtZSK1AQoIU25hcHNob3QSTQoNY29uZmlndXJhdGlvbhgBIAEoCzI2LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuR2V0Q29uZmlndXJhdGlvblJlc3BvbnNlEjoKC2Fzc2lnbm1lbnRzGAIgAygLMiUudGlsZGUudHlwZXMudjEuUGFydGljaXBhbnRBc3NpZ25tZW50Eh4KEXRva2VuX3NpZ25pbmdfa2V5GAMgASgJQgOAAQEiBgoEUGluZyLVAgoJRGlyZWN0aXZlEgoKAmlkGAEgASgJEhEKCXRocmVhZF9pZBgCIAEoCRISCgpnZW5lcmF0aW9uGAMgASgEEkEKDGluZ3Jlc3NfY2FsbBgKIAEoCzIpLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSW5ncmVzc0NhbGxIABJOCg5wcm92aWRlcl9ldmVudBgLIAEoCzI0LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuUHJvdmlkZXJFdmVudERpcmVjdGl2ZUgAEjsKB3JlY292ZXIYDCABKAsyKC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlY292ZXJSdW5IABI7CgVyZWxheRgNIAEoCzIqLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuUmVsYXlNZXNzYWdlSABCCAoGYWN0aW9uImAKDFJlbGF5TWVzc2FnZRImCgZ0aHJlYWQYASABKAsyFi50aWxkZS50eXBlcy52MS5UaHJlYWQSKAoHbWVzc2FnZRgCIAEoCzIXLnRpbGRlLnR5cGVzLnYxLk1lc3NhZ2UiXAoLSW5ncmVzc0NhbGwSDgoGbWV0aG9kGAEgASgJEhQKDGNvbnRlbnRfdHlwZRgCIAEoCRIMCgRib2R5GAMgASgMEhkKDGNhbGxlcl90b2tlbhgEIAEoCUIDgAEBIkAKCkNhbGxSZXN1bHQSDgoGc3RhdHVzGAEgASgFEhQKDGNvbnRlbnRfdHlwZRgCIAEoCRIMCgRib2R5GAMgASgMIl0KFlByb3ZpZGVyRXZlbnREaXJlY3RpdmUSFQoNY29ubmVjdGlvbl9pZBgBIAEoCRIsCgVldmVudBgCIAEoCzIdLnRpbGRlLnR5cGVzLnYxLlByb3ZpZGVyRXZlbnQiRwoKUmVjb3ZlclJ1bhIOCgZydW5faWQYASABKAkSFgoOcGFydGljaXBhbnRfaWQYAiABKAkSEQoJb2JqZWN0aXZlGAMgASgJIl0KDlB1Ymxpc2hSZXF1ZXN0EhMKC2luc3RhbmNlX2lkGAEgASgJEjYKBmZyYW1lcxgCIAMoCzImLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuVXBzdHJlYW0ixgIKCFVwc3RyZWFtEjwKCWhlYXJ0YmVhdBgBIAEoCzInLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSGVhcnRiZWF0SAASNAoFY2xhaW0YAiABKAsyIy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkNsYWltSAASNAoFZXZlbnQYAyABKAsyIy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkV2ZW50SAASSQoQZGlyZWN0aXZlX3Jlc3VsdBgEIAEoCzItLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuRGlyZWN0aXZlUmVzdWx0SAASPAoJdGVsZW1ldHJ5GAUgASgLMicudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5UZWxlbWV0cnlIAEIHCgVmcmFtZSJWCglIZWFydGJlYXQSEQoJc2FtcGxlX2lkGAEgASgJEg0KBXJlYWR5GAIgASgIEhMKC2FnZW50X3JlYWR5GAMgASgIEhIKCmxhdGVuY3lfbXMYBCABKAUiMgoFQ2xhaW0SEQoJdGhyZWFkX2lkGAEgASgJEhYKDnBhcnRpY2lwYW50X2lkGAIgASgJIkgKBUV2ZW50EisKBWV2ZW50GAEgASgLMhwudGlsZGUudHlwZXMudjEuUnVudGltZUV2ZW50EhIKCmdlbmVyYXRpb24YAiABKAQiVwoPRGlyZWN0aXZlUmVzdWx0EgoKAmlkGAEgASgJEjgKBnJlc3VsdBgCIAEoCzIoLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ2FsbFJlc3VsdCJXCglUZWxlbWV0cnkSOQoEa2luZBgBIAEoDjIrLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuVGVsZW1ldHJ5S2luZBIPCgdwYXlsb2FkGAIgASgMIuIBCg9QdWJsaXNoUmVzcG9uc2USNQoEYWNrcxgBIAMoCzInLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuVGhyZWFkQWNrEjkKBmNsYWltcxgCIAMoCzIpLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ2xhaW1SZXN1bHQSMwoGZmVuY2VzGAMgAygLMiMudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5GZW5jZRIOCgZwYXVzZWQYBCABKAgSGAoQYWdlbnRfZ2VuZXJhdGlvbhgFIAEoAyIwCglUaHJlYWRBY2sSEQoJdGhyZWFkX2lkGAEgASgJEhAKCHNlcXVlbmNlGAIgASgDIngKC0NsYWltUmVzdWx0EhEKCXRocmVhZF9pZBgBIAEoCRIWCg5wYXJ0aWNpcGFudF9pZBgCIAEoCRIPCgdncmFudGVkGAMgASgIEhIKCmdlbmVyYXRpb24YBCABKAQSGQoRb3duZXJfaW5zdGFuY2VfaWQYBSABKAkiLgoFRmVuY2USEQoJdGhyZWFkX2lkGAEgASgJEhIKCmdlbmVyYXRpb24YAiABKAQijwEKDkh5ZHJhdGVSZXF1ZXN0EhMKCXRocmVhZF9pZBgBIAEoCUgAEj0KCGV4dGVybmFsGAIgASgLMikudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5FeHRlcm5hbEtleUgAEg0KBWNsYWltGAMgASgIEhMKC2luc3RhbmNlX2lkGAQgASgJQgUKA2tleSI5CgtFeHRlcm5hbEtleRIVCg1jb25uZWN0aW9uX2lkGAEgASgJEhMKC2V4dGVybmFsX2lkGAIgASgJIuUBCg9IeWRyYXRlUmVzcG9uc2USDQoFZm91bmQYASABKAgSJgoGdGhyZWFkGAIgASgLMhYudGlsZGUudHlwZXMudjEuVGhyZWFkEikKCG1lc3NhZ2VzGAMgAygLMhcudGlsZGUudHlwZXMudjEuTWVzc2FnZRIhCgRydW5zGAQgAygLMhMudGlsZGUudHlwZXMudjEuUnVuEjkKCmFzc2lnbm1lbnQYBSABKAsyJS50aWxkZS50eXBlcy52MS5QYXJ0aWNpcGFudEFzc2lnbm1lbnQSEgoKb3duZXJfbGl2ZRgGIAEoCCK2AQoORm9yd2FyZFJlcXVlc3QSEQoJdGhyZWFkX2lkGAEgASgJEjkKBGNhbGwYAiABKAsyKS50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkluZ3Jlc3NDYWxsSAASTgoOcHJvdmlkZXJfZXZlbnQYAyABKAsyNC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlByb3ZpZGVyRXZlbnREaXJlY3RpdmVIAEIGCgR3b3JrIksKD0ZvcndhcmRSZXNwb25zZRI4CgZyZXN1bHQYASABKAsyKC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkNhbGxSZXN1bHQiWgoXVXBsb2FkQXR0YWNobWVudFJlcXVlc3QSLgoKYXR0YWNobWVudBgBIAEoCzIaLnRpbGRlLnR5cGVzLnYxLkF0dGFjaG1lbnQSDwoHY29udGVudBgCIAEoDCJKChhVcGxvYWRBdHRhY2htZW50UmVzcG9uc2USLgoKYXR0YWNobWVudBgBIAEoCzIaLnRpbGRlLnR5cGVzLnYxLkF0dGFjaG1lbnQiRQoZRG93bmxvYWRBdHRhY2htZW50UmVxdWVzdBIRCgl0aHJlYWRfaWQYASABKAkSFQoNYXR0YWNobWVudF9pZBgCIAEoCSItChpEb3dubG9hZEF0dGFjaG1lbnRSZXNwb25zZRIPCgdjb250ZW50GAEgASgMIkkKGVJlc29sdmVQYXJ0aWNpcGFudFJlcXVlc3QSEgoIYWdlbnRfaWQYASABKAlIABIRCgd1c2VyX2lkGAIgASgJSABCBQoDa2V5IjYKGlJlc29sdmVQYXJ0aWNpcGFudFJlc3BvbnNlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkiMwoPQ3JlZGVudGlhbEZpZWxkEgwKBG5hbWUYASABKAkSEgoFdmFsdWUYAiABKAlCA4ABASLtAgoXQ29ubmVjdGlvbkNvbmZpZ3VyYXRpb24SNgoLYWNjZXNzX21vZGUYCSABKA4yIS50aWxkZS50eXBlcy52MS5DaGFubmVsQWNjZXNzTW9kZRI/CgppZGVudGl0aWVzGAogAygLMisudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5JZGVudGl0eUdyYW50EhIKCmV4cGlyZXNfYXQYCyABKAMSCgoCaWQYASABKAkSEwoLcHJvdmlkZXJfaWQYAiABKAkSDwoHdHlwZV9pZBgDIAEoCRIMCgRuYW1lGAQgASgJEg4KBnN0YXR1cxgFIAEoCRIVCg1hY2NvdW50X2xhYmVsGAYgASgJEhoKEmNyZWRlbnRpYWxfdmVyc2lvbhgHIAEoAxJCCgtjcmVkZW50aWFscxgIIAMoCzItLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuQ3JlZGVudGlhbEZpZWxkIvcBChhHZXRDb25maWd1cmF0aW9uUmVzcG9uc2USFAoMbG9nc19lbmFibGVkGAYgASgIEhcKD3RyYWNpbmdfZW5hYmxlZBgFIAEoCBIkCgVhZ2VudBgBIAEoCzIVLnRpbGRlLnR5cGVzLnYxLkFnZW50EhgKEGFnZW50X2dlbmVyYXRpb24YAiABKAMSIAoTd2ViaG9va19zaWduaW5nX2tleRgDIAEoCUIDgAEBEkoKC2Nvbm5lY3Rpb25zGAQgAygLMjUudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5Db25uZWN0aW9uQ29uZmlndXJhdGlvbiKCAQoNSWRlbnRpdHlHcmFudBIKCgJpZBgBIAEoCRIzCg1pZGVudGl0eV90eXBlGAIgASgOMhwudGlsZGUudHlwZXMudjEuSWRlbnRpdHlUeXBlEg0KBXZhbHVlGAMgASgJEhAKCHZlcmlmaWVkGAQgASgIEg8KB2FsbG93ZWQYBSABKAgqYwoNVGVsZW1ldHJ5S2luZBIeChpURUxFTUVUUllfS0lORF9VTlNQRUNJRklFRBAAEhkKFVRFTEVNRVRSWV9LSU5EX1RSQUNFUxABEhcKE1RFTEVNRVRSWV9LSU5EX0xPR1MQAjLEBgoOU2lkZWNhclNlcnZpY2USYgoFV2F0Y2gSKi50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLldhdGNoUmVxdWVzdBorLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuV2F0Y2hSZXNwb25zZTABEmYKB1B1Ymxpc2gSLC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlB1Ymxpc2hSZXF1ZXN0Gi0udGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5QdWJsaXNoUmVzcG9uc2USZgoHSHlkcmF0ZRIsLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuSHlkcmF0ZVJlcXVlc3QaLS50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkh5ZHJhdGVSZXNwb25zZRJmCgdGb3J3YXJkEiwudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5Gb3J3YXJkUmVxdWVzdBotLnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuRm9yd2FyZFJlc3BvbnNlEoEBChBVcGxvYWRBdHRhY2htZW50EjUudGlsZGUuYWdlbnRfZXZlbnRfaW5ncmVzcy52MS5VcGxvYWRBdHRhY2htZW50UmVxdWVzdBo2LnRpbGRlLmFnZW50X2V2ZW50X2luZ3Jlc3MudjEuVXBsb2FkQXR0YWNobWVudFJlc3BvbnNlEocBChJEb3dubG9hZEF0dGFjaG1lbnQSNy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkRvd25sb2FkQXR0YWNobWVudFJlcXVlc3QaOC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLkRvd25sb2FkQXR0YWNobWVudFJlc3BvbnNlEocBChJSZXNvbHZlUGFydGljaXBhbnQSNy50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlc29sdmVQYXJ0aWNpcGFudFJlcXVlc3QaOC50aWxkZS5hZ2VudF9ldmVudF9pbmdyZXNzLnYxLlJlc29sdmVQYXJ0aWNpcGFudFJlc3BvbnNlYgZwcm90bzM", [file_tilde_types_v1_agent, file_tilde_types_v1_access, file_tilde_types_v1_chat, file_tilde_types_v1_runtime_event, file_tilde_types_v1_deployment]);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.RegisterSidecarRequest.
- * Use `create(RegisterSidecarRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.WatchRequest.
+ * Use `create(WatchRequestSchema)` to create a new message.
  */
-export const RegisterSidecarRequestSchema = /*@__PURE__*/
+export const WatchRequestSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 0);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.RegisterSidecarResponse.
- * Use `create(RegisterSidecarResponseSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.WatchResponse.
+ * Use `create(WatchResponseSchema)` to create a new message.
  */
-export const RegisterSidecarResponseSchema = /*@__PURE__*/
+export const WatchResponseSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 1);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.HeartbeatRequest.
- * Use `create(HeartbeatRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Snapshot.
+ * Use `create(SnapshotSchema)` to create a new message.
  */
-export const HeartbeatRequestSchema = /*@__PURE__*/
+export const SnapshotSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 2);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.HeartbeatResponse.
- * Use `create(HeartbeatResponseSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Ping.
+ * Use `create(PingSchema)` to create a new message.
  */
-export const HeartbeatResponseSchema = /*@__PURE__*/
+export const PingSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 3);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.GetConfigurationRequest.
- * Use `create(GetConfigurationRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Directive.
+ * Use `create(DirectiveSchema)` to create a new message.
  */
-export const GetConfigurationRequestSchema = /*@__PURE__*/
+export const DirectiveSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 4);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RelayMessage.
+ * Use `create(RelayMessageSchema)` to create a new message.
+ */
+export const RelayMessageSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 5);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.IngressCall.
+ * Use `create(IngressCallSchema)` to create a new message.
+ */
+export const IngressCallSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 6);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.CallResult.
+ * Use `create(CallResultSchema)` to create a new message.
+ */
+export const CallResultSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 7);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ProviderEventDirective.
+ * Use `create(ProviderEventDirectiveSchema)` to create a new message.
+ */
+export const ProviderEventDirectiveSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 8);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RecoverRun.
+ * Use `create(RecoverRunSchema)` to create a new message.
+ */
+export const RecoverRunSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 9);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.PublishRequest.
+ * Use `create(PublishRequestSchema)` to create a new message.
+ */
+export const PublishRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 10);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Upstream.
+ * Use `create(UpstreamSchema)` to create a new message.
+ */
+export const UpstreamSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 11);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Heartbeat.
+ * Use `create(HeartbeatSchema)` to create a new message.
+ */
+export const HeartbeatSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 12);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Claim.
+ * Use `create(ClaimSchema)` to create a new message.
+ */
+export const ClaimSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 13);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Event.
+ * Use `create(EventSchema)` to create a new message.
+ */
+export const EventSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 14);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DirectiveResult.
+ * Use `create(DirectiveResultSchema)` to create a new message.
+ */
+export const DirectiveResultSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 15);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Telemetry.
+ * Use `create(TelemetrySchema)` to create a new message.
+ */
+export const TelemetrySchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 16);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.PublishResponse.
+ * Use `create(PublishResponseSchema)` to create a new message.
+ */
+export const PublishResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 17);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ThreadAck.
+ * Use `create(ThreadAckSchema)` to create a new message.
+ */
+export const ThreadAckSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 18);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ClaimResult.
+ * Use `create(ClaimResultSchema)` to create a new message.
+ */
+export const ClaimResultSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 19);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Fence.
+ * Use `create(FenceSchema)` to create a new message.
+ */
+export const FenceSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 20);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.HydrateRequest.
+ * Use `create(HydrateRequestSchema)` to create a new message.
+ */
+export const HydrateRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 21);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ExternalKey.
+ * Use `create(ExternalKeySchema)` to create a new message.
+ */
+export const ExternalKeySchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 22);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.HydrateResponse.
+ * Use `create(HydrateResponseSchema)` to create a new message.
+ */
+export const HydrateResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 23);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ForwardRequest.
+ * Use `create(ForwardRequestSchema)` to create a new message.
+ */
+export const ForwardRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 24);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ForwardResponse.
+ * Use `create(ForwardResponseSchema)` to create a new message.
+ */
+export const ForwardResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 25);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.UploadAttachmentRequest.
+ * Use `create(UploadAttachmentRequestSchema)` to create a new message.
+ */
+export const UploadAttachmentRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 26);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.UploadAttachmentResponse.
+ * Use `create(UploadAttachmentResponseSchema)` to create a new message.
+ */
+export const UploadAttachmentResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 27);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DownloadAttachmentRequest.
+ * Use `create(DownloadAttachmentRequestSchema)` to create a new message.
+ */
+export const DownloadAttachmentRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 28);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DownloadAttachmentResponse.
+ * Use `create(DownloadAttachmentResponseSchema)` to create a new message.
+ */
+export const DownloadAttachmentResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 29);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ResolveParticipantRequest.
+ * Use `create(ResolveParticipantRequestSchema)` to create a new message.
+ */
+export const ResolveParticipantRequestSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 30);
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ResolveParticipantResponse.
+ * Use `create(ResolveParticipantResponseSchema)` to create a new message.
+ */
+export const ResolveParticipantResponseSchema = /*@__PURE__*/
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 31);
 
 /**
  * Describes the message tilde.agent_event_ingress.v1.CredentialField.
  * Use `create(CredentialFieldSchema)` to create a new message.
  */
 export const CredentialFieldSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 5);
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 32);
 
 /**
  * Describes the message tilde.agent_event_ingress.v1.ConnectionConfiguration.
  * Use `create(ConnectionConfigurationSchema)` to create a new message.
  */
 export const ConnectionConfigurationSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 6);
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 33);
 
 /**
  * Describes the message tilde.agent_event_ingress.v1.GetConfigurationResponse.
  * Use `create(GetConfigurationResponseSchema)` to create a new message.
  */
 export const GetConfigurationResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 7);
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 34);
 
 /**
  * Describes the message tilde.agent_event_ingress.v1.IdentityGrant.
  * Use `create(IdentityGrantSchema)` to create a new message.
  */
 export const IdentityGrantSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 8);
+  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 35);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.WatchCommandsRequest.
- * Use `create(WatchCommandsRequestSchema)` to create a new message.
+ * Describes the enum tilde.agent_event_ingress.v1.TelemetryKind.
  */
-export const WatchCommandsRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 9);
+export const TelemetryKindSchema = /*@__PURE__*/
+  enumDesc(file_tilde_agent_event_ingress_v1_sidecars, 0);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.WatchCommandsResponse.
- * Use `create(WatchCommandsResponseSchema)` to create a new message.
+ * @generated from enum tilde.agent_event_ingress.v1.TelemetryKind
  */
-export const WatchCommandsResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 10);
+export const TelemetryKind = /*@__PURE__*/
+  tsEnum(TelemetryKindSchema);
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.GetInvocationRequest.
- * Use `create(GetInvocationRequestSchema)` to create a new message.
- */
-export const GetInvocationRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 11);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.GetInvocationResponse.
- * Use `create(GetInvocationResponseSchema)` to create a new message.
- */
-export const GetInvocationResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 12);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.AcknowledgeCommandRequest.
- * Use `create(AcknowledgeCommandRequestSchema)` to create a new message.
- */
-export const AcknowledgeCommandRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 13);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.AcknowledgeCommandResponse.
- * Use `create(AcknowledgeCommandResponseSchema)` to create a new message.
- */
-export const AcknowledgeCommandResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 14);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.CompleteCommandRequest.
- * Use `create(CompleteCommandRequestSchema)` to create a new message.
- */
-export const CompleteCommandRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 15);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.CompleteCommandResponse.
- * Use `create(CompleteCommandResponseSchema)` to create a new message.
- */
-export const CompleteCommandResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 16);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ReportActivityRequest.
- * Use `create(ReportActivityRequestSchema)` to create a new message.
- */
-export const ReportActivityRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 17);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ReportActivityResponse.
- * Use `create(ReportActivityResponseSchema)` to create a new message.
- */
-export const ReportActivityResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 18);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.LocateConversationRequest.
- * Use `create(LocateConversationRequestSchema)` to create a new message.
- */
-export const LocateConversationRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 19);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.LocateConversationResponse.
- * Use `create(LocateConversationResponseSchema)` to create a new message.
- */
-export const LocateConversationResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 20);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.IngestProviderEventRequest.
- * Use `create(IngestProviderEventRequestSchema)` to create a new message.
- */
-export const IngestProviderEventRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 21);
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.IngestProviderEventResponse.
- * Use `create(IngestProviderEventResponseSchema)` to create a new message.
- */
-export const IngestProviderEventResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_event_ingress_v1_sidecars, 22);
-
-/**
- * This complete service mounts only on agent-event-ingress. Every call authenticates
- * an agent deployment token, never a browser session or agent invocation token.
+ * Sidecars dial the gateway; every call authenticates one agent deployment token.
+ * The gateway never opens a connection to a sidecar.
  *
  * @generated from service tilde.agent_event_ingress.v1.SidecarService
  */

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 const address = process.env.TEST_ADDRESS ?? "127.0.0.1";
 const child = spawn(
   resolve(process.env.ENGINE_TEST_BINARY ?? "target/debug/tilde"),
-  ["--management-listen", `${address}:0`, "--agent-runtime-listen", "127.0.0.1:0"],
+  ["--listen", `${address}:0`],
   {
     env: {
       ...process.env,
@@ -16,8 +16,7 @@ const child = spawn(
       ENGINE_ENCRYPTION_BACKEND: "seed",
       ENGINE_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
       ENGINE_KMS_KEY_ID: "",
-      ENGINE_MANAGEMENT_PUBLIC_URL:
-        process.env.TEST_MANAGEMENT_PUBLIC_URL ?? `http://${address}:8080`,
+      ENGINE_PUBLIC_URL: process.env.TEST_MANAGEMENT_PUBLIC_URL ?? `http://${address}:8080`,
       ENGINE_OIDC_ISSUER: `http://${address}:5556`,
       ENGINE_ALLOW_NETWORK: "true",
       ENGINE_OIDC_CLIENT_ID: "tilde-dev",
@@ -33,7 +32,7 @@ try {
     const timer = setTimeout(() => reject(new Error("startup timeout")), 30000);
     const read = (chunk) => {
       logs += chunk.toString();
-      const match = logs.match(/management_address=([0-9.]+:\d+)/);
+      const match = logs.match(/ address=([0-9.]+:\d+)/);
       if (match) {
         clearTimeout(timer);
         resolve(`http://${match[1]}`);
@@ -82,7 +81,7 @@ try {
       const { access_token } = await exchange.json();
       const headers = { Authorization: `Bearer ${access_token}` };
       assert.equal((await fetch(`${url}/auth/session`, { headers })).status, 200);
-      const runtime = `http://${logs.match(/agent_runtime_address=(127\.0\.0\.1:\d+)/)[1]}`;
+      const runtime = `http://${logs.match(/ address=(127\.0\.0\.1:\d+)/)[1]}`;
       assert.equal(
         (
           await fetch(`${runtime}/tilde.management.v1.AgentService/ListAgents`, {

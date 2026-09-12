@@ -1,4 +1,5 @@
 //! Typed application environment. Development loads .env before launching this process.
+//! One listener serves every route group; ENGINE_SERVE selects which groups a process mounts.
 use crate::{encryption::KeyProtection, error::Error};
 use clap::ValueEnum;
 use envconfig::Envconfig;
@@ -43,13 +44,84 @@ impl FromStr for WebOrigins {
     }
 }
 
+/// Route groups mounted by this process. Each group keeps its own authentication;
+/// operators who want network isolation run separate processes per group.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Serve {
+    pub management: bool,
+    pub ingress: bool,
+    pub runtime: bool,
+    pub sidecar: bool,
+}
+impl Default for Serve {
+    fn default() -> Self {
+        Self {
+            management: true,
+            ingress: true,
+            runtime: true,
+            sidecar: true,
+        }
+    }
+}
+impl FromStr for Serve {
+    type Err = String;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let mut serve = Self {
+            management: false,
+            ingress: false,
+            runtime: false,
+            sidecar: false,
+        };
+        for group in value.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            match group {
+                "management" => serve.management = true,
+                "ingress" => serve.ingress = true,
+                "runtime" => serve.runtime = true,
+                "sidecar" => serve.sidecar = true,
+                "all" => serve = Self::default(),
+                other => {
+                    return Err(format!(
+                        "ENGINE_SERVE contains unknown group {other:?}; use management, ingress, runtime, sidecar"
+                    ));
+                }
+            }
+        }
+        Ok(serve)
+    }
+}
+impl std::fmt::Display for Serve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let groups = [
+            ("management", self.management),
+            ("ingress", self.ingress),
+            ("runtime", self.runtime),
+            ("sidecar", self.sidecar),
+        ];
+        let names: Vec<&str> = groups
+            .iter()
+            .filter(|(_, on)| *on)
+            .map(|(name, _)| *name)
+            .collect();
+        write!(f, "{}", names.join(","))
+    }
+}
+
 /// One typed environment schema. Never derive Debug or serialize this configuration.
 #[derive(Envconfig)]
 pub struct Config {
-    #[envconfig(from = "ENGINE_AGENT_EVENT_INGRESS_LISTEN", default = "127.0.0.1:8083")]
-    pub agent_event_ingress_listen: SocketAddr,
-    #[envconfig(from = "ENGINE_AGENT_EVENT_INGRESS_PUBLIC_URL")]
-    pub agent_event_ingress_public_url: Option<String>,
+    #[envconfig(from = "ENGINE_LISTEN", default = "127.0.0.1:8080")]
+    pub listen: SocketAddr,
+    #[envconfig(from = "ENGINE_SERVE", default = "all")]
+    pub serve: Serve,
+    /// Browser-facing origin for management, OAuth callbacks and setup links.
+    #[envconfig(from = "ENGINE_PUBLIC_URL")]
+    pub public_url: Option<String>,
+    /// Origin providers deliver webhooks to when it differs from the public URL.
+    #[envconfig(from = "ENGINE_INGRESS_PUBLIC_URL")]
+    pub ingress_public_url: Option<String>,
+    /// Origin agent hosts call back when it differs from the public URL.
+    #[envconfig(from = "ENGINE_RUNTIME_PUBLIC_URL")]
+    pub runtime_public_url: Option<String>,
     #[envconfig(from = "ENGINE_S3_BUCKET")]
     pub s3_bucket: Option<String>,
     #[envconfig(from = "ENGINE_S3_REGION", default = "us-east-1")]
@@ -88,21 +160,8 @@ pub struct Config {
     pub connection_setup_public_url: Option<String>,
     #[envconfig(from = "ENGINE_CONNECTION_UI_DEV_URL")]
     pub connection_ui_dev_url: Option<String>,
-    #[envconfig(from = "ENGINE_MANAGEMENT_ENABLED", default = "true")]
-    pub management_enabled: bool,
     #[envconfig(from = "ENGINE_WEB_ENABLED", default = "true")]
     pub web_enabled: bool,
-    #[envconfig(
-        from = "ENGINE_PUBLIC_EVENT_INGRESS_LISTEN",
-        default = "127.0.0.1:8082"
-    )]
-    pub public_event_ingress_listen: SocketAddr,
-    #[envconfig(from = "ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL")]
-    pub public_event_ingress_public_url: Option<String>,
-    #[envconfig(from = "ENGINE_AGENT_RUNTIME_LISTEN", default = "127.0.0.1:8081")]
-    pub agent_runtime_listen: SocketAddr,
-    #[envconfig(from = "ENGINE_AGENT_RUNTIME_PUBLIC_URL")]
-    pub agent_runtime_public_url: Option<String>,
     #[envconfig(from = "ENGINE_OIDC_ISSUER")]
     pub oidc_issuer: Option<String>,
     #[envconfig(from = "ENGINE_OIDC_CLIENT_ID")]
@@ -111,12 +170,8 @@ pub struct Config {
     pub oidc_client_secret: Option<SecretEnv>,
     #[envconfig(from = "ENGINE_OIDC_ALLOW_HTTP", default = "false")]
     pub oidc_allow_http: bool,
-    #[envconfig(from = "ENGINE_MANAGEMENT_PUBLIC_URL")]
-    pub management_public_url: Option<String>,
     #[envconfig(from = "DATABASE_URL")]
     pub database_url: SecretEnv,
-    #[envconfig(from = "ENGINE_MANAGEMENT_LISTEN", default = "127.0.0.1:8080")]
-    pub management_listen: SocketAddr,
     #[envconfig(from = "ENGINE_ALLOW_NETWORK", default = "false")]
     pub allow_network: bool,
     #[envconfig(from = "ENGINE_WEB_ORIGINS", default = "")]
@@ -135,8 +190,6 @@ pub struct Config {
     pub log_filter: tracing_subscriber::EnvFilter,
     #[envconfig(from = "API_PORT", default = "8080")]
     pub api_port: u16,
-    #[envconfig(from = "PUBLIC_EVENT_INGRESS_PORT", default = "8082")]
-    pub public_event_ingress_port: u16,
     #[envconfig(from = "WEB_PORT", default = "5173")]
     pub web_port: u16,
 }
@@ -176,35 +229,26 @@ impl Config {
         )
         .map(Some)
     }
-
-    /// Static assets share the management bind only in builds that embed the web app.
-    pub fn management_listener_enabled(&self) -> bool {
-        self.management_enabled || (self.web_enabled && cfg!(feature = "embedded-web"))
+    pub fn management_enabled(&self) -> bool {
+        self.serve.management
     }
-    /// OIDC is required only by the enabled management API, never by the agent runtime API.
+    /// Static assets are served only in builds that embed the web app.
+    pub fn web_served(&self) -> bool {
+        self.web_enabled && cfg!(feature = "embedded-web")
+    }
+    /// OIDC is required only by the management group, never by agent-facing groups.
     pub fn validate_services(&self) -> Result<(), Error> {
-        let mut listeners = vec![
-            self.agent_runtime_listen,
-            self.public_event_ingress_listen,
-            self.agent_event_ingress_listen,
-        ];
-        if self.management_listener_enabled() {
-            listeners.push(self.management_listen);
+        for origin in [
+            &self.public_url,
+            &self.ingress_public_url,
+            &self.runtime_public_url,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            crate::network::Boundary::new(self.listen, self.allow_network, vec![origin.clone()])?;
         }
-        for (index, listen) in listeners.iter().enumerate() {
-            if listen.port() != 0 && listeners[..index].contains(listen) {
-                return Err(Error::Invalid("Management, agent runtime, public-event-ingress and agent-event-ingress listeners must use distinct addresses".into()));
-            }
-        }
-        if let Some(origin) = &self.public_event_ingress_public_url {
-            crate::network::Boundary::new(
-                self.public_event_ingress_listen,
-                self.allow_network,
-                vec![origin.clone()],
-            )?;
-        }
-
-        if self.management_enabled {
+        if self.serve.management {
             for (name, value) in [
                 ("ENGINE_OIDC_ISSUER", self.oidc_issuer.as_deref()),
                 ("ENGINE_OIDC_CLIENT_ID", self.oidc_client_id.as_deref()),
@@ -217,7 +261,7 @@ impl Config {
             ] {
                 if value.is_none_or(|v| v.trim().is_empty()) {
                     return Err(Error::Invalid(format!(
-                        "{name} is required when ENGINE_MANAGEMENT_ENABLED=true"
+                        "{name} is required when ENGINE_SERVE includes management"
                     )));
                 }
             }
@@ -231,15 +275,11 @@ impl Config {
         if self.database_url.0.expose_secret().trim().is_empty() {
             return Err(Error::Invalid("DATABASE_URL is required".into()));
         }
-        if self.public_event_ingress_port == 0
-            || (self.management_enabled && self.public_event_ingress_port == self.api_port)
-            || (self.web_enabled && self.public_event_ingress_port == self.web_port)
-            || (self.management_enabled && self.api_port == 0)
-            || (self.web_enabled && self.web_port == 0)
-            || (self.management_enabled && self.web_enabled && self.api_port == self.web_port)
+        if self.api_port == 0
+            || (self.web_enabled && (self.web_port == 0 || self.api_port == self.web_port))
         {
             return Err(Error::Invalid(
-                "API_PORT, WEB_PORT and PUBLIC_EVENT_INGRESS_PORT must be distinct ports from 1 to 65535".into(),
+                "API_PORT and WEB_PORT must be distinct ports from 1 to 65535".into(),
             ));
         }
         match self.encryption_backend {
@@ -253,8 +293,7 @@ impl Config {
                         "ENGINE_KMS_KEY_ID is set but seed mode is selected".into(),
                     ));
                 }
-                let seed = self.encryption_key.take().ok_or_else(|| Error::Invalid(
-                    "ENGINE_ENCRYPTION_KEY is required in seed mode; use generate-key once and retain it".into()))?;
+                let seed = self.encryption_key.take().ok_or_else(|| Error::Invalid("ENGINE_ENCRYPTION_KEY is required in seed mode; use generate-key once and retain it".into()))?;
                 KeyProtection::seed(seed.0)
             }
             Backend::AwsKms => {

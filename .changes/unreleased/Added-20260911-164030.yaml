@@ -1,3 +1,3 @@
 kind: Added
-body: Support agent sidecars with Corrosion replication, separate public and agent event ingress, deployment registration and retention settings, coordinated execution ownership, and sidecar trace relay through the gateway to Langfuse.
+body: Support agent sidecars that own conversations in memory beside the agent process, dial the gateway over one connection for configuration, ownership, projection and forwarding, and relay traces and logs through the gateway. The gateway serves every route group on one listener selected by ENGINE_SERVE.
 time: 2026-09-11T16:40:30.721150731+02:00

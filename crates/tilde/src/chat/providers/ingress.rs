@@ -121,15 +121,23 @@ async fn receive(
         match result {
             Webhook::Challenge(value) => Ok(Some(value)),
             Webhook::Messages(messages) => {
-                if sqlx::query_file!("../../queries/chat/channel_owner.sql", id)
+                let owner = sqlx::query_file!("../../queries/chat/channel_owner.sql", id)
                     .fetch_optional(&s.connections.pool)
                     .await
-                    .map_err(ChatError::from)?
-                    .is_some_and(|r| r.deployment_mode == "sidecar")
+                    .map_err(ChatError::from)?;
+                if let Some(owner) = owner
+                    && owner.deployment_mode == "sidecar"
                 {
-                    return Err(ConnectError::failed_precondition(
-                        "sidecar_required: use the sidecar public-event-ingress endpoint",
-                    ));
+                    // The replica owning the conversation ingests it; the gateway only relays.
+                    let deployments = s.chat.deployments.as_ref().ok_or_else(|| {
+                        ConnectError::failed_precondition("Sidecar routing is unavailable")
+                    })?;
+                    for message in messages {
+                        deployments
+                            .forward_provider_event(owner.agent_id, id, message.into())
+                            .await?;
+                    }
+                    return Ok(None);
                 }
                 for message in messages {
                     s.chat.ingest(id, message).await?;

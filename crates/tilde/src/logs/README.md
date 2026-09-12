@@ -53,11 +53,11 @@ records every three seconds. It is a bounded live view, not a lossless subscript
 pause and query a fixed time interval to investigate high-volume gaps. History
 browsing caps the browser at 1000 records until the filters are narrowed.
 
-The sidecar worktree uses the existing Corrosion `logs` relation for immutable OTLP
-batches, bounded to 64 MiB per agent and 24-hour retention. Only enablement is
-replicated to sidecars. They retain cached settings while disconnected, discard
-when known disabled, and delete batches after durable gateway acceptance. Gateway
-projection supplies source-group ownership and does not reuse expired agent tokens.
+Sidecars queue immutable OTLP log batches in their bounded in-memory outbox and ship
+them to the gateway in the publish stream. Only enablement is replicated to sidecars.
+They retain cached settings while disconnected, discard when known disabled, and drop
+batches after durable gateway acceptance. Gateway acceptance supplies ownership from
+the authenticated deployment and does not reuse expired agent tokens.
 
 Do preserve persistent queue volumes across restarts. Do scope every history query
 by verified agent ID. Do monitor queue rejection, expiration and forwarding-loss

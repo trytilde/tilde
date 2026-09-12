@@ -8,6 +8,7 @@
 //! than automatically replaying potentially completed external effects.
 use crate::chat as application;
 use crate::proto::tilde::agent_host::v1 as host;
+use crate::proto::tilde::ingress::v1 as ingress_pb;
 use crate::proto::tilde::runtime::v1 as runtime_pb;
 use crate::proto::tilde::types::v1 as types;
 use crate::{
@@ -75,19 +76,23 @@ impl Chat {
         if let Some(local) = self.local() {
             return local.start_run(r).await;
         }
-        if let Some(deployments) = &self.deployments
-            && let Some(run) = deployments
-                .start_retained_run(&r)
-                .await
-                .map_err(|e| match e {
-                    crate::error::Error::ChatLifecycle(e) => e,
-                    crate::error::Error::Denied => ChatError::Denied,
-                    crate::error::Error::NotFound => ChatError::NotFound,
-                    crate::error::Error::Conflict => ChatError::Conflict,
-                    _ => ChatError::Transport,
-                })?
-        {
-            return Ok(run);
+        let forwarded: Option<ingress_pb::StartRunResponse> = self
+            .forward_sidecar(
+                id(&r.agent_id)?,
+                Some(id(&r.thread_id)?),
+                "StartRun",
+                &ingress_pb::StartRunRequest {
+                    thread_id: r.thread_id.clone(),
+                    agent_id: r.agent_id.clone(),
+                    objective: r.objective.clone(),
+                    goal_id: r.goal_id.clone(),
+                    idempotency_key: r.idempotency_key.clone(),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        if let Some(response) = forwarded {
+            return response.run.into_option().ok_or(ChatError::Transport);
         }
         text(&r.objective)?;
         text(&r.idempotency_key)?;
@@ -194,6 +199,20 @@ impl Chat {
         let old = self.run(run).await?;
         let agent = id(&old.agent_id)?;
         let thread = id(&old.thread_id)?;
+        let forwarded: Option<ingress_pb::ResumeRunResponse> = self
+            .forward_sidecar(
+                agent,
+                Some(thread),
+                "ResumeRun",
+                &ingress_pb::ResumeRunRequest {
+                    id: run.to_string(),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        if let Some(response) = forwarded {
+            return response.run.into_option().ok_or(ChatError::Transport);
+        }
         let mut tx = self.pg()?.begin().await?;
         super::access::lock_thread_route(&mut tx, thread).await?;
         sqlx::query_file!("../../queries/chat/agent_available.sql", agent)
@@ -364,6 +383,26 @@ impl Chat {
         text(&r.text)?;
         let invocation = id(&r.invocation_id)?;
         let input = id(&r.input_id)?;
+        let target = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
+            .fetch_optional(self.pg()?)
+            .await?
+            .ok_or(ChatError::NotFound)?;
+        if let Some(()) = self
+            .forward_control(
+                target.agent_id,
+                target.thread_id,
+                "SteerInvocation",
+                &ingress_pb::SteerInvocationRequest {
+                    invocation_id: r.invocation_id.clone(),
+                    input_id: r.input_id.clone(),
+                    text: r.text.clone(),
+                    ..Default::default()
+                },
+            )
+            .await?
+        {
+            return Ok(());
+        }
         let mut tx = self.pg()?.begin().await?;
         let row = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
             .fetch_optional(&mut *tx)
@@ -394,8 +433,143 @@ impl Chat {
         if let Some(local) = self.local() {
             return local.cancel_invocation(invocation).await;
         }
+        let target = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
+            .fetch_optional(self.pg()?)
+            .await?
+            .ok_or(ChatError::NotFound)?;
+        if let Some(()) = self
+            .forward_control(
+                target.agent_id,
+                target.thread_id,
+                "CancelInvocation",
+                &ingress_pb::CancelInvocationRequest {
+                    invocation_id: invocation.to_string(),
+                    ..Default::default()
+                },
+            )
+            .await?
+        {
+            return Ok(());
+        }
         self.finish(invocation, "canceled").await?;
         Ok(())
+    }
+    /// Execute one ingress call on the sidecar replica that owns the conversation.
+    /// Returns None for gateway-deployed agents so the caller continues locally.
+    pub(crate) async fn forward_sidecar<
+        Req: buffa::Message + serde::Serialize,
+        Resp: buffa::Message + serde::de::DeserializeOwned,
+    >(
+        &self,
+        agent: Uuid,
+        thread: Option<Uuid>,
+        method: &str,
+        request: &Req,
+    ) -> Result<Option<Resp>> {
+        let Some(deployments) = &self.deployments else {
+            return Ok(None);
+        };
+        if !deployments
+            .is_sidecar(agent)
+            .await
+            .map_err(|_| ChatError::Transport)?
+        {
+            return Ok(None);
+        }
+        let token = deployments
+            .issue_ingress_token(agent, thread.map(|t| t.to_string()), Uuid::nil())
+            .await
+            .map_err(|_| ChatError::Transport)?;
+        let call = crate::proto::tilde::agent_event_ingress::v1::IngressCall {
+            method: method.into(),
+            content_type: "application/json".into(),
+            body: serde_json::to_vec(request).map_err(|_| ChatError::Transport)?,
+            caller_token: token.expose_secret().into(),
+            ..Default::default()
+        };
+        let result = deployments
+            .forward(agent, thread, call)
+            .await
+            .map_err(|e| match e {
+                crate::error::Error::ChatLifecycle(e) => e,
+                crate::error::Error::Invalid(message) => ChatError::Invalid(message),
+                crate::error::Error::NotFound => ChatError::NotFound,
+                crate::error::Error::Denied => ChatError::Denied,
+                _ => ChatError::Transport,
+            })?;
+        if result.status != 200 {
+            #[derive(serde::Deserialize)]
+            struct Failure {
+                code: String,
+                #[serde(default)]
+                message: String,
+            }
+            let failure: Failure =
+                serde_json::from_slice(&result.body).map_err(|_| ChatError::Transport)?;
+            return Err(match failure.code.as_str() {
+                "not_found" => ChatError::NotFound,
+                "failed_precondition" | "already_exists" => ChatError::Conflict,
+                "permission_denied" | "unauthenticated" => ChatError::Denied,
+                "invalid_argument" => ChatError::Invalid(failure.message),
+                _ => ChatError::Transport,
+            });
+        }
+        serde_json::from_slice(&result.body)
+            .map(Some)
+            .map_err(|_| ChatError::Transport)
+    }
+    pub(crate) async fn forward_control<Req: buffa::Message + serde::Serialize>(
+        &self,
+        agent: Uuid,
+        thread: Uuid,
+        method: &str,
+        request: &Req,
+    ) -> Result<Option<()>> {
+        Ok(self
+            .forward_sidecar::<_, ingress_pb::CancelInvocationResponse>(
+                agent,
+                Some(thread),
+                method,
+                request,
+            )
+            .await?
+            .map(|_| ()))
+    }
+    /// A message posted at the gateway into a room owned by a sidecar replica.
+    /// First sidecar-deployed agent participating in a thread, if any.
+    pub(crate) async fn thread_sidecar_agent(&self, thread: Uuid) -> Result<Option<Uuid>> {
+        if self.deployments.is_none() {
+            return Ok(None);
+        }
+        Ok(
+            sqlx::query_file!("../../queries/deployment/thread_sidecar_agents.sql", thread)
+                .fetch_optional(self.pg()?)
+                .await?
+                .map(|row| row.agent_id),
+        )
+    }
+    pub(crate) async fn forward_post(
+        &self,
+        r: &application::PostMessage,
+    ) -> Result<Option<types::Message>> {
+        let thread = id(&r.thread_id)?;
+        let Some(agent) = self.thread_sidecar_agent(thread).await? else {
+            return Ok(None);
+        };
+        let request = ingress_pb::PostMessageRequest {
+            id: r.id.clone(),
+            thread_id: r.thread_id.clone(),
+            participant_id: r.participant_id.clone(),
+            text: r.text.clone(),
+            addressed_participant_ids: r.addressed_participant_ids.clone(),
+            in_reply_to_message_id: r.in_reply_to_message_id.clone(),
+            attachment_ids: r.attachment_ids.clone(),
+            ..Default::default()
+        };
+        let response: Option<ingress_pb::PostMessageResponse> = self
+            .forward_sidecar(agent, Some(thread), "PostMessage", &request)
+            .await?;
+        Ok(response.and_then(|r| r.message.into_option()))
     }
     pub(crate) async fn finish(&self, invocation: Uuid, status: &str) -> Result<()> {
         let existing = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)

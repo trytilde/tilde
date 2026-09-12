@@ -7,7 +7,7 @@ use secrecy::ExposeSecret;
 use std::{net::SocketAddr, sync::Arc};
 use tilde::{
     agent::Agents,
-    config::{Backend, Config},
+    config::{Backend, Config, Serve},
     database,
     encryption::Encryption,
     network,
@@ -25,14 +25,12 @@ mod web;
 struct Args {
     #[command(subcommand)]
     command: Option<Command>,
+    /// Address for the single listener serving every enabled route group.
     #[arg(long)]
-    management_listen: Option<SocketAddr>,
+    listen: Option<SocketAddr>,
+    /// Comma-separated route groups: management, ingress, runtime, sidecar.
     #[arg(long)]
-    agent_runtime_listen: Option<SocketAddr>,
-    #[arg(long)]
-    public_event_ingress_listen: Option<SocketAddr>,
-    #[arg(long)]
-    agent_event_ingress_listen: Option<SocketAddr>,
+    serve: Option<Serve>,
     #[arg(long)]
     allow_network: bool,
     #[arg(long, value_delimiter = ',')]
@@ -58,28 +56,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let mut config = Config::init_from_env()?;
-    if let Some(listen) = args.management_listen {
-        config.management_listen = listen;
+    if let Some(listen) = args.listen {
+        config.listen = listen;
     }
-    if let Some(listen) = args.agent_runtime_listen {
-        config.agent_runtime_listen = listen;
+    if let Some(serve) = args.serve {
+        config.serve = serve;
     }
-    if let Some(listen) = args.agent_event_ingress_listen {
-        config.agent_event_ingress_listen = listen;
-    }
-    if let Some(listen) = args.public_event_ingress_listen {
-        config.public_event_ingress_listen = listen;
-    }
-    network::Boundary::new(
-        config.public_event_ingress_listen,
-        config.allow_network || args.allow_network,
-        vec![],
-    )?;
-    network::Boundary::new(
-        config.agent_runtime_listen,
-        config.allow_network || args.allow_network,
-        vec![],
-    )?;
     if args.allow_network {
         config.allow_network = true;
     }
@@ -88,13 +70,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(backend) = args.encryption_backend {
         config.encryption_backend = backend;
-    }
-    if config.management_listener_enabled() {
-        network::Boundary::new(
-            config.management_listen,
-            config.allow_network,
-            config.web_origins.0.clone(),
-        )?;
     }
     let avatars = config.avatar_store()?;
     let protection = config.key_protection()?;
@@ -107,7 +82,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if matches!(args.command, Some(Command::CheckConfig)) {
         return Ok(());
     }
-    let management_listener_enabled = config.management_listener_enabled();
     tracing_subscriber::fmt()
         .with_ansi(false)
         .with_env_filter(config.log_filter.clone())
@@ -126,73 +100,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(avatars) = avatars {
         agents = agents.with_avatar_store(avatars);
     }
-    let listener = if management_listener_enabled {
-        Some(tokio::net::TcpListener::bind(config.management_listen).await?)
-    } else {
-        None
-    };
-    let address = listener
-        .as_ref()
-        .map(|listener| listener.local_addr())
-        .transpose()?
-        .unwrap_or(config.management_listen);
-    let sidecar_listener = tokio::net::TcpListener::bind(config.agent_event_ingress_listen).await?;
-    let sidecar_address = sidecar_listener.local_addr()?;
-    let sidecar_boundary = network::Boundary::new(sidecar_address, config.allow_network, vec![])?;
-    let ingress_listener =
-        tokio::net::TcpListener::bind(config.public_event_ingress_listen).await?;
-    let ingress_address = ingress_listener.local_addr()?;
-    let ingress_url = config
-        .public_event_ingress_public_url
-        .unwrap_or_else(|| format!("http://{ingress_address}"));
-    let ingress_boundary = network::Boundary::new(
-        ingress_address,
-        config.allow_network,
-        vec![ingress_url.clone()],
-    )?;
-    let agent_runtime_listener = tokio::net::TcpListener::bind(config.agent_runtime_listen).await?;
-    let agent_address = agent_runtime_listener.local_addr()?;
-    let agent_callback_url = config
-        .agent_runtime_public_url
-        .unwrap_or_else(|| format!("http://{agent_address}"));
-    let agent_origin = url::Url::parse(&agent_callback_url)?
-        .origin()
-        .ascii_serialization();
-    let agent_boundary =
-        network::Boundary::new(agent_address, config.allow_network, vec![agent_origin])?;
-    let callback_url = config
-        .management_public_url
+    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let address = listener.local_addr()?;
+    let serve = config.serve;
+    let web_served = config.web_served();
+    let public_url = config
+        .public_url
+        .clone()
         .unwrap_or_else(|| format!("http://{address}"));
-    let callback = url::Url::parse(&callback_url)?;
-    if !matches!(callback.scheme(), "http" | "https")
-        || callback.host_str().is_none()
-        || !callback.username().is_empty()
-        || callback.password().is_some()
-        || callback.query().is_some()
-        || callback.fragment().is_some()
+    let public = url::Url::parse(&public_url)?;
+    if !matches!(public.scheme(), "http" | "https")
+        || public.host_str().is_none()
+        || !public.username().is_empty()
+        || public.password().is_some()
+        || public.query().is_some()
+        || public.fragment().is_some()
     {
         return Err(
-            "ENGINE_MANAGEMENT_PUBLIC_URL must be an HTTP(S) origin without credentials, query or fragment"
+            "ENGINE_PUBLIC_URL must be an HTTP(S) origin without credentials, query or fragment"
                 .into(),
         );
     }
-    config
-        .web_origins
-        .0
-        .push(callback.origin().ascii_serialization());
+    let ingress_url = config
+        .ingress_public_url
+        .clone()
+        .unwrap_or_else(|| public_url.clone());
+    let runtime_url = config
+        .runtime_public_url
+        .clone()
+        .unwrap_or_else(|| public_url.clone());
     let connection_setup_url = config
         .connection_setup_public_url
         .clone()
-        .unwrap_or_else(|| callback_url.clone());
-    config.web_origins.0.push(
-        url::Url::parse(&connection_setup_url)?
-            .origin()
-            .ascii_serialization(),
-    );
-    let boundary = listener
-        .as_ref()
-        .map(|_| network::Boundary::new(address, config.allow_network, config.web_origins.0))
-        .transpose()?;
+        .unwrap_or_else(|| public_url.clone());
+    let mut origins = config.web_origins.0.clone();
+    for value in [
+        &public_url,
+        &ingress_url,
+        &runtime_url,
+        &connection_setup_url,
+    ] {
+        origins.push(url::Url::parse(value)?.origin().ascii_serialization());
+    }
+    let boundary = network::Boundary::new(address, config.allow_network, origins)?;
     let connections = tilde::connections::service::Connections::new(
         pool.clone(),
         encryption.clone(),
@@ -212,82 +162,77 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool.clone(),
         trace_destination.is_some(),
     ));
-
     let health = tilde::agent::health::AgentHealth::new(pool.clone(), encryption.clone());
     health.cleanup().await?;
-    let chat = tilde::chat::Chat::new(pool.clone(), encryption.clone(), agent_callback_url)
+    let chat = tilde::chat::Chat::new(pool.clone(), encryption.clone(), runtime_url)
         .with_connections(connections.clone())
         .with_deployments(deployments.clone())
         .with_objects(agents.object_store().cloned());
-    let sidecar_router = tilde::deployment::rpc::agent_event_ingress_router(deployments.clone())
-        .merge(tilde::deployment::proxy::router(
-            deployments.clone(),
-            chat.clone(),
-        ))
-        .layer(axum::middleware::from_fn_with_state(
-            sidecar_boundary,
-            network::guard,
-        ));
     let trace_reader =
         tilde::telemetry::viewer::Reader::new(pool.clone(), trace_destination.clone());
     let telemetry =
         tilde::telemetry::Runtime::start(pool.clone(), chat.tokens.clone(), trace_destination);
     opentelemetry::global::set_tracer_provider(telemetry.provider.clone());
-    let agent_router = tilde::iam::listeners::agent_runtime_router(
-        agents.clone(),
-        chat.clone(),
-        &telemetry.tracing,
-    )
-    .merge(logs.router(&telemetry.tracing))
-    .layer(axum::middleware::from_fn(
-        tilde::telemetry::context::request,
-    ))
-    .layer(axum::middleware::from_fn_with_state(
-        agent_boundary,
-        network::guard,
-    ));
-    let ingress_router =
-        tilde::iam::listeners::public_event_ingress_router(chat.clone(), connections.clone())
-            .merge(tilde::deployment::public::router(
-                deployments.clone(),
-                chat.clone(),
-            ))
-            .layer(axum::middleware::from_fn(
-                tilde::telemetry::context::request,
-            ))
-            .layer(axum::middleware::from_fn_with_state(
-                ingress_boundary,
-                network::guard,
-            ));
     let (chat_shutdown, chat_shutdown_rx) = tokio::sync::watch::channel(false);
-    let mut bridge_worker =
-        tokio::spawn(deployments.clone().bridge_worker(chat_shutdown_rx.clone()));
-    let mut cold_worker = tokio::spawn(deployments.clone().cold_worker(chat_shutdown_rx.clone()));
-    let mut retention_worker = tokio::spawn(
-        deployments
-            .clone()
-            .retention_worker(chat_shutdown_rx.clone()),
-    );
-    let mut outbox_worker =
-        tokio::spawn(deployments.clone().outbox_worker(chat_shutdown_rx.clone()));
+    let mut relay_worker = tokio::spawn(deployments.clone().relay_worker(chat_shutdown_rx.clone()));
     let mut recovery_worker = tokio::spawn(
         deployments
             .clone()
             .recovery_worker(chat_shutdown_rx.clone()),
     );
-    let mut deployment_worker = tokio::spawn(deployments.worker(chat_shutdown_rx.clone()));
     let mut connection_worker = tokio::spawn(connections.clone().worker(chat_shutdown_rx.clone()));
     let mut health_worker = tokio::spawn(health.run(chat_shutdown_rx.clone()));
     let chat_worker = tokio::spawn(chat.clone().worker(chat_shutdown_rx));
     let readiness_pool = pool.clone();
-    let router = if config.management_enabled {
+    let mut router = Router::new()
+        .route("/healthz", get(|| async { "ok" }))
+        .route(
+            "/readyz",
+            get(move || {
+                let pool = readiness_pool.clone();
+                async move {
+                    if sqlx::query_file!("../../queries/system/ready.sql")
+                        .fetch_one(&pool)
+                        .await
+                        .is_ok()
+                    {
+                        (http::StatusCode::OK, "ready")
+                    } else {
+                        (http::StatusCode::SERVICE_UNAVAILABLE, "unavailable")
+                    }
+                }
+            }),
+        );
+    if serve.runtime {
+        router = router.merge(
+            tilde::iam::listeners::agent_runtime_router(
+                agents.clone(),
+                chat.clone(),
+                &telemetry.tracing,
+            )
+            .merge(logs.router(&telemetry.tracing)),
+        );
+    }
+    if serve.ingress {
+        router = router.merge(
+            tilde::iam::listeners::public_event_ingress_router(chat.clone(), connections.clone())
+                .merge(tilde::deployment::public::router(
+                    deployments.clone(),
+                    chat.clone(),
+                )),
+        );
+    }
+    if serve.sidecar {
+        router = router.merge(tilde::deployment::rpc::sidecar_router(deployments.clone()));
+    }
+    if serve.management {
         let oidc = tilde::iam::oidc::Oidc::new(
             pool.clone(),
             encryption,
             config.oidc_issuer.expect("validated OIDC issuer"),
             config.oidc_client_id.expect("validated OIDC client ID"),
             config.oidc_client_secret.expect("validated OIDC secret").0,
-            callback_url,
+            public_url.clone(),
             config.oidc_allow_http,
         )?;
         let trace_router = tilde::telemetry::viewer::router(trace_reader)
@@ -296,124 +241,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 oidc.clone(),
                 tilde::iam::oidc::management_guard,
             ));
-        tilde::iam::listeners::management_router(agents, chat.clone(), connections.clone(), oidc)
-            .merge(trace_router)
-    } else {
-        Router::new()
-    };
-    let router = if config.management_enabled {
-        router.merge(tilde::connections::assets::router(
-            config.connection_ui_dev_url.clone(),
-            Some(connections),
-        )?)
-    } else {
-        router
-    };
-    let router = router.route("/healthz", get(|| async { "ok" })).route(
-        "/readyz",
-        get(move || {
-            let pool = readiness_pool.clone();
-            async move {
-                if sqlx::query_file!("../../queries/system/ready.sql")
-                    .fetch_one(&pool)
-                    .await
-                    .is_ok()
-                {
-                    (http::StatusCode::OK, "ready")
-                } else {
-                    (http::StatusCode::SERVICE_UNAVAILABLE, "unavailable")
-                }
-            }
-        }),
-    );
+        router = router
+            .merge(
+                tilde::iam::listeners::management_router(
+                    agents,
+                    chat.clone(),
+                    connections.clone(),
+                    oidc,
+                )
+                .merge(trace_router),
+            )
+            .merge(tilde::connections::assets::router(
+                config.connection_ui_dev_url.clone(),
+                Some(connections),
+            )?);
+    }
     #[cfg(feature = "embedded-web")]
     let router = if config.web_enabled {
         router.fallback(web::serve)
     } else {
         router
     };
-    let router = if let Some(boundary) = boundary {
-        router.layer(axum::middleware::from_fn_with_state(
+    let router = router
+        .layer(axum::middleware::from_fn_with_state(
             boundary,
             network::guard,
         ))
-    } else {
-        router
-    };
-    let router = router.layer(axum::middleware::from_fn(
-        tilde::telemetry::context::request,
-    ));
-    tracing::info!(public_event_ingress_address=%ingress_address, management_address=%address, agent_runtime_address=%agent_address, management_enabled=config.management_enabled, web_enabled=config.web_enabled && cfg!(feature="embedded-web"), management_listener=listener.is_some(), "tilde listening");
+        .layer(axum::middleware::from_fn(
+            tilde::telemetry::context::request,
+        ));
+    tracing::info!(address=%address, serve=%serve, web_enabled=web_served, "tilde listening");
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
-    let user_shutdown = server_shutdown_rx.clone();
-    let server = async move {
-        match listener {
-            Some(listener) => {
-                axum::serve(listener, router)
-                    .with_graceful_shutdown(wait_shutdown(user_shutdown))
-                    .await
-            }
-            None => {
-                wait_shutdown(user_shutdown).await;
-                Ok(())
-            }
-        }
-    };
-    let ingress_server = axum::serve(ingress_listener, ingress_router)
-        .with_graceful_shutdown(wait_shutdown(server_shutdown_rx.clone()));
-    let sidecar_server = axum::serve(sidecar_listener, sidecar_router)
-        .with_graceful_shutdown(wait_shutdown(server_shutdown_rx.clone()));
-    let agent_server = axum::serve(agent_runtime_listener, agent_router)
-        .with_graceful_shutdown(wait_shutdown(server_shutdown_rx));
-    let mut servers = tokio::spawn(async move {
-        tokio::try_join!(server, agent_server, ingress_server, sidecar_server).map(|_| ())
-    });
+    let mut server = tokio::spawn(
+        axum::serve(listener, router)
+            .with_graceful_shutdown(wait_shutdown(server_shutdown_rx))
+            .into_future(),
+    );
     let result = tokio::select! {
         _ = shutdown() => Ok(()),
-        result = &mut servers => result.unwrap_or_else(|e|Err(std::io::Error::other(e))),
+        result = &mut server => result.unwrap_or_else(|e|Err(std::io::Error::other(e))),
         _ = &mut connection_worker => Err(std::io::Error::other("Connection setup worker stopped unexpectedly")),
-        _ = &mut bridge_worker => Err(std::io::Error::other("Conversation bridge stopped unexpectedly")),
-        _ = &mut cold_worker => Err(std::io::Error::other("Archived conversation worker stopped unexpectedly")),
-        _ = &mut outbox_worker => Err(std::io::Error::other("Sidecar outbox worker stopped unexpectedly")),
-        _ = &mut retention_worker => Err(std::io::Error::other("Sidecar retention worker stopped unexpectedly")),
+        _ = &mut relay_worker => Err(std::io::Error::other("Sidecar relay worker stopped unexpectedly")),
         _ = &mut recovery_worker => Err(std::io::Error::other("Sidecar recovery worker stopped unexpectedly")),
-        _ = &mut deployment_worker => Err(std::io::Error::other("Sidecar replication worker stopped unexpectedly")),
         _ = &mut health_worker => Err(std::io::Error::other("Agent health worker stopped unexpectedly")),
     };
     let _ = server_shutdown.send(true);
     let _ = chat_shutdown.send(true);
-    if !servers.is_finished()
-        && tokio::time::timeout(std::time::Duration::from_secs(5), &mut servers)
+    if !server.is_finished()
+        && tokio::time::timeout(std::time::Duration::from_secs(5), &mut server)
             .await
             .is_err()
     {
-        servers.abort();
+        server.abort();
     }
-    if !health_worker.is_finished() {
-        let _ = health_worker.await;
+    for worker in [
+        health_worker,
+        connection_worker,
+        relay_worker,
+        recovery_worker,
+    ] {
+        if !worker.is_finished() {
+            let _ = worker.await;
+        }
     }
     let _ = chat_worker.await;
-    if !connection_worker.is_finished() {
-        let _ = connection_worker.await;
-    }
-    if !bridge_worker.is_finished() {
-        let _ = bridge_worker.await;
-    }
-    if !cold_worker.is_finished() {
-        let _ = cold_worker.await;
-    }
-    if !outbox_worker.is_finished() {
-        let _ = outbox_worker.await;
-    }
-    if !retention_worker.is_finished() {
-        let _ = retention_worker.await;
-    }
-    if !recovery_worker.is_finished() {
-        let _ = recovery_worker.await;
-    }
-    if !deployment_worker.is_finished() {
-        let _ = deployment_worker.await;
-    }
     logs.shutdown().await;
     telemetry.shutdown().await;
     pool.close().await;

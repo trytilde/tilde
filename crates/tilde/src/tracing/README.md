@@ -84,18 +84,15 @@ Selected formatting and I/O controls are adapted from Langfuse's MIT source;
 
 ## Sidecar integration
 
-The `codex/corrosion-sidecars` worktree carries the companion integration. Local
-OTLP is batched with Rotel and committed to the existing Corrosion `traces` relation
-as base64-encoded raw protobuf. It is not encrypted and never includes Langfuse keys.
-The local relay is bounded at 64 MiB and receives only observability enablement
-through gateway configuration. It retains the last known setting during outages.
-Known-disabled sidecars discard valid payloads; disabling clears the local relay.
+A sidecar batches local OTLP with Rotel, stamps each span with the verified invocation
+scope, and queues the batch as a telemetry frame in its publish stream to the gateway.
+Nothing is written to disk and no Langfuse keys reach the sidecar. Enablement arrives
+through gateway configuration; known-disabled sidecars discard valid payloads.
 
-The gateway projects replicated batches into the same temporary outbox, then
-removes acknowledged sidecar records. Stable payload identities deduplicate HA
-and restart replay. Already accepted records use authenticated replication-group
-ownership rather than expired invocation tokens. Both sidecar and gateway enforce
-terminal upload grace on new agent requests.
+The gateway re-stamps the agent from the authenticated deployment token and accepts the
+batch into the same temporary outbox. A batch is only dropped from sidecar memory once
+the gateway acknowledged the publish. Both sidecar and gateway enforce terminal upload
+grace on new agent requests.
 
 Do preserve API scope and IDs when adapting instruments. Do treat queued delivery
 as at least once. Do not use trace metadata to grant permissions, send project

@@ -1,1 +1,0 @@
-SELECT n.instance_id,n.agent_ingress_url FROM sidecar_nodes n WHERE n.agent_id=$1 AND n.last_seen_at>NOW()-INTERVAL '7 days' AND NOT EXISTS(SELECT 1 FROM sidecar_nodes newer WHERE newer.agent_id=n.agent_id AND newer.gossip_address=n.gossip_address AND newer.instance_id<>n.instance_id AND newer.last_seen_at>n.last_seen_at);

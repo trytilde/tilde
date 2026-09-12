@@ -30,7 +30,7 @@ impl Deployments {
         let secret = match row.encrypted_secrets.as_deref() {
             Some(sealed) => self.open_secrets(agent, sealed)?,
             None => {
-                let secret = super::secrets::Secrets::generate()?;
+                let secret = super::secrets::Secrets::generate();
                 let sealed = self
                     .encryption
                     .seal(super::secret_binding(agent), &secret.encode()?)?

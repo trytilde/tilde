@@ -188,9 +188,6 @@ async function start() {
   const env = {
     ...process.env,
     ...oidc.env,
-    ENGINE_AGENT_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
-    ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
-    ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     ENGINE_ENCRYPTION_BACKEND: "seed",
     ENGINE_ENCRYPTION_KEY: seed,
@@ -199,8 +196,8 @@ async function start() {
     API_PORT: "18111",
     WEB_PORT: "18112",
   };
-  delete env.ENGINE_MANAGEMENT_PUBLIC_URL;
-  child = spawn(binary, ["--management-listen", "127.0.0.1:0"], {
+  delete env.ENGINE_PUBLIC_URL;
+  child = spawn(binary, ["--listen", "127.0.0.1:0"], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -208,7 +205,7 @@ async function start() {
     const timer = setTimeout(() => reject(new Error("Tilde did not start")), 15000);
     const data = (chunk) => {
       logs += chunk;
-      const match = logs.match(/management_address=(127\.0\.0\.1:\d+)/);
+      const match = logs.match(/ address=(127\.0\.0\.1:\d+)/);
       if (match) {
         clearTimeout(timer);
         resolve(`http://${match[1]}`);
@@ -250,7 +247,7 @@ try {
   const unbound = rpcClient(
     RuntimeChatService,
     createConnectTransport({
-      baseUrl: `http://${logs.match(/agent_runtime_address=(127\.0\.0\.1:\d+)/)[1]}`,
+      baseUrl: url,
       httpVersion: "2",
     }),
   );

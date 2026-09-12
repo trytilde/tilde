@@ -11,9 +11,7 @@ pub struct DeploymentView<'a> {
     pub endpoint_url: ::core::option::Option<&'a str>,
     /// Field 4: `failure_mode`
     pub failure_mode: ::buffa::EnumValue<super::super::SidecarFailureMode>,
-    /// Field 5: `retention_days`
-    pub retention_days: u32,
-    /// Field 6: `token_issued`
+    /// Field 5: `token_issued`
     pub token_issued: bool,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
@@ -82,13 +80,6 @@ impl<'a> ::buffa::MessageView<'a> for DeploymentView<'a> {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                view.retention_days = ::buffa::types::decode_uint32(&mut cur)?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
                 view.token_issued = ::buffa::types::decode_bool(&mut cur)?;
             }
             _ => {
@@ -117,7 +108,6 @@ impl<'a> ::buffa::MessageView<'a> for DeploymentView<'a> {
             mode: self.mode,
             endpoint_url: self.endpoint_url.map(|s| s.to_string()),
             failure_mode: self.failure_mode,
-            retention_days: self.retention_days,
             token_issued: self.token_issued,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
@@ -147,10 +137,6 @@ impl<'a> ::buffa::ViewEncode<'a> for DeploymentView<'a> {
             if val != 0 {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
-        }
-        if self.retention_days != 0u32 {
-            size
-                += 1u64 + ::buffa::types::uint32_encoded_len(self.retention_days) as u64;
         }
         if self.token_issued {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
@@ -184,11 +170,8 @@ impl<'a> ::buffa::ViewEncode<'a> for DeploymentView<'a> {
                 ::buffa::types::put_int32_field(4u32, val, buf);
             }
         }
-        if self.retention_days != 0u32 {
-            ::buffa::types::put_uint32_field(5u32, self.retention_days, buf);
-        }
         if self.token_issued {
-            ::buffa::types::put_bool_field(6u32, self.token_issued, buf);
+            ::buffa::types::put_bool_field(5u32, self.token_issued, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -222,13 +205,6 @@ impl<'__a> ::serde::Serialize for DeploymentView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.failure_mode) {
             __map.serialize_entry("failureMode", &self.failure_mode)?;
-        }
-        if !::buffa::json_helpers::skip_if::is_zero_u32(&self.retention_days) {
-            __map
-                .serialize_entry(
-                    "retentionDays",
-                    &::buffa::json_helpers::ProtoJson(&self.retention_days),
-                )?;
         }
         if self.token_issued {
             __map.serialize_entry("tokenIssued", &self.token_issued)?;
@@ -344,12 +320,7 @@ impl DeploymentOwnedView {
     pub fn failure_mode(&self) -> ::buffa::EnumValue<super::super::SidecarFailureMode> {
         self.0.reborrow().failure_mode
     }
-    /// Field 5: `retention_days`
-    #[must_use]
-    pub fn retention_days(&self) -> u32 {
-        self.0.reborrow().retention_days
-    }
-    /// Field 6: `token_issued`
+    /// Field 5: `token_issued`
     #[must_use]
     pub fn token_issued(&self) -> bool {
         self.0.reborrow().token_issued
@@ -391,17 +362,13 @@ pub struct SidecarNodeView<'a> {
     pub instance_id: &'a str,
     /// Field 2: `agent_id`
     pub agent_id: &'a str,
-    /// Field 3: `public_ingress_url`
-    pub public_ingress_url: &'a str,
-    /// Field 4: `agent_ingress_url`
-    pub agent_ingress_url: &'a str,
-    /// Field 5: `runtime_url`
+    /// Field 3: `public_url`
+    pub public_url: &'a str,
+    /// Field 4: `runtime_url`
     pub runtime_url: &'a str,
-    /// Field 6: `gossip_address`
-    pub gossip_address: &'a str,
-    /// Field 7: `ready`
+    /// Field 5: `ready`
     pub ready: bool,
-    /// Field 8: `last_seen_at`
+    /// Field 6: `last_seen_at`
     pub last_seen_at: ::buffa::MessageFieldView<
         ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
     >,
@@ -454,37 +421,23 @@ impl<'a> ::buffa::MessageView<'a> for SidecarNodeView<'a> {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                view.public_ingress_url = ::buffa::types::borrow_str(&mut cur)?;
+                view.public_url = ::buffa::types::borrow_str(&mut cur)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                view.agent_ingress_url = ::buffa::types::borrow_str(&mut cur)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
                 view.runtime_url = ::buffa::types::borrow_str(&mut cur)?;
             }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                view.gossip_address = ::buffa::types::borrow_str(&mut cur)?;
-            }
-            7u32 => {
+            5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 view.ready = ::buffa::types::decode_bool(&mut cur)?;
             }
-            8u32 => {
+            6u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -529,10 +482,8 @@ impl<'a> ::buffa::MessageView<'a> for SidecarNodeView<'a> {
         ::core::result::Result::Ok(super::super::SidecarNode {
             instance_id: self.instance_id.to_string(),
             agent_id: self.agent_id.to_string(),
-            public_ingress_url: self.public_ingress_url.to_string(),
-            agent_ingress_url: self.agent_ingress_url.to_string(),
+            public_url: self.public_url.to_string(),
             runtime_url: self.runtime_url.to_string(),
-            gossip_address: self.gossip_address.to_string(),
             ready: self.ready,
             last_seen_at: match self.last_seen_at.as_option() {
                 Some(v) => {
@@ -560,24 +511,11 @@ impl<'a> ::buffa::ViewEncode<'a> for SidecarNodeView<'a> {
         if !self.agent_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
         }
-        if !self.public_ingress_url.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.public_ingress_url)
-                        as u64;
-        }
-        if !self.agent_ingress_url.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.agent_ingress_url) as u64;
+        if !self.public_url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.public_url) as u64;
         }
         if !self.runtime_url.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.runtime_url) as u64;
-        }
-        if !self.gossip_address.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.gossip_address) as u64;
         }
         if self.ready {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
@@ -607,24 +545,18 @@ impl<'a> ::buffa::ViewEncode<'a> for SidecarNodeView<'a> {
         if !self.agent_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
         }
-        if !self.public_ingress_url.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.public_ingress_url, buf);
-        }
-        if !self.agent_ingress_url.is_empty() {
-            ::buffa::types::put_string_field(4u32, &self.agent_ingress_url, buf);
+        if !self.public_url.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.public_url, buf);
         }
         if !self.runtime_url.is_empty() {
-            ::buffa::types::put_string_field(5u32, &self.runtime_url, buf);
-        }
-        if !self.gossip_address.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.gossip_address, buf);
+            ::buffa::types::put_string_field(4u32, &self.runtime_url, buf);
         }
         if self.ready {
-            ::buffa::types::put_bool_field(7u32, self.ready, buf);
+            ::buffa::types::put_bool_field(5u32, self.ready, buf);
         }
         if self.last_seen_at.is_set() {
             ::buffa::types::put_len_delimited_header(
-                8u32,
+                6u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -657,17 +589,11 @@ impl<'__a> ::serde::Serialize for SidecarNodeView<'__a> {
         if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
             __map.serialize_entry("agentId", self.agent_id)?;
         }
-        if !::buffa::json_helpers::skip_if::is_empty_str(self.public_ingress_url) {
-            __map.serialize_entry("publicIngressUrl", self.public_ingress_url)?;
-        }
-        if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_ingress_url) {
-            __map.serialize_entry("agentIngressUrl", self.agent_ingress_url)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.public_url) {
+            __map.serialize_entry("publicUrl", self.public_url)?;
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.runtime_url) {
             __map.serialize_entry("runtimeUrl", self.runtime_url)?;
-        }
-        if !::buffa::json_helpers::skip_if::is_empty_str(self.gossip_address) {
-            __map.serialize_entry("gossipAddress", self.gossip_address)?;
         }
         if self.ready {
             __map.serialize_entry("ready", &self.ready)?;
@@ -778,32 +704,22 @@ impl SidecarNodeOwnedView {
     pub fn agent_id(&self) -> &'_ str {
         self.0.reborrow().agent_id
     }
-    /// Field 3: `public_ingress_url`
+    /// Field 3: `public_url`
     #[must_use]
-    pub fn public_ingress_url(&self) -> &'_ str {
-        self.0.reborrow().public_ingress_url
+    pub fn public_url(&self) -> &'_ str {
+        self.0.reborrow().public_url
     }
-    /// Field 4: `agent_ingress_url`
-    #[must_use]
-    pub fn agent_ingress_url(&self) -> &'_ str {
-        self.0.reborrow().agent_ingress_url
-    }
-    /// Field 5: `runtime_url`
+    /// Field 4: `runtime_url`
     #[must_use]
     pub fn runtime_url(&self) -> &'_ str {
         self.0.reborrow().runtime_url
     }
-    /// Field 6: `gossip_address`
-    #[must_use]
-    pub fn gossip_address(&self) -> &'_ str {
-        self.0.reborrow().gossip_address
-    }
-    /// Field 7: `ready`
+    /// Field 5: `ready`
     #[must_use]
     pub fn ready(&self) -> bool {
         self.0.reborrow().ready
     }
-    /// Field 8: `last_seen_at`
+    /// Field 6: `last_seen_at`
     #[must_use]
     pub fn last_seen_at(
         &self,

@@ -90,8 +90,8 @@ export declare type InvocationState = Message<"tilde.types.v1.InvocationState"> 
 export declare const InvocationStateSchema: GenMessage<InvocationState>;
 
 /**
- * Immutable, explicitly typed domain events. The complete encoded envelope is
- * encrypted before persistence and decrypted only inside authorized projections.
+ * Immutable, explicitly typed domain events. The owning replica assigns
+ * origin_sequence per thread; the gateway projects them in that order.
  *
  * @generated from message tilde.types.v1.RuntimeEvent
  */
@@ -145,11 +145,6 @@ export declare type RuntimeEvent = Message<"tilde.types.v1.RuntimeEvent"> & {
    * @generated from field: string origin_agent_id = 33;
    */
   originAgentId: string;
-
-  /**
-   * @generated from field: bool archive_origin = 34;
-   */
-  archiveOrigin: boolean;
 
   /**
    * @generated from oneof tilde.types.v1.RuntimeEvent.state
@@ -447,39 +442,6 @@ export declare type ChannelDecision = Message<"tilde.types.v1.ChannelDecision"> 
 export declare const ChannelDecisionSchema: GenMessage<ChannelDecision>;
 
 /**
- * Gateway-authored ownership transition, committed to its Postgres outbox before publication.
- *
- * @generated from message tilde.types.v1.AssignmentChange
- */
-export declare type AssignmentChange = Message<"tilde.types.v1.AssignmentChange"> & {
-  /**
-   * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 1;
-   */
-  assignment?: ParticipantAssignment | undefined;
-
-  /**
-   * @generated from field: tilde.types.v1.AgentCommand command = 2;
-   */
-  command?: AgentCommand | undefined;
-
-  /**
-   * @generated from field: tilde.types.v1.InvocationState invocation = 3;
-   */
-  invocation?: InvocationState | undefined;
-
-  /**
-   * @generated from field: tilde.types.v1.Run run = 4;
-   */
-  run?: Run | undefined;
-};
-
-/**
- * Describes the message tilde.types.v1.AssignmentChange.
- * Use `create(AssignmentChangeSchema)` to create a new message.
- */
-export declare const AssignmentChangeSchema: GenMessage<AssignmentChange>;
-
-/**
  * @generated from message tilde.types.v1.AttachmentSource
  */
 export declare type AttachmentSource = Message<"tilde.types.v1.AttachmentSource"> & {
@@ -509,27 +471,6 @@ export declare type AttachmentSource = Message<"tilde.types.v1.AttachmentSource"
  * Use `create(AttachmentSourceSchema)` to create a new message.
  */
 export declare const AttachmentSourceSchema: GenMessage<AttachmentSource>;
-
-/**
- * @generated from message tilde.types.v1.AttachmentTransfer
- */
-export declare type AttachmentTransfer = Message<"tilde.types.v1.AttachmentTransfer"> & {
-  /**
-   * @generated from field: string attachment_id = 1;
-   */
-  attachmentId: string;
-
-  /**
-   * @generated from field: string thread_id = 2;
-   */
-  threadId: string;
-};
-
-/**
- * Describes the message tilde.types.v1.AttachmentTransfer.
- * Use `create(AttachmentTransferSchema)` to create a new message.
- */
-export declare const AttachmentTransferSchema: GenMessage<AttachmentTransfer>;
 
 /**
  * @generated from message tilde.types.v1.ProviderEvent
@@ -647,47 +588,6 @@ export declare type ProviderAttachment = Message<"tilde.types.v1.ProviderAttachm
  * Use `create(ProviderAttachmentSchema)` to create a new message.
  */
 export declare const ProviderAttachmentSchema: GenMessage<ProviderAttachment>;
-
-/**
- * @generated from message tilde.types.v1.BridgeSnapshot
- */
-export declare type BridgeSnapshot = Message<"tilde.types.v1.BridgeSnapshot"> & {
-  /**
-   * @generated from field: tilde.types.v1.Thread thread = 1;
-   */
-  thread?: Thread | undefined;
-
-  /**
-   * @generated from field: repeated tilde.types.v1.Message messages = 2;
-   */
-  messages: Message$1[];
-
-  /**
-   * @generated from field: repeated tilde.types.v1.Activity activities = 3;
-   */
-  activities: Activity[];
-
-  /**
-   * @generated from field: int64 sequence = 4;
-   */
-  sequence: bigint;
-
-  /**
-   * @generated from field: optional string objective = 5;
-   */
-  objective?: string | undefined;
-
-  /**
-   * @generated from field: string idempotency_key = 6;
-   */
-  idempotencyKey: string;
-};
-
-/**
- * Describes the message tilde.types.v1.BridgeSnapshot.
- * Use `create(BridgeSnapshotSchema)` to create a new message.
- */
-export declare const BridgeSnapshotSchema: GenMessage<BridgeSnapshot>;
 
 /**
  * @generated from enum tilde.types.v1.ProviderEventKind

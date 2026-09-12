@@ -324,6 +324,19 @@ impl Chat {
             return local.add_participant(r).await;
         }
         let thread = id(&r.thread_id)?;
+        if let Some(agent) = self.thread_sidecar_agent(thread).await? {
+            let request = crate::proto::tilde::ingress::v1::AddParticipantRequest {
+                thread_id: r.thread_id.clone(),
+                participant: r.participant.clone().into(),
+                ..Default::default()
+            };
+            let response: Option<crate::proto::tilde::ingress::v1::AddParticipantResponse> = self
+                .forward_sidecar(agent, Some(thread), "AddParticipant", &request)
+                .await?;
+            if let Some(response) = response {
+                return response.thread.into_option().ok_or(ChatError::Transport);
+            }
+        }
         let p = r.participant.ok_or(ChatError::NotFound)?;
         if p.user_id.is_some() == p.agent_id.is_some() {
             return Err(ChatError::Invalid("Specify one user or agent".into()));

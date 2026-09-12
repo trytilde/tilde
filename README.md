@@ -288,92 +288,85 @@ and ends execution; resume starts a new invocation. See the
 
 ## Sidecar deployments
 
-Gateway-only deployments require no Corrosion configuration. To run an agent
-beside a sidecar, choose **Sidecar** in its **Deployment** tab, select the failure
-policy and retention days, and issue a deployment token. Use the same token for
-all replicas of that agent. Pause an existing agent before changing its mode;
-leaving sidecar mode waits for retained conversations to finish archiving.
+Gateway-only deployments need nothing beyond the gateway. To run an agent beside a
+sidecar, choose **Sidecar** in its **Deployment** tab, select the failure policy, and
+issue a deployment token. Use the same token for every replica of that agent. Pause an
+existing agent before changing its mode.
 
-The release archive and container include `tilde`, `tilde-sidecar`, and a pinned
-`corrosion` binary. Put the binaries on `PATH`, or set `ENGINE_CORROSION_BINARY`.
-Run the sidecar next to your SDK-hosted agent process:
+The release archive and container include `tilde` and `tilde-sidecar`. Run the sidecar
+next to your SDK-hosted agent process:
 
 ```bash
-export ENGINE_SIDECAR_GATEWAY_URL=https://gateway.example:8083
+export ENGINE_SIDECAR_GATEWAY_URL=https://tilde.example.com
 export ENGINE_SIDECAR_AGENT_TOKENS='<deployment-token>'
 export ENGINE_SIDECAR_AGENT_ENDPOINTS='<agent-id>=http://127.0.0.1:3000'
-export ENGINE_SIDECAR_ADVERTISE_ADDRESS=10.0.0.12
-export ENGINE_SIDECAR_STATE_DIRECTORY=/var/lib/tilde-sidecar
 tilde-sidecar
 ```
 
-For multiple agents, separate tokens and `agent-id=endpoint` entries with commas.
-Each agent receives its own Corrosion database and peer cluster. Keep the state
-directory persistent. The gateway brokers peer discovery, encryption and TLS
-material during registration. Gateway and sidecar schema revisions must match.
-A joining replica checks replication progress before becoming ready.
+For multiple agents, separate tokens and `agent-id=endpoint` entries with commas. The
+sidecar keeps no state on disk. It dials the gateway's `sidecar` route group over one
+connection, receives configuration, credentials and ownership from that stream, and
+publishes typed events back for projection into Postgres. The gateway never connects to
+a sidecar, so replicas may sit behind NAT.
 
-The sidecar serves agent runtime on port 8081, public event ingress on 8082, and
-agent event ingress on 8083. Agent routes are prefixed with `/agents/<agent-id>`;
-provider webhooks use `/agents/<agent-id>/connections/webhooks/<connection-id>`.
-Use `ENGINE_AGENT_RUNTIME_LISTEN`, `ENGINE_PUBLIC_EVENT_INGRESS_LISTEN`, and
-`ENGINE_AGENT_EVENT_INGRESS_LISTEN` to change binds. Allow private gateway-to-sidecar
-HTTP traffic and peer UDP traffic starting at `ENGINE_SIDECAR_GOSSIP_PORT` (default
-8787, incremented once per configured agent). Advertised addresses must be
-reachable by the other replicas and gateway. Use a load balancer to route your
-provider webhooks and native ingress requests to sidecars.
+The sidecar binds two listeners: `ENGINE_SIDECAR_RUNTIME_LISTEN` (default
+`127.0.0.1:8081`, loopback only) for the agent process, and `ENGINE_SIDECAR_LISTEN`
+(default `0.0.0.0:8082`) for provider webhooks and native ingress. Agent routes are
+prefixed with `/agents/<agent-id>`; provider webhooks use
+`/agents/<agent-id>/connections/webhooks/<connection-id>`. Set `ENGINE_SIDECAR_PUBLIC_URL`
+to the externally reachable origin of that listener and put a load balancer in front of
+the replicas.
 
-Public gateway ingress rejects requests for sidecar-deployed agents. A sidecar
-serves retained conversations locally and proxies absent conversations through
-authenticated agent-event-ingress. Retired conversations remain in Postgres and
-are never copied back into Corrosion; their requests therefore incur gateway
-latency. Gateway archival runs continuously so management can inspect live history.
-Central IAM, registry changes and credential setup require the gateway.
+The replica that first receives work for a conversation owns it: turn state lives in its
+memory, the agent process is invoked over loopback, and channel replies use the
+replicated credentials. Requests that land on another replica, or on the gateway, are
+executed by the owner and answered through the gateway. The gateway serves reads of
+sidecar conversations from its projection, and completed messages in rooms with several
+sidecar agents are relayed to each owner.
 
-The owner of each conversation's agent participant executes its commands.
-Acknowledgements have a five-second deadline; owner health expires after fifteen
-seconds. Recovery follows the selected **Assign to new node** or **Stop** policy.
-The gateway serializes ownership changes in Postgres and publishes new generations.
-Replication is eventual: partitioned execution can overlap during failover, so
-application effects should use idempotency keys.
+Heartbeats travel with every publish; an owner unheard from for fifteen seconds loses its
+conversations. Under **Assign to new node** the gateway hands active runs to another live
+replica, which restarts them from their objective. Under **Stop** the runs fail. A
+replica that cannot reach the gateway stops executing after thirty seconds, so a
+partitioned owner never keeps running beside its replacement. External effects should
+still use idempotency keys.
 
-Retention defaults to seven inactive days. Complete conversations are removed
-only after archival and peer acknowledgement; Postgres history remains available.
 Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until
-uploaded to gateway S3 storage. Pending uploads are not evicted. Configure the
-existing `ENGINE_S3_*` settings on the gateway for durable attachment storage.
+uploaded to gateway S3 storage; configure the existing `ENGINE_S3_*` settings on the
+gateway. Use `task dev:sidecar` for local development; `task test:sidecar` runs two
+in-process replicas against Postgres and exercises ownership, projection, forwarding and
+failover.
 
-For local development use `task dev:sidecar`; `task test:sidecar` exercises real
-Corrosion peers, execution ownership and Postgres archival.
+## Route groups and authentication
 
-## IAM and API listeners
+One listener (`ENGINE_LISTEN` / `--listen`, default `127.0.0.1:8080`) serves every
+route group. `ENGINE_SERVE` / `--serve` selects the groups a process mounts:
 
-One Tilde gateway serves four APIs:
-
-| API | Default bind | Authentication |
+| Group | Routes | Authentication |
 | --- | --- | --- |
-| Management API | `127.0.0.1:8080` | User bearer session from OIDC |
-| Agent runtime API | `127.0.0.1:8081` | Signed invocation connect token |
-| Public event ingress API | `127.0.0.1:8082` | Provider signatures or scoped ingress tokens |
-| Agent event ingress API | `127.0.0.1:8083` | Agent deployment tokens and original caller scope |
+| `management` | Management RPCs, OIDC, connection setup, embedded UI | User bearer session from OIDC |
+| `runtime` | Agent runtime RPCs, invocation controls, OTLP uploads | Signed invocation connect token |
+| `ingress` | Provider webhooks and native conversation ingress | Provider signatures or scoped ingress tokens |
+| `sidecar` | The sidecar protocol | Agent deployment tokens |
+
+The default is `all`. Operators who want network isolation run separate processes with
+different `ENGINE_SERVE` values rather than separate ports. Binding outside loopback
+requires `--allow-network`.
 
 Every user admitted by the configured OIDC provider has unrestricted management
 access. There is no role model or API-key support. Configure the provider's login
 admission policy accordingly. Agent runtimes never receive user tokens.
 
 Configure `ENGINE_OIDC_ISSUER`, `ENGINE_OIDC_CLIENT_ID` and
-`ENGINE_OIDC_CLIENT_SECRET`. Register
-`<ENGINE_MANAGEMENT_PUBLIC_URL>/auth/callback` at the provider. The management
-public URL is the browser-facing origin, including Vite's port in development.
-Production requires HTTPS; `ENGINE_OIDC_ALLOW_HTTP=true` is for local development.
-The initial OIDC implementation validates RS256 ID tokens.
+`ENGINE_OIDC_CLIENT_SECRET`. Register `<ENGINE_PUBLIC_URL>/auth/callback` at the
+provider. The public URL is the browser-facing origin, including Vite's port in
+development. Production requires HTTPS; `ENGINE_OIDC_ALLOW_HTTP=true` is for local
+development. The initial OIDC implementation validates RS256 ID tokens.
 
-Use `ENGINE_MANAGEMENT_LISTEN` / `--management-listen` and
-`ENGINE_AGENT_RUNTIME_LISTEN` / `--agent-runtime-listen` for bind addresses.
-`ENGINE_AGENT_RUNTIME_PUBLIC_URL` must be reachable by agent servers and is the
-callback URL delivered on invocation. All listeners require `--allow-network`
-when binding outside loopback. These names replace `ENGINE_LISTEN`,
-`ENGINE_PUBLIC_URL` and `--listen`.
+`ENGINE_PUBLIC_URL` is also the default origin for provider webhooks and agent
+callbacks. Set `ENGINE_INGRESS_PUBLIC_URL` when providers reach the engine through a
+different origin, and `ENGINE_RUNTIME_PUBLIC_URL` when agent hosts do; the latter is
+the callback URL delivered on invocation.
 
 The browser stores its eight-hour user token in local storage and sends it through
 `Authorization: Bearer`; no authentication cookies are issued or accepted. Logout
@@ -431,41 +424,28 @@ The SDK exposes invocation-authenticated `ctx.agents` registry methods and
 `ctx.invokeAgent({agentId, objective})` for agents already participating in the
 current thread. Management clients accept an OIDC-derived `accessToken` option.
 
-### Optional management API and React serving
+### Optional management routes and React serving
 
 Set these independently in the process environment or development `.env`:
 
 ```dotenv
-ENGINE_MANAGEMENT_ENABLED=true
+ENGINE_SERVE=all
 ENGINE_WEB_ENABLED=true
 ```
 
-Both default to `true`. `ENGINE_MANAGEMENT_ENABLED=false` removes management,
-OIDC and connection-brokering routes and makes OIDC configuration optional.
-The agent runtime API and background workers continue running.
+`ENGINE_SERVE=ingress,runtime,sidecar` removes management, OIDC and
+connection-brokering routes and makes OIDC configuration optional. Agent-facing routes
+and background workers continue running. The dev launcher exposes this switch as
+`ENGINE_MANAGEMENT_ENABLED=false`.
 
 `ENGINE_WEB_ENABLED=false` disables embedded React assets in packaged builds
-and prevents Vite from starting under `pnpm dev`. It does not disable management
+and prevents Vite from starting under `task dev`. It does not disable management
 RPCs or OIDC endpoints. Development starts Dex only when management is enabled.
 
-In packaged builds, React shares `ENGINE_MANAGEMENT_LISTEN`: with management off
-and web on, that address serves the UI and health endpoints only. With both off,
-it is not bound at all. Builds without the `embedded-web` feature do not bind an
-extra listener for static assets. A separately served UI needs its API/auth paths
-proxied to an enabled management API; dev Vite supports `ENGINE_DEV_URL` for that
-upstream. When web is disabled, the dev management public URL defaults to the API
-port rather than Vite's port.
-
-Development orchestration lives in `Taskfile.yml`; `pnpm dev` and `pnpm build`
-are aliases for `task dev` and `task build`. Task runs the API and Vite in parallel
-with live interleaved output after configuration validation and optional Dex startup.
-A service failure stops the other development services (fail-fast). Ctrl+C also
-stops all processes.
-`task sqlx:prepare` owns migration/query preparation; use `task sqlx:prepare --
---check` to verify metadata. Test sequencing also lives in Task; the retained
-Postgres shell wrapper owns temporary database allocation and cleanup. JavaScript
-scripts remain for code-generator installation, generated-file verification and
-protocol/process integration tests.
+In packaged builds the embedded UI is served by the same listener as the API. A
+separately served UI needs its API/auth paths proxied to an enabled management group;
+dev Vite supports `ENGINE_DEV_URL` for that upstream. When web is disabled, the dev
+public URL defaults to the API port rather than Vite's port.
 
 ### Local provider webhooks with ngrok
 
@@ -478,26 +458,23 @@ NGROK_AUTHTOKEN=your-token
 ```
 
 `task secrets:load` also loads `ngrok_authtoken` from SOPS into the private dev
-dotenv file. Run `task dev`; ngrok forwards only to event ingress at
-`ADDRESS:PUBLIC_EVENT_INGRESS_PORT` (default port `8082`). The launcher sets
-`ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any configured
-ingress public URL while ngrok is enabled. This also updates the webhook URLs
-displayed and copied in connection setup iframes. The dashboard, setup UI and OAuth redirects remain
-on management; ngrok never forwards to management or the agent runtime API.
+dotenv file. Run `task dev`; ngrok forwards to the engine port at `ADDRESS:API_PORT`.
+The launcher sets `ENGINE_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any
+configured ingress public URL while ngrok is enabled. This also updates the webhook
+URLs displayed and copied in connection setup iframes. Management and runtime routes on
+the tunnelled port still require their own credentials.
 
-All connection webhook URLs and provider manifests use the event ingress origin.
+All connection webhook URLs and provider manifests use the ingress public origin.
 Existing provider webhook registrations must be updated to the new URL shown on
-the connection; starting the listener does not rewrite provider registrations.
-`/connections/webhooks/{connection_id}` is served only on event ingress, which
-remains active when management and web are disabled. Deployments can expose this
-listener while keeping management private. Configure its bind with
-`ENGINE_PUBLIC_EVENT_INGRESS_LISTEN` or `--event-ingress-listen`, and its externally
-reachable origin with `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL`.
+the connection; starting the engine does not rewrite provider registrations.
+`/connections/webhooks/{connection_id}` belongs to the ingress group, which remains
+active when management and web are disabled. Configure the externally reachable
+origin with `ENGINE_INGRESS_PUBLIC_URL`.
 
 Ngrok is disabled by default and belongs only to Task's dev launcher; the packaged
 Rust server never starts it. It stops with Ctrl+C or a dev service failure.
 `task dev:ngrok` can attach a dev tunnel separately; the running API must already
-use the matching event ingress public URL and port.
+use the matching ingress public URL and port.
 
 ### Development over Tailscale
 
@@ -543,13 +520,13 @@ LANGFUSE_SECRET_KEY=sk-lf-...
 ```
 
 Agents upload OTLP to `/v1/traces` on their runtime listener with their invocation
-token. Sidecars retain accepted spans in Corrosion and replicate them between HA
-peers. The gateway subscribes, takes over delivery, and forwards to Langfuse.
-Only the gateway has Langfuse credentials. The management tracing tab reads from
-Langfuse; Postgres does not retain permanent trace history.
+token. A sidecar stamps accepted spans with the verified invocation scope and ships
+them to the gateway in its publish stream; the gateway forwards to Langfuse. Only the
+gateway has Langfuse credentials. The management tracing tab reads from Langfuse;
+Postgres does not retain permanent trace history.
 
-The sidecar relay and gateway delivery queue are bounded. Corrosion rows are
-removed after gateway acceptance, and gateway payloads are cleared after delivery.
+The sidecar relay and gateway delivery queue are bounded. Sidecar batches leave memory
+once the gateway accepts them, and gateway payloads are cleared after delivery.
 Temporary gateway replay receipts suppress repeated batches; delivery retries use
 Postgres notifications and scheduled deadlines. Overload returns retryable errors.
 Gateway delivery records expire after seven days. Conversation retention settings

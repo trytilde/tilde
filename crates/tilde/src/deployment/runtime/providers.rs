@@ -1,4 +1,5 @@
 //! Provider wire formats and tool implementations are shared with the gateway.
+//! Credentials come from the replicated configuration held in memory.
 use super::*;
 use crate::chat::{
     providers::{self, Access},
@@ -6,38 +7,36 @@ use crate::chat::{
 };
 use connectrpc::ConnectError;
 use futures::{StreamExt, future::BoxFuture};
-use zeroize::Zeroize;
+use serde_json::{Value, json};
 pub struct LocalChannels(pub Arc<Runtime>);
 impl Runtime {
     pub async fn connection_access(
         &self,
         connection: Uuid,
     ) -> ToolResult<(String, String, Access)> {
-        let mut config = self.configuration().await?;
+        let config = self.configuration()?;
         let selected = config
             .connections
-            .iter_mut()
+            .iter()
             .find(|c| c.id == connection.to_string() && c.status == "ready")
             .ok_or_else(|| {
                 ConnectError::permission_denied("Connection is not ready and assigned")
             })?;
         let mut values = crate::connections::model::Values::new();
-        for field in &mut selected.credentials {
-            values.insert(
-                field.name.clone(),
-                SecretString::from(std::mem::take(&mut field.value)),
-            );
+        for field in &selected.credentials {
+            values.insert(field.name.clone(), SecretString::from(field.value.clone()));
         }
-        let provider = selected.provider_id.clone();
-        let typ = selected.type_id.clone();
-        clear_secrets(&mut config);
         let access = Access {
             connection_id: connection,
             values,
             http: crate::connections::oauth::Http::new()?,
             endpoints: Default::default(),
         };
-        Ok((provider, typ, access))
+        Ok((
+            selected.provider_id.clone(),
+            selected.type_id.clone(),
+            access,
+        ))
     }
 }
 pub(crate) fn clear_secrets(config: &mut control::GetConfigurationResponse) {
@@ -57,7 +56,7 @@ impl Provider for LocalChannels {
             if scope.agent_id != self.0.agent_id {
                 return Err(ConnectError::permission_denied("Wrong agent"));
             }
-            let mut config = self.0.configuration().await?;
+            let config = self.0.configuration()?;
             let mut tools = vec![];
             for connection in &config.connections {
                 if connection.status != "ready" {
@@ -78,7 +77,6 @@ impl Provider for LocalChannels {
                     }
                 }
             }
-            clear_secrets(&mut config);
             Ok(tools)
         })
     }

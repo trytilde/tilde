@@ -17,7 +17,7 @@ try {
   const stub = `#!/usr/bin/env node
 const fs=require('node:fs');const path=require('node:path');
 const command=path.basename(process.argv[1]);const args=process.argv.slice(2);
-fs.appendFileSync(process.env.SWITCH_LOG,JSON.stringify({command,args,publicUrl:process.env.ENGINE_MANAGEMENT_PUBLIC_URL,bind:process.env.ENGINE_MANAGEMENT_LISTEN,host:process.env.WEB_HOST,network:process.env.ENGINE_ALLOW_NETWORK,issuer:process.env.ENGINE_OIDC_ISSUER,agent:process.env.ENGINE_AGENT_RUNTIME_LISTEN,ingress:process.env.ENGINE_PUBLIC_EVENT_INGRESS_LISTEN,ingressUrl:process.env.ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL,connectionUi:process.env.ENGINE_CONNECTION_UI_DEV_URL,setup:process.env.ENGINE_CONNECTION_SETUP_PUBLIC_URL,apiUpstream:process.env.ENGINE_DEV_URL,webCallback:process.env.DEX_DEV_WEB_CALLBACK,apiCallback:process.env.DEX_DEV_API_CALLBACK})+'\\n');
+fs.appendFileSync(process.env.SWITCH_LOG,JSON.stringify({command,args,publicUrl:process.env.ENGINE_PUBLIC_URL,bind:process.env.ENGINE_LISTEN,serve:process.env.ENGINE_SERVE,host:process.env.WEB_HOST,network:process.env.ENGINE_ALLOW_NETWORK,issuer:process.env.ENGINE_OIDC_ISSUER,agent:process.env.ENGINE_RUNTIME_PUBLIC_URL,ingressUrl:process.env.ENGINE_INGRESS_PUBLIC_URL,connectionUi:process.env.ENGINE_CONNECTION_UI_DEV_URL,setup:process.env.ENGINE_CONNECTION_SETUP_PUBLIC_URL,apiUpstream:process.env.ENGINE_DEV_URL,webCallback:process.env.DEX_DEV_WEB_CALLBACK,apiCallback:process.env.DEX_DEV_API_CALLBACK})+'\\n');
 if(command==='docker'||args.includes('check-config')||(command==='pnpm' && !args.includes('vite')))process.exit(0);
 if(command==='ngrok' && process.env.FAIL_NGROK==='true')setTimeout(()=>{console.error('ngrok fixture failed');process.exit(8)},700);
 if(command==='cargo' && process.env.FAIL_API==='true')setTimeout(()=>{console.error('API fixture failed');process.exit(7)},700);
@@ -33,7 +33,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
           const log = join(root, `calls-${ngrok}-${address}-${management}-${web}`);
           await writeFile(
             join(root, ".env"),
-            `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL=https://explicit-ingress.example\nNGROK_ENABLED=false\nNGROK_DOMAIN=fixture.ngrok.app\nNGROK_AUTHTOKEN=fixture-token\nINGRESS_PORT=18082\nENGINE_MANAGEMENT_ENABLED=${management}\nENGINE_WEB_ENABLED=${web}\nAPI_PORT=18080\nWEB_PORT=15173\nDATABASE_URL=postgres://engine:fixture@127.0.0.1:5432/engine\nPOSTGRES_PASSWORD=fixture\n`,
+            `ENGINE_INGRESS_PUBLIC_URL=https://explicit-ingress.example\nNGROK_ENABLED=false\nNGROK_DOMAIN=fixture.ngrok.app\nNGROK_AUTHTOKEN=fixture-token\nENGINE_MANAGEMENT_ENABLED=${management}\nENGINE_WEB_ENABLED=${web}\nAPI_PORT=18080\nWEB_PORT=15173\nDATABASE_URL=postgres://engine:fixture@127.0.0.1:5432/engine\nPOSTGRES_PASSWORD=fixture\n`,
           );
           const env = {
             ...process.env,
@@ -45,20 +45,20 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
             "NGROK_ENABLED",
             "NGROK_DOMAIN",
             "NGROK_AUTHTOKEN",
-            "PUBLIC_EVENT_INGRESS_PORT",
-            "ENGINE_PUBLIC_EVENT_INGRESS_LISTEN",
-            "ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL",
+            "ENGINE_INGRESS_PUBLIC_URL",
+            "ENGINE_SERVE",
+            "ENGINE_RUNTIME_PUBLIC_URL",
             "DATABASE_URL",
             "POSTGRES_PASSWORD",
             "ENGINE_MANAGEMENT_ENABLED",
             "ENGINE_WEB_ENABLED",
-            "ENGINE_MANAGEMENT_PUBLIC_URL",
+            "ENGINE_PUBLIC_URL",
             "ENGINE_OIDC_ISSUER",
             "API_PORT",
             "WEB_PORT",
             "ADDRESS",
             "WEB_HOST",
-            "ENGINE_MANAGEMENT_LISTEN",
+            "ENGINE_LISTEN",
             "ENGINE_ALLOW_NETWORK",
             "ENGINE_DEV_URL",
             "ENGINE_CONNECTION_SETUP_PUBLIC_URL",
@@ -67,8 +67,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
           ])
             delete env[key];
           // Explicit process environment must also yield to the enabled tunnel URL.
-          if (address)
-            env.ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL = "https://explicit-ingress.example";
+          if (address) env.ENGINE_INGRESS_PUBLIC_URL = "https://explicit-ingress.example";
           const child = spawn(
             "task",
             [
@@ -138,7 +137,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
               (c) => c.command === "cargo" && !c.args.includes("check-config"),
             );
             const host = address ?? "127.0.0.1";
-            assert.equal(api.ingress, `${host}:18082`);
+            assert.equal(api.serve, management ? "all" : "ingress,runtime,sidecar");
             assert.equal(
               api.ingressUrl,
               ngrok ? "https://fixture.ngrok.app" : "https://explicit-ingress.example",
@@ -148,7 +147,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
             if (ngrok)
               assert.deepEqual(tunnel[0].args, [
                 "http",
-                `http://${host}:18082`,
+                `http://${host}:18080`,
                 "--url",
                 "https://fixture.ngrok.app",
                 "--log",
@@ -158,7 +157,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
             assert.equal(api.host, host);
             assert.equal(api.network, address ? "true" : "false");
             assert.equal(api.issuer, `http://${host}:5556`);
-            assert.equal(api.agent, "127.0.0.1:8081");
+            assert.equal(api.agent, `http://${host}:18080`);
             assert.equal(api.connectionUi, `http://${host}:5174`);
             assert.equal(api.setup, `http://${host}:18080`);
             assert.equal(api.apiUpstream, `http://${host}:18080`);
@@ -193,7 +192,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
         NGROK_ENABLED: "true",
         NGROK_DOMAIN: "fixture.ngrok.app",
         NGROK_AUTHTOKEN: "never-print-this-token",
-        ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: "https://fixture.ngrok.app",
+        ENGINE_INGRESS_PUBLIC_URL: "https://fixture.ngrok.app",
         ...overrides,
       },
       encoding: "utf8",
@@ -217,7 +216,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
       NGROK_ENABLED: "true",
       NGROK_DOMAIN: "fixture.ngrok.app",
       NGROK_AUTHTOKEN: "fixture-token",
-      ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: "https://fixture.ngrok.app",
+      ENGINE_INGRESS_PUBLIC_URL: "https://fixture.ngrok.app",
     };
     for (const key of ["DATABASE_URL", "ENGINE_MANAGEMENT_ENABLED", "ENGINE_WEB_ENABLED"])
       delete env[key];

@@ -204,13 +204,6 @@ pub enum Tokens {
     Sidecar(Arc<crate::deployment::runtime::Runtime>),
 }
 impl Tokens {
-    pub(crate) async fn sign_for_proxy(&self, claims: Claims) -> Result<SecretString> {
-        match self {
-            Self::Postgres(tokens) => tokens.sign(&claims).await,
-            _ => Err(ChatError::Denied),
-        }
-    }
-
     pub fn new(pool: PgPool, encryption: Arc<Encryption>) -> Self {
         Self::Postgres(PostgresTokens::new(pool, encryption))
     }

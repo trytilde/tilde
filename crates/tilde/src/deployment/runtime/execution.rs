@@ -1,7 +1,11 @@
+//! Runs, invocations and commands for the owning replica, plus the executor that
+//! drives the local agent process. Ownership generations fence stale work.
 use super::*;
 use crate::proto::tilde::agent_host::v1 as host;
-use futures::StreamExt;
+use secrecy::ExposeSecret;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use store::Command;
 use types::agent_command::Action;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -18,78 +22,19 @@ struct Claims {
     assignment_generation: u64,
     agent_generation: i64,
 }
-#[derive(Deserialize)]
-struct AssignmentRow {
-    thread_id: String,
-    participant_id: String,
-    agent_id: String,
-    owner_instance_id: String,
-    generation: i64,
-    stopped: i64,
-}
-#[derive(Deserialize)]
-pub struct CommandRow {
-    pub attempt_id: String,
-    pub id: String,
-    pub thread_id: String,
-    pub participant_id: String,
-    pub agent_id: String,
-    pub owner_instance_id: String,
-    pub generation: i64,
-    pub kind: String,
-    pub created_at: i64,
-    pub acked_at: Option<i64>,
-    pub finished_at: Option<i64>,
-    pub payload: String,
-    pub failure: String,
-}
 impl Runtime {
-    pub(crate) fn assignment_insert(&self, a: &types::ParticipantAssignment) -> Value {
-        statement(
-            "INSERT INTO assignments(id,thread_id,participant_id,agent_id,owner_instance_id,generation,stopped) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
-            vec![
-                json!(format!("{}:{}", a.participant_id, a.generation)),
-                json!(a.thread_id),
-                json!(a.participant_id),
-                json!(a.agent_id),
-                json!(a.owner_instance_id),
-                json!(a.generation),
-                json!(i32::from(a.stopped)),
-            ],
-        )
+    pub async fn assignment(&self, thread: Uuid) -> Result<types::ParticipantAssignment> {
+        let shared = self.load(thread).await?;
+        let t = shared.lock().await;
+        Ok(t.assignment.clone())
     }
-    pub async fn assignment(
-        &self,
-        thread: Uuid,
-        participant: Uuid,
-    ) -> Result<types::ParticipantAssignment> {
-        let row = self
-            .client
-            .query::<AssignmentRow>(
-                "SELECT * FROM assignments WHERE participant_id=? ORDER BY generation DESC LIMIT 1",
-                vec![json!(participant)],
-            )
-            .await?
-            .pop();
-        Ok(match row {
-            Some(r) => types::ParticipantAssignment {
-                thread_id: r.thread_id,
-                participant_id: r.participant_id,
-                agent_id: r.agent_id,
-                owner_instance_id: r.owner_instance_id,
-                generation: r.generation as u64,
-                stopped: r.stopped != 0,
-                ..Default::default()
-            },
-            None => types::ParticipantAssignment {
-                thread_id: thread.to_string(),
-                participant_id: participant.to_string(),
-                agent_id: self.agent_id.to_string(),
-                owner_instance_id: self.instance_id.to_string(),
-                generation: 1,
-                ..Default::default()
-            },
-        })
+    fn agent_participant(&self, t: &ThreadState) -> Result<Uuid> {
+        t.thread
+            .participants
+            .iter()
+            .find(|p| p.agent_id.as_deref() == Some(&self.agent_id.to_string()) && p.active)
+            .map(|p| id(&p.id))
+            .ok_or(ChatError::NotFound)?
     }
     pub async fn start_run(&self, r: chat::StartRun) -> Result<types::Run> {
         text(&r.objective)?;
@@ -98,31 +43,23 @@ impl Runtime {
         if id(&r.agent_id)? != self.agent_id {
             return Err(ChatError::Denied);
         }
-        let participant = self
-            .thread(thread)
-            .await?
-            .participants
-            .into_iter()
-            .find(|p| p.agent_id.as_deref() == Some(&r.agent_id) && p.active)
-            .ok_or(ChatError::NotFound)?;
-        let _guard = self.mutation.lock().await;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        self.ensure_capacity()?;
+        let participant = self.agent_participant(&t)?;
         let run_id = Uuid::new_v5(
             &thread,
             format!("{}:{}", r.agent_id, r.idempotency_key).as_bytes(),
         );
-        match self.run(run_id).await {
-            Ok(old) => {
-                return if old.objective == r.objective {
-                    Ok(old)
-                } else {
-                    Err(ChatError::Conflict)
-                };
-            }
-            Err(ChatError::NotFound) => {}
-            Err(e) => return Err(e),
+        if let Some(old) = t.runs.get(&run_id) {
+            return if old.objective == r.objective {
+                Ok(self.run_view(&t, old))
+            } else {
+                Err(ChatError::Conflict)
+            };
         }
-        let active=self.client.query::<IdRow>("SELECT id FROM invocations WHERE thread_id=? AND agent_id=? AND status IN ('pending','running')",vec![json!(thread),json!(self.agent_id)]).await?;
-        if !active.is_empty() {
+        if t.active_invocation(self.agent_id).is_some() {
             return Err(ChatError::Conflict);
         }
         let mut run = types::Run {
@@ -134,25 +71,35 @@ impl Runtime {
             goal_id: r.goal_id,
             ..Default::default()
         };
-        let writes = self
-            .invocation_writes(&mut run, id(&participant.id)?, &r.idempotency_key)
-            .await?;
-        self.commit(thread, writes).await?;
+        self.begin_invocation(&mut t, &mut run, participant)?;
+        drop(t);
+        self.changed(thread);
         Ok(run)
     }
-    async fn invocation_writes(
+    fn run_view(&self, t: &ThreadState, run: &types::Run) -> types::Run {
+        let mut run = run.clone();
+        if let Ok(key) = id(&run.invocation_id)
+            && let Some(v) = t.invocations.get(&key)
+        {
+            run.invocation_status = v.status.clone();
+        }
+        run
+    }
+    /// Record a pending invocation and its invoke command; the executor picks it up.
+    pub(crate) fn begin_invocation(
         &self,
+        t: &mut ThreadState,
         run: &mut types::Run,
         participant: Uuid,
-        key: &str,
-    ) -> Result<Vec<Value>> {
+    ) -> Result<()> {
         let thread = id(&run.thread_id)?;
-        let assignment = self.assignment(thread, participant).await?;
+        let assignment = t.assignment.clone();
         if assignment.stopped {
             return Err(ChatError::Conflict);
         }
+        let run_id = id(&run.id)?;
         let invocation_id = Uuid::new_v5(
-            &id(&run.id)?,
+            &run_id,
             format!("{}:{}", assignment.generation, run.invocation_id).as_bytes(),
         );
         run.invocation_id = invocation_id.to_string();
@@ -190,193 +137,155 @@ impl Runtime {
             ),
             ..Default::default()
         };
-        Ok(vec![
-            statement(
-                "INSERT INTO assignments(id,thread_id,participant_id,agent_id,owner_instance_id,generation,stopped) VALUES(?,?,?,?,?,?,0) ON CONFLICT(id) DO NOTHING",
-                vec![
-                    json!(format!("{participant}:{}", assignment.generation)),
-                    json!(thread),
-                    json!(participant),
-                    json!(self.agent_id),
-                    json!(assignment.owner_instance_id),
-                    json!(assignment.generation),
-                ],
-            ),
-            statement(
-                "INSERT INTO runs(id,thread_id,agent_id,participant_id,status,idempotency_key,payload) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,payload=excluded.payload",
-                vec![
-                    json!(run.id),
-                    json!(thread),
-                    json!(self.agent_id),
-                    json!(participant),
-                    json!(run.status),
-                    json!(key),
-                    json!(self.seal(id(&run.id)?, "run", run)?),
-                ],
-            ),
-            self.invocation_insert(&invocation)?,
-            self.command_insert(&command)?,
-            self.event(thread, "participant.assigned", assignment.into())?,
-            self.event(thread, "run.created", run.clone().into())?,
-            self.event(thread, "invocation.pending", invocation.into())?,
-        ])
+        let attempt = Uuid::new_v5(&id(&command.id)?, &assignment.generation.to_be_bytes());
+        t.invocations.insert(invocation_id, invocation.clone());
+        t.commands.push(Command {
+            attempt_id: attempt,
+            command,
+            acked_at: None,
+            finished_at: None,
+            failure: String::new(),
+        });
+        t.runs.insert(run_id, run.clone());
+        self.state
+            .run_threads
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(run_id, thread);
+        self.state
+            .invocation_threads
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(invocation_id, thread);
+        self.emit(t, "participant.assigned", assignment.into(), None)?;
+        self.emit(t, "run.created", run.clone().into(), None)?;
+        self.emit(t, "invocation.pending", invocation.into(), None)?;
+        self.state
+            .work
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push_back((thread, attempt));
+        self.state.work_notify.notify_one();
+        Ok(())
     }
-    pub(crate) fn invocation_insert(&self, v: &types::InvocationState) -> Result<Value> {
-        Ok(statement(
-            "INSERT INTO invocations(id,thread_id,run_id,agent_id,participant_id,owner_instance_id,generation,status,lease_expires_at,payload) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status,lease_expires_at=excluded.lease_expires_at,payload=excluded.payload",
-            vec![
-                json!(v.id),
-                json!(v.thread_id),
-                json!(v.run_id),
-                json!(v.agent_id),
-                json!(v.participant_id),
-                json!(v.owner_instance_id),
-                json!(v.generation),
-                json!(v.status),
-                json!(v.lease_expires_at),
-                json!(self.seal(id(&v.id)?, "invocation", v)?),
-            ],
-        ))
+    pub(crate) fn run_thread(&self, run: Uuid) -> Option<Uuid> {
+        self.state
+            .run_threads
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&run)
+            .copied()
     }
-    pub(crate) fn command_insert(&self, c: &types::AgentCommand) -> Result<Value> {
-        let kind = match &c.action {
-            Some(Action::Invoke(_)) => "invoke",
-            Some(Action::Steer(_)) => "steer",
-            _ => return Err(ChatError::Invalid("Command requires an action".into())),
-        };
-        let attempt = Uuid::new_v5(&id(&c.id)?, &c.generation.to_be_bytes());
-        Ok(statement(
-            "INSERT INTO commands(attempt_id,id,thread_id,participant_id,agent_id,owner_instance_id,generation,kind,created_at,payload) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(attempt_id) DO NOTHING",
-            vec![
-                json!(attempt),
-                json!(c.id),
-                json!(c.thread_id),
-                json!(c.participant_id),
-                json!(c.agent_id),
-                json!(c.owner_instance_id),
-                json!(c.generation),
-                json!(kind),
-                json!(c.created_at),
-                json!(self.seal(id(&c.id)?, "command", c)?),
-            ],
-        ))
+    pub(crate) fn invocation_thread(&self, invocation: Uuid) -> Option<Uuid> {
+        self.state
+            .invocation_threads
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&invocation)
+            .copied()
     }
     pub async fn run(&self, key: Uuid) -> Result<types::Run> {
-        let row = self
-            .client
-            .query::<Payload>("SELECT payload FROM runs WHERE id=?", vec![json!(key)])
-            .await?
-            .pop()
-            .ok_or(ChatError::NotFound)?;
-        let mut run: types::Run = self.open(key, "run", &row.payload)?;
-        if !run.invocation_id.is_empty() {
-            run.invocation_status = self.invocation(id(&run.invocation_id)?).await?.status;
-        }
-        Ok(run)
+        let thread = self.run_thread(key).ok_or(ChatError::NotFound)?;
+        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
+        let t = shared.lock().await;
+        let run = t.runs.get(&key).ok_or(ChatError::NotFound)?;
+        Ok(self.run_view(&t, run))
     }
     pub async fn invocation(&self, key: Uuid) -> Result<types::InvocationState> {
-        #[derive(Deserialize)]
-        struct Row {
-            payload: String,
-            status: String,
-            lease_expires_at: i64,
-        }
-        let row = self
-            .client
-            .query::<Row>(
-                "SELECT payload,status,lease_expires_at FROM invocations WHERE id=?",
-                vec![json!(key)],
-            )
-            .await?
-            .pop()
-            .ok_or(ChatError::NotFound)?;
-        let mut invocation: types::InvocationState = self.open(key, "invocation", &row.payload)?;
-        invocation.status = row.status;
-        invocation.lease_expires_at = row.lease_expires_at;
-        Ok(invocation)
+        let thread = self.invocation_thread(key).ok_or(ChatError::NotFound)?;
+        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
+        let t = shared.lock().await;
+        t.invocations.get(&key).cloned().ok_or(ChatError::NotFound)
     }
     pub async fn resume_run(&self, key: Uuid) -> Result<types::Run> {
-        let mut run = self.run(key).await?;
+        let thread = self.run_thread(key).ok_or(ChatError::NotFound)?;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        self.ensure_capacity()?;
+        let mut run = t.runs.get(&key).cloned().ok_or(ChatError::NotFound)?;
         if !["waiting", "failed"].contains(&run.status.as_str()) {
             return Err(ChatError::Conflict);
         }
-        let participant = self
-            .thread(id(&run.thread_id)?)
-            .await?
-            .participants
-            .into_iter()
-            .find(|p| p.agent_id.as_deref() == Some(&run.agent_id) && p.active)
-            .ok_or(ChatError::NotFound)?;
-        let _guard = self.mutation.lock().await;
+        let participant = self.agent_participant(&t)?;
         let previous = run.invocation_id.clone();
         run.status = "active".into();
-        let mut writes = self
-            .invocation_writes(&mut run, id(&participant.id)?, &key.to_string())
-            .await?;
-        for row in self
-            .client
-            .query::<CommandRow>(
-                "SELECT * FROM commands WHERE thread_id=? AND kind='steer' AND acked_at IS NULL",
-                vec![json!(run.thread_id)],
-            )
-            .await?
+        self.begin_invocation(&mut t, &mut run, participant)?;
+        let generation = t.assignment.generation;
+        let mut carried = vec![];
+        for command in t
+            .commands
+            .iter_mut()
+            .filter(|c| c.acked_at.is_none() && c.finished_at.is_none())
         {
-            let mut command: types::AgentCommand =
-                self.open(id(&row.id)?, "command", &row.payload)?;
-            if let Some(Action::Steer(input)) = &mut command.action
+            if let Some(Action::Steer(input)) = &command.command.action
                 && input.invocation_id == previous
             {
-                input.invocation_id = run.invocation_id.clone();
-                command.id =
-                    Uuid::new_v5(&id(&run.invocation_id)?, id(&input.input_id)?.as_bytes())
-                        .to_string();
-                command.created_at = now();
-                writes.push(self.command_insert(&command)?);
-                writes.push(statement(
-                    "UPDATE commands SET finished_at=? WHERE attempt_id=?",
-                    vec![json!(now()), json!(row.attempt_id)],
-                ));
+                let mut next = command.command.clone();
+                if let Some(Action::Steer(input)) = &mut next.action {
+                    input.invocation_id = run.invocation_id.clone();
+                    next.id =
+                        Uuid::new_v5(&id(&run.invocation_id)?, id(&input.input_id)?.as_bytes())
+                            .to_string();
+                }
+                next.created_at = now();
+                command.finished_at = Some(now());
+                carried.push(next);
             }
         }
-        self.commit(id(&run.thread_id)?, writes).await?;
+        for next in carried {
+            let attempt = Uuid::new_v5(&id(&next.id)?, &generation.to_be_bytes());
+            t.commands.push(Command {
+                attempt_id: attempt,
+                command: next,
+                acked_at: None,
+                finished_at: None,
+                failure: String::new(),
+            });
+        }
+        drop(t);
+        self.changed(thread);
         Ok(run)
     }
     pub async fn set_run_status(&self, s: &Scope, status: &str) -> Result<()> {
         if !["waiting", "completed", "failed", "canceled"].contains(&status) {
             return Err(ChatError::Invalid("Invalid run status".into()));
         }
-        let _guard = self.mutation.lock().await;
-        let mut run = self.run(s.run_id).await?;
+        let shared = self.load(s.thread_id).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        let mut run = t.runs.get(&s.run_id).cloned().ok_or(ChatError::NotFound)?;
         run.status = status.into();
-        self.commit(
-            s.thread_id,
-            vec![
-                statement(
-                    "UPDATE runs SET status=?,payload=? WHERE id=?",
-                    vec![
-                        json!(status),
-                        json!(self.seal(s.run_id, "run", &run)?),
-                        json!(s.run_id),
-                    ],
-                ),
-                self.event(s.thread_id, "run.updated", run.into())?,
-            ],
-        )
-        .await
+        t.runs.insert(s.run_id, run.clone());
+        self.emit(&mut t, "run.updated", run.into(), None)?;
+        drop(t);
+        self.changed(s.thread_id);
+        Ok(())
     }
     pub async fn steer_invocation(&self, r: chat::SteerInvocation) -> Result<()> {
         text(&r.text)?;
-        let invocation = self.invocation(id(&r.invocation_id)?).await?;
-        if !["pending", "running"].contains(&invocation.status.as_str()) {
+        let invocation = id(&r.invocation_id)?;
+        let thread = self
+            .invocation_thread(invocation)
+            .ok_or(ChatError::NotFound)?;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        let v = t
+            .invocations
+            .get(&invocation)
+            .cloned()
+            .ok_or(ChatError::NotFound)?;
+        if !["pending", "running"].contains(&v.status.as_str()) {
             return Err(ChatError::Conflict);
         }
         let command = types::AgentCommand {
-            id: Uuid::new_v5(&id(&r.invocation_id)?, id(&r.input_id)?.as_bytes()).to_string(),
-            thread_id: invocation.thread_id.clone(),
-            participant_id: invocation.participant_id,
-            agent_id: invocation.agent_id,
-            owner_instance_id: invocation.owner_instance_id,
-            generation: invocation.generation,
+            id: Uuid::new_v5(&invocation, id(&r.input_id)?.as_bytes()).to_string(),
+            thread_id: v.thread_id.clone(),
+            participant_id: v.participant_id,
+            agent_id: v.agent_id,
+            owner_instance_id: v.owner_instance_id,
+            generation: v.generation,
             created_at: now(),
             action: Some(
                 types::SteerCommand {
@@ -389,114 +298,109 @@ impl Runtime {
             ),
             ..Default::default()
         };
-        self.commit(
-            id(&invocation.thread_id)?,
-            vec![self.command_insert(&command)?],
-        )
-        .await
+        if t.command(&command.id).is_none() {
+            let attempt = Uuid::new_v5(&id(&command.id)?, &command.generation.to_be_bytes());
+            t.commands.push(Command {
+                attempt_id: attempt,
+                command,
+                acked_at: None,
+                finished_at: None,
+                failure: String::new(),
+            });
+        }
+        drop(t);
+        self.changed(thread);
+        Ok(())
     }
     pub async fn cancel_invocation(&self, key: Uuid) -> Result<()> {
-        let _guard = self.mutation.lock().await;
-        let mut invocation = self.invocation(key).await?;
-        if !matches!(invocation.status.as_str(), "pending" | "running") {
+        let thread = self.invocation_thread(key).ok_or(ChatError::NotFound)?;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        let mut v = t
+            .invocations
+            .get(&key)
+            .cloned()
+            .ok_or(ChatError::NotFound)?;
+        if !matches!(v.status.as_str(), "pending" | "running") {
             return Ok(());
         }
-        invocation.status = "canceled".into();
-        invocation.ended_at = now();
-        let mut run = self.run(id(&invocation.run_id)?).await?;
+        v.status = "canceled".into();
+        v.ended_at = now();
+        let run_id = id(&v.run_id)?;
+        let mut run = t.runs.get(&run_id).cloned().ok_or(ChatError::NotFound)?;
         run.status = "canceled".into();
         run.invocation_status = "canceled".into();
-        let thread = id(&invocation.thread_id)?;
-        self.commit(
-            thread,
-            vec![
-                self.invocation_insert(&invocation)?,
-                statement(
-                    "UPDATE runs SET status=?,payload=? WHERE id=?",
-                    vec![
-                        json!(run.status),
-                        json!(self.seal(id(&run.id)?, "run", &run)?),
-                        json!(run.id),
-                    ],
-                ),
-                self.event(thread, "invocation.ended", invocation.into())?,
-                self.event(thread, "run.updated", run.into())?,
-            ],
-        )
-        .await
+        t.invocations.insert(key, v.clone());
+        t.runs.insert(run_id, run.clone());
+        self.emit(&mut t, "invocation.ended", v.into(), None)?;
+        self.emit(&mut t, "run.updated", run.into(), None)?;
+        drop(t);
+        self.changed(thread);
+        Ok(())
     }
     pub async fn route_message(&self, message: &types::Message) -> Result<()> {
-        let _guard = self.mutation.lock().await;
-        let writes = self.route_message_writes(message).await?;
-        if writes.is_empty() {
+        let thread = id(&message.thread_id)?;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        if !self.owns(&t) {
             return Ok(());
         }
-        self.commit(id(&message.thread_id)?, writes).await
+        self.route_message_in(&mut t, message)?;
+        drop(t);
+        self.changed(thread);
+        Ok(())
     }
-    pub(crate) async fn route_message_writes(
+    /// Addressed completed messages start a run or steer the active invocation.
+    pub(crate) fn route_message_in(
         &self,
+        t: &mut ThreadState,
         message: &types::Message,
-    ) -> Result<Vec<Value>> {
-        if self.configuration().await?.agent.paused {
-            return Ok(vec![]);
+    ) -> Result<()> {
+        if self.paused() || message.status != "complete" {
+            return Ok(());
         }
-        let thread = self.thread(id(&message.thread_id)?).await?;
-        self.route_message_in(message, &thread).await
-    }
-    pub(crate) async fn route_message_in(
-        &self,
-        message: &types::Message,
-        thread: &types::Thread,
-    ) -> Result<Vec<Value>> {
-        if self.configuration().await?.agent.paused {
-            return Ok(vec![]);
-        }
-        let sender = thread
+        let sender = t
+            .thread
             .participants
             .iter()
             .find(|p| p.id == message.participant_id)
+            .cloned()
             .ok_or(ChatError::NotFound)?;
-        let Some(target) = thread
+        let Some(target) = t
+            .thread
             .participants
             .iter()
             .find(|p| p.active && p.agent_id.as_deref() == Some(&self.agent_id.to_string()))
+            .cloned()
         else {
-            return Ok(vec![]);
+            return Ok(());
         };
         let addressed = message.addressed_participant_ids.contains(&target.id)
             || (message.addressed_participant_ids.is_empty()
                 && sender.user_id.is_some()
-                && thread.primary_agent_id == self.agent_id.to_string());
+                && t.thread.primary_agent_id == self.agent_id.to_string());
         if !addressed {
-            return Ok(vec![]);
+            return Ok(());
         }
         let receipt = Uuid::new_v5(&self.agent_id, message.id.as_bytes());
-        if !self
-            .client
-            .query::<IdRow>(
-                "SELECT id FROM message_dispatch WHERE id=?",
-                vec![json!(receipt)],
-            )
-            .await?
-            .is_empty()
-        {
-            return Ok(vec![]);
+        if !t.dispatched.insert(receipt) {
+            return Ok(());
         }
-        let active=self.client.query::<IdRow>("SELECT id FROM invocations WHERE thread_id=? AND agent_id=? AND status IN ('pending','running') LIMIT 1",vec![json!(message.thread_id),json!(self.agent_id)]).await?.pop();
         let objective = if message.text.is_empty() {
-            "New message with attachments.".into()
+            "New message with attachments.".to_owned()
         } else {
             message.text.clone()
         };
-        let mut writes = if let Some(active) = active {
-            let invocation = self.invocation(id(&active.id)?).await?;
+        let thread = id(&message.thread_id)?;
+        if let Some(active) = t.active_invocation(self.agent_id).cloned() {
             let command = types::AgentCommand {
                 id: Uuid::new_v5(&id(&active.id)?, id(&message.id)?.as_bytes()).to_string(),
                 thread_id: message.thread_id.clone(),
                 participant_id: target.id.clone(),
                 agent_id: self.agent_id.to_string(),
-                owner_instance_id: invocation.owner_instance_id,
-                generation: invocation.generation,
+                owner_instance_id: active.owner_instance_id,
+                generation: active.generation,
                 created_at: now(),
                 action: Some(
                     types::SteerCommand {
@@ -510,41 +414,43 @@ impl Runtime {
                 ),
                 ..Default::default()
             };
-            vec![self.command_insert(&command)?]
-        } else {
-            let run_id = Uuid::new_v5(
-                &id(&message.thread_id)?,
-                format!("{}:{}", self.agent_id, message.id).as_bytes(),
-            );
-            let mut run = types::Run {
-                id: run_id.to_string(),
-                thread_id: message.thread_id.clone(),
-                agent_id: self.agent_id.to_string(),
-                objective,
-                status: "active".into(),
-                ..Default::default()
-            };
-            self.invocation_writes(&mut run, id(&target.id)?, &message.id)
-                .await?
-        };
-        if message.delivery.is_set() && sender.user_id.is_some() {
-            let run_id = Uuid::new_v5(
-                &id(&message.thread_id)?,
-                format!("{}:{}", self.agent_id, message.id).as_bytes(),
-            );
-            writes.push(statement(
-                "UPDATE runs SET source_identity_id=?,channel_origin=1 WHERE id=?",
-                vec![
-                    json!(sender.user_id.as_deref().unwrap_or("")),
-                    json!(run_id),
-                ],
-            ));
+            let attempt = Uuid::new_v5(&id(&command.id)?, &command.generation.to_be_bytes());
+            t.commands.push(Command {
+                attempt_id: attempt,
+                command,
+                acked_at: None,
+                finished_at: None,
+                failure: String::new(),
+            });
+            return Ok(());
         }
-        writes.push(statement("INSERT INTO message_dispatch(id,thread_id,message_id,agent_id) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(receipt),json!(message.thread_id),json!(message.id),json!(self.agent_id)]));
-        Ok(writes)
+        let run_id = Uuid::new_v5(
+            &thread,
+            format!("{}:{}", self.agent_id, message.id).as_bytes(),
+        );
+        let mut run = types::Run {
+            id: run_id.to_string(),
+            thread_id: message.thread_id.clone(),
+            agent_id: self.agent_id.to_string(),
+            objective,
+            status: "active".into(),
+            ..Default::default()
+        };
+        t.run_meta.insert(
+            run_id,
+            store::RunMeta {
+                source_identity_id: if message.delivery.is_set() {
+                    sender.user_id.clone().unwrap_or_default()
+                } else {
+                    String::new()
+                },
+                channel_origin: message.delivery.is_set() && sender.user_id.is_some(),
+            },
+        );
+        self.begin_invocation(t, &mut run, id(&target.id)?)
     }
     pub async fn issue_token(&self, v: &types::InvocationState) -> Result<SecretString> {
-        let configuration = self.configuration().await?;
+        let configuration = self.configuration()?;
         let capabilities = crate::iam::capabilities::Capabilities::from_wire(
             configuration
                 .agent
@@ -576,10 +482,11 @@ impl Runtime {
         .map(SecretString::from)
         .map_err(|_| ChatError::Transport)
     }
-    pub async fn scope(&self, token: &str) -> Result<Scope> {
+    fn decode(&self, token: &str, leeway: u64) -> Result<Claims> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
         validation.set_issuer(&["tilde:invocation"]);
         validation.set_audience(&["tilde:agent-api"]);
+        validation.leeway = leeway;
         let claims = jsonwebtoken::decode::<Claims>(
             token,
             &jsonwebtoken::DecodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
@@ -590,49 +497,41 @@ impl Runtime {
         if claims.sub != self.agent_id {
             return Err(ChatError::Denied);
         }
-        let v = self.invocation(claims.invocation_id).await?;
-        let assignment = self
-            .assignment(claims.thread_id, id(&v.participant_id)?)
-            .await?;
-        let configuration = self.configuration().await?;
+        Ok(claims)
+    }
+    pub async fn scope(&self, token: &str) -> Result<Scope> {
+        let claims = self.decode(token, 0)?;
+        let shared = self.local(claims.thread_id).ok_or(ChatError::Denied)?;
+        let t = shared.lock().await;
+        let v = t
+            .invocations
+            .get(&claims.invocation_id)
+            .ok_or(ChatError::Denied)?;
+        let configuration = self.configuration()?;
         if claims.agent_generation != configuration.agent_generation
             || v.status != "running"
             || v.lease_expires_at < now()
             || v.thread_id != claims.thread_id.to_string()
             || v.run_id != claims.run_id.to_string()
-            || assignment.generation != claims.assignment_generation
-            || assignment.stopped
+            || t.assignment.generation != claims.assignment_generation
+            || !self.owns(&t)
             || configuration.agent.paused
         {
             return Err(ChatError::Denied);
         }
-        #[derive(Deserialize)]
-        struct Origin {
-            source_identity_id: String,
-            channel_origin: i64,
-        }
-        let origin = self
-            .client
-            .query::<Origin>(
-                "SELECT source_identity_id,channel_origin FROM runs WHERE id=?",
-                vec![json!(v.run_id)],
-            )
-            .await?
-            .pop()
-            .ok_or(ChatError::Denied)?;
-        if origin.channel_origin != 0 {
-            let thread = self.thread(claims.thread_id).await?;
+        let meta = t.run_meta.get(&claims.run_id).cloned().unwrap_or_default();
+        if meta.channel_origin {
             let connection = configuration
                 .connections
                 .iter()
-                .find(|c| c.id == thread.channel.connection_id && c.status == "ready")
+                .find(|c| c.id == t.thread.channel.connection_id && c.status == "ready")
                 .ok_or(ChatError::Denied)?;
             let allowed = match connection.access_mode.as_known() {
                 Some(types::ChannelAccessMode::Public) => true,
                 Some(types::ChannelAccessMode::Private) => connection
                     .identities
                     .iter()
-                    .any(|i| i.id == origin.source_identity_id && i.verified && i.allowed),
+                    .any(|i| i.id == meta.source_identity_id && i.verified && i.allowed),
                 _ => false,
             };
             if !allowed {
@@ -650,19 +549,9 @@ impl Runtime {
     }
     pub async fn renew_token(&self, token: &str) -> Result<SecretString> {
         let scope = self.scope(token).await?;
-        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-        validation.set_issuer(&["tilde:invocation"]);
-        validation.set_audience(&["tilde:agent-api"]);
-        let mut claims = jsonwebtoken::decode::<Claims>(
-            token,
-            &jsonwebtoken::DecodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
-            &validation,
-        )
-        .map_err(|_| ChatError::Denied)?
-        .claims;
+        let mut claims = self.decode(token, 0)?;
         let current = crate::iam::capabilities::Capabilities::from_wire(
-            self.configuration()
-                .await?
+            self.configuration()?
                 .agent
                 .capabilities
                 .clone()
@@ -681,259 +570,12 @@ impl Runtime {
         .map(SecretString::from)
         .map_err(|_| ChatError::Transport)
     }
-    pub async fn worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
-        let mut tasks = tokio::task::JoinSet::new();
-        let mut accepted = std::collections::BTreeSet::new();
-        loop {
-            let subscription=self.client.subscribe::<CommandRow>("SELECT * FROM commands WHERE kind='invoke' AND owner_instance_id=? AND acked_at IS NULL AND finished_at IS NULL",vec![json!(self.instance_id)]).await;
-            if let Ok(mut stream) = subscription {
-                loop {
-                    tokio::select! {
-                        _=shutdown.changed()=>{tasks.abort_all();return;},
-                        done=tasks.join_next(),if !tasks.is_empty()=>{if let Some(Ok(key))=done {accepted.remove(&key);}},
-                        value=stream.next()=>match value{
-                            Some(Ok(row)) if !row.deleted=>{
-                                if accepted.insert(row.value.attempt_id.clone()) {let runtime=self.clone();tasks.spawn(async move {let key=row.value.attempt_id.clone();if runtime.execute_command(row.value).await.is_err(){tracing::warn!("Sidecar command execution failed");}key});}
-                            },Some(Ok(_))=>{},_=>break,
-                        }
-                    }
-                }
-            }
-            tokio::select! {_=shutdown.changed()=>{tasks.abort_all();return;},_=tokio::time::sleep(Duration::from_secs(1))=>{}}
-        }
-    }
-    async fn execute_command(&self, row: CommandRow) -> Result<()> {
-        let command: types::AgentCommand = self.open(id(&row.id)?, "command", &row.payload)?;
-        let assignment = self
-            .assignment(id(&row.thread_id)?, id(&row.participant_id)?)
-            .await?;
-        if assignment.owner_instance_id != self.instance_id.to_string()
-            || assignment.generation != command.generation
-            || assignment.stopped
-        {
-            return Ok(());
-        }
-        let result = async {
-            match command.action {
-                Some(Action::Invoke(invoke)) => self.execute_invocation(&row, *invoke).await,
-                Some(_) => Err(ChatError::Invalid(
-                    "Control commands are consumed by the execution".into(),
-                )),
-                None => Err(ChatError::Invalid("Missing command action".into())),
-            }
-        }
-        .await;
-        let mut writes = vec![statement(
-            "UPDATE commands SET finished_at=?,failure=? WHERE attempt_id=?",
-            vec![
-                json!(now()),
-                json!(if result.is_err() {
-                    "agent_execution_failed"
-                } else {
-                    ""
-                }),
-                json!(row.attempt_id),
-            ],
-        )];
-        if result.is_err() {
-            let activity = types::Activity {
-                kind: "command.failed".into(),
-                entity_id: row.id.clone(),
-                participant_id: row.participant_id.clone(),
-                text_delta: "agent_execution_failed".into(),
-                ..Default::default()
-            };
-            writes.push(self.event(id(&row.thread_id)?, "command.failed", activity.into())?);
-        }
-        self.commit(id(&row.thread_id)?, writes).await?;
-        result
-    }
-    async fn ack(&self, row: &CommandRow) -> Result<()> {
-        self.client
-            .transaction(vec![statement(
-                "UPDATE commands SET acked_at=? WHERE attempt_id=? AND acked_at IS NULL",
-                vec![json!(now()), json!(row.attempt_id)],
-            )])
-            .await?;
-        Ok(())
-    }
-    async fn execute_invocation(
-        &self,
-        row: &CommandRow,
-        invoke: types::InvokeCommand,
-    ) -> Result<()> {
-        let key = id(&invoke.invocation_id)?;
-        let mut v = self.invocation(key).await?;
-        if v.status != "pending" {
-            return Ok(());
-        }
-        use opentelemetry::trace::{FutureExt, TraceContextExt};
-        let cx = if self.configuration().await?.tracing_enabled {
-            crate::telemetry::context::start(
-                "tilde.invocation",
-                opentelemetry::trace::SpanKind::Client,
-                &crate::telemetry::context::restore(&v.traceparent, &v.tracestate),
-                vec![
-                    opentelemetry::KeyValue::new("tilde.agent.id", self.agent_id.to_string()),
-                    opentelemetry::KeyValue::new("tilde.thread.id", v.thread_id.clone()),
-                    opentelemetry::KeyValue::new("tilde.invocation.id", v.id.clone()),
-                    opentelemetry::KeyValue::new("tilde.run.id", v.run_id.clone()),
-                ],
-            )
-        } else {
-            opentelemetry::Context::new()
-        };
-        let _end = crate::telemetry::context::EndOnDrop(cx.clone());
-        {
-            let _guard = cx.clone().attach();
-            let parent = crate::telemetry::context::capture();
-            v.traceparent = parent.0;
-            v.tracestate = parent.1;
-        }
-        v.status = "running".into();
-        v.lease_expires_at = now() + 30_000;
-        self.commit(
-            id(&v.thread_id)?,
-            vec![
-                self.invocation_insert(&v)?,
-                self.event(id(&v.thread_id)?, "invocation.running", v.clone().into())?,
-            ],
-        )
-        .await?;
-        let mut pending = Vec::new();
-        let result=async {
-            let capability=self.issue_token(&v).await?;let configuration=self.configuration().await?;
-            let request=host::InvokeRequest{command_id:row.id.clone(),assignment_generation:v.generation,owner_instance_id:self.instance_id.to_string(),agent_generation:configuration.agent_generation,invocation_id:v.id.clone(),run_id:v.run_id.clone(),thread_id:v.thread_id.clone(),agent_id:self.agent_id.to_string(),objective:invoke.objective,callback_url:self.callback_url.clone(),capability:capability.expose_secret().into(),messages:self.messages(id(&v.thread_id)?,100).await?,thread:self.thread(id(&v.thread_id)?).await?.into(),cached_messages:vec![],..Default::default()};
-            let mut stream=tokio::time::timeout(Duration::from_secs(5),crate::chat::runtime::client(&self.local_endpoint,self.host_key.expose_secret(),"Invoke",&request)?.invoke(request)).await.map_err(|_|ChatError::Transport)?.map_err(|_|ChatError::Transport)?;
-            let mut acknowledged=false;
-            let mut tick=tokio::time::interval(Duration::from_secs(5));
-            loop {tokio::select!{
-                _=tick.tick()=>{
-                    self.scope(capability.expose_secret()).await?;
-                    let assignment=self.assignment(id(&v.thread_id)?,id(&v.participant_id)?).await?;
-                    if assignment.generation!=v.generation||assignment.owner_instance_id!=self.instance_id.to_string()||assignment.stopped{return Err(ChatError::Denied);}
-                    self.client.transaction(vec![statement("UPDATE invocations SET lease_expires_at=? WHERE id=? AND status='running'",vec![json!(now()+30_000),json!(v.id)])]).await?;
-                },
-                message=stream.message()=>{
-                    let Some(message)=message.map_err(|_|ChatError::Transport)?else{break;};let message=message.view();
-                    pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
-                    if message.accepted_command_id==row.id{self.ack(row).await?;acknowledged=true;}
-                    if !message.reasoning_delta.is_empty(){let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:message.reasoning_delta.into(),..Default::default()};self.commit(id(&v.thread_id)?,vec![self.event(id(&v.thread_id)?,"reasoning.delta",activity.into())?]).await?;}
-                }
-            }}if !acknowledged{return Err(ChatError::Transport);}Ok(())
-        }.with_context(cx.clone()).await;
-        if result.is_err() {
-            cx.span()
-                .set_status(opentelemetry::trace::Status::error("Invocation failed"));
-        }
-        self.finish_invocation(
-            key,
-            if result.is_ok() { "stopped" } else { "failed" },
-            &pending,
-        )
-        .await?;
-        result
-    }
-    pub(crate) async fn finish_invocation(
-        &self,
-        key: Uuid,
-        status: &str,
-        pending: &[String],
-    ) -> Result<()> {
-        let _guard = self.mutation.lock().await;
-        let mut v = self.invocation(key).await?;
-        if v.status == "canceled" {
-            return Ok(());
-        }
-        v.status = status.into();
-        v.ended_at = now();
-        let mut run = self.run(id(&v.run_id)?).await?;
-        let suspending = run.status == "suspending";
-        run.invocation_status = status.into();
-        if run.status == "active" || suspending {
-            run.status = if status == "stopped" {
-                "waiting"
-            } else {
-                status
-            }
-            .into();
-        }
-        let thread = id(&v.thread_id)?;
-        let assignment = self.assignment(thread, id(&v.participant_id)?).await?;
-        if assignment.generation != v.generation
-            || assignment.owner_instance_id != self.instance_id.to_string()
-            || assignment.stopped
-        {
-            return Ok(());
-        }
-        let mut writes = vec![
-            self.invocation_insert(&v)?,
-            statement(
-                "UPDATE runs SET status=?,payload=? WHERE id=?",
-                vec![
-                    json!(run.status),
-                    json!(self.seal(id(&run.id)?, "run", &run)?),
-                    json!(run.id),
-                ],
-            ),
-            self.event(thread, "invocation.ended", v.clone().into())?,
-            self.event(thread, "run.updated", run.into())?,
-        ];
-        if status == "stopped" {
-            let mut text = Vec::new();
-            for row in self.client.query::<CommandRow>("SELECT * FROM commands WHERE thread_id=? AND kind='steer' ORDER BY created_at,id",vec![json!(thread)]).await? {
-                let command: types::AgentCommand = self.open(id(&row.id)?,"command",&row.payload)?;
-                if let Some(Action::Steer(steer)) = command.action
-                    && steer.invocation_id==v.id && (pending.contains(&steer.input_id) || row.acked_at.is_none()) {
-                    text.push(steer.text);
-                    if suspending {writes.push(statement("UPDATE commands SET acked_at=NULL,finished_at=NULL WHERE attempt_id=?",vec![json!(row.attempt_id)]));}
-                }
-            }
-            if !text.is_empty() && !suspending {
-                let mut next = types::Run {
-                    id: Uuid::new_v5(&key, b"unconsumed-input").to_string(),
-                    thread_id: v.thread_id.clone(),
-                    agent_id: v.agent_id.clone(),
-                    objective: text.join("\n"),
-                    status: "active".into(),
-                    ..Default::default()
-                };
-                writes.extend(
-                    self.invocation_writes(
-                        &mut next,
-                        id(&v.participant_id)?,
-                        &format!("unconsumed:{key}"),
-                    )
-                    .await?,
-                );
-            }
-        }
-        writes.push(statement("INSERT INTO write_guards(id,reason) SELECT NULL,'stale execution' WHERE EXISTS(SELECT 1 FROM assignments WHERE thread_id=? AND participant_id=? AND generation>?)",vec![json!(thread),json!(v.participant_id),json!(v.generation)]));
-        self.commit(thread, writes).await
-    }
-}
-impl Runtime {
     pub async fn verified_claims(
         &self,
         token: &str,
         trace: bool,
     ) -> Result<crate::iam::tokens::Claims> {
-        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-        validation.set_issuer(&["tilde:invocation"]);
-        validation.set_audience(&["tilde:agent-api"]);
-        if trace {
-            validation.leeway = 300;
-        }
-        let claims = jsonwebtoken::decode::<Claims>(
-            token,
-            &jsonwebtoken::DecodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
-            &validation,
-        )
-        .map_err(|_| ChatError::Denied)?
-        .claims;
-        if claims.sub != self.agent_id {
-            return Err(ChatError::Denied);
-        }
+        let claims = self.decode(token, if trace { 300 } else { 0 })?;
         if trace {
             let invocation = self.invocation(claims.invocation_id).await?;
             if invocation.thread_id != claims.thread_id.to_string()
@@ -966,46 +608,451 @@ impl Runtime {
             exp: claims.exp,
         })
     }
-}
-impl Runtime {
     pub fn verify_token_signature(&self, token: &str) -> Result<()> {
-        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-        validation.set_issuer(&["tilde:invocation"]);
-        validation.set_audience(&["tilde:agent-api"]);
-        let claims = jsonwebtoken::decode::<Claims>(
-            token,
-            &jsonwebtoken::DecodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
-            &validation,
-        )
-        .map_err(|_| ChatError::Denied)?
-        .claims;
-        if claims.sub != self.agent_id {
-            return Err(ChatError::Denied);
-        }
-        Ok(())
+        self.decode(token, 0).map(|_| ())
     }
-}
-impl Runtime {
-    pub async fn configuration_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    pub fn token_thread(&self, token: &str) -> Result<Uuid> {
+        Ok(self.decode(token, 300)?.thread_id)
+    }
+    /// Drive pending invoke commands for threads this replica owns.
+    pub async fn worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+        let mut tasks = tokio::task::JoinSet::new();
         loop {
-            if let Ok(mut changes) = self
-                .client
-                .subscribe::<Payload>(
-                    "SELECT payload FROM configuration WHERE agent_id=?",
-                    vec![json!(self.agent_id)],
-                )
-                .await
+            tokio::select! {
+                _=shutdown.changed()=>{tasks.abort_all();return;},
+                _=tasks.join_next(),if !tasks.is_empty()=>{},
+                _=self.state.work_notify.notified()=>{},
+                _=tokio::time::sleep(Duration::from_secs(5))=>{},
+            }
+            let pending: Vec<(Uuid, Uuid)> = self
+                .state
+                .work
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .drain(..)
+                .collect();
+            for (thread, attempt) in pending {
+                let runtime = self.clone();
+                tasks.spawn(async move {
+                    if runtime.execute_command(thread, attempt).await.is_err() {
+                        tracing::warn!(thread_id=%thread, "Sidecar command execution failed");
+                    }
+                });
+            }
+        }
+    }
+    async fn execute_command(&self, thread: Uuid, attempt: Uuid) -> Result<()> {
+        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
+        let command = {
+            let t = shared.lock().await;
+            let Some(entry) = t.commands.iter().find(|c| c.attempt_id == attempt) else {
+                return Ok(());
+            };
+            if entry.finished_at.is_some()
+                || !self.owns(&t)
+                || t.assignment.generation != entry.command.generation
             {
-                loop {
-                    tokio::select! {_=shutdown.changed()=>return,change=changes.next()=>match change{
-                        Some(Ok(change)) if !change.deleted=>{
-                            if self.configuration().await.is_ok_and(|c|!c.agent.paused)
-                                && let Ok(rows)=self.client.query::<IdRow>("SELECT m.id FROM messages m WHERE m.status='complete' AND NOT EXISTS(SELECT 1 FROM message_dispatch d WHERE d.message_id=m.id AND d.agent_id=?)",vec![json!(self.agent_id)]).await{for row in rows{if let Ok(message)=self.message(id(&row.id).unwrap_or_default()).await{let _=self.route_message(&message).await;}}}
-                        },Some(Ok(_))=>{},_=>break,
-                    }}
+                return Ok(());
+            }
+            entry.command.clone()
+        };
+        let result = match command.action.clone() {
+            Some(Action::Invoke(invoke)) => {
+                self.execute_invocation(&shared, attempt, &command, *invoke)
+                    .await
+            }
+            _ => Err(ChatError::Invalid("Only invoke commands execute".into())),
+        };
+        let mut t = shared.lock().await;
+        if let Some(entry) = t.commands.iter_mut().find(|c| c.attempt_id == attempt) {
+            entry.finished_at = Some(now());
+            if result.is_err() {
+                entry.failure = "agent_execution_failed".into();
+            }
+        }
+        if result.is_err() && self.owns(&t) {
+            let activity = types::Activity {
+                kind: "command.failed".into(),
+                entity_id: command.id.clone(),
+                participant_id: command.participant_id.clone(),
+                text_delta: "agent_execution_failed".into(),
+                ..Default::default()
+            };
+            self.emit(&mut t, "command.failed", activity.into(), None)?;
+        }
+        drop(t);
+        self.changed(thread);
+        result
+    }
+    async fn execute_invocation(
+        &self,
+        shared: &Shared,
+        attempt: Uuid,
+        command: &types::AgentCommand,
+        invoke: types::InvokeCommand,
+    ) -> Result<()> {
+        use opentelemetry::trace::{FutureExt, TraceContextExt};
+        let key = id(&invoke.invocation_id)?;
+        let thread = id(&command.thread_id)?;
+        let (mut v, tracing_enabled) = {
+            let t = shared.lock().await;
+            (
+                t.invocations
+                    .get(&key)
+                    .cloned()
+                    .ok_or(ChatError::NotFound)?,
+                self.configuration()?.tracing_enabled,
+            )
+        };
+        if v.status != "pending" {
+            return Ok(());
+        }
+        let cx = if tracing_enabled {
+            crate::telemetry::context::start(
+                "tilde.invocation",
+                opentelemetry::trace::SpanKind::Client,
+                &crate::telemetry::context::restore(&v.traceparent, &v.tracestate),
+                vec![
+                    opentelemetry::KeyValue::new("tilde.agent.id", self.agent_id.to_string()),
+                    opentelemetry::KeyValue::new("tilde.thread.id", v.thread_id.clone()),
+                    opentelemetry::KeyValue::new("tilde.invocation.id", v.id.clone()),
+                    opentelemetry::KeyValue::new("tilde.run.id", v.run_id.clone()),
+                ],
+            )
+        } else {
+            opentelemetry::Context::new()
+        };
+        let _end = crate::telemetry::context::EndOnDrop(cx.clone());
+        {
+            let _guard = cx.clone().attach();
+            let parent = crate::telemetry::context::capture();
+            v.traceparent = parent.0;
+            v.tracestate = parent.1;
+        }
+        v.status = "running".into();
+        v.lease_expires_at = now() + 30_000;
+        {
+            let mut t = shared.lock().await;
+            t.invocations.insert(key, v.clone());
+            self.emit(&mut t, "invocation.running", v.clone().into(), None)?;
+        }
+        self.changed(thread);
+        let mut pending = Vec::new();
+        let result = async {
+            let capability = self.issue_token(&v).await?;
+            let configuration = self.configuration()?;
+            let request = host::InvokeRequest {
+                command_id: command.id.clone(),
+                assignment_generation: v.generation,
+                owner_instance_id: self.instance_id.to_string(),
+                agent_generation: configuration.agent_generation,
+                invocation_id: v.id.clone(),
+                run_id: v.run_id.clone(),
+                thread_id: v.thread_id.clone(),
+                agent_id: self.agent_id.to_string(),
+                objective: invoke.objective,
+                callback_url: self.callback_url.clone(),
+                capability: capability.expose_secret().into(),
+                messages: self.messages(thread, 100).await?,
+                thread: self.thread(thread).await?.into(),
+                cached_messages: self
+                    .hydrate_converted_messages(self.agent_id, thread, &[])
+                    .await?
+                    .into_iter()
+                    .map(|c| crate::proto::tilde::runtime::v1::CachedAgentRepresentation { message_id: c.message_id, message_json: c.message_json, ..Default::default() })
+                    .collect(),
+                ..Default::default()
+            };
+            let mut stream = tokio::time::timeout(Duration::from_secs(5), crate::chat::runtime::client(&self.local_endpoint, self.host_key.expose_secret(), "Invoke", &request)?.invoke(request))
+                .await
+                .map_err(|_| ChatError::Transport)?
+                .map_err(|_| ChatError::Transport)?;
+            let mut acknowledged = false;
+            let mut tick = tokio::time::interval(Duration::from_secs(5));
+            loop {
+                tokio::select! {
+                    _=tick.tick()=>{
+                        // The lease is only renewed while the gateway still hears this replica.
+                        if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
+                        let mut t=shared.lock().await;
+                        if !self.owns(&t) || t.assignment.generation!=v.generation { return Err(ChatError::Denied); }
+                        if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
+                    },
+                    message=stream.message()=>{
+                        let Some(message)=message.map_err(|_|ChatError::Transport)? else { break; };
+                        let message=message.view();
+                        pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
+                        if message.accepted_command_id==command.id && !acknowledged {
+                            acknowledged=true;
+                            let mut t=shared.lock().await;
+                            if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
+                        }
+                        if !message.reasoning_delta.is_empty() {
+                            let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:message.reasoning_delta.into(),..Default::default()};
+                            let mut t=shared.lock().await;
+                            self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
+                            drop(t);
+                            self.changed(thread);
+                        }
+                    }
                 }
             }
-            tokio::select! {_=shutdown.changed()=>return,_=tokio::time::sleep(Duration::from_secs(1))=>{}}
+            if !acknowledged {
+                return Err(ChatError::Transport);
+            }
+            Ok(())
         }
+        .with_context(cx.clone())
+        .await;
+        if result.is_err() {
+            cx.span()
+                .set_status(opentelemetry::trace::Status::error("Invocation failed"));
+        }
+        self.finish_invocation(
+            shared,
+            key,
+            if result.is_ok() { "stopped" } else { "failed" },
+            &pending,
+        )
+        .await?;
+        result
+    }
+    pub(crate) async fn finish_invocation(
+        &self,
+        shared: &Shared,
+        key: Uuid,
+        status: &str,
+        pending: &[String],
+    ) -> Result<()> {
+        let mut t = shared.lock().await;
+        let mut v = t
+            .invocations
+            .get(&key)
+            .cloned()
+            .ok_or(ChatError::NotFound)?;
+        if v.status == "canceled" || !matches!(v.status.as_str(), "pending" | "running") {
+            return Ok(());
+        }
+        if !self.owns(&t) || t.assignment.generation != v.generation {
+            // A newer owner exists; its state is canonical.
+            v.status = "failed".into();
+            v.ended_at = now();
+            t.invocations.insert(key, v);
+            return Ok(());
+        }
+        v.status = status.into();
+        v.ended_at = now();
+        let run_id = id(&v.run_id)?;
+        let mut run = t.runs.get(&run_id).cloned().ok_or(ChatError::NotFound)?;
+        let suspending = run.status == "suspending";
+        run.invocation_status = status.into();
+        if run.status == "active" || suspending {
+            run.status = if status == "stopped" {
+                "waiting"
+            } else {
+                status
+            }
+            .into();
+        }
+        t.invocations.insert(key, v.clone());
+        t.runs.insert(run_id, run.clone());
+        self.emit(&mut t, "invocation.ended", v.clone().into(), None)?;
+        self.emit(&mut t, "run.updated", run.clone().into(), None)?;
+        if status == "stopped" {
+            let mut text = Vec::new();
+            for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
+                if let Some(Action::Steer(steer)) = &command.command.action
+                    && steer.invocation_id == v.id
+                    && (pending.contains(&steer.input_id) || command.acked_at.is_none())
+                {
+                    text.push(steer.text.clone());
+                    if suspending {
+                        command.acked_at = None;
+                    } else {
+                        command.finished_at = Some(now());
+                    }
+                }
+            }
+            if !text.is_empty() && !suspending {
+                let participant = id(&v.participant_id)?;
+                let next_id = Uuid::new_v5(&key, b"unconsumed-input");
+                let mut next = types::Run {
+                    id: next_id.to_string(),
+                    thread_id: v.thread_id.clone(),
+                    agent_id: v.agent_id.clone(),
+                    objective: text.join("\n"),
+                    status: "active".into(),
+                    ..Default::default()
+                };
+                self.begin_invocation(&mut t, &mut next, participant)?;
+            }
+        }
+        drop(t);
+        self.changed(id(&v.thread_id)?);
+        Ok(())
+    }
+    /// Gateway-authored ownership for one thread. Losing ownership fails local work.
+    pub(crate) async fn apply_assignment(
+        &self,
+        assignment: types::ParticipantAssignment,
+    ) -> Result<()> {
+        let thread = id(&assignment.thread_id)?;
+        let Some(shared) = self.local(thread) else {
+            return Ok(());
+        };
+        let mut t = shared.lock().await;
+        if assignment.generation < t.assignment.generation {
+            return Ok(());
+        }
+        let lost =
+            assignment.owner_instance_id != self.instance_id.to_string() || assignment.stopped;
+        t.assignment = assignment;
+        if lost {
+            let stale: Vec<Uuid> = t
+                .invocations
+                .iter()
+                .filter(|(_, v)| matches!(v.status.as_str(), "pending" | "running"))
+                .map(|(k, _)| *k)
+                .collect();
+            for key in stale {
+                if let Some(v) = t.invocations.get_mut(&key) {
+                    v.status = "failed".into();
+                    v.ended_at = now();
+                }
+            }
+            for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
+                command.finished_at = Some(now());
+                command.failure = "ownership_changed".into();
+            }
+        }
+        drop(t);
+        self.changed(thread);
+        Ok(())
+    }
+    pub(crate) async fn fence(&self, thread: Uuid, generation: u64) -> Result<()> {
+        let assignment = {
+            let Some(shared) = self.local(thread) else {
+                return Ok(());
+            };
+            let t = shared.lock().await;
+            types::ParticipantAssignment {
+                generation: generation.max(t.assignment.generation),
+                owner_instance_id: String::new(),
+                ..t.assignment.clone()
+            }
+        };
+        self.apply_assignment(assignment).await
+    }
+    /// Take over a run after the previous owner disappeared: a fresh invocation from the objective.
+    pub(crate) async fn recover_run(
+        &self,
+        thread: Uuid,
+        run_id: Uuid,
+        participant: Uuid,
+        objective: String,
+    ) -> Result<()> {
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        if t.active_invocation(self.agent_id).is_some() {
+            return Ok(());
+        }
+        let mut run = t.runs.get(&run_id).cloned().unwrap_or(types::Run {
+            id: run_id.to_string(),
+            thread_id: thread.to_string(),
+            agent_id: self.agent_id.to_string(),
+            objective,
+            ..Default::default()
+        });
+        run.status = "active".into();
+        self.begin_invocation(&mut t, &mut run, participant)?;
+        drop(t);
+        self.changed(thread);
+        Ok(())
+    }
+    /// Unacknowledged steering for one invocation as (command id, input) pairs.
+    pub(crate) async fn pending_steering(
+        &self,
+        thread: Uuid,
+        invocation: Uuid,
+    ) -> Result<Vec<(String, types::SteerCommand)>> {
+        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
+        let t = shared.lock().await;
+        let mut out = vec![];
+        for command in t
+            .commands
+            .iter()
+            .filter(|c| c.acked_at.is_none() && c.finished_at.is_none())
+        {
+            if let Some(Action::Steer(input)) = &command.command.action
+                && input.invocation_id == invocation.to_string()
+            {
+                out.push((command.command.id.clone(), (**input).clone()));
+            }
+        }
+        Ok(out)
+    }
+    pub async fn suspend_invocation(&self, invocation: Uuid) -> Result<()> {
+        let thread = self
+            .invocation_thread(invocation)
+            .ok_or(ChatError::NotFound)?;
+        let shared = self.load(thread).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        let v = t
+            .invocations
+            .get(&invocation)
+            .cloned()
+            .ok_or(ChatError::NotFound)?;
+        if v.status != "running" {
+            return Err(ChatError::Conflict);
+        }
+        let run_id = id(&v.run_id)?;
+        let mut run = t.runs.get(&run_id).cloned().ok_or(ChatError::NotFound)?;
+        run.status = "suspending".into();
+        t.runs.insert(run_id, run.clone());
+        self.emit(&mut t, "run.updated", run.into(), None)?;
+        drop(t);
+        self.changed(thread);
+        Ok(())
+    }
+    /// Returns true when the acknowledgement was recorded or already existed.
+    pub(crate) async fn acknowledge_control(
+        &self,
+        thread: Uuid,
+        invocation: Uuid,
+        key: Uuid,
+    ) -> Result<bool> {
+        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
+        let mut t = shared.lock().await;
+        if t.control_receipts.contains(&key) {
+            return Ok(true);
+        }
+        let Some(command) = t
+            .commands
+            .iter_mut()
+            .find(|c| c.command.id == key.to_string() && c.finished_at.is_none())
+        else {
+            return Ok(false);
+        };
+        let at = now();
+        command.acked_at = Some(at);
+        command.finished_at = Some(at);
+        if let Some(Action::Steer(input)) = &command.command.action {
+            let input = id(&input.input_id)?;
+            t.dispatched
+                .insert(Uuid::new_v5(&self.agent_id, input.to_string().as_bytes()));
+        }
+        t.control_receipts.insert(key);
+        let activity = types::Activity {
+            kind: "command.acknowledged".into(),
+            entity_id: key.to_string(),
+            invocation_id: invocation.to_string(),
+            ..Default::default()
+        };
+        self.emit(&mut t, "command.acknowledged", activity.into(), None)?;
+        drop(t);
+        self.changed(thread);
+        Ok(true)
     }
 }

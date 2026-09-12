@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id,a.deployment_mode,a.endpoint_url,a.paused,a.generation,d.failure_mode,d.token_hash,d.encrypted_secrets FROM agents a JOIN agent_deployments d ON d.agent_id=a.id WHERE a.id=$1 AND a.deleted_at IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "deployment_mode",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "paused",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "failure_mode",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "token_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 7,
+        "name": "encrypted_secrets",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "0dccf2dce214bb5ee6ca2ca74bb9c7c8e91dbc1b03e2a62d72a65ca319a2ea7a"
+}

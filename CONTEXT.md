@@ -212,8 +212,8 @@ cannot bypass pause/revocation even on a different serverless instance.
 
 `InvocationControlService` on the runtime listener streams scoped steering, stop and
 suspend controls. It allows a narrowly scoped terminal-token window to acknowledge
-stops without restoring ordinary RPC access. PostgreSQL LISTEN/NOTIFY or Corrosion
-subscriptions wake delivery; unacknowledged steering replays after reconnect. SDK
+stops without restoring ordinary RPC access. PostgreSQL LISTEN/NOTIFY at the gateway, or
+in-memory change notifications on a sidecar, wake delivery; unacknowledged steering replays after reconnect. SDK
 input IDs deduplicate delivery. Control subscriptions are renewed with current tokens
 and the SDK aborts work after a prolonged loss of the control connection.
 
@@ -284,11 +284,11 @@ qualify if they were valid at termination. Other actions and renewal still requi
 live invocation state and unexpired tokens. No separate telemetry credential exists.
 
 Message and invocation rows retain W3C trace context across durable dispatch.
-Langfuse is the trace system of record. Sidecars accept scoped OTLP into Corrosion;
-HA replicas share that temporary relay through gossip. The gateway subscribes to
-those rows, normalizes ownership, and accepts them into its bounded delivery queue
-before removing the Corrosion copy. It forwards to Langfuse and clears delivered
-payloads. Postgres holds only temporary delivery payloads and expiring replay
+Langfuse is the trace system of record. Sidecars accept scoped OTLP, stamp it with the
+verified invocation scope, and ship it to the gateway as telemetry frames in their
+publish stream. The gateway re-stamps the agent from the authenticated deployment and
+accepts batches into its bounded delivery queue. It forwards to Langfuse and clears
+delivered payloads. Postgres holds only temporary delivery payloads and expiring replay
 receipts, never permanent trace history. Delivery wakes through LISTEN/NOTIFY and
 uses scheduled retry deadlines. Langfuse credentials remain at the gateway.
 
@@ -481,70 +481,61 @@ notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
 refreshes every 30 seconds; it does not yet have a registry subscription API.
 
-## Agent deployments and Corrosion
+## Agent deployments and sidecars
 
-Agents select gateway or sidecar deployment in the Deployment settings tab.
-Gateway mode has an agent endpoint and uses Postgres. Sidecar mode registers
-replicas with one shared token per agent. `tilde-sidecar` accepts comma-separated
-agent tokens and an agent-ID-to-local-endpoint map; it supervises one isolated
-Corrosion process, database and mutual-TLS peer cluster per registered agent.
-Gateway and sidecar distributions bundle the same pinned Corrosion binary. The
-gateway connects to those clusters as a client, and does not run a peer.
+Agents select gateway or sidecar deployment in the Deployment settings tab. Gateway
+mode has an agent endpoint and uses Postgres for everything. Sidecar mode registers
+replicas with one shared token per agent. `tilde-sidecar` accepts comma-separated agent
+tokens and an agent-ID-to-local-endpoint map and keeps no state on disk.
 
-Four audiences use separate listeners: management, agent runtime, public event
-ingress, and agent event ingress. Sidecars expose the last three. Public ingress
-contains provider webhooks and native conversation commands. Sidecar deployments
-reject public gateway invocation traffic; authenticated agent-event-ingress accepts
-sidecar control, attachment transfer and caller-scoped fallback. Central IAM,
-registry changes and credential setup stay at the gateway. Sidecars enforce
-replicated permissions and serve assigned connection credentials locally.
+The gateway serves four route groups on one listener: management, runtime, ingress and
+sidecar. A sidecar binds a loopback runtime listener for its agent process and one
+network listener for provider webhooks and native ingress. Every other interaction is an
+outbound connection from the sidecar to the gateway's sidecar group: a held `Watch`
+stream that delivers a snapshot, configuration changes, ownership changes and
+directives, and `Publish` calls that carry heartbeats, ownership claims, typed events,
+directive results and telemetry. Central IAM, registry changes and credential setup stay
+at the gateway. Sidecars enforce replicated permissions and serve assigned connection
+credentials from memory.
 
-Ownership is `(thread, agent participant)` and points to a sidecar process
-incarnation. The first receiving replica creates the initial assignment; any
-replica accepts durable commands, but only the owner dispatches. The host SDK
-acknowledges acceptance and serializes execution by `(agent, thread)`, while
-unrelated threads remain concurrent. Gateway recovery locks the Postgres
-participant assignment, increments its generation, and commits an encrypted
-assignment outbox before publishing to Corrosion. Missing acknowledgements and
-unhealthy owners follow the configured reassign/stop policy. Old generations
-cannot update canonical execution state. Temporary overlap during partitions is
-possible; external effects need application idempotency.
+Ownership is `(thread, agent participant)` and points to a sidecar process incarnation.
+The replica that first touches a conversation claims it; a claim for an unknown
+conversation is answered by hydration from the gateway's projection, which also settles
+ownership in the same call. The owner mutates thread state under one per-thread lock,
+appends typed events with a per-thread sequence, and the shipper delivers them in order.
+The gateway records event receipts for deduplication, fences events from an older
+generation or a non-owner, and projects the rest into the chat tables and activity
+history. Batches that fail are rejected whole and resent.
 
-Corrosion subscriptions continuously project typed events, health samples and
-commands into Postgres. Traces pass through the gateway to Langfuse. The management UI therefore sees live conversation
-history. Cross-instance Postgres subscriptions use LISTEN/NOTIFY, while Corrosion
-peers use streaming query subscriptions. Stable origin cursors permit reconnects,
-out-of-order events and the transition to Postgres without repeating history.
-Mixed-deployment rooms copy shared history through the gateway; bootstrap copies
-do not replay historical messages as fresh agent input.
+Heartbeats travel with every publish; an owner unheard from for fifteen seconds is dead.
+Recovery locks the assignment in Postgres, bumps the generation, fails the old
+invocations, and either directs a live replica to restart the run from its objective or
+fails the run under the stop policy. A replica renews an invocation's lease only while
+its own publishes succeed, so a replica cut off from the gateway stops within thirty
+seconds. External effects still need application idempotency.
 
-Conversations are retained as complete aggregates until their configured inactivity
-window expires (default seven days). The gateway fences local writes, waits for
-peer acknowledgements, verifies archival and attachment durability, then removes
-the whole aggregate and records permanent Postgres placement. An absent local
-conversation proxies through agent-event-ingress with the original caller scope.
-The gateway serves retired conversations directly from Postgres and never restores
-them into Corrosion. Archived runs still execute in the assigned sidecar through
-the gateway command stream. Mode changes require pause and completed archival;
-existing history remains in Postgres when moving an agent into sidecar mode.
+Requests for a conversation that land on a non-owner replica, or on the gateway's
+ingress for a sidecar agent, are executed by the owner: the gateway queues a durable
+directive for the owning replica, waits for its answer through notifications, and relays
+the HTTP result unchanged. Provider webhooks are handed over the same way without
+waiting. Completed messages in rooms with several sidecar agents are relayed to each
+owner; gateway-deployed agents in the same room are routed from the projection.
+Management writes to sidecar conversations forward the same way. Management reads use
+the projection.
 
-Attachment bytes live in bounded sidecar memory until the gateway encrypts and
-uploads them to S3. Replicated metadata distinguishes temporary availability from
-persistence. Persisted bytes can be downloaded through the gateway by any replica.
-Health retention only removes local records confirmed in Postgres. Trace relay
-rows are removed after gateway acceptance; Langfuse controls trace history retention.
-Conversation retention does not delete Langfuse traces or permanent Postgres history.
+Attachment bytes live in bounded sidecar memory until the replica uploads them to the
+gateway, which encrypts them into S3. Replicated metadata distinguishes temporary
+availability from persistence, and persisted bytes can be downloaded through the
+gateway by any replica. Health samples arrive with heartbeats.
 
 ## Langfuse observability integration
 
 Gateway configuration owns LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY,
 LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Only tracing_enabled is
 included in sidecar configuration. Disabled telemetry is validated and discarded;
-configured outages retain a bounded relay. Corrosion traces contain base64 raw
-OTLP, not encrypted content. Gateway projection accepts them into the shared
-transient telemetry_delivery queue and then deletes replicated payloads. Stable
-payload receipts deduplicate HA/reconnect replay; Langfuse owns all trace history.
-The old sidecar_traces archive is removed. Platform spans use a process-wide
+gateway outages keep batches in the bounded sidecar outbox. Gateway acceptance places
+them in the shared transient telemetry_delivery queue. Stable payload receipts
+deduplicate reconnect replay; Langfuse owns all trace history. Platform spans use a process-wide
 provider routed to the correct local agent, preserving invocation context and
 terminal trace-token grace. The agent Tracing tab queries scoped Langfuse public
 APIs through management-only RPCs. No Langfuse credentials reach agents or browsers.
@@ -556,8 +547,8 @@ traces. ClickHouse owns log history in a standard OTel Map schema with explicit
 agent, invocation, thread, and record identities. Gateway disk queues independently
 buffer local history and optional external OTLP delivery; application Postgres
 never stores bulk logs. Queue limits, 24-hour pending expiry, and seven-day history
-retention bound resource use. Sidecars replicate immutable log batches through
-Corrosion until durable gateway acceptance and receive enablement only.
+retention bound resource use. Sidecars ship immutable log batches in their publish
+stream until durable gateway acceptance and receive enablement only.
 
 The management-only LogsService enforces agent scoping and fixed-window cursor
 pagination. The agent Logs tab provides filters, record inspection, native trace

@@ -59,20 +59,9 @@ services:
       retries: 20
   engine:
     build: .
-    command:
-      [
-        "--management-listen",
-        "0.0.0.0:8080",
-        "--agent-runtime-listen",
-        "0.0.0.0:8081",
-        "--event-ingress-listen",
-        "0.0.0.0:8082",
-        "--allow-network",
-      ]
+    command: ["--listen", "0.0.0.0:8080", "--allow-network"]
     ports:
       - "127.0.0.1:${ENGINE_PORT:-8080}:8080"
-      - "127.0.0.1:${ENGINE_AGENT_RUNTIME_PORT:-8081}:8081"
-      - "127.0.0.1:${ENGINE_PUBLIC_EVENT_INGRESS_PORT:-8082}:8082"
     volumes: [log-queue:/var/lib/tilde/log-queue]
     environment:
       DATABASE_URL: postgres://engine:${POSTGRES_PASSWORD}@postgres:5432/engine
@@ -93,11 +82,11 @@ services:
       ENGINE_S3_PUBLIC_ENDPOINT: ${ENGINE_S3_PUBLIC_ENDPOINT:-http://127.0.0.1:19000}
       ENGINE_S3_ACCESS_KEY_ID: ${ENGINE_S3_ACCESS_KEY_ID:-}
       ENGINE_S3_SECRET_ACCESS_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-}
-      ENGINE_MANAGEMENT_ENABLED: ${ENGINE_MANAGEMENT_ENABLED:-true}
+      ENGINE_SERVE: ${ENGINE_SERVE:-all}
       ENGINE_WEB_ENABLED: ${ENGINE_WEB_ENABLED:-true}
-      ENGINE_MANAGEMENT_PUBLIC_URL: ${ENGINE_MANAGEMENT_PUBLIC_URL:-http://127.0.0.1:8080}
-      ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: ${ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL:-http://127.0.0.1:8082}
-      ENGINE_AGENT_RUNTIME_PUBLIC_URL: ${ENGINE_AGENT_RUNTIME_PUBLIC_URL:-http://127.0.0.1:8081}
+      ENGINE_PUBLIC_URL: ${ENGINE_PUBLIC_URL:-http://127.0.0.1:8080}
+      ENGINE_INGRESS_PUBLIC_URL: ${ENGINE_INGRESS_PUBLIC_URL:-}
+      ENGINE_RUNTIME_PUBLIC_URL: ${ENGINE_RUNTIME_PUBLIC_URL:-}
       ENGINE_OIDC_ISSUER: ${ENGINE_OIDC_ISSUER:-}
       ENGINE_OIDC_CLIENT_ID: ${ENGINE_OIDC_CLIENT_ID:-}
       ENGINE_OIDC_CLIENT_SECRET: ${ENGINE_OIDC_CLIENT_SECRET:-}

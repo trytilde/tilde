@@ -36,12 +36,7 @@ export declare type Deployment = Message<"tilde.types.v1.Deployment"> & {
   failureMode: SidecarFailureMode;
 
   /**
-   * @generated from field: uint32 retention_days = 5;
-   */
-  retentionDays: number;
-
-  /**
-   * @generated from field: bool token_issued = 6;
+   * @generated from field: bool token_issued = 5;
    */
   tokenIssued: boolean;
 };
@@ -67,32 +62,22 @@ export declare type SidecarNode = Message<"tilde.types.v1.SidecarNode"> & {
   agentId: string;
 
   /**
-   * @generated from field: string public_ingress_url = 3;
+   * @generated from field: string public_url = 3;
    */
-  publicIngressUrl: string;
+  publicUrl: string;
 
   /**
-   * @generated from field: string agent_ingress_url = 4;
-   */
-  agentIngressUrl: string;
-
-  /**
-   * @generated from field: string runtime_url = 5;
+   * @generated from field: string runtime_url = 4;
    */
   runtimeUrl: string;
 
   /**
-   * @generated from field: string gossip_address = 6;
-   */
-  gossipAddress: string;
-
-  /**
-   * @generated from field: bool ready = 7;
+   * @generated from field: bool ready = 5;
    */
   ready: boolean;
 
   /**
-   * @generated from field: google.protobuf.Timestamp last_seen_at = 8;
+   * @generated from field: google.protobuf.Timestamp last_seen_at = 6;
    */
   lastSeenAt?: Timestamp | undefined;
 };

@@ -1,45 +1,48 @@
-//! Agent deployment configuration and scoped registration. Postgres owns control
-//! decisions; the agent-event-ingress listener is the only sidecar control entry.
-//! Gateway mode does not start Corrosion or require any peer infrastructure.
+//! Agent deployment settings and the gateway half of the sidecar protocol.
+//! Postgres owns every control decision. Replicas dial in over one connection;
+//! the gateway never opens a connection to a replica.
 pub mod attachments;
-pub mod bridge;
-pub mod cold;
-pub mod corrosion;
 pub mod gateway;
+mod hydrate;
 pub mod logs;
 pub mod project;
 pub mod provider_events;
-pub mod proxy;
 pub mod public;
 pub mod recovery;
-pub mod retention;
 pub mod routing;
 pub mod rpc;
 pub mod runtime;
 mod secrets;
+pub(crate) use secrets::random_secret;
 pub mod sidecar;
-mod sidecar_commands;
 pub mod telemetry;
 pub mod tokens;
 use crate::proto::tilde::{agent_event_ingress::v1 as wire, types::v1 as types};
 use crate::{
     agent::Agents,
+    chat::Chat,
     connections::service::Connections,
+    database::notifications::Notifications,
     encryption::{Encryption, SealedSecret, SecretBinding},
     error::Error,
 };
+use buffa::Message;
 use chrono::Utc;
 use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
-use sqlx::PgPool;
-use std::sync::Arc;
+use sqlx::{PgPool, Postgres, Transaction};
+use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
-pub const CORROSION_REVISION: &str = "753cfd2408d67edeaf3052a990175356ed4dcbc6";
-pub fn schema_revision() -> String {
-    hex::encode(Sha256::digest(
-        include_str!("../../../../schema/corrosion/runtime.sql").as_bytes(),
-    ))
+/// Owners that miss this window are treated as gone.
+pub const LIVENESS: Duration = Duration::from_secs(15);
+#[derive(Default)]
+pub(crate) struct Channels {
+    pub directives: Notifications,
+    pub assignments: Notifications,
+    pub configuration: Notifications,
+    pub recovery: Notifications,
 }
 #[derive(Clone)]
 pub struct Deployments {
@@ -49,6 +52,7 @@ pub struct Deployments {
     pub(crate) connections: Connections,
     pub(crate) logs: Option<crate::logs::Delivery>,
     pub(crate) telemetry: Option<crate::telemetry::delivery::Queue>,
+    pub(crate) channels: Arc<Channels>,
 }
 impl Deployments {
     pub fn new(
@@ -64,6 +68,7 @@ impl Deployments {
             connections,
             telemetry: None,
             logs: None,
+            channels: Arc::default(),
         }
     }
     pub fn with_logs(mut self, logs: crate::logs::Delivery) -> Self {
@@ -73,6 +78,12 @@ impl Deployments {
     pub fn with_telemetry(mut self, queue: crate::telemetry::delivery::Queue) -> Self {
         self.telemetry = Some(queue);
         self
+    }
+    pub(crate) fn chat(&self) -> Chat {
+        Chat::new(self.pool.clone(), self.encryption.clone(), String::new())
+            .with_connections(self.connections.clone())
+            .with_deployments(self.clone())
+            .with_objects(self.agents.object_store().cloned())
     }
     pub async fn get(&self, agent: Uuid) -> Result<types::Deployment, Error> {
         let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
@@ -94,10 +105,15 @@ impl Deployments {
                 types::SidecarFailureMode::Reassign
             }
             .into(),
-            retention_days: row.retention_days as u32,
             token_issued: row.token_hash.is_some(),
             ..Default::default()
         })
+    }
+    pub async fn is_sidecar(&self, agent: Uuid) -> Result<bool, Error> {
+        Ok(sqlx::query_file!("../../queries/deployment/get.sql", agent)
+            .fetch_optional(&self.pool)
+            .await?
+            .is_some_and(|r| r.deployment_mode == "sidecar"))
     }
     pub async fn set(
         &self,
@@ -105,13 +121,7 @@ impl Deployments {
         mode: types::DeploymentMode,
         endpoint: Option<String>,
         failure: types::SidecarFailureMode,
-        days: u32,
     ) -> Result<types::Deployment, Error> {
-        if days == 0 {
-            return Err(Error::Invalid(
-                "Retention must be a positive number of whole days".into(),
-            ));
-        }
         let mode = match mode {
             types::DeploymentMode::Gateway => "gateway",
             types::DeploymentMode::Sidecar => "sidecar",
@@ -135,17 +145,6 @@ impl Deployments {
             if !current.paused {
                 return Err(Error::AgentNotPaused);
             }
-            if current.deployment_mode == "sidecar"
-                && sqlx::query_file!("../../queries/deployment/retained.sql", agent)
-                    .fetch_one(&mut *tx)
-                    .await?
-                    .retained
-            {
-                return Err(Error::Invalid(
-                    "Wait for paused conversations to finish archiving before changing deployment"
-                        .into(),
-                ));
-            }
             if sqlx::query_file!("../../queries/deployment/active_work.sql", agent)
                 .fetch_one(&mut *tx)
                 .await?
@@ -154,11 +153,6 @@ impl Deployments {
                 return Err(Error::Invalid(
                     "Wait for active work to stop before changing deployment".into(),
                 ));
-            }
-            if mode == "sidecar" {
-                sqlx::query_file!("../../queries/deployment/old_placements.sql", agent)
-                    .execute(&mut *tx)
-                    .await?;
             }
             sqlx::query_file!("../../queries/deployment/migrate_assignments.sql", agent)
                 .execute(&mut *tx)
@@ -174,14 +168,9 @@ impl Deployments {
         sqlx::query_file!("../../queries/deployment/set.sql", agent, mode, endpoint)
             .execute(&mut *tx)
             .await?;
-        sqlx::query_file!(
-            "../../queries/deployment/settings.sql",
-            agent,
-            failure,
-            i64::from(days)
-        )
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query_file!("../../queries/deployment/settings.sql", agent, failure)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         self.get(agent).await
     }
@@ -211,7 +200,7 @@ impl Deployments {
                 self.encryption
                     .seal(
                         secret_binding(agent),
-                        &secrets::Secrets::generate()?.encode()?,
+                        &secrets::Secrets::generate().encode()?,
                     )?
                     .into_bytes(),
             )
@@ -238,85 +227,40 @@ impl Deployments {
                 .map(|r| types::SidecarNode {
                     instance_id: r.instance_id.to_string(),
                     agent_id: agent.to_string(),
-                    public_ingress_url: r.public_ingress_url,
-                    agent_ingress_url: r.agent_ingress_url,
+                    public_url: r.public_url,
                     runtime_url: r.runtime_url,
-                    gossip_address: r.gossip_address,
                     ready: r.ready
                         && r.agent_ready
-                        && r.last_seen_at > Utc::now() - chrono::Duration::seconds(15),
+                        && r.last_seen_at
+                            > Utc::now() - chrono::Duration::from_std(LIVENESS).unwrap_or_default(),
                     last_seen_at: crate::chat::audit::timestamp(r.last_seen_at).into(),
                     ..Default::default()
                 })
                 .collect(),
         )
     }
-    pub async fn register(
-        &self,
-        agent: Uuid,
-        r: wire::RegisterSidecarRequest,
-    ) -> Result<wire::RegisterSidecarResponse, Error> {
+    pub async fn register(&self, agent: Uuid, r: &wire::WatchRequest) -> Result<Uuid, Error> {
         let instance = id(&r.instance_id)?;
-        for endpoint in [
-            &r.public_ingress_url,
-            &r.agent_ingress_url,
-            &r.runtime_url,
-            &r.local_agent_endpoint,
-        ] {
+        for endpoint in [&r.public_url, &r.runtime_url] {
             crate::agent::validate_endpoint(endpoint.clone())?;
         }
-        let gossip: std::net::SocketAddr = r.gossip_address.parse().map_err(|_| {
-            Error::Invalid("Gossip address must be an advertised IP and port".into())
-        })?;
-        if gossip.ip().is_unspecified() || gossip.port() == 0 {
-            return Err(Error::Invalid("Gossip address must be reachable".into()));
-        }
-        let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
-            .fetch_one(&self.pool)
-            .await?;
-        let secret = self.open_secrets(
-            agent,
-            row.encrypted_secrets.as_deref().ok_or(Error::Denied)?,
-        )?;
-        let certificate = secret.certificate(gossip.ip())?;
         sqlx::query_file!(
             "../../queries/deployment/register.sql",
             agent,
             instance,
-            r.public_ingress_url,
-            r.agent_ingress_url,
-            r.runtime_url,
-            r.gossip_address,
-            r.local_agent_endpoint
+            r.public_url,
+            r.runtime_url
         )
         .execute(&self.pool)
         .await?;
-        Ok(wire::RegisterSidecarResponse {
-            corrosion_token: secret.api_token.expose_secret().into(),
-            agent_id: agent.to_string(),
-            cluster_id: row.cluster_id.to_string(),
-            peers: self
-                .nodes(agent)
-                .await?
-                .into_iter()
-                .filter(|p| p.instance_id != r.instance_id)
-                .collect(),
-            encryption_key: secret.encryption_key.expose_secret().into(),
-            token_signing_key: secret.signing_key.expose_secret().into(),
-            tls_certificate: certificate.0,
-            tls_private_key: certificate.1.expose_secret().into(),
-            tls_ca: secret.ca_certificate.expose_secret().into(),
-            retention_days: row.retention_days as u32,
-            schema_revision: schema_revision(),
-            ..Default::default()
-        })
+        Ok(instance)
     }
     pub async fn heartbeat(
         &self,
         agent: Uuid,
-        r: wire::HeartbeatRequest,
-    ) -> Result<wire::HeartbeatResponse, Error> {
-        let instance = id(&r.instance_id)?;
+        instance: Uuid,
+        r: &wire::Heartbeat,
+    ) -> Result<(), Error> {
         if sqlx::query_file!(
             "../../queries/deployment/heartbeat.sql",
             agent,
@@ -331,20 +275,73 @@ impl Deployments {
         {
             return Err(Error::NotFound);
         }
-        if r.agent_ready {
-            sqlx::query_file!("../../queries/deployment/cold_renew.sql", agent, instance)
-                .execute(&self.pool)
-                .await?;
-        }
-        let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
-            .fetch_one(&self.pool)
+        if let Ok(sample) = id(&r.sample_id) {
+            sqlx::query_file!(
+                "../../queries/deployment/telemetry/health.sql",
+                sample,
+                agent,
+                instance.to_string(),
+                Utc::now(),
+                r.ready && r.agent_ready,
+                r.latency_ms
+            )
+            .execute(&self.pool)
             .await?;
-        Ok(wire::HeartbeatResponse {
-            paused: row.paused,
-            agent_generation: row.generation,
-            retention_days: row.retention_days as u32,
+        }
+        Ok(())
+    }
+    pub async fn instance_live(&self, agent: Uuid, instance: Uuid) -> Result<bool, Error> {
+        Ok(sqlx::query_file!(
+            "../../queries/deployment/instance_live.sql",
+            agent,
+            instance
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .live)
+    }
+    pub async fn snapshot(&self, agent: Uuid) -> Result<wire::Snapshot, Error> {
+        let since = chrono::DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_default();
+        Ok(wire::Snapshot {
+            configuration: self.configuration(agent).await?.into(),
+            assignments: self
+                .assignments_since(agent, since)
+                .await?
+                .into_iter()
+                .map(|(a, _)| a)
+                .collect(),
+            token_signing_key: self.signing_key(agent).await?.expose_secret().into(),
             ..Default::default()
         })
+    }
+    pub async fn assignments_since(
+        &self,
+        agent: Uuid,
+        since: chrono::DateTime<Utc>,
+    ) -> Result<Vec<(types::ParticipantAssignment, chrono::DateTime<Utc>)>, Error> {
+        Ok(sqlx::query_file!(
+            "../../queries/deployment/assignments_since.sql",
+            agent,
+            since
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|r| {
+            (
+                types::ParticipantAssignment {
+                    thread_id: r.thread_id.to_string(),
+                    participant_id: r.participant_id.to_string(),
+                    agent_id: agent.to_string(),
+                    owner_instance_id: r.owner_instance_id.to_string(),
+                    generation: r.generation as u64,
+                    stopped: r.stopped,
+                    ..Default::default()
+                },
+                r.updated_at,
+            )
+        })
+        .collect())
     }
     pub async fn configuration(
         &self,
@@ -433,11 +430,330 @@ impl Deployments {
         }
         Ok(response)
     }
+    pub(crate) async fn signing_key(&self, agent: Uuid) -> Result<SecretString, Error> {
+        let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or(Error::NotFound)?;
+        Ok(self
+            .open_secrets(
+                agent,
+                row.encrypted_secrets.as_deref().ok_or(Error::Denied)?,
+            )?
+            .signing_key)
+    }
     fn open_secrets(&self, agent: Uuid, sealed: &[u8]) -> Result<secrets::Secrets, Error> {
         let value = self
             .encryption
             .open(secret_binding(agent), SealedSecret::from_bytes(sealed)?)?;
         secrets::Secrets::decode(value)
+    }
+    /// Grant or refuse ownership of one thread participant under the Postgres lock.
+    pub async fn claim(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+        thread: Uuid,
+        participant: Uuid,
+    ) -> Result<wire::ClaimResult, Error> {
+        let mut tx = self.pool.begin().await?;
+        let result = self
+            .claim_in(&mut tx, agent, instance, thread, participant)
+            .await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+    pub(crate) async fn claim_in(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        agent: Uuid,
+        instance: Uuid,
+        thread: Uuid,
+        participant: Uuid,
+    ) -> Result<wire::ClaimResult, Error> {
+        crate::chat::access::lock_thread_route(tx, thread).await?;
+        let current = sqlx::query_file!(
+            "../../queries/deployment/assignment_lock.sql",
+            thread,
+            participant
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        let result = |granted: bool, generation: i64, owner: Uuid| wire::ClaimResult {
+            thread_id: thread.to_string(),
+            participant_id: participant.to_string(),
+            granted,
+            generation: generation as u64,
+            owner_instance_id: owner.to_string(),
+            ..Default::default()
+        };
+        let generation = match current {
+            None => 1,
+            Some(c) if c.owner_instance_id == instance && !c.stopped => {
+                return Ok(result(true, c.generation, instance));
+            }
+            Some(c) => {
+                let live = !c.stopped
+                    && sqlx::query_file!(
+                        "../../queries/deployment/instance_live.sql",
+                        agent,
+                        c.owner_instance_id
+                    )
+                    .fetch_one(&mut **tx)
+                    .await?
+                    .live;
+                if live {
+                    return Ok(result(false, c.generation, c.owner_instance_id));
+                }
+                for failed in sqlx::query_file!(
+                    "../../queries/deployment/fail_old_invocations.sql",
+                    thread,
+                    agent
+                )
+                .fetch_all(&mut **tx)
+                .await?
+                {
+                    crate::chat::activity(tx, thread, "invocation.ended", failed.id, "").await?;
+                }
+                c.generation + 1
+            }
+        };
+        sqlx::query_file!(
+            "../../queries/deployment/assign.sql",
+            thread,
+            participant,
+            agent,
+            instance,
+            generation,
+            false
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(result(true, generation, instance))
+    }
+    /// Which live replica should receive work for a thread, assigning one when needed.
+    pub(crate) async fn owner_for(
+        &self,
+        agent: Uuid,
+        thread: Option<Uuid>,
+    ) -> Result<Option<(Uuid, u64)>, Error> {
+        if let Some(thread) = thread
+            && let Some(current) =
+                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
+                    .fetch_optional(&self.pool)
+                    .await?
+            && !current.stopped
+            && self.instance_live(agent, current.owner_instance_id).await?
+        {
+            return Ok(Some((current.owner_instance_id, current.generation as u64)));
+        }
+        let Some(node) = sqlx::query_file!("../../queries/deployment/choose_owner.sql", agent)
+            .fetch_optional(&self.pool)
+            .await?
+        else {
+            return Ok(None);
+        };
+        if let Some(thread) = thread
+            && let Some(current) =
+                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
+                    .fetch_optional(&self.pool)
+                    .await?
+        {
+            let claim = self
+                .claim(agent, node.instance_id, thread, current.participant_id)
+                .await?;
+            return Ok(Some((node.instance_id, claim.generation)));
+        }
+        Ok(Some((node.instance_id, 0)))
+    }
+    pub(crate) fn seal_record<M: Message>(
+        &self,
+        key: Uuid,
+        kind: &str,
+        value: &M,
+    ) -> Result<Vec<u8>, Error> {
+        let bytes = Zeroizing::new(value.encode_to_vec());
+        let text = SecretString::from(base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            bytes.as_slice(),
+        ));
+        Ok(self
+            .encryption
+            .seal(
+                SecretBinding {
+                    resource_kind: "sidecar_control",
+                    resource_id: key,
+                    name: kind,
+                },
+                &text,
+            )?
+            .into_bytes())
+    }
+    pub(crate) fn open_record<M: Message>(
+        &self,
+        key: Uuid,
+        kind: &str,
+        sealed: &[u8],
+    ) -> Result<M, Error> {
+        let text = self.encryption.open(
+            SecretBinding {
+                resource_kind: "sidecar_control",
+                resource_id: key,
+                name: kind,
+            },
+            SealedSecret::from_bytes(sealed)?,
+        )?;
+        let bytes = Zeroizing::new(
+            base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD,
+                text.expose_secret(),
+            )
+            .map_err(|_| Error::Encryption)?,
+        );
+        M::decode_from_slice(bytes.as_slice()).map_err(|_| Error::Encryption)
+    }
+    /// Queue durable gateway-originated work for one replica.
+    pub(crate) async fn direct(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+        thread: Option<Uuid>,
+        generation: u64,
+        action: wire::directive::Action,
+    ) -> Result<Uuid, Error> {
+        let key = Uuid::new_v4();
+        let directive = wire::Directive {
+            id: key.to_string(),
+            thread_id: thread.map(|t| t.to_string()).unwrap_or_default(),
+            generation,
+            action: Some(action),
+            ..Default::default()
+        };
+        let payload = self.seal_record(key, "directive", &directive)?;
+        sqlx::query_file!(
+            "../../queries/deployment/directive_insert.sql",
+            key,
+            agent,
+            instance,
+            thread,
+            generation as i64,
+            payload
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(key)
+    }
+    pub(crate) async fn pending_directives(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+    ) -> Result<Vec<wire::Directive>, Error> {
+        sqlx::query_file!(
+            "../../queries/deployment/directives_pending.sql",
+            agent,
+            instance
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|r| self.open_record(r.id, "directive", &r.payload))
+        .collect()
+    }
+    pub(crate) async fn directive_result(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+        key: Uuid,
+        result: &wire::CallResult,
+    ) -> Result<(), Error> {
+        let payload = self.seal_record(key, "result", result)?;
+        sqlx::query_file!(
+            "../../queries/deployment/directive_result.sql",
+            key,
+            agent,
+            instance,
+            payload
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(())
+    }
+    async fn wait_directive(
+        &self,
+        key: Uuid,
+        timeout: Duration,
+    ) -> Result<wire::CallResult, Error> {
+        let mut changed = self
+            .channels
+            .directives
+            .subscribe(&self.pool, "tilde_sidecar_directives")
+            .await?;
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            changed.borrow_and_update();
+            let row = sqlx::query_file!("../../queries/deployment/directive_get.sql", key)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or(Error::NotFound)?;
+            if row.acked_at.is_some() {
+                let result = row.result.ok_or(Error::NotFound)?;
+                return self.open_record(key, "result", &result);
+            }
+            tokio::select! {
+                _ = tokio::time::sleep_until(deadline) => return Err(Error::Invalid("Sidecar did not answer in time".into())),
+                changed = changed.changed() => { if changed.is_err() { return Err(Error::Invalid("Directive notifications ended".into())); } }
+            }
+        }
+    }
+    /// Run one ingress call on the replica that owns a thread and relay its answer.
+    pub async fn forward(
+        &self,
+        agent: Uuid,
+        thread: Option<Uuid>,
+        call: wire::IngressCall,
+    ) -> Result<wire::CallResult, Error> {
+        let thread = match thread {
+            Some(thread) => Some(thread),
+            None => routing::thread(&self.chat(), &call.method, &call.body, &call.content_type)
+                .await
+                .ok()
+                .flatten(),
+        };
+        let (instance, generation) = self.owner_for(agent, thread).await?.ok_or_else(|| {
+            Error::Invalid("No sidecar replica is available for this agent".into())
+        })?;
+        let key = self
+            .direct(agent, instance, thread, generation, call.into())
+            .await?;
+        self.wait_directive(key, Duration::from_secs(30)).await
+    }
+    pub async fn resolve_participant(
+        &self,
+        r: wire::ResolveParticipantRequest,
+    ) -> Result<wire::ResolveParticipantResponse, Error> {
+        match r.key {
+            Some(wire::resolve_participant_request::Key::AgentId(agent)) => {
+                let agent = self.agents.get(id(&agent)?).await?;
+                Ok(wire::ResolveParticipantResponse {
+                    id: agent.id.to_string(),
+                    name: agent.name,
+                    ..Default::default()
+                })
+            }
+            Some(wire::resolve_participant_request::Key::UserId(user)) => {
+                let user = id(&user)?;
+                let row = sqlx::query_file!("../../queries/chat/user_get.sql", user)
+                    .fetch_optional(&self.pool)
+                    .await?
+                    .ok_or(Error::NotFound)?;
+                Ok(wire::ResolveParticipantResponse {
+                    id: user.to_string(),
+                    name: row.name,
+                    ..Default::default()
+                })
+            }
+            None => Err(Error::Invalid("Resolve requires an agent or user".into())),
+        }
     }
 }
 pub(crate) fn id(value: &str) -> Result<Uuid, Error> {

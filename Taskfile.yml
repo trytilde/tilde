@@ -21,23 +21,13 @@ tasks:
       - task: setup
       - pnpm generate
 
-  build:corrosion:
-    desc: Build the pinned Corrosion binary included in gateway and sidecar distributions
-    cmds:
-      - scripts/build-corrosion.sh
-
   dev:sidecar:
-    desc: Run sidecar with gateway-brokered registration from ENGINE_SIDECAR_* configuration
-    deps: [build:corrosion]
-    env:
-      ENGINE_CORROSION_BINARY: "{{.ROOT_DIR}}/.tools/corrosion"
-      ENGINE_SIDECAR_STATE_DIRECTORY: "{{.ROOT_DIR}}/.run/sidecar"
+    desc: Run a sidecar beside a local agent from ENGINE_SIDECAR_* configuration
     cmds:
       - cargo run --bin tilde-sidecar
 
   test:sidecar:
-    desc: Exercise real Corrosion peers and Postgres projection
-    deps: [build:corrosion]
+    desc: Exercise two in-process sidecar replicas, gateway projection, forwarding and failover
     cmds:
       - scripts/with-postgres.sh cargo test -p tilde --test sidecars
 
@@ -48,13 +38,12 @@ tasks:
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
-      - task: build:corrosion
       - cargo build --locked --release --features embedded-web --bins
 
   dev:
-    desc: Run agent runtime and event ingress, optional management API, Vite and dev ngrok
+    desc: Run the engine on one port with optional management, Vite and dev ngrok
     vars:
-      INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}{{end}}'
+      INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.API_PORT | default "8080"}}{{end}}'
       DEV_ADDRESS: '{{.ADDRESS | default "127.0.0.1"}}'
       DEV_ISSUER: '{{if and .ENGINE_OIDC_ISSUER (ne .ENGINE_OIDC_ISSUER "http://127.0.0.1:5556")}}{{.ENGINE_OIDC_ISSUER}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:5556{{end}}'
       PUBLIC_PORT: '{{if eq (.ENGINE_WEB_ENABLED | default "true") "false"}}{{.API_PORT | default "8080"}}{{else}}{{.WEB_PORT | default "5173"}}{{end}}'
@@ -77,17 +66,15 @@ tasks:
       CONNECTION_UI_PORT: '{{.CONNECTION_UI_PORT | default "5174"}}'
       ENGINE_CONNECTION_SETUP_PUBLIC_URL: '{{.ENGINE_CONNECTION_SETUP_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
       ENGINE_MANAGEMENT_ENABLED: '{{.ENGINE_MANAGEMENT_ENABLED | default "true"}}'
+      ENGINE_SERVE: '{{if eq (.ENGINE_MANAGEMENT_ENABLED | default "true") "false"}}ingress,runtime,sidecar{{else}}all{{end}}'
       ENGINE_WEB_ENABLED: '{{.ENGINE_WEB_ENABLED | default "true"}}'
-      ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: '{{.DEV_ADDRESS}}:{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}'
-      ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}{{.INGRESS_URL}}{{else}}{{.ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL | default .INGRESS_URL}}{{end}}'
-      PUBLIC_EVENT_INGRESS_PORT: '{{.PUBLIC_EVENT_INGRESS_PORT | default "8082"}}'
+      ENGINE_INGRESS_PUBLIC_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}{{.INGRESS_URL}}{{else}}{{.ENGINE_INGRESS_PUBLIC_URL | default .INGRESS_URL}}{{end}}'
       API_PORT: '{{.API_PORT | default "8080"}}'
       WEB_PORT: '{{.WEB_PORT | default "5173"}}'
-      ENGINE_MANAGEMENT_LISTEN: '{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}'
-      ENGINE_MANAGEMENT_PUBLIC_URL: '{{.ENGINE_MANAGEMENT_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS .PUBLIC_PORT)}}'
+      ENGINE_LISTEN: '{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}'
+      ENGINE_PUBLIC_URL: '{{.ENGINE_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS .PUBLIC_PORT)}}'
+      ENGINE_RUNTIME_PUBLIC_URL: '{{.ENGINE_RUNTIME_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
       ENGINE_WEB_ORIGINS: 'http://{{.DEV_ADDRESS}}:{{.WEB_PORT | default "5173"}},http://{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}},http://{{.DEV_ADDRESS}}:{{.CONNECTION_UI_PORT | default "5174"}},http://localhost:{{.WEB_PORT | default "5173"}}'
-      ENGINE_AGENT_RUNTIME_LISTEN: '{{.ENGINE_AGENT_RUNTIME_LISTEN | default "127.0.0.1:8081"}}'
-      ENGINE_AGENT_RUNTIME_PUBLIC_URL: '{{.ENGINE_AGENT_RUNTIME_PUBLIC_URL | default "http://127.0.0.1:8081"}}'
       ENGINE_DEV_URL: '{{.ENGINE_DEV_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
       ENGINE_OIDC_ISSUER: "{{.DEV_ISSUER}}"
       ENGINE_OIDC_CLIENT_ID: '{{.ENGINE_OIDC_CLIENT_ID | default "tilde-dev"}}'
@@ -223,7 +210,6 @@ tasks:
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
-      - task: build:corrosion
       - cargo test --workspace
       - cargo build --features embedded-web
       - node web/scripts/test-client.mjs

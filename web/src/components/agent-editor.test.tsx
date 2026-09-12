@@ -71,7 +71,7 @@ it("autosaves typed capabilities and keeps header saves independent", async () =
   expect(onSaved).not.toHaveBeenCalled();
 
   getDeployment.mockResolvedValue({
-    deployment: { mode: 1, endpointUrl: agent.endpointUrl, failureMode: 1, retentionDays: 7 },
+    deployment: { mode: 1, endpointUrl: agent.endpointUrl, failureMode: 1 },
     nodes: [],
   });
   setDeployment.mockImplementation(async (values) => ({ deployment: values }));

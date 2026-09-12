@@ -1,50 +1,37 @@
-//! The sidecar owns Corrosion child processes and local agent execution. Its
-//! listeners have independent audiences; management routes are never mounted.
+//! The sidecar runs the owning-replica runtime for one or more agents beside
+//! their agent processes. Two listeners: a loopback runtime listener for the
+//! agent process, and one network listener for provider webhooks and native
+//! ingress. Everything else is an outbound connection to the gateway.
 use super::{
-    corrosion::process::Process,
     gateway,
     runtime::{Runtime, RuntimeOptions},
 };
 use crate::{
     chat::{Chat, ChatError, Result},
-    proto::tilde::agent_event_ingress::v1 as wire,
+    proto::tilde::{agent_event_ingress::v1 as wire, types::v1 as types},
 };
 use axum::{
     Router,
     extract::{Request, State},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{any, get},
+    routing::get,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use secrecy::{ExposeSecret, SecretString};
-use std::{
-    collections::BTreeMap,
-    net::{IpAddr, SocketAddr},
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
+use tower::ServiceExt;
 use uuid::Uuid;
-use zeroize::Zeroize;
 #[derive(Clone)]
 pub struct Node {
     pub runtime: Arc<Runtime>,
     pub gateway: gateway::Client,
-    api_token: SecretString,
-    corrosion_url: String,
 }
 pub struct Options {
     pub gateway_url: String,
     pub tokens: Vec<SecretString>,
     pub endpoints: BTreeMap<Uuid, String>,
-    pub advertise: IpAddr,
     pub runtime_listen: SocketAddr,
-    pub public_ingress_listen: SocketAddr,
-    pub agent_ingress_listen: SocketAddr,
-    pub gossip_port: u16,
-    pub state_directory: PathBuf,
-    pub corrosion_binary: PathBuf,
+    pub listen: SocketAddr,
     pub public_url: Option<String>,
 }
 impl Options {
@@ -86,72 +73,81 @@ impl Options {
             gateway_url: env("ENGINE_SIDECAR_GATEWAY_URL")?,
             tokens,
             endpoints,
-            advertise: env("ENGINE_SIDECAR_ADVERTISE_ADDRESS")?
-                .parse()
-                .map_err(|_| ChatError::Invalid("Advertised address must be an IP".into()))?,
-            runtime_listen: socket("ENGINE_AGENT_RUNTIME_LISTEN", "0.0.0.0:8081")?,
-            public_ingress_listen: socket("ENGINE_PUBLIC_EVENT_INGRESS_LISTEN", "0.0.0.0:8082")?,
-            agent_ingress_listen: socket("ENGINE_AGENT_EVENT_INGRESS_LISTEN", "0.0.0.0:8083")?,
-            gossip_port: std::env::var("ENGINE_SIDECAR_GOSSIP_PORT")
-                .unwrap_or_else(|_| "8787".into())
-                .parse()
-                .map_err(|_| ChatError::Invalid("Invalid gossip port".into()))?,
-            state_directory: std::env::var("ENGINE_SIDECAR_STATE_DIRECTORY")
-                .unwrap_or_else(|_| "/var/lib/tilde-sidecar".into())
-                .into(),
-            corrosion_binary: std::env::var("ENGINE_CORROSION_BINARY")
-                .unwrap_or_else(|_| "corrosion".into())
-                .into(),
-            public_url: std::env::var("ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL").ok(),
+            runtime_listen: socket("ENGINE_SIDECAR_RUNTIME_LISTEN", "127.0.0.1:8081")?,
+            listen: socket("ENGINE_SIDECAR_LISTEN", "0.0.0.0:8082")?,
+            public_url: std::env::var("ENGINE_SIDECAR_PUBLIC_URL")
+                .ok()
+                .filter(|s| !s.is_empty()),
         };
-        if result.advertise.is_unspecified() {
-            return Err(ChatError::Invalid(
-                "Advertised address must be reachable".into(),
-            ));
+        if !result.runtime_listen.ip().is_loopback() {
+            return Err(ChatError::Invalid("ENGINE_SIDECAR_RUNTIME_LISTEN must be a loopback address; only the agent process next door may use it".into()));
         }
-        let listeners = [
-            result.runtime_listen,
-            result.public_ingress_listen,
-            result.agent_ingress_listen,
-        ];
-        for (i, l) in listeners.iter().enumerate() {
-            if l.port() != 0 && listeners[..i].contains(l) {
-                return Err(ChatError::Invalid(
-                    "Sidecar listeners must have distinct addresses".into(),
-                ));
-            }
+        if result.runtime_listen == result.listen {
+            return Err(ChatError::Invalid(
+                "Sidecar listeners must have distinct addresses".into(),
+            ));
         }
         Ok(result)
     }
 }
+/// A running sidecar: its nodes, bound addresses, and the handle that stops it.
+pub struct Sidecar {
+    pub instance: Uuid,
+    pub nodes: Vec<Node>,
+    pub runtime_address: SocketAddr,
+    pub address: SocketAddr,
+    stop: tokio::sync::watch::Sender<bool>,
+    workers: tokio::task::JoinSet<()>,
+    servers: tokio::task::JoinHandle<Result<()>>,
+    platform: Option<(
+        opentelemetry_sdk::trace::SdkTracerProvider,
+        tokio::task::JoinHandle<()>,
+    )>,
+}
+impl Sidecar {
+    /// Stop serving, drop live executions, and let the gateway see this incarnation disappear.
+    pub async fn stop(mut self) {
+        let _ = self.stop.send(true);
+        self.servers.abort();
+        self.workers.abort_all();
+        while self.workers.join_next().await.is_some() {}
+        if let Some((provider, worker)) = self.platform.take() {
+            let _ = tokio::task::spawn_blocking(move || provider.shutdown()).await;
+            worker.abort();
+        }
+    }
+}
 pub async fn run(options: Options) -> Result<()> {
-    tokio::fs::create_dir_all(&options.state_directory)
-        .await
-        .map_err(|_| ChatError::Transport)?;
-    // A process restart loses its live executions. A fresh incarnation lets
-    // the gateway detect the old owner as unavailable and apply its policy.
+    let mut sidecar = start(options).await?;
+    let result = tokio::select! {
+        _ = tokio::signal::ctrl_c() => Ok(()),
+        result = &mut sidecar.servers => result.unwrap_or(Err(ChatError::Transport)),
+        _ = sidecar.workers.join_next() => Err(ChatError::Transport),
+    };
+    sidecar.stop().await;
+    result
+}
+pub async fn start(options: Options) -> Result<Sidecar> {
+    // A restart loses live executions. A fresh incarnation lets the gateway see
+    // the previous owner disappear and apply the agent's failure policy.
     let instance = Uuid::new_v4();
     let runtime_listener = tokio::net::TcpListener::bind(options.runtime_listen)
         .await
         .map_err(|_| ChatError::Transport)?;
-    let public_listener = tokio::net::TcpListener::bind(options.public_ingress_listen)
-        .await
-        .map_err(|_| ChatError::Transport)?;
-    let agent_listener = tokio::net::TcpListener::bind(options.agent_ingress_listen)
+    let public_listener = tokio::net::TcpListener::bind(options.listen)
         .await
         .map_err(|_| ChatError::Transport)?;
     let runtime_port = runtime_listener
         .local_addr()
         .map_err(|_| ChatError::Transport)?
         .port();
-    let public_port = public_listener
+    let public_address = public_listener
         .local_addr()
-        .map_err(|_| ChatError::Transport)?
-        .port();
-    let agent_port = agent_listener
-        .local_addr()
-        .map_err(|_| ChatError::Transport)?
-        .port();
+        .map_err(|_| ChatError::Transport)?;
+    let public_url = options
+        .public_url
+        .clone()
+        .unwrap_or_else(|| format!("http://{public_address}"));
     let platform_routes = super::telemetry::PlatformRoutes::default();
     let (platform_provider, platform_worker) = super::telemetry::platform(platform_routes.clone());
     opentelemetry::global::set_tracer_provider(platform_provider.clone());
@@ -159,15 +155,34 @@ pub async fn run(options: Options) -> Result<()> {
     let mut workers = tokio::task::JoinSet::new();
     let mut runtime_router = Router::new();
     let mut public_router = Router::new();
-    let mut agent_router = Router::new();
-    let serving = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut readiness = Vec::new();
-    let mut registered = std::collections::BTreeSet::new();
-    for (index, token) in options.tokens.into_iter().enumerate() {
+    let mut nodes: Vec<Node> = vec![];
+    for token in options.tokens {
         let gateway = gateway::Client::new(&options.gateway_url, token)?;
-        let mut configuration = gateway.configuration().await?;
+        let request = wire::WatchRequest {
+            instance_id: instance.to_string(),
+            public_url: public_url.clone(),
+            runtime_url: format!("http://127.0.0.1:{runtime_port}"),
+            ..Default::default()
+        };
+        let mut stream = gateway.watch(request.clone()).await?;
+        let first = stream
+            .message()
+            .await
+            .map_err(|_| ChatError::Transport)?
+            .ok_or(ChatError::Transport)?;
+        let first: wire::WatchResponse = first.to_owned_message();
+        let Some(wire::watch_response::Frame::Snapshot(snapshot)) = first.frame else {
+            return Err(ChatError::Invalid(
+                "Gateway did not begin with a snapshot".into(),
+            ));
+        };
+        let mut snapshot = *snapshot;
+        let configuration = snapshot
+            .configuration
+            .into_option()
+            .ok_or(ChatError::Transport)?;
         let agent = crate::chat::id(&configuration.agent.id)?;
-        if !registered.insert(agent) {
+        if nodes.iter().any(|n| n.runtime.agent_id == agent) {
             return Err(ChatError::Invalid(
                 "An agent appears more than once in the deployment token list".into(),
             ));
@@ -178,99 +193,24 @@ pub async fn run(options: Options) -> Result<()> {
             .ok_or_else(|| ChatError::Invalid(format!("Local endpoint missing for agent {agent}")))?
             .clone();
         let prefix = format!("/agents/{agent}");
-        let gossip = SocketAddr::new(
-            options.advertise,
-            options
-                .gossip_port
-                .checked_add(
-                    u16::try_from(index)
-                        .map_err(|_| ChatError::Invalid("Too many agent registrations".into()))?,
-                )
-                .ok_or_else(|| ChatError::Invalid("Too many gossip ports".into()))?,
-        );
-        let public_url = format!(
-            "{}{prefix}",
-            options.public_url.clone().unwrap_or_else(|| format!(
-                "http://{}",
-                SocketAddr::new(options.advertise, public_port)
-            ))
-        );
-        let registration = wire::RegisterSidecarRequest {
-            instance_id: instance.to_string(),
-            public_ingress_url: public_url,
-            runtime_url: format!(
-                "http://{}{prefix}",
-                SocketAddr::new(options.advertise, runtime_port)
-            ),
-            agent_ingress_url: format!(
-                "http://{}{prefix}",
-                SocketAddr::new(options.advertise, agent_port)
-            ),
-            gossip_address: gossip.to_string(),
-            local_agent_endpoint: endpoint.clone(),
-            ..Default::default()
-        };
-        let mut registration = gateway.register(&registration).await?;
-        if registration.schema_revision != super::schema_revision() {
-            return Err(ChatError::Invalid(
-                "Gateway and sidecar schemas differ; deploy matching binaries".into(),
-            ));
+        let runtime = Arc::new(Runtime::new(
+            gateway.clone(),
+            RuntimeOptions {
+                agent_id: agent,
+                instance_id: instance,
+                signing_key: SecretString::from(std::mem::take(&mut snapshot.token_signing_key)),
+                host_key: SecretString::from(configuration.webhook_signing_key.clone()),
+                local_endpoint: endpoint,
+                callback_url: format!("http://127.0.0.1:{runtime_port}{prefix}"),
+            },
+        ));
+        runtime.configure(configuration);
+        for assignment in std::mem::take(&mut snapshot.assignments) {
+            runtime.apply_assignment(assignment).await?;
         }
-        let reserved =
-            std::net::TcpListener::bind("127.0.0.1:0").map_err(|_| ChatError::Transport)?;
-        let api = reserved.local_addr().map_err(|_| ChatError::Transport)?;
-        drop(reserved);
-        let api_token = SecretString::from(std::mem::take(&mut registration.corrosion_token));
-        let mut process = Process::start(
-            options.corrosion_binary.clone(),
-            &options.state_directory.join(agent.to_string()),
-            api,
-            gossip,
-            &api_token,
-            &registration,
-        )
-        .await?;
-        if let Some(peer) = registration.peers.iter().find(|p| p.ready) {
-            let client = super::corrosion::Client::new(
-                &format!("{}/corrosion", peer.agent_ingress_url.trim_end_matches('/')),
-                api_token.clone(),
-            )?;
-            process.client.catch_up(&client).await?;
-        }
-        let encryption = Arc::new(
-            crate::encryption::Encryption::from_agent_key(
-                agent,
-                SecretString::from(std::mem::take(&mut registration.encryption_key)),
-            )
-            .map_err(|_| ChatError::Transport)?,
-        );
-        let runtime = Arc::new(
-            Runtime::new(
-                process.client.clone(),
-                RuntimeOptions {
-                    agent_id: agent,
-                    instance_id: instance,
-                    encryption,
-                    signing_key: SecretString::from(std::mem::take(
-                        &mut registration.token_signing_key,
-                    )),
-                    host_key: SecretString::from(std::mem::take(
-                        &mut configuration.webhook_signing_key,
-                    )),
-                    local_endpoint: endpoint,
-                    callback_url: format!("http://127.0.0.1:{runtime_port}{prefix}"),
-                },
-            )
-            .with_archive(gateway.clone()),
-        );
-        registration.tls_private_key.zeroize();
-        runtime.configure(&configuration).await?;
-        super::runtime::providers::clear_secrets(&mut configuration);
         let node = Node {
             runtime: runtime.clone(),
-            gateway,
-            api_token,
-            corrosion_url: format!("http://{api}"),
+            gateway: gateway.clone(),
         };
         platform_routes
             .write()
@@ -284,42 +224,42 @@ pub async fn run(options: Options) -> Result<()> {
                 super::telemetry::capture,
             )),
         );
-        agent_router = agent_router.nest(&prefix, node.agent_router());
-        workers.spawn(node.clone().gateway_commands(rx.clone()));
+        // Listeners are bound; the first heartbeat may already report readiness.
+        runtime
+            .state
+            .serving
+            .store(true, std::sync::atomic::Ordering::Release);
+        workers.spawn(runtime.as_ref().clone().worker(rx.clone()));
+        workers.spawn(runtime.as_ref().clone().shipper(rx.clone()));
+        let watcher = node.clone();
         let mut shutdown = rx.clone();
-        let local = node.clone();
-        let worker_runtime = runtime.as_ref().clone();
-        workers.spawn(worker_runtime.worker(rx.clone()));
-        workers.spawn(runtime.as_ref().clone().retirement_worker(rx.clone()));
-        workers.spawn(runtime.as_ref().clone().attachment_worker(rx.clone()));
-        workers.spawn(runtime.as_ref().clone().configuration_worker(rx.clone()));
-        let serving = serving.clone();
-        let healthy = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        readiness.push(healthy.clone());
         workers.spawn(async move {
-            let mut tick=tokio::time::interval(Duration::from_secs(5));
-            loop{tokio::select!{_=shutdown.changed()=>break,_=tick.tick()=>{
-                let process_ready=process.supervise().await.is_ok() && serving.load(std::sync::atomic::Ordering::Acquire);
-                let began=std::time::Instant::now();
-                let health=crate::proto::tilde::agent_host::v1::HealthzRequest::default();
-                let agent_ready=match crate::chat::runtime::client(&local.runtime.local_endpoint,local.runtime.host_key.expose_secret(),"Healthz",&health){Ok(client)=>matches!(tokio::time::timeout(Duration::from_secs(3),client.healthz(health)).await,Ok(Ok(value)) if value.view().ready),Err(_)=>false};
-                let _=local.runtime.client.transaction(vec![super::corrosion::client::statement("INSERT INTO health(id,agent_id,instance_id,checked_at,healthy,latency_ms) VALUES(?,?,?,?,?,?)",vec![serde_json::json!(Uuid::new_v4()),serde_json::json!(agent),serde_json::json!(instance),serde_json::json!(chrono::Utc::now().timestamp_millis()),serde_json::json!(i32::from(process_ready&&agent_ready)),serde_json::json!(began.elapsed().as_millis().min(i32::MAX as u128) as i32)])]).await;
-                healthy.store(process_ready&&agent_ready, std::sync::atomic::Ordering::Release);
-                let request=wire::HeartbeatRequest{instance_id:instance.to_string(),ready:process_ready,agent_ready,..Default::default()};
-                if local.gateway.heartbeat(&request).await.is_err(){tracing::warn!(agent_id=%agent,"Gateway heartbeat unavailable");}
-            }}}
-            process.stop().await;
+            let mut current = Some(stream);
+            loop {
+                if let Some(mut stream) = current.take() {
+                    tokio::select! {
+                        _ = shutdown.changed() => return,
+                        result = watcher.runtime.consume(&watcher, &mut stream) => {
+                            if result.is_err() { tracing::warn!(agent_id=%watcher.runtime.agent_id, "Gateway watch stream failed"); }
+                        }
+                    }
+                }
+                tokio::select! { _ = shutdown.changed() => return, _ = tokio::time::sleep(Duration::from_secs(1)) => {} }
+                match watcher.gateway.watch(request.clone()).await {
+                    Ok(stream) => current = Some(stream),
+                    Err(_) => tracing::warn!(agent_id=%watcher.runtime.agent_id, "Gateway watch reconnect failed"),
+                }
+            }
         });
+        nodes.push(node);
     }
+    let readiness = nodes.iter().map(|n| n.runtime.clone()).collect::<Vec<_>>();
     let health = Router::new().route(
         "/healthz",
         get(move || {
             let readiness = readiness.clone();
             async move {
-                if readiness
-                    .iter()
-                    .all(|r| r.load(std::sync::atomic::Ordering::Acquire))
-                {
+                if readiness.iter().all(|r| r.healthy()) {
                     http::StatusCode::OK
                 } else {
                     http::StatusCode::SERVICE_UNAVAILABLE
@@ -328,44 +268,33 @@ pub async fn run(options: Options) -> Result<()> {
         }),
     );
     runtime_router = runtime_router.merge(health.clone());
-    public_router = public_router.merge(health.clone());
-    agent_router = agent_router.merge(health);
-    serving.store(true, std::sync::atomic::Ordering::Release);
-    let server = async {
+    public_router = public_router.merge(health);
+    let runtime_address = runtime_listener
+        .local_addr()
+        .map_err(|_| ChatError::Transport)?;
+    tracing::info!(runtime_address=%runtime_address, address=%public_address, agents=nodes.len(), "tilde-sidecar listening");
+    let servers = tokio::spawn(async move {
         tokio::try_join!(
             axum::serve(runtime_listener, runtime_router),
-            axum::serve(public_listener, public_router),
-            axum::serve(agent_listener, agent_router)
+            axum::serve(public_listener, public_router)
         )
+        .map(|_| ())
         .map_err(|_| ChatError::Transport)
-    };
-    tokio::select! {_=tokio::signal::ctrl_c()=>{},result=server=>{result?;},_=workers.join_next()=>return Err(ChatError::Transport)};
-    let _ = tokio::task::spawn_blocking(move || platform_provider.shutdown()).await;
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), platform_worker).await;
-    let _ = stop.send(true);
-    while workers.join_next().await.is_some() {}
-    Ok(())
+    });
+    Ok(Sidecar {
+        instance,
+        nodes,
+        runtime_address,
+        address: public_address,
+        stop,
+        workers,
+        servers,
+        platform: Some((platform_provider, platform_worker)),
+    })
 }
 impl Node {
-    pub fn new(
-        runtime: Arc<Runtime>,
-        gateway: gateway::Client,
-        api_token: SecretString,
-        corrosion_url: String,
-    ) -> Self {
-        Self {
-            runtime,
-            gateway,
-            api_token,
-            corrosion_url,
-        }
-    }
     pub fn runtime_router(&self) -> Router {
         crate::chat::rpc::runtime::router(Chat::from_sidecar(self.runtime.clone()))
-            .route(
-                "/tilde.runtime.v1.AgentService/{*method}",
-                any(registry_proxy).with_state(self.clone()),
-            )
             .layer(middleware::from_fn_with_state(self.clone(), runtime_guard))
             .layer(middleware::from_fn_with_state(
                 self.clone(),
@@ -378,34 +307,156 @@ impl Node {
             )
     }
     pub fn public_router(&self) -> Router {
-        crate::chat::rpc::ingress::router_with_gateway(
-            Chat::from_sidecar(self.runtime.clone()),
-            Some(self.gateway.clone()),
-        )
-        .layer(middleware::from_fn_with_state(self.clone(), public_guard))
-        .merge(
-            Router::new()
-                .route(
-                    "/connections/webhooks/{id}",
-                    axum::routing::post(provider_receive).get(provider_challenge),
-                )
-                .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
-                .with_state(self.clone()),
-        )
+        crate::chat::rpc::ingress::router(Chat::from_sidecar(self.runtime.clone()))
+            .layer(middleware::from_fn_with_state(self.clone(), public_guard))
+            .merge(
+                Router::new()
+                    .route(
+                        "/connections/webhooks/{id}",
+                        axum::routing::post(provider_receive).get(provider_challenge),
+                    )
+                    .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
+                    .with_state(self.clone()),
+            )
     }
-    pub fn agent_router(&self) -> Router {
-        Router::new()
-            .route("/bridge", axum::routing::post(bridge_receive))
-            .route(
-                "/provider-events/{id}",
-                axum::routing::post(provider_internal),
+    /// Ingress calls executed here on the gateway's behalf: verified, never forwarded again.
+    fn local_router(&self) -> Router {
+        crate::chat::rpc::ingress::router(Chat::from_sidecar(self.runtime.clone()))
+            .layer(middleware::from_fn_with_state(self.clone(), local_guard))
+    }
+    pub(crate) async fn directive(self, directive: wire::Directive) {
+        // The gateway decided ownership before queueing this; apply it ahead of
+        // the assignment frame that may still be behind on the same stream.
+        if directive.generation > 0
+            && let Ok(thread) = crate::chat::id(&directive.thread_id)
+            && let Ok(shared) = self.runtime.load(thread).await
+        {
+            let assignment = {
+                let t = shared.lock().await;
+                types::ParticipantAssignment {
+                    owner_instance_id: self.runtime.instance_id.to_string(),
+                    generation: directive.generation,
+                    stopped: false,
+                    ..t.assignment.clone()
+                }
+            };
+            let _ = self.runtime.apply_assignment(assignment).await;
+        }
+        let result = match directive.action {
+            Some(wire::directive::Action::IngressCall(call)) => self.execute_call(*call).await,
+            Some(wire::directive::Action::ProviderEvent(event)) => {
+                let outcome = async {
+                    let connection = crate::chat::id(&event.connection_id)?;
+                    let message = crate::chat::providers::ingress::IncomingMessage::try_from(
+                        event.event.into_option().ok_or(ChatError::Transport)?,
+                    )
+                    .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
+                    self.runtime.ingest_provider(connection, message).await
+                }
+                .await;
+                status_result(outcome)
+            }
+            Some(wire::directive::Action::Recover(recover)) => {
+                let outcome = async {
+                    let thread = crate::chat::id(&directive.thread_id)?;
+                    self.runtime
+                        .recover_run(
+                            thread,
+                            crate::chat::id(&recover.run_id)?,
+                            crate::chat::id(&recover.participant_id)?,
+                            recover.objective,
+                        )
+                        .await
+                }
+                .await;
+                status_result(outcome)
+            }
+            Some(wire::directive::Action::Relay(relay)) => {
+                let outcome = async {
+                    let roster = relay.thread.into_option().ok_or(ChatError::Transport)?;
+                    let message = relay.message.into_option().ok_or(ChatError::Transport)?;
+                    self.runtime.relay(roster, message).await
+                }
+                .await;
+                status_result(outcome)
+            }
+            None => wire::CallResult {
+                status: 400,
+                ..Default::default()
+            },
+        };
+        if self
+            .runtime
+            .push(
+                wire::DirectiveResult {
+                    id: directive.id,
+                    result: result.into(),
+                    ..Default::default()
+                }
+                .into(),
             )
-            .route(
-                "/attachments/{id}",
-                get(attachment_get).delete(attachment_delete),
-            )
-            .route("/corrosion/{*path}", any(corrosion_proxy))
-            .with_state(self.clone())
+            .is_err()
+        {
+            tracing::warn!(agent_id=%self.runtime.agent_id, "Directive result could not be queued");
+        }
+    }
+    async fn execute_call(&self, call: wire::IngressCall) -> wire::CallResult {
+        let mut request = Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("/tilde.ingress.v1.ChatService/{}", call.method));
+        if let Ok(value) = http::HeaderValue::from_str(&call.content_type) {
+            request = request.header(http::header::CONTENT_TYPE, value);
+        }
+        if let Ok(value) = http::HeaderValue::from_str(&format!("Bearer {}", call.caller_token)) {
+            request = request.header(http::header::AUTHORIZATION, value);
+        }
+        let Ok(request) = request.body(axum::body::Body::from(call.body)) else {
+            return wire::CallResult {
+                status: 400,
+                ..Default::default()
+            };
+        };
+        let response = match self.local_router().oneshot(request).await {
+            Ok(response) => response,
+            Err(never) => match never {},
+        };
+        let status = response.status().as_u16() as i32;
+        let content_type = response
+            .headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_owned();
+        let body = axum::body::to_bytes(response.into_body(), 192 * 1024 * 1024)
+            .await
+            .map(|b| b.to_vec())
+            .unwrap_or_default();
+        wire::CallResult {
+            status,
+            content_type,
+            body,
+            ..Default::default()
+        }
+    }
+}
+fn status_result(outcome: Result<()>) -> wire::CallResult {
+    match outcome {
+        Ok(()) => wire::CallResult {
+            status: 204,
+            ..Default::default()
+        },
+        Err(ChatError::Denied) => wire::CallResult {
+            status: 409,
+            ..Default::default()
+        },
+        Err(ChatError::NotFound) => wire::CallResult {
+            status: 404,
+            ..Default::default()
+        },
+        Err(_) => wire::CallResult {
+            status: 503,
+            ..Default::default()
+        },
     }
 }
 fn bearer(request: &Request) -> Option<&str> {
@@ -416,80 +467,53 @@ fn bearer(request: &Request) -> Option<&str> {
         .ok()?
         .strip_prefix("Bearer ")
 }
-fn token_thread(token: &str) -> Option<Uuid> {
-    let bytes = URL_SAFE_NO_PAD.decode(token.split('.').nth(1)?).ok()?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    value.get("thread_id")?.as_str()?.parse().ok()
-}
 async fn runtime_guard(State(node): State<Node>, mut request: Request, next: Next) -> Response {
-    let mut cross_run = false;
-    if request.uri().path().ends_with(".ChatService/StartRun") {
-        let (parts, body) = request.into_parts();
-        let bytes = match axum::body::to_bytes(body, 256 * 1024).await {
-            Ok(bytes) => bytes,
-            Err(_) => return http::StatusCode::PAYLOAD_TOO_LARGE.into_response(),
-        };
-        let content_type = parts
-            .headers
-            .get(http::header::CONTENT_TYPE)
-            .and_then(|h| h.to_str().ok())
-            .unwrap_or("");
-        let run: crate::proto::tilde::runtime::v1::StartRunRequest =
-            match super::routing::decode(&bytes, content_type) {
-                Ok(run) => run,
-                Err(e) => return connectrpc::ConnectError::from(e).into_response(),
-            };
-        cross_run = run.agent_id != node.runtime.agent_id.to_string();
-        request = Request::from_parts(parts, axum::body::Body::from(bytes));
-    }
     let Some(token) = bearer(&request) else {
         return connectrpc::ConnectError::unauthenticated("Invocation token required")
             .into_response();
     };
-    let Some(thread) = token_thread(token) else {
+    let Ok(thread) = node.runtime.token_thread(token) else {
         return connectrpc::ConnectError::unauthenticated("Invalid invocation token")
             .into_response();
     };
-    // Signature validation must also precede the absence fallback; the gateway
-    // then validates the live invocation against its authoritative storage.
-    if node.runtime.verify_token_signature(token).is_err() {
+    if node.runtime.load(thread).await.is_err() {
         return connectrpc::ConnectError::unauthenticated("Invalid invocation token")
             .into_response();
     }
-    if cross_run {
-        return node.gateway.proxy(node.runtime.agent_id, request).await;
-    }
-    match node.runtime.exists(thread).await {
-        Ok(false) => node.gateway.proxy(node.runtime.agent_id, request).await,
-        Ok(true) if node.runtime.retiring(thread).await.unwrap_or(false) => {
-            node.gateway.proxy(node.runtime.agent_id, request).await
-        }
-        Ok(true) => match node.runtime.scope(token).await {
-            Ok(scope) => {
-                use opentelemetry::trace::TraceContextExt;
-                let cx = opentelemetry::Context::current();
-                for (key, value) in [
-                    ("tilde.thread.id", scope.thread_id),
-                    ("tilde.run.id", scope.run_id),
-                    ("tilde.invocation.id", scope.id),
-                ] {
-                    cx.span()
-                        .set_attribute(opentelemetry::KeyValue::new(key, value.to_string()));
-                }
-                request.extensions_mut().insert(scope);
-                next.run(request).await
+    match node.runtime.scope(token).await {
+        Ok(scope) => {
+            use opentelemetry::trace::TraceContextExt;
+            let cx = opentelemetry::Context::current();
+            for (key, value) in [
+                ("tilde.thread.id", scope.thread_id),
+                ("tilde.run.id", scope.run_id),
+                ("tilde.invocation.id", scope.id),
+            ] {
+                cx.span()
+                    .set_attribute(opentelemetry::KeyValue::new(key, value.to_string()));
             }
-            Err(e) => connectrpc::ConnectError::from(e).into_response(),
-        },
+            request.extensions_mut().insert(scope);
+            next.run(request).await
+        }
         Err(e) => connectrpc::ConnectError::from(e).into_response(),
     }
 }
-async fn public_guard(State(node): State<Node>, request: Request, next: Next) -> Response {
+async fn control_guard(State(node): State<Node>, request: Request, next: Next) -> Response {
     let Some(token) = bearer(&request) else {
+        return http::StatusCode::UNAUTHORIZED.into_response();
+    };
+    if node.runtime.verify_token_signature(token).is_err() {
+        return http::StatusCode::UNAUTHORIZED.into_response();
+    }
+    next.run(request).await
+}
+/// Verify the ingress credential and decide between local execution and the owner.
+async fn public_guard(State(node): State<Node>, request: Request, next: Next) -> Response {
+    let Some(token) = bearer(&request).map(str::to_owned) else {
         return connectrpc::ConnectError::unauthenticated("Ingress token required").into_response();
     };
     let claims = match super::tokens::verify_ingress(
-        token,
+        &token,
         node.runtime.agent_id,
         &node.runtime.signing_key,
     ) {
@@ -504,146 +528,98 @@ async fn public_guard(State(node): State<Node>, request: Request, next: Next) ->
         Ok(body) => body,
         Err(_) => return http::StatusCode::PAYLOAD_TOO_LARGE.into_response(),
     };
-    let method = parts.uri.path().rsplit('/').next().unwrap_or("");
+    let method = parts.uri.path().rsplit('/').next().unwrap_or("").to_owned();
     let content_type = parts
         .headers
         .get(http::header::CONTENT_TYPE)
         .and_then(|h| h.to_str().ok())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_owned();
     if let Err(e) =
-        super::routing::check_creation_scope(node.runtime.agent_id, method, &body, content_type)
+        super::routing::check_creation_scope(node.runtime.agent_id, &method, &body, &content_type)
     {
         return connectrpc::ConnectError::from(e).into_response();
     }
     let chat = Chat::from_sidecar(node.runtime.clone());
-    let thread = super::routing::thread(&chat, method, &body, content_type).await;
-    let fallback = match thread {
-        Ok(Some(thread)) => {
-            if claims.thread_id.is_some_and(|allowed| allowed != thread) {
-                return connectrpc::ConnectError::permission_denied(
-                    "Credential is scoped to another conversation",
+    let thread = match super::routing::thread(&chat, &method, &body, &content_type).await {
+        Ok(thread) => thread,
+        Err(ChatError::NotFound) => {
+            // Known only elsewhere: the gateway resolves the conversation from the call.
+            let result = node
+                .gateway
+                .forward(
+                    None,
+                    wire::IngressCall {
+                        method,
+                        content_type,
+                        body: body.to_vec(),
+                        caller_token: token,
+                        ..Default::default()
+                    },
                 )
-                .into_response();
-            }
-            match node.runtime.exists(thread).await {
-                Ok(exists) => !exists || node.runtime.retiring(thread).await.unwrap_or(false),
-                Err(e) => return connectrpc::ConnectError::from(e).into_response(),
-            }
+                .await;
+            return match result {
+                Ok(result) => super::public::relay(result),
+                Err(e) => connectrpc::ConnectError::from(e).into_response(),
+            };
         }
-        Ok(None) => {
-            if claims.thread_id.is_some() {
-                return connectrpc::ConnectError::permission_denied(
-                    "Credential requires a conversation-scoped operation",
-                )
-                .into_response();
-            }
-            false
-        }
-        Err(ChatError::NotFound) => true,
         Err(e) => return connectrpc::ConnectError::from(e).into_response(),
     };
-    parts.extensions.insert(claims);
-    let request = Request::from_parts(parts, axum::body::Body::from(body));
-    if fallback {
-        node.gateway.proxy(node.runtime.agent_id, request).await
-    } else {
-        next.run(request).await
-    }
-}
-
-async fn corrosion_proxy(State(node): State<Node>, mut request: Request) -> Response {
-    use subtle::ConstantTimeEq;
-    if !bearer(&request).is_some_and(|v| {
-        bool::from(
-            v.as_bytes()
-                .ct_eq(node.api_token.expose_secret().as_bytes()),
-        )
-    }) {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    }
-    let Some(path) = request.uri().path().strip_prefix("/corrosion/") else {
-        return http::StatusCode::NOT_FOUND.into_response();
-    };
-    if !["v1/queries", "v1/transactions", "v1/subscriptions"]
-        .iter()
-        .any(|p| path == *p || path.starts_with(&format!("{p}/")))
-    {
-        return http::StatusCode::NOT_FOUND.into_response();
-    }
-    let url = format!("{}/{}", node.corrosion_url, path);
-    request.headers_mut().remove(http::header::HOST);
-    let (parts, body) = request.into_parts();
-    match reqwest::Client::new()
-        .request(parts.method, url)
-        .headers(parts.headers)
-        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
-        .send()
-        .await
-    {
-        Ok(response) => {
-            let status = response.status();
-            let headers = response.headers().clone();
-            let mut out = axum::body::Body::from_stream(response.bytes_stream()).into_response();
-            *out.status_mut() = status;
-            for (name, value) in headers.iter() {
-                if name != http::header::TRANSFER_ENCODING && name != http::header::CONTENT_LENGTH {
-                    out.headers_mut().insert(name, value.clone());
-                }
-            }
-            out
-        }
-        Err(_) => http::StatusCode::BAD_GATEWAY.into_response(),
-    }
-}
-
-async fn registry_proxy(State(node): State<Node>, request: Request) -> Response {
-    node.gateway.proxy(node.runtime.agent_id, request).await
-}
-
-#[derive(serde::Deserialize)]
-struct AttachmentQuery {
-    thread_id: Uuid,
-}
-fn control_authorized(node: &Node, headers: &http::HeaderMap) -> bool {
-    use subtle::ConstantTimeEq;
-    headers
-        .get(http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .is_some_and(|token| {
-            bool::from(
-                token
-                    .as_bytes()
-                    .ct_eq(node.api_token.expose_secret().as_bytes()),
+    if let Some(thread) = thread {
+        if claims.thread_id.is_some_and(|allowed| allowed != thread) {
+            return connectrpc::ConnectError::permission_denied(
+                "Credential is scoped to another conversation",
             )
-        })
-}
-async fn attachment_get(
-    State(node): State<Node>,
-    axum::extract::Path(key): axum::extract::Path<Uuid>,
-    axum::extract::Query(query): axum::extract::Query<AttachmentQuery>,
-    headers: http::HeaderMap,
-) -> Response {
-    if !control_authorized(&node, &headers) {
-        return http::StatusCode::UNAUTHORIZED.into_response();
+            .into_response();
+        }
+        let owned = match node.runtime.load(thread).await {
+            Ok(shared) => node.runtime.owns(&*shared.lock().await),
+            Err(ChatError::NotFound) => false,
+            Err(e) => return connectrpc::ConnectError::from(e).into_response(),
+        };
+        if !owned {
+            let result = node
+                .gateway
+                .forward(
+                    Some(thread),
+                    wire::IngressCall {
+                        method,
+                        content_type,
+                        body: body.to_vec(),
+                        caller_token: token,
+                        ..Default::default()
+                    },
+                )
+                .await;
+            return match result {
+                Ok(result) => super::public::relay(result),
+                Err(e) => connectrpc::ConnectError::from(e).into_response(),
+            };
+        }
+    } else if claims.thread_id.is_some() {
+        return connectrpc::ConnectError::permission_denied(
+            "Credential requires a conversation-scoped operation",
+        )
+        .into_response();
     }
-    match node.runtime.download_attachment(query.thread_id, key).await {
-        Ok(value) => value.content.into_response(),
-        Err(_) => http::StatusCode::SERVICE_UNAVAILABLE.into_response(),
+    parts.extensions.insert(claims);
+    next.run(Request::from_parts(parts, axum::body::Body::from(body)))
+        .await
+}
+async fn local_guard(State(node): State<Node>, mut request: Request, next: Next) -> Response {
+    let Some(token) = bearer(&request) else {
+        return connectrpc::ConnectError::unauthenticated("Ingress token required").into_response();
+    };
+    match super::tokens::verify_ingress(token, node.runtime.agent_id, &node.runtime.signing_key) {
+        Ok(claims) => {
+            request.extensions_mut().insert(claims);
+            next.run(request).await
+        }
+        Err(_) => {
+            connectrpc::ConnectError::unauthenticated("Invalid ingress token").into_response()
+        }
     }
 }
-async fn attachment_delete(
-    State(node): State<Node>,
-    axum::extract::Path(key): axum::extract::Path<Uuid>,
-    headers: http::HeaderMap,
-) -> Response {
-    if !control_authorized(&node, &headers) {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    }
-    node.runtime.release_attachment(key).await;
-    http::StatusCode::NO_CONTENT.into_response()
-}
-
 async fn provider_receive(
     State(node): State<Node>,
     axum::extract::Path(connection): axum::extract::Path<Uuid>,
@@ -671,37 +647,19 @@ async fn provider_receive(
                         "thread",
                         &format!("{}:{}", node.runtime.agent_id, message.thread_id),
                     );
-                    if node.runtime.exists(thread).await? && !node.runtime.retiring(thread).await? {
-                        node.runtime.ingest_provider(connection, message).await?;
-                    } else {
-                        let location: wire::LocateConversationResponse = node
-                            .gateway
-                            .rpc(
-                                "LocateConversation",
-                                &wire::LocateConversationRequest {
-                                    thread_id: thread.to_string(),
-                                    ..Default::default()
-                                },
-                            )
-                            .await?;
-                        if location.storage == "not_found" {
-                            node.runtime.ingest_provider(connection, message).await?;
-                        } else {
-                            let _: wire::IngestProviderEventResponse = node
-                                .gateway
-                                .rpc(
-                                    "IngestProviderEvent",
-                                    &wire::IngestProviderEventRequest {
-                                        connection_id: connection.to_string(),
-                                        event: crate::proto::tilde::types::v1::ProviderEvent::from(
-                                            message,
-                                        )
-                                        .into(),
-                                        ..Default::default()
-                                    },
-                                )
-                                .await?;
+                    let event = crate::proto::tilde::types::v1::ProviderEvent::from(message);
+                    let local =
+                        crate::chat::providers::ingress::IncomingMessage::try_from(event.clone())
+                            .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
+                    match node.runtime.ingest_provider(connection, local).await {
+                        Ok(()) => {}
+                        // Another live replica owns this conversation; the gateway hands it over.
+                        Err(ChatError::Denied) => {
+                            node.gateway
+                                .forward_provider_event(thread, connection, event)
+                                .await?
                         }
+                        Err(e) => return Err(e),
                     }
                 }
                 Ok(None)
@@ -747,84 +705,5 @@ async fn provider_challenge(
             query.challenge.into_response()
         }
         _ => http::StatusCode::UNAUTHORIZED.into_response(),
-    }
-}
-async fn provider_internal(
-    State(node): State<Node>,
-    axum::extract::Path(connection): axum::extract::Path<Uuid>,
-    headers: http::HeaderMap,
-    axum::Json(event): axum::Json<crate::proto::tilde::types::v1::ProviderEvent>,
-) -> Response {
-    if !control_authorized(&node, &headers) {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    }
-    let thread = crate::chat::providers::ingress::stable(
-        connection,
-        "thread",
-        &format!("{}:{}", node.runtime.agent_id, event.thread_id),
-    );
-    if !node.runtime.exists(thread).await.unwrap_or(false) {
-        return http::StatusCode::NOT_FOUND.into_response();
-    }
-    let message = match crate::chat::providers::ingress::IncomingMessage::try_from(event) {
-        Ok(value) => value,
-        Err(_) => return http::StatusCode::BAD_REQUEST.into_response(),
-    };
-    match node.runtime.ingest_provider(connection, message).await {
-        Ok(()) => http::StatusCode::NO_CONTENT.into_response(),
-        Err(_) => http::StatusCode::SERVICE_UNAVAILABLE.into_response(),
-    }
-}
-
-async fn bridge_receive(
-    State(node): State<Node>,
-    headers: http::HeaderMap,
-    axum::Json(snapshot): axum::Json<crate::proto::tilde::types::v1::BridgeSnapshot>,
-) -> Response {
-    if !control_authorized(&node, &headers) {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    }
-    let Ok(thread) = crate::chat::id(&snapshot.thread.id) else {
-        return http::StatusCode::BAD_REQUEST.into_response();
-    };
-    if !node.runtime.exists(thread).await.unwrap_or(false) {
-        let location: Result<wire::LocateConversationResponse> = node
-            .gateway
-            .rpc(
-                "LocateConversation",
-                &wire::LocateConversationRequest {
-                    thread_id: thread.to_string(),
-                    ..Default::default()
-                },
-            )
-            .await;
-        match location {
-            Ok(value) if value.storage == "postgres" => {
-                return http::StatusCode::NO_CONTENT.into_response();
-            }
-            Ok(value) if value.storage == "corrosion" => {}
-            _ => return http::StatusCode::SERVICE_UNAVAILABLE.into_response(),
-        }
-    }
-    match node.runtime.apply_bridge(snapshot).await {
-        Ok(()) => http::StatusCode::NO_CONTENT.into_response(),
-        Err(_) => http::StatusCode::SERVICE_UNAVAILABLE.into_response(),
-    }
-}
-
-async fn control_guard(State(node): State<Node>, request: Request, next: Next) -> Response {
-    let Some(token) = bearer(&request) else {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    };
-    if node.runtime.verify_token_signature(token).is_err() {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    }
-    let Some(thread) = token_thread(token) else {
-        return http::StatusCode::UNAUTHORIZED.into_response();
-    };
-    match node.runtime.exists(thread).await {
-        Ok(true) => next.run(request).await,
-        Ok(false) => node.gateway.proxy(node.runtime.agent_id, request).await,
-        Err(e) => connectrpc::ConnectError::from(e).into_response(),
     }
 }

@@ -2,13 +2,13 @@
 // @generated from file tilde/agent_event_ingress/v1/sidecars.proto (package tilde.agent_event_ingress.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { SidecarNode } from "../../types/v1/deployment_pb.js";
+import type { ParticipantAssignment } from "../../types/v1/deployment_pb.js";
+import type { Attachment, Message as Message$1, Run, Thread } from "../../types/v1/chat_pb.js";
+import type { ProviderEvent, RuntimeEvent } from "../../types/v1/runtime_event_pb.js";
 import type { ChannelAccessMode, IdentityType } from "../../types/v1/access_pb.js";
 import type { Agent } from "../../types/v1/agent_pb.js";
-import type { AgentCommand, ProviderEvent } from "../../types/v1/runtime_event_pb.js";
-import type { InvokeRequest } from "../../agent_host/v1/agent_pb.js";
 
 /**
  * Describes the file tilde/agent_event_ingress/v1/sidecars.proto.
@@ -16,120 +16,376 @@ import type { InvokeRequest } from "../../agent_host/v1/agent_pb.js";
 export declare const file_tilde_agent_event_ingress_v1_sidecars: GenFile;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.RegisterSidecarRequest
+ * @generated from message tilde.agent_event_ingress.v1.WatchRequest
  */
-export declare type RegisterSidecarRequest = Message<"tilde.agent_event_ingress.v1.RegisterSidecarRequest"> & {
+export declare type WatchRequest = Message<"tilde.agent_event_ingress.v1.WatchRequest"> & {
   /**
    * @generated from field: string instance_id = 1;
    */
   instanceId: string;
 
   /**
-   * @generated from field: string public_ingress_url = 2;
+   * @generated from field: string public_url = 2;
    */
-  publicIngressUrl: string;
+  publicUrl: string;
 
   /**
-   * @generated from field: string agent_ingress_url = 3;
-   */
-  agentIngressUrl: string;
-
-  /**
-   * @generated from field: string runtime_url = 4;
+   * @generated from field: string runtime_url = 3;
    */
   runtimeUrl: string;
-
-  /**
-   * @generated from field: string gossip_address = 5;
-   */
-  gossipAddress: string;
-
-  /**
-   * @generated from field: string local_agent_endpoint = 6;
-   */
-  localAgentEndpoint: string;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.RegisterSidecarRequest.
- * Use `create(RegisterSidecarRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.WatchRequest.
+ * Use `create(WatchRequestSchema)` to create a new message.
  */
-export declare const RegisterSidecarRequestSchema: GenMessage<RegisterSidecarRequest>;
+export declare const WatchRequestSchema: GenMessage<WatchRequest>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.RegisterSidecarResponse
+ * @generated from message tilde.agent_event_ingress.v1.WatchResponse
  */
-export declare type RegisterSidecarResponse = Message<"tilde.agent_event_ingress.v1.RegisterSidecarResponse"> & {
+export declare type WatchResponse = Message<"tilde.agent_event_ingress.v1.WatchResponse"> & {
   /**
-   * @generated from field: string corrosion_token = 11;
+   * @generated from oneof tilde.agent_event_ingress.v1.WatchResponse.frame
    */
-  corrosionToken: string;
+  frame: {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Snapshot snapshot = 1;
+     */
+    value: Snapshot;
+    case: "snapshot";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.GetConfigurationResponse configuration = 2;
+     */
+    value: GetConfigurationResponse;
+    case: "configuration";
+  } | {
+    /**
+     * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 3;
+     */
+    value: ParticipantAssignment;
+    case: "assignment";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Directive directive = 4;
+     */
+    value: Directive;
+    case: "directive";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Ping ping = 5;
+     */
+    value: Ping;
+    case: "ping";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.WatchResponse.
+ * Use `create(WatchResponseSchema)` to create a new message.
+ */
+export declare const WatchResponseSchema: GenMessage<WatchResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Snapshot
+ */
+export declare type Snapshot = Message<"tilde.agent_event_ingress.v1.Snapshot"> & {
+  /**
+   * @generated from field: tilde.agent_event_ingress.v1.GetConfigurationResponse configuration = 1;
+   */
+  configuration?: GetConfigurationResponse | undefined;
 
   /**
-   * @generated from field: string agent_id = 1;
+   * @generated from field: repeated tilde.types.v1.ParticipantAssignment assignments = 2;
    */
-  agentId: string;
+  assignments: ParticipantAssignment[];
 
   /**
-   * @generated from field: string cluster_id = 2;
-   */
-  clusterId: string;
-
-  /**
-   * @generated from field: repeated tilde.types.v1.SidecarNode peers = 3;
-   */
-  peers: SidecarNode[];
-
-  /**
-   * @generated from field: string encryption_key = 4;
-   */
-  encryptionKey: string;
-
-  /**
-   * @generated from field: string token_signing_key = 5;
+   * @generated from field: string token_signing_key = 3;
    */
   tokenSigningKey: string;
-
-  /**
-   * @generated from field: string tls_certificate = 6;
-   */
-  tlsCertificate: string;
-
-  /**
-   * @generated from field: string tls_private_key = 7;
-   */
-  tlsPrivateKey: string;
-
-  /**
-   * @generated from field: string tls_ca = 8;
-   */
-  tlsCa: string;
-
-  /**
-   * @generated from field: uint32 retention_days = 9;
-   */
-  retentionDays: number;
-
-  /**
-   * @generated from field: string schema_revision = 10;
-   */
-  schemaRevision: string;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.RegisterSidecarResponse.
- * Use `create(RegisterSidecarResponseSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Snapshot.
+ * Use `create(SnapshotSchema)` to create a new message.
  */
-export declare const RegisterSidecarResponseSchema: GenMessage<RegisterSidecarResponse>;
+export declare const SnapshotSchema: GenMessage<Snapshot>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.HeartbeatRequest
+ * @generated from message tilde.agent_event_ingress.v1.Ping
  */
-export declare type HeartbeatRequest = Message<"tilde.agent_event_ingress.v1.HeartbeatRequest"> & {
+export declare type Ping = Message<"tilde.agent_event_ingress.v1.Ping"> & {
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Ping.
+ * Use `create(PingSchema)` to create a new message.
+ */
+export declare const PingSchema: GenMessage<Ping>;
+
+/**
+ * Durable gateway-originated work for the owning replica, acknowledged by DirectiveResult.
+ *
+ * @generated from message tilde.agent_event_ingress.v1.Directive
+ */
+export declare type Directive = Message<"tilde.agent_event_ingress.v1.Directive"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string thread_id = 2;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: uint64 generation = 3;
+   */
+  generation: bigint;
+
+  /**
+   * @generated from oneof tilde.agent_event_ingress.v1.Directive.action
+   */
+  action: {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.IngressCall ingress_call = 10;
+     */
+    value: IngressCall;
+    case: "ingressCall";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.ProviderEventDirective provider_event = 11;
+     */
+    value: ProviderEventDirective;
+    case: "providerEvent";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.RecoverRun recover = 12;
+     */
+    value: RecoverRun;
+    case: "recover";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.RelayMessage relay = 13;
+     */
+    value: RelayMessage;
+    case: "relay";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Directive.
+ * Use `create(DirectiveSchema)` to create a new message.
+ */
+export declare const DirectiveSchema: GenMessage<Directive>;
+
+/**
+ * A completed message from another participant's replica or the gateway, for local routing.
+ *
+ * @generated from message tilde.agent_event_ingress.v1.RelayMessage
+ */
+export declare type RelayMessage = Message<"tilde.agent_event_ingress.v1.RelayMessage"> & {
+  /**
+   * @generated from field: tilde.types.v1.Thread thread = 1;
+   */
+  thread?: Thread | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.Message message = 2;
+   */
+  message?: Message$1 | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RelayMessage.
+ * Use `create(RelayMessageSchema)` to create a new message.
+ */
+export declare const RelayMessageSchema: GenMessage<RelayMessage>;
+
+/**
+ * One tilde.ingress.v1.ChatService method executed with the original caller's scope.
+ *
+ * @generated from message tilde.agent_event_ingress.v1.IngressCall
+ */
+export declare type IngressCall = Message<"tilde.agent_event_ingress.v1.IngressCall"> & {
+  /**
+   * @generated from field: string method = 1;
+   */
+  method: string;
+
+  /**
+   * @generated from field: string content_type = 2;
+   */
+  contentType: string;
+
+  /**
+   * @generated from field: bytes body = 3;
+   */
+  body: Uint8Array;
+
+  /**
+   * @generated from field: string caller_token = 4;
+   */
+  callerToken: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.IngressCall.
+ * Use `create(IngressCallSchema)` to create a new message.
+ */
+export declare const IngressCallSchema: GenMessage<IngressCall>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.CallResult
+ */
+export declare type CallResult = Message<"tilde.agent_event_ingress.v1.CallResult"> & {
+  /**
+   * @generated from field: int32 status = 1;
+   */
+  status: number;
+
+  /**
+   * @generated from field: string content_type = 2;
+   */
+  contentType: string;
+
+  /**
+   * @generated from field: bytes body = 3;
+   */
+  body: Uint8Array;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.CallResult.
+ * Use `create(CallResultSchema)` to create a new message.
+ */
+export declare const CallResultSchema: GenMessage<CallResult>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ProviderEventDirective
+ */
+export declare type ProviderEventDirective = Message<"tilde.agent_event_ingress.v1.ProviderEventDirective"> & {
+  /**
+   * @generated from field: string connection_id = 1;
+   */
+  connectionId: string;
+
+  /**
+   * @generated from field: tilde.types.v1.ProviderEvent event = 2;
+   */
+  event?: ProviderEvent | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ProviderEventDirective.
+ * Use `create(ProviderEventDirectiveSchema)` to create a new message.
+ */
+export declare const ProviderEventDirectiveSchema: GenMessage<ProviderEventDirective>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.RecoverRun
+ */
+export declare type RecoverRun = Message<"tilde.agent_event_ingress.v1.RecoverRun"> & {
+  /**
+   * @generated from field: string run_id = 1;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: string participant_id = 2;
+   */
+  participantId: string;
+
+  /**
+   * @generated from field: string objective = 3;
+   */
+  objective: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RecoverRun.
+ * Use `create(RecoverRunSchema)` to create a new message.
+ */
+export declare const RecoverRunSchema: GenMessage<RecoverRun>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.PublishRequest
+ */
+export declare type PublishRequest = Message<"tilde.agent_event_ingress.v1.PublishRequest"> & {
   /**
    * @generated from field: string instance_id = 1;
    */
   instanceId: string;
+
+  /**
+   * @generated from field: repeated tilde.agent_event_ingress.v1.Upstream frames = 2;
+   */
+  frames: Upstream[];
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.PublishRequest.
+ * Use `create(PublishRequestSchema)` to create a new message.
+ */
+export declare const PublishRequestSchema: GenMessage<PublishRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Upstream
+ */
+export declare type Upstream = Message<"tilde.agent_event_ingress.v1.Upstream"> & {
+  /**
+   * @generated from oneof tilde.agent_event_ingress.v1.Upstream.frame
+   */
+  frame: {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Heartbeat heartbeat = 1;
+     */
+    value: Heartbeat;
+    case: "heartbeat";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Claim claim = 2;
+     */
+    value: Claim;
+    case: "claim";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Event event = 3;
+     */
+    value: Event;
+    case: "event";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.DirectiveResult directive_result = 4;
+     */
+    value: DirectiveResult;
+    case: "directiveResult";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Telemetry telemetry = 5;
+     */
+    value: Telemetry;
+    case: "telemetry";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Upstream.
+ * Use `create(UpstreamSchema)` to create a new message.
+ */
+export declare const UpstreamSchema: GenMessage<Upstream>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Heartbeat
+ */
+export declare type Heartbeat = Message<"tilde.agent_event_ingress.v1.Heartbeat"> & {
+  /**
+   * @generated from field: string sample_id = 1;
+   */
+  sampleId: string;
 
   /**
    * @generated from field: bool ready = 2;
@@ -140,51 +396,488 @@ export declare type HeartbeatRequest = Message<"tilde.agent_event_ingress.v1.Hea
    * @generated from field: bool agent_ready = 3;
    */
   agentReady: boolean;
+
+  /**
+   * @generated from field: int32 latency_ms = 4;
+   */
+  latencyMs: number;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.HeartbeatRequest.
- * Use `create(HeartbeatRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Heartbeat.
+ * Use `create(HeartbeatSchema)` to create a new message.
  */
-export declare const HeartbeatRequestSchema: GenMessage<HeartbeatRequest>;
+export declare const HeartbeatSchema: GenMessage<Heartbeat>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.HeartbeatResponse
+ * @generated from message tilde.agent_event_ingress.v1.Claim
  */
-export declare type HeartbeatResponse = Message<"tilde.agent_event_ingress.v1.HeartbeatResponse"> & {
+export declare type Claim = Message<"tilde.agent_event_ingress.v1.Claim"> & {
   /**
-   * @generated from field: bool paused = 1;
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string participant_id = 2;
+   */
+  participantId: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Claim.
+ * Use `create(ClaimSchema)` to create a new message.
+ */
+export declare const ClaimSchema: GenMessage<Claim>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Event
+ */
+export declare type Event = Message<"tilde.agent_event_ingress.v1.Event"> & {
+  /**
+   * @generated from field: tilde.types.v1.RuntimeEvent event = 1;
+   */
+  event?: RuntimeEvent | undefined;
+
+  /**
+   * @generated from field: uint64 generation = 2;
+   */
+  generation: bigint;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Event.
+ * Use `create(EventSchema)` to create a new message.
+ */
+export declare const EventSchema: GenMessage<Event>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.DirectiveResult
+ */
+export declare type DirectiveResult = Message<"tilde.agent_event_ingress.v1.DirectiveResult"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: tilde.agent_event_ingress.v1.CallResult result = 2;
+   */
+  result?: CallResult | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DirectiveResult.
+ * Use `create(DirectiveResultSchema)` to create a new message.
+ */
+export declare const DirectiveResultSchema: GenMessage<DirectiveResult>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Telemetry
+ */
+export declare type Telemetry = Message<"tilde.agent_event_ingress.v1.Telemetry"> & {
+  /**
+   * @generated from field: tilde.agent_event_ingress.v1.TelemetryKind kind = 1;
+   */
+  kind: TelemetryKind;
+
+  /**
+   * @generated from field: bytes payload = 2;
+   */
+  payload: Uint8Array;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Telemetry.
+ * Use `create(TelemetrySchema)` to create a new message.
+ */
+export declare const TelemetrySchema: GenMessage<Telemetry>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.PublishResponse
+ */
+export declare type PublishResponse = Message<"tilde.agent_event_ingress.v1.PublishResponse"> & {
+  /**
+   * @generated from field: repeated tilde.agent_event_ingress.v1.ThreadAck acks = 1;
+   */
+  acks: ThreadAck[];
+
+  /**
+   * @generated from field: repeated tilde.agent_event_ingress.v1.ClaimResult claims = 2;
+   */
+  claims: ClaimResult[];
+
+  /**
+   * @generated from field: repeated tilde.agent_event_ingress.v1.Fence fences = 3;
+   */
+  fences: Fence[];
+
+  /**
+   * @generated from field: bool paused = 4;
    */
   paused: boolean;
 
   /**
-   * @generated from field: int64 agent_generation = 2;
+   * @generated from field: int64 agent_generation = 5;
    */
   agentGeneration: bigint;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.PublishResponse.
+ * Use `create(PublishResponseSchema)` to create a new message.
+ */
+export declare const PublishResponseSchema: GenMessage<PublishResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ThreadAck
+ */
+export declare type ThreadAck = Message<"tilde.agent_event_ingress.v1.ThreadAck"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
 
   /**
-   * @generated from field: uint32 retention_days = 3;
+   * @generated from field: int64 sequence = 2;
    */
-  retentionDays: number;
+  sequence: bigint;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.HeartbeatResponse.
- * Use `create(HeartbeatResponseSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.ThreadAck.
+ * Use `create(ThreadAckSchema)` to create a new message.
  */
-export declare const HeartbeatResponseSchema: GenMessage<HeartbeatResponse>;
+export declare const ThreadAckSchema: GenMessage<ThreadAck>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.GetConfigurationRequest
+ * @generated from message tilde.agent_event_ingress.v1.ClaimResult
  */
-export declare type GetConfigurationRequest = Message<"tilde.agent_event_ingress.v1.GetConfigurationRequest"> & {
+export declare type ClaimResult = Message<"tilde.agent_event_ingress.v1.ClaimResult"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string participant_id = 2;
+   */
+  participantId: string;
+
+  /**
+   * @generated from field: bool granted = 3;
+   */
+  granted: boolean;
+
+  /**
+   * @generated from field: uint64 generation = 4;
+   */
+  generation: bigint;
+
+  /**
+   * @generated from field: string owner_instance_id = 5;
+   */
+  ownerInstanceId: string;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.GetConfigurationRequest.
- * Use `create(GetConfigurationRequestSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.ClaimResult.
+ * Use `create(ClaimResultSchema)` to create a new message.
  */
-export declare const GetConfigurationRequestSchema: GenMessage<GetConfigurationRequest>;
+export declare const ClaimResultSchema: GenMessage<ClaimResult>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.Fence
+ */
+export declare type Fence = Message<"tilde.agent_event_ingress.v1.Fence"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: uint64 generation = 2;
+   */
+  generation: bigint;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.Fence.
+ * Use `create(FenceSchema)` to create a new message.
+ */
+export declare const FenceSchema: GenMessage<Fence>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.HydrateRequest
+ */
+export declare type HydrateRequest = Message<"tilde.agent_event_ingress.v1.HydrateRequest"> & {
+  /**
+   * @generated from oneof tilde.agent_event_ingress.v1.HydrateRequest.key
+   */
+  key: {
+    /**
+     * @generated from field: string thread_id = 1;
+     */
+    value: string;
+    case: "threadId";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.ExternalKey external = 2;
+     */
+    value: ExternalKey;
+    case: "external";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * @generated from field: bool claim = 3;
+   */
+  claim: boolean;
+
+  /**
+   * @generated from field: string instance_id = 4;
+   */
+  instanceId: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.HydrateRequest.
+ * Use `create(HydrateRequestSchema)` to create a new message.
+ */
+export declare const HydrateRequestSchema: GenMessage<HydrateRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ExternalKey
+ */
+export declare type ExternalKey = Message<"tilde.agent_event_ingress.v1.ExternalKey"> & {
+  /**
+   * @generated from field: string connection_id = 1;
+   */
+  connectionId: string;
+
+  /**
+   * @generated from field: string external_id = 2;
+   */
+  externalId: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ExternalKey.
+ * Use `create(ExternalKeySchema)` to create a new message.
+ */
+export declare const ExternalKeySchema: GenMessage<ExternalKey>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.HydrateResponse
+ */
+export declare type HydrateResponse = Message<"tilde.agent_event_ingress.v1.HydrateResponse"> & {
+  /**
+   * @generated from field: bool found = 1;
+   */
+  found: boolean;
+
+  /**
+   * @generated from field: tilde.types.v1.Thread thread = 2;
+   */
+  thread?: Thread | undefined;
+
+  /**
+   * @generated from field: repeated tilde.types.v1.Message messages = 3;
+   */
+  messages: Message$1[];
+
+  /**
+   * @generated from field: repeated tilde.types.v1.Run runs = 4;
+   */
+  runs: Run[];
+
+  /**
+   * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 5;
+   */
+  assignment?: ParticipantAssignment | undefined;
+
+  /**
+   * @generated from field: bool owner_live = 6;
+   */
+  ownerLive: boolean;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.HydrateResponse.
+ * Use `create(HydrateResponseSchema)` to create a new message.
+ */
+export declare const HydrateResponseSchema: GenMessage<HydrateResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ForwardRequest
+ */
+export declare type ForwardRequest = Message<"tilde.agent_event_ingress.v1.ForwardRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from oneof tilde.agent_event_ingress.v1.ForwardRequest.work
+   */
+  work: {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.IngressCall call = 2;
+     */
+    value: IngressCall;
+    case: "call";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.ProviderEventDirective provider_event = 3;
+     */
+    value: ProviderEventDirective;
+    case: "providerEvent";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ForwardRequest.
+ * Use `create(ForwardRequestSchema)` to create a new message.
+ */
+export declare const ForwardRequestSchema: GenMessage<ForwardRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ForwardResponse
+ */
+export declare type ForwardResponse = Message<"tilde.agent_event_ingress.v1.ForwardResponse"> & {
+  /**
+   * @generated from field: tilde.agent_event_ingress.v1.CallResult result = 1;
+   */
+  result?: CallResult | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ForwardResponse.
+ * Use `create(ForwardResponseSchema)` to create a new message.
+ */
+export declare const ForwardResponseSchema: GenMessage<ForwardResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.UploadAttachmentRequest
+ */
+export declare type UploadAttachmentRequest = Message<"tilde.agent_event_ingress.v1.UploadAttachmentRequest"> & {
+  /**
+   * @generated from field: tilde.types.v1.Attachment attachment = 1;
+   */
+  attachment?: Attachment | undefined;
+
+  /**
+   * @generated from field: bytes content = 2;
+   */
+  content: Uint8Array;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.UploadAttachmentRequest.
+ * Use `create(UploadAttachmentRequestSchema)` to create a new message.
+ */
+export declare const UploadAttachmentRequestSchema: GenMessage<UploadAttachmentRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.UploadAttachmentResponse
+ */
+export declare type UploadAttachmentResponse = Message<"tilde.agent_event_ingress.v1.UploadAttachmentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.Attachment attachment = 1;
+   */
+  attachment?: Attachment | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.UploadAttachmentResponse.
+ * Use `create(UploadAttachmentResponseSchema)` to create a new message.
+ */
+export declare const UploadAttachmentResponseSchema: GenMessage<UploadAttachmentResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.DownloadAttachmentRequest
+ */
+export declare type DownloadAttachmentRequest = Message<"tilde.agent_event_ingress.v1.DownloadAttachmentRequest"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string attachment_id = 2;
+   */
+  attachmentId: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DownloadAttachmentRequest.
+ * Use `create(DownloadAttachmentRequestSchema)` to create a new message.
+ */
+export declare const DownloadAttachmentRequestSchema: GenMessage<DownloadAttachmentRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.DownloadAttachmentResponse
+ */
+export declare type DownloadAttachmentResponse = Message<"tilde.agent_event_ingress.v1.DownloadAttachmentResponse"> & {
+  /**
+   * @generated from field: bytes content = 1;
+   */
+  content: Uint8Array;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.DownloadAttachmentResponse.
+ * Use `create(DownloadAttachmentResponseSchema)` to create a new message.
+ */
+export declare const DownloadAttachmentResponseSchema: GenMessage<DownloadAttachmentResponse>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ResolveParticipantRequest
+ */
+export declare type ResolveParticipantRequest = Message<"tilde.agent_event_ingress.v1.ResolveParticipantRequest"> & {
+  /**
+   * @generated from oneof tilde.agent_event_ingress.v1.ResolveParticipantRequest.key
+   */
+  key: {
+    /**
+     * @generated from field: string agent_id = 1;
+     */
+    value: string;
+    case: "agentId";
+  } | {
+    /**
+     * @generated from field: string user_id = 2;
+     */
+    value: string;
+    case: "userId";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ResolveParticipantRequest.
+ * Use `create(ResolveParticipantRequestSchema)` to create a new message.
+ */
+export declare const ResolveParticipantRequestSchema: GenMessage<ResolveParticipantRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.ResolveParticipantResponse
+ */
+export declare type ResolveParticipantResponse = Message<"tilde.agent_event_ingress.v1.ResolveParticipantResponse"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ResolveParticipantResponse.
+ * Use `create(ResolveParticipantResponseSchema)` to create a new message.
+ */
+export declare const ResolveParticipantResponseSchema: GenMessage<ResolveParticipantResponse>;
 
 /**
  * @generated from message tilde.agent_event_ingress.v1.CredentialField
@@ -351,359 +1044,101 @@ export declare type IdentityGrant = Message<"tilde.agent_event_ingress.v1.Identi
 export declare const IdentityGrantSchema: GenMessage<IdentityGrant>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.WatchCommandsRequest
+ * @generated from enum tilde.agent_event_ingress.v1.TelemetryKind
  */
-export declare type WatchCommandsRequest = Message<"tilde.agent_event_ingress.v1.WatchCommandsRequest"> & {
+export enum TelemetryKind {
   /**
-   * @generated from field: string instance_id = 1;
+   * @generated from enum value: TELEMETRY_KIND_UNSPECIFIED = 0;
    */
-  instanceId: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.WatchCommandsRequest.
- * Use `create(WatchCommandsRequestSchema)` to create a new message.
- */
-export declare const WatchCommandsRequestSchema: GenMessage<WatchCommandsRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.WatchCommandsResponse
- */
-export declare type WatchCommandsResponse = Message<"tilde.agent_event_ingress.v1.WatchCommandsResponse"> & {
-  /**
-   * @generated from field: tilde.types.v1.AgentCommand command = 1;
-   */
-  command?: AgentCommand | undefined;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.WatchCommandsResponse.
- * Use `create(WatchCommandsResponseSchema)` to create a new message.
- */
-export declare const WatchCommandsResponseSchema: GenMessage<WatchCommandsResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.GetInvocationRequest
- */
-export declare type GetInvocationRequest = Message<"tilde.agent_event_ingress.v1.GetInvocationRequest"> & {
-  /**
-   * @generated from field: string command_id = 1;
-   */
-  commandId: string;
+  UNSPECIFIED = 0,
 
   /**
-   * @generated from field: uint64 generation = 2;
+   * @generated from enum value: TELEMETRY_KIND_TRACES = 1;
    */
-  generation: bigint;
+  TRACES = 1,
 
   /**
-   * @generated from field: string instance_id = 3;
+   * @generated from enum value: TELEMETRY_KIND_LOGS = 2;
    */
-  instanceId: string;
-};
+  LOGS = 2,
+}
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.GetInvocationRequest.
- * Use `create(GetInvocationRequestSchema)` to create a new message.
+ * Describes the enum tilde.agent_event_ingress.v1.TelemetryKind.
  */
-export declare const GetInvocationRequestSchema: GenMessage<GetInvocationRequest>;
+export declare const TelemetryKindSchema: GenEnum<TelemetryKind>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.GetInvocationResponse
- */
-export declare type GetInvocationResponse = Message<"tilde.agent_event_ingress.v1.GetInvocationResponse"> & {
-  /**
-   * @generated from field: tilde.agent_host.v1.InvokeRequest invocation = 1;
-   */
-  invocation?: InvokeRequest | undefined;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.GetInvocationResponse.
- * Use `create(GetInvocationResponseSchema)` to create a new message.
- */
-export declare const GetInvocationResponseSchema: GenMessage<GetInvocationResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.AcknowledgeCommandRequest
- */
-export declare type AcknowledgeCommandRequest = Message<"tilde.agent_event_ingress.v1.AcknowledgeCommandRequest"> & {
-  /**
-   * @generated from field: string command_id = 1;
-   */
-  commandId: string;
-
-  /**
-   * @generated from field: uint64 generation = 2;
-   */
-  generation: bigint;
-
-  /**
-   * @generated from field: string instance_id = 3;
-   */
-  instanceId: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.AcknowledgeCommandRequest.
- * Use `create(AcknowledgeCommandRequestSchema)` to create a new message.
- */
-export declare const AcknowledgeCommandRequestSchema: GenMessage<AcknowledgeCommandRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.AcknowledgeCommandResponse
- */
-export declare type AcknowledgeCommandResponse = Message<"tilde.agent_event_ingress.v1.AcknowledgeCommandResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.AcknowledgeCommandResponse.
- * Use `create(AcknowledgeCommandResponseSchema)` to create a new message.
- */
-export declare const AcknowledgeCommandResponseSchema: GenMessage<AcknowledgeCommandResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.CompleteCommandRequest
- */
-export declare type CompleteCommandRequest = Message<"tilde.agent_event_ingress.v1.CompleteCommandRequest"> & {
-  /**
-   * @generated from field: string command_id = 1;
-   */
-  commandId: string;
-
-  /**
-   * @generated from field: uint64 generation = 2;
-   */
-  generation: bigint;
-
-  /**
-   * @generated from field: string instance_id = 3;
-   */
-  instanceId: string;
-
-  /**
-   * @generated from field: string status = 4;
-   */
-  status: string;
-
-  /**
-   * @generated from field: repeated string pending_input_ids = 5;
-   */
-  pendingInputIds: string[];
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.CompleteCommandRequest.
- * Use `create(CompleteCommandRequestSchema)` to create a new message.
- */
-export declare const CompleteCommandRequestSchema: GenMessage<CompleteCommandRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.CompleteCommandResponse
- */
-export declare type CompleteCommandResponse = Message<"tilde.agent_event_ingress.v1.CompleteCommandResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.CompleteCommandResponse.
- * Use `create(CompleteCommandResponseSchema)` to create a new message.
- */
-export declare const CompleteCommandResponseSchema: GenMessage<CompleteCommandResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.ReportActivityRequest
- */
-export declare type ReportActivityRequest = Message<"tilde.agent_event_ingress.v1.ReportActivityRequest"> & {
-  /**
-   * @generated from field: string command_id = 1;
-   */
-  commandId: string;
-
-  /**
-   * @generated from field: uint64 generation = 2;
-   */
-  generation: bigint;
-
-  /**
-   * @generated from field: string instance_id = 3;
-   */
-  instanceId: string;
-
-  /**
-   * @generated from field: string reasoning_delta = 4;
-   */
-  reasoningDelta: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ReportActivityRequest.
- * Use `create(ReportActivityRequestSchema)` to create a new message.
- */
-export declare const ReportActivityRequestSchema: GenMessage<ReportActivityRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.ReportActivityResponse
- */
-export declare type ReportActivityResponse = Message<"tilde.agent_event_ingress.v1.ReportActivityResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ReportActivityResponse.
- * Use `create(ReportActivityResponseSchema)` to create a new message.
- */
-export declare const ReportActivityResponseSchema: GenMessage<ReportActivityResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.LocateConversationRequest
- */
-export declare type LocateConversationRequest = Message<"tilde.agent_event_ingress.v1.LocateConversationRequest"> & {
-  /**
-   * @generated from field: string thread_id = 1;
-   */
-  threadId: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.LocateConversationRequest.
- * Use `create(LocateConversationRequestSchema)` to create a new message.
- */
-export declare const LocateConversationRequestSchema: GenMessage<LocateConversationRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.LocateConversationResponse
- */
-export declare type LocateConversationResponse = Message<"tilde.agent_event_ingress.v1.LocateConversationResponse"> & {
-  /**
-   * @generated from field: string storage = 1;
-   */
-  storage: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.LocateConversationResponse.
- * Use `create(LocateConversationResponseSchema)` to create a new message.
- */
-export declare const LocateConversationResponseSchema: GenMessage<LocateConversationResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.IngestProviderEventRequest
- */
-export declare type IngestProviderEventRequest = Message<"tilde.agent_event_ingress.v1.IngestProviderEventRequest"> & {
-  /**
-   * @generated from field: string connection_id = 1;
-   */
-  connectionId: string;
-
-  /**
-   * @generated from field: tilde.types.v1.ProviderEvent event = 2;
-   */
-  event?: ProviderEvent | undefined;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.IngestProviderEventRequest.
- * Use `create(IngestProviderEventRequestSchema)` to create a new message.
- */
-export declare const IngestProviderEventRequestSchema: GenMessage<IngestProviderEventRequest>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.IngestProviderEventResponse
- */
-export declare type IngestProviderEventResponse = Message<"tilde.agent_event_ingress.v1.IngestProviderEventResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.IngestProviderEventResponse.
- * Use `create(IngestProviderEventResponseSchema)` to create a new message.
- */
-export declare const IngestProviderEventResponseSchema: GenMessage<IngestProviderEventResponse>;
-
-/**
- * This complete service mounts only on agent-event-ingress. Every call authenticates
- * an agent deployment token, never a browser session or agent invocation token.
+ * Sidecars dial the gateway; every call authenticates one agent deployment token.
+ * The gateway never opens a connection to a sidecar.
  *
  * @generated from service tilde.agent_event_ingress.v1.SidecarService
  */
 export declare const SidecarService: GenService<{
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.LocateConversation
+   * Held open for the life of a replica: a snapshot first, then configuration,
+   * ownership and directives as they change.
+   *
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Watch
    */
-  locateConversation: {
-    methodKind: "unary";
-    input: typeof LocateConversationRequestSchema;
-    output: typeof LocateConversationResponseSchema;
-  },
-  /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.IngestProviderEvent
-   */
-  ingestProviderEvent: {
-    methodKind: "unary";
-    input: typeof IngestProviderEventRequestSchema;
-    output: typeof IngestProviderEventResponseSchema;
-  },
-  /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.WatchCommands
-   */
-  watchCommands: {
+  watch: {
     methodKind: "server_streaming";
-    input: typeof WatchCommandsRequestSchema;
-    output: typeof WatchCommandsResponseSchema;
+    input: typeof WatchRequestSchema;
+    output: typeof WatchResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.GetInvocation
+   * Batched replica frames. The response acknowledges events and answers claims.
+   *
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Publish
    */
-  getInvocation: {
+  publish: {
     methodKind: "unary";
-    input: typeof GetInvocationRequestSchema;
-    output: typeof GetInvocationResponseSchema;
+    input: typeof PublishRequestSchema;
+    output: typeof PublishResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.AcknowledgeCommand
+   * Conversation state a replica does not hold in memory, optionally claiming ownership.
+   *
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Hydrate
    */
-  acknowledgeCommand: {
+  hydrate: {
     methodKind: "unary";
-    input: typeof AcknowledgeCommandRequestSchema;
-    output: typeof AcknowledgeCommandResponseSchema;
+    input: typeof HydrateRequestSchema;
+    output: typeof HydrateResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.CompleteCommand
+   * Execute one ingress call on the replica that owns the conversation.
+   *
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Forward
    */
-  completeCommand: {
+  forward: {
     methodKind: "unary";
-    input: typeof CompleteCommandRequestSchema;
-    output: typeof CompleteCommandResponseSchema;
+    input: typeof ForwardRequestSchema;
+    output: typeof ForwardResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.ReportActivity
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.UploadAttachment
    */
-  reportActivity: {
+  uploadAttachment: {
     methodKind: "unary";
-    input: typeof ReportActivityRequestSchema;
-    output: typeof ReportActivityResponseSchema;
+    input: typeof UploadAttachmentRequestSchema;
+    output: typeof UploadAttachmentResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.RegisterSidecar
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.DownloadAttachment
    */
-  registerSidecar: {
+  downloadAttachment: {
     methodKind: "unary";
-    input: typeof RegisterSidecarRequestSchema;
-    output: typeof RegisterSidecarResponseSchema;
+    input: typeof DownloadAttachmentRequestSchema;
+    output: typeof DownloadAttachmentResponseSchema;
   },
   /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Heartbeat
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.ResolveParticipant
    */
-  heartbeat: {
+  resolveParticipant: {
     methodKind: "unary";
-    input: typeof HeartbeatRequestSchema;
-    output: typeof HeartbeatResponseSchema;
-  },
-  /**
-   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.GetConfiguration
-   */
-  getConfiguration: {
-    methodKind: "unary";
-    input: typeof GetConfigurationRequestSchema;
-    output: typeof GetConfigurationResponseSchema;
+    input: typeof ResolveParticipantRequestSchema;
+    output: typeof ResolveParticipantResponseSchema;
   },
 }>;
 

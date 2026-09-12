@@ -586,8 +586,8 @@ pub const __INVOCATION_STATE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<InvocationState>,
     is_wkt: false,
 };
-/// Immutable, explicitly typed domain events. The complete encoded envelope is
-/// encrypted before persistence and decrypted only inside authorized projections.
+/// Immutable, explicitly typed domain events. The owning replica assigns
+/// origin_sequence per thread; the gateway projects them in that order.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -670,14 +670,6 @@ pub struct RuntimeEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub origin_agent_id: ::buffa::alloc::string::String,
-    /// Field 34: `archive_origin`
-    #[serde(
-        rename = "archiveOrigin",
-        alias = "archive_origin",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub archive_origin: bool,
     #[serde(flatten)]
     pub state: ::core::option::Option<__buffa::oneof::runtime_event::State>,
     #[serde(skip)]
@@ -697,7 +689,6 @@ impl ::core::fmt::Debug for RuntimeEvent {
             .field("invocation_id", &self.invocation_id)
             .field("participant_id", &self.participant_id)
             .field("origin_agent_id", &self.origin_agent_id)
-            .field("archive_origin", &self.archive_origin)
             .field("state", &self.state)
             .finish()
     }
@@ -900,9 +891,6 @@ impl ::buffa::Message for RuntimeEvent {
                 += 2u64
                     + ::buffa::types::string_encoded_len(&self.origin_agent_id) as u64;
         }
-        if self.archive_origin {
-            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1074,9 +1062,6 @@ impl ::buffa::Message for RuntimeEvent {
         }
         if !self.origin_agent_id.is_empty() {
             ::buffa::types::put_string_field(33u32, &self.origin_agent_id, buf);
-        }
-        if self.archive_origin {
-            ::buffa::types::put_bool_field(34u32, self.archive_origin, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1487,13 +1472,6 @@ impl ::buffa::Message for RuntimeEvent {
                 )?;
                 ::buffa::types::merge_string(&mut self.origin_agent_id, buf)?;
             }
-            34u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.archive_origin = ::buffa::types::decode_bool(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1513,7 +1491,6 @@ impl ::buffa::Message for RuntimeEvent {
         self.participant_id.clear();
         self.state = ::core::option::Option::None;
         self.origin_agent_id.clear();
-        self.archive_origin = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1565,7 +1542,6 @@ impl<'de> serde::Deserialize<'de> for RuntimeEvent {
                 let mut __f_origin_agent_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
-                let mut __f_archive_origin: ::core::option::Option<bool> = None;
                 let mut __oneof_state: ::core::option::Option<
                     __buffa::oneof::runtime_event::State,
                 > = None;
@@ -1740,21 +1716,6 @@ impl<'de> serde::Deserialize<'de> for RuntimeEvent {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "archiveOrigin" | "archive_origin" => {
-                            __f_archive_origin = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -2171,9 +2132,6 @@ impl<'de> serde::Deserialize<'de> for RuntimeEvent {
                 }
                 if let ::core::option::Option::Some(v) = __f_origin_agent_id {
                     __r.origin_agent_id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_archive_origin {
-                    __r.archive_origin = v;
                 }
                 __r.state = __oneof_state;
                 Ok(__r)
@@ -3617,257 +3575,6 @@ pub const __CHANNEL_DECISION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<ChannelDecision>,
     is_wkt: false,
 };
-/// Gateway-authored ownership transition, committed to its Postgres outbox before publication.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct AssignmentChange {
-    /// Field 1: `assignment`
-    #[serde(
-        rename = "assignment",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub assignment: ::buffa::MessageField<
-        ParticipantAssignment,
-        ::buffa::Inline<ParticipantAssignment>,
-    >,
-    /// Field 2: `command`
-    #[serde(
-        rename = "command",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub command: ::buffa::MessageField<AgentCommand, ::buffa::Inline<AgentCommand>>,
-    /// Field 3: `invocation`
-    #[serde(
-        rename = "invocation",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub invocation: ::buffa::MessageField<
-        InvocationState,
-        ::buffa::Inline<InvocationState>,
-    >,
-    /// Field 4: `run`
-    #[serde(
-        rename = "run",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub run: ::buffa::MessageField<Run, ::buffa::Inline<Run>>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AssignmentChange {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AssignmentChange")
-            .field("assignment", &self.assignment)
-            .field("command", &self.command)
-            .field("invocation", &self.invocation)
-            .field("run", &self.run)
-            .finish()
-    }
-}
-impl AssignmentChange {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AssignmentChange";
-}
-::buffa::impl_default_instance!(AssignmentChange);
-impl ::buffa::MessageName for AssignmentChange {
-    const PACKAGE: &'static str = "tilde.types.v1";
-    const NAME: &'static str = "AssignmentChange";
-    const FULL_NAME: &'static str = "tilde.types.v1.AssignmentChange";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AssignmentChange";
-}
-impl ::buffa::Message for AssignmentChange {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if self.assignment.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.assignment.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.command.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.command.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.invocation.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.invocation.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.run.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.run.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if self.assignment.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                1u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.assignment.write_to(__cache, buf);
-        }
-        if self.command.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.command.write_to(__cache, buf);
-        }
-        if self.invocation.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                3u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.invocation.write_to(__cache, buf);
-        }
-        if self.run.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                4u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.run.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.assignment.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.command.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.invocation.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.run.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.assignment = ::buffa::MessageField::none();
-        self.command = ::buffa::MessageField::none();
-        self.invocation = ::buffa::MessageField::none();
-        self.run = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AssignmentChange {
-    const PROTO_FQN: &'static str = "tilde.types.v1.AssignmentChange";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AssignmentChange {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __ASSIGNMENT_CHANGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.types.v1.AssignmentChange",
-    to_json: ::buffa::type_registry::any_to_json::<AssignmentChange>,
-    from_json: ::buffa::type_registry::any_from_json::<AssignmentChange>,
-    is_wkt: false,
-};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -4096,157 +3803,6 @@ pub const __ATTACHMENT_SOURCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     type_url: "type.googleapis.com/tilde.types.v1.AttachmentSource",
     to_json: ::buffa::type_registry::any_to_json::<AttachmentSource>,
     from_json: ::buffa::type_registry::any_from_json::<AttachmentSource>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct AttachmentTransfer {
-    /// Field 1: `attachment_id`
-    #[serde(
-        rename = "attachmentId",
-        alias = "attachment_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub attachment_id: ::buffa::alloc::string::String,
-    /// Field 2: `thread_id`
-    #[serde(
-        rename = "threadId",
-        alias = "thread_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub thread_id: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for AttachmentTransfer {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("AttachmentTransfer")
-            .field("attachment_id", &self.attachment_id)
-            .field("thread_id", &self.thread_id)
-            .finish()
-    }
-}
-impl AttachmentTransfer {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AttachmentTransfer";
-}
-::buffa::impl_default_instance!(AttachmentTransfer);
-impl ::buffa::MessageName for AttachmentTransfer {
-    const PACKAGE: &'static str = "tilde.types.v1";
-    const NAME: &'static str = "AttachmentTransfer";
-    const FULL_NAME: &'static str = "tilde.types.v1.AttachmentTransfer";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AttachmentTransfer";
-}
-impl ::buffa::Message for AttachmentTransfer {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.attachment_id.is_empty() {
-            size
-                += 1u64 + ::buffa::types::string_encoded_len(&self.attachment_id) as u64;
-        }
-        if !self.thread_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.attachment_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.attachment_id, buf);
-        }
-        if !self.thread_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.thread_id, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.attachment_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.thread_id, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.attachment_id.clear();
-        self.thread_id.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for AttachmentTransfer {
-    const PROTO_FQN: &'static str = "tilde.types.v1.AttachmentTransfer";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for AttachmentTransfer {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __ATTACHMENT_TRANSFER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.types.v1.AttachmentTransfer",
-    to_json: ::buffa::type_registry::any_to_json::<AttachmentTransfer>,
-    from_json: ::buffa::type_registry::any_from_json::<AttachmentTransfer>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -4960,303 +4516,5 @@ pub const __PROVIDER_ATTACHMENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     type_url: "type.googleapis.com/tilde.types.v1.ProviderAttachment",
     to_json: ::buffa::type_registry::any_to_json::<ProviderAttachment>,
     from_json: ::buffa::type_registry::any_from_json::<ProviderAttachment>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct BridgeSnapshot {
-    /// Field 1: `thread`
-    #[serde(
-        rename = "thread",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub thread: ::buffa::MessageField<Thread, ::buffa::Inline<Thread>>,
-    /// Field 2: `messages`
-    #[serde(
-        rename = "messages",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub messages: ::buffa::alloc::vec::Vec<Message>,
-    /// Field 3: `activities`
-    #[serde(
-        rename = "activities",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub activities: ::buffa::alloc::vec::Vec<Activity>,
-    /// Field 4: `sequence`
-    #[serde(
-        rename = "sequence",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub sequence: i64,
-    /// Field 5: `objective`
-    #[serde(
-        rename = "objective",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub objective: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 6: `idempotency_key`
-    #[serde(
-        rename = "idempotencyKey",
-        alias = "idempotency_key",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub idempotency_key: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for BridgeSnapshot {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("BridgeSnapshot")
-            .field("thread", &self.thread)
-            .field("messages", &self.messages)
-            .field("activities", &self.activities)
-            .field("sequence", &self.sequence)
-            .field("objective", &self.objective)
-            .field("idempotency_key", &self.idempotency_key)
-            .finish()
-    }
-}
-impl BridgeSnapshot {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.BridgeSnapshot";
-}
-impl BridgeSnapshot {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::objective`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_objective(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.objective = Some(value.into());
-        self
-    }
-}
-::buffa::impl_default_instance!(BridgeSnapshot);
-impl ::buffa::MessageName for BridgeSnapshot {
-    const PACKAGE: &'static str = "tilde.types.v1";
-    const NAME: &'static str = "BridgeSnapshot";
-    const FULL_NAME: &'static str = "tilde.types.v1.BridgeSnapshot";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.BridgeSnapshot";
-}
-impl ::buffa::Message for BridgeSnapshot {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if self.thread.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.thread.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        for v in &self.messages {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        for v in &self.activities {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        if self.sequence != 0i64 {
-            size += 1u64 + ::buffa::types::int64_encoded_len(self.sequence) as u64;
-        }
-        if let Some(ref v) = self.objective {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        if !self.idempotency_key.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if self.thread.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                1u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.thread.write_to(__cache, buf);
-        }
-        for v in &self.messages {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        for v in &self.activities {
-            ::buffa::types::put_len_delimited_header(
-                3u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        if self.sequence != 0i64 {
-            ::buffa::types::put_int64_field(4u32, self.sequence, buf);
-        }
-        if let Some(ref v) = self.objective {
-            ::buffa::types::put_string_field(5u32, v, buf);
-        }
-        if !self.idempotency_key.is_empty() {
-            ::buffa::types::put_string_field(6u32, &self.idempotency_key, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.thread.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.messages.push(elem);
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.activities.push(elem);
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.sequence = ::buffa::types::decode_int64(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .objective
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.thread = ::buffa::MessageField::none();
-        self.messages.clear();
-        self.activities.clear();
-        self.sequence = 0i64;
-        self.objective = ::core::option::Option::None;
-        self.idempotency_key.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for BridgeSnapshot {
-    const PROTO_FQN: &'static str = "tilde.types.v1.BridgeSnapshot";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for BridgeSnapshot {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __BRIDGE_SNAPSHOT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.types.v1.BridgeSnapshot",
-    to_json: ::buffa::type_registry::any_to_json::<BridgeSnapshot>,
-    from_json: ::buffa::type_registry::any_from_json::<BridgeSnapshot>,
     is_wkt: false,
 };

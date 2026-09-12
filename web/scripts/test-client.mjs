@@ -24,21 +24,18 @@ async function start(key = seed) {
   const env = {
     ...process.env,
     ...oidc.env,
-    ENGINE_PUBLIC_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
-    ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
-    ENGINE_AGENT_EVENT_INGRESS_LISTEN: "127.0.0.1:0",
     DATABASE_URL: database,
     ENGINE_ENCRYPTION_BACKEND: "seed",
     ENGINE_ENCRYPTION_KEY: key,
     RUST_LOG: "tilde=info",
   };
-  delete env.ENGINE_MANAGEMENT_PUBLIC_URL;
-  delete env.ENGINE_AGENT_RUNTIME_PUBLIC_URL;
+  delete env.ENGINE_PUBLIC_URL;
+  delete env.ENGINE_RUNTIME_PUBLIC_URL;
   delete env.ENGINE_KMS_KEY_ID;
-  delete env.ENGINE_MANAGEMENT_LISTEN;
+  delete env.ENGINE_LISTEN;
   delete env.ENGINE_ALLOW_NETWORK;
   env.ENGINE_WEB_ORIGINS = "";
-  const child = spawn(binary, ["--management-listen", "127.0.0.1:0"], {
+  const child = spawn(binary, ["--listen", "127.0.0.1:0"], {
     env,
     cwd: scratch,
     stdio: ["ignore", "pipe", "pipe"],
@@ -53,7 +50,7 @@ async function start(key = seed) {
       const text = chunk.toString();
       output += text;
       logs += text;
-      const match = output.match(/management_address=(127\.0\.0\.1:\d+)/);
+      const match = output.match(/ address=(127\.0\.0\.1:\d+)/);
       if (match) {
         clearTimeout(timer);
         resolve(`http://${match[1]}`);
@@ -149,6 +146,7 @@ try {
     webhookSigningKey: value,
   });
   assert.match(minimal.agent.id, /^[0-9a-f-]{36}$/);
+  await client(server.url, false).pauseAgent({ id: minimal.agent.id });
   await client(server.url, false).deleteAgent({ id: minimal.agent.id });
   for (const binary of [false, true]) {
     const rpc = client(server.url, binary);
@@ -202,6 +200,7 @@ try {
       endpointUrl: "http://127.0.0.1:3000/agent",
       webhookSigningKey: value,
     });
+    await rpc.pauseAgent({ id });
     await rpc.deleteAgent({ id });
     await rpc.deleteAgent({ id });
     await assert.rejects(

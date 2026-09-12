@@ -95,12 +95,9 @@ pub mod __buffa {
         reg.register_json_any(super::__STEER_COMMAND_JSON_ANY);
         reg.register_json_any(super::__CONVERTED_MESSAGE_STATE_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_DECISION_JSON_ANY);
-        reg.register_json_any(super::__ASSIGNMENT_CHANGE_JSON_ANY);
         reg.register_json_any(super::__ATTACHMENT_SOURCE_JSON_ANY);
-        reg.register_json_any(super::__ATTACHMENT_TRANSFER_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_EVENT_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_ATTACHMENT_JSON_ANY);
-        reg.register_json_any(super::__BRIDGE_SNAPSHOT_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -300,17 +297,9 @@ pub use self::__buffa::view::ChannelDecisionView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelDecisionOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::AssignmentChangeView;
-#[doc(inline)]
-pub use self::__buffa::view::AssignmentChangeOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::AttachmentSourceView;
 #[doc(inline)]
 pub use self::__buffa::view::AttachmentSourceOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AttachmentTransferView;
-#[doc(inline)]
-pub use self::__buffa::view::AttachmentTransferOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ProviderEventView;
 #[doc(inline)]
@@ -319,9 +308,5 @@ pub use self::__buffa::view::ProviderEventOwnedView;
 pub use self::__buffa::view::ProviderAttachmentView;
 #[doc(inline)]
 pub use self::__buffa::view::ProviderAttachmentOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::BridgeSnapshotView;
-#[doc(inline)]
-pub use self::__buffa::view::BridgeSnapshotOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

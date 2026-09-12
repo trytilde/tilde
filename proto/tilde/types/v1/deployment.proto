@@ -3,7 +3,7 @@ package tilde.types.v1;
 import "google/protobuf/timestamp.proto";
 enum DeploymentMode { DEPLOYMENT_MODE_UNSPECIFIED = 0; DEPLOYMENT_MODE_GATEWAY = 1; DEPLOYMENT_MODE_SIDECAR = 2; }
 enum SidecarFailureMode { SIDECAR_FAILURE_MODE_UNSPECIFIED = 0; SIDECAR_FAILURE_MODE_REASSIGN = 1; SIDECAR_FAILURE_MODE_STOP = 2; }
-message Deployment { string agent_id = 1; DeploymentMode mode = 2; optional string endpoint_url = 3; SidecarFailureMode failure_mode = 4; uint32 retention_days = 5; bool token_issued = 6; }
-message SidecarNode { string instance_id = 1; string agent_id = 2; string public_ingress_url = 3; string agent_ingress_url = 4; string runtime_url = 5; string gossip_address = 6; bool ready = 7; google.protobuf.Timestamp last_seen_at = 8; }
+message Deployment { string agent_id = 1; DeploymentMode mode = 2; optional string endpoint_url = 3; SidecarFailureMode failure_mode = 4; bool token_issued = 5; }
+message SidecarNode { string instance_id = 1; string agent_id = 2; string public_url = 3; string runtime_url = 4; bool ready = 5; google.protobuf.Timestamp last_seen_at = 6; }
 // Generation identifies an assignment, independently from the agent's pause/stop generation.
 message ParticipantAssignment { string thread_id = 1; string participant_id = 2; string agent_id = 3; string owner_instance_id = 4; uint64 generation = 5; bool stopped = 6; }

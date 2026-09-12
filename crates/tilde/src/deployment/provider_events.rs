@@ -1,19 +1,15 @@
 //! Provider payload parsing stays in the existing adapters. This module moves
-//! verified, typed events between the local runtime and archived gateway state.
-use super::{
-    Deployments,
-    corrosion::client::statement,
-    runtime::{Runtime, now},
-};
+//! verified, typed events into the owning replica's memory, or hands them to
+//! that replica when they arrive elsewhere.
+use super::{Deployments, runtime::Runtime, runtime::store};
 use crate::{
     chat::{
         ChatError, Result,
         providers::ingress::{IncomingKind, IncomingMessage, RemoteAttachment, stable},
     },
     error::Error,
-    proto::tilde::types::v1 as types,
+    proto::tilde::{agent_event_ingress::v1 as wire, types::v1 as types},
 };
-use serde_json::json;
 use uuid::Uuid;
 impl From<IncomingMessage> for types::ProviderEvent {
     fn from(m: IncomingMessage) -> Self {
@@ -103,96 +99,46 @@ impl TryFrom<types::ProviderEvent> for IncomingMessage {
     }
 }
 impl Deployments {
-    pub async fn locate(&self, agent: Uuid, thread: Uuid) -> std::result::Result<String, Error> {
-        if let Some(row) = sqlx::query_file!(
-            "../../queries/deployment/project/location.sql",
-            thread,
-            agent
-        )
-        .fetch_optional(&self.pool)
-        .await?
-        {
-            return Ok(row.storage);
-        }
-        if sqlx::query_file!("../../queries/deployment/thread_agent.sql", thread, agent)
-            .fetch_one(&self.pool)
-            .await?
-            .allowed
-        {
-            return Ok("postgres".into());
-        }
-        Ok("not_found".into())
-    }
-    pub async fn ingest_archived(
+    /// A provider event that reached the gateway for a sidecar agent goes to the
+    /// replica owning its conversation, or to any live replica for a new one.
+    pub async fn forward_provider_event(
         &self,
         agent: Uuid,
         connection: Uuid,
         event: types::ProviderEvent,
-    ) -> std::result::Result<(), Error> {
-        let owner = sqlx::query_file!("../../queries/chat/channel_owner.sql", connection)
-            .fetch_optional(&self.pool)
-            .await?
-            .ok_or(Error::NotFound)?;
-        if owner.agent_id != agent {
-            return Err(Error::Denied);
-        }
+    ) -> Result<()> {
         let thread = stable(
             connection,
             "thread",
             &format!("{agent}:{}", event.thread_id),
         );
-        match self.locate(agent, thread).await?.as_str() {
-            "postgres" => {
-                self.chat().ingest(connection, event.try_into()?).await?;
-                Ok(())
-            }
-            "corrosion" => {
-                let settings = sqlx::query_file!("../../queries/deployment/get.sql", agent)
-                    .fetch_one(&self.pool)
-                    .await?;
-                let secrets = self.open_secrets(
-                    agent,
-                    settings.encrypted_secrets.as_deref().ok_or(Error::Denied)?,
-                )?;
-                use secrecy::ExposeSecret;
-                for node in
-                    sqlx::query_file!("../../queries/deployment/project/node_available.sql", agent)
-                        .fetch_all(&self.pool)
-                        .await?
-                {
-                    let peer = super::corrosion::Client::new(
-                        &format!("{}/corrosion", node.agent_ingress_url.trim_end_matches('/')),
-                        secrets.api_token.clone(),
-                    )?;
-                    if !peer
-                        .query::<super::runtime::IdRow>(
-                            "SELECT id FROM threads WHERE id=?",
-                            vec![json!(thread)],
-                        )
-                        .await
-                        .is_ok_and(|r| !r.is_empty())
-                    {
-                        continue;
-                    }
-                    let response = reqwest::Client::new()
-                        .post(format!(
-                            "{}/provider-events/{connection}",
-                            node.agent_ingress_url.trim_end_matches('/')
-                        ))
-                        .bearer_auth(secrets.api_token.expose_secret())
-                        .json(&event)
-                        .send()
-                        .await
-                        .map_err(|_| Error::Invalid("Live peer is unavailable".into()))?;
-                    if !response.status().is_success() {
-                        return Err(Error::Invalid("Live peer did not accept event".into()));
-                    }
-                    return Ok(());
-                }
-                Err(Error::Invalid("Live conversation is unavailable".into()))
-            }
-            _ => Err(Error::Invalid("Conversation storage is unavailable".into())),
-        }
+        let known = sqlx::query_file!(
+            "../../queries/deployment/external_thread.sql",
+            connection,
+            event.thread_id,
+            agent
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(ChatError::from)?
+        .map(|r| r.thread_id)
+        .unwrap_or(thread);
+        let (instance, generation) = self
+            .owner_for(agent, Some(known))
+            .await
+            .map_err(|_| ChatError::Transport)?
+            .ok_or_else(|| {
+                ChatError::Invalid("No sidecar replica is available for this agent".into())
+            })?;
+        let directive = wire::ProviderEventDirective {
+            connection_id: connection.to_string(),
+            event: event.into(),
+            ..Default::default()
+        };
+        self.direct(agent, instance, Some(known), generation, directive.into())
+            .await
+            .map_err(|_| ChatError::Transport)?;
+        Ok(())
     }
 }
 impl Runtime {
@@ -203,7 +149,7 @@ impl Runtime {
         if m.text.len() > 1024 * 1024 || m.message_id.is_empty() || m.thread_id.is_empty() {
             return Err(ChatError::Invalid("Invalid provider message".into()));
         }
-        let configuration = self.configuration().await?;
+        let configuration = self.configuration()?;
         let c = configuration
             .connections
             .iter()
@@ -222,18 +168,6 @@ impl Runtime {
         let kind = crate::chat::access::identity::kind_name(m.sender.identity_type);
         let user = stable(connection, "user", &format!("{kind}:{}", m.sender.value));
         let receipt = stable(connection, "receipt", &m.event_id);
-        let _guard = self.mutation.lock().await;
-        if !self
-            .client
-            .query::<super::runtime::IdRow>(
-                "SELECT id FROM channel_receipts WHERE id=?",
-                vec![json!(receipt)],
-            )
-            .await?
-            .is_empty()
-        {
-            return Ok(());
-        }
         let decision = types::ChannelDecision {
             connection_id: connection.to_string(),
             event_id: m.event_id.clone(),
@@ -244,10 +178,6 @@ impl Runtime {
             access_mode: c.access_mode,
             ..Default::default()
         };
-        if !allowed {
-            self.client.transaction(vec![statement("INSERT INTO channel_receipts(id,thread_id,connection_id,external_id,message_id) VALUES(?,'',?,?,'')",vec![json!(receipt),json!(connection),json!(m.event_id)]),self.event(Uuid::nil(),"channel.access",decision.into())?]).await?;
-            return Ok(());
-        }
         let thread = stable(
             connection,
             "thread",
@@ -264,10 +194,6 @@ impl Runtime {
         .chars()
         .take(200)
         .collect::<String>();
-        let mut writes = vec![statement(
-            "INSERT INTO users(id,name) VALUES(?,?) ON CONFLICT(id) DO NOTHING",
-            vec![json!(user), json!(name)],
-        )];
         let user_row = types::Participant {
             id: user_participant.to_string(),
             user_id: Some(user.to_string()),
@@ -282,36 +208,57 @@ impl Runtime {
             active: true,
             ..Default::default()
         };
-        let mut roster = match self.thread(thread).await {
-            Ok(thread) => thread,
-            Err(ChatError::NotFound) => types::Thread {
-                id: thread.to_string(),
-                title: name,
-                primary_agent_id: self.agent_id.to_string(),
-                channel: types::ChannelBinding {
-                    connection_id: connection.to_string(),
-                    provider_id: c.provider_id.clone(),
-                    external_id: m.thread_id.clone(),
-                    ..Default::default()
+        let (shared, created) = match self.load_external(connection, &m.thread_id).await? {
+            Some(shared) => (shared, false),
+            None => {
+                if !allowed {
+                    return Ok(());
                 }
-                .into(),
-                ..Default::default()
-            },
-            Err(e) => return Err(e),
-        };
-        for p in [&user_row, &agent_row] {
-            if !roster.participants.iter().any(|old| old.id == p.id) {
-                roster.participants.push(p.clone());
-                writes.push(self.event(thread, "participant.joined", p.clone().into())?);
+                let roster = types::Thread {
+                    id: thread.to_string(),
+                    title: name.clone(),
+                    primary_agent_id: self.agent_id.to_string(),
+                    participants: vec![user_row.clone(), agent_row.clone()],
+                    channel: types::ChannelBinding {
+                        connection_id: connection.to_string(),
+                        provider_id: c.provider_id.clone(),
+                        external_id: m.thread_id.clone(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                };
+                (
+                    self.adopt(store::ThreadState::new(roster, Default::default()))?,
+                    true,
+                )
             }
-            writes.push(self.participant_insert(thread, p)?);
+        };
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        self.ensure_capacity()?;
+        if !t.receipts.insert(receipt) {
+            return Ok(());
         }
-        writes.insert(0,statement("INSERT INTO threads(id,title,primary_agent_id,last_activity_at,payload) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(thread),json!(roster.title),json!(self.agent_id),json!(now()),json!(self.seal(thread,"thread",&roster)?)]));
-        writes.push(statement("INSERT INTO channel_threads(id,connection_id,external_id,thread_id,agent_id) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(thread),json!(connection),json!(m.thread_id),json!(thread),json!(self.agent_id)]));
-        let assignment = self.assignment(thread, agent_participant).await?;
-        writes.push(self.assignment_insert(&assignment));
-        writes.push(self.event(thread, "participant.assigned", assignment.into())?);
-        writes.push(self.event(thread, "channel.access", decision.into())?);
+        if created {
+            let roster = t.thread.clone();
+            let assignment = t.assignment.clone();
+            self.emit(&mut t, "thread.created", roster.into(), None)?;
+            self.emit(&mut t, "participant.joined", user_row.clone().into(), None)?;
+            self.emit(&mut t, "participant.joined", agent_row.clone().into(), None)?;
+            self.emit(&mut t, "participant.assigned", assignment.into(), None)?;
+        } else {
+            for p in [&user_row, &agent_row] {
+                if !t.thread.participants.iter().any(|old| old.id == p.id) {
+                    t.thread.participants.push(p.clone());
+                    self.emit(&mut t, "participant.joined", p.clone().into(), None)?;
+                }
+            }
+        }
+        self.emit(&mut t, "channel.access", decision.into(), None)?;
+        if !allowed {
+            return Ok(());
+        }
         match m.kind {
             IncomingKind::Message => {
                 let mut message = types::Message {
@@ -353,16 +300,16 @@ impl Runtime {
                         url: a.url,
                         ..Default::default()
                     };
-                    writes.push(statement("INSERT INTO attachments(id,thread_id,holder_instance_id,payload,source) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(key),json!(thread),json!(self.instance_id),json!(self.seal(key,"attachment",&metadata)?),json!(self.seal(key,"attachment_source",&source)?)]));
-                    writes.push(self.event(thread, "attachment.source", source.into())?);
+                    self.record_attachment_source(&mut t, source)?;
                     message.attachments.push(metadata);
                 }
-                writes.push(self.message_insert(&message)?);
-                writes.push(self.event(thread, "message.completed", message.clone().into())?);
-                writes.extend(self.route_message_in(&message, &roster).await?);
+                t.upsert_message(message.clone());
+                self.index_message(message_id, thread);
+                self.emit(&mut t, "message.completed", message.clone().into(), None)?;
+                self.route_message_in(&mut t, &message)?;
             }
             IncomingKind::Updated | IncomingKind::Deleted => {
-                let mut message = self.message(message_id).await?;
+                let mut message = t.message(message_id).cloned().ok_or(ChatError::NotFound)?;
                 message.text = m.text;
                 message.status = if matches!(m.kind, IncomingKind::Deleted) {
                     "deleted"
@@ -370,12 +317,9 @@ impl Runtime {
                     "complete"
                 }
                 .into();
-                writes.push(self.message_insert(&message)?);
-                writes.push(statement(
-                    "DELETE FROM converted_messages WHERE message_id=?",
-                    vec![json!(message_id)],
-                ));
-                writes.push(self.event(thread, "message.updated", message.into())?);
+                t.upsert_message(message.clone());
+                t.converted.remove(&message_id);
+                self.emit(&mut t, "message.updated", message.into(), None)?;
             }
             IncomingKind::Typing(typing) => {
                 let typing = types::Typing {
@@ -387,32 +331,37 @@ impl Runtime {
                     .into(),
                     ..Default::default()
                 };
-                writes.push(self.event(thread, "typing.changed", typing.into())?);
+                self.emit(&mut t, "typing.changed", typing.into(), None)?;
             }
             IncomingKind::Membership(active) => {
                 let mut user = user_row;
                 user.active = active;
-                writes.push(self.participant_insert(thread, &user)?);
-                writes.push(self.event(
-                    thread,
+                if let Some(p) = t.thread.participants.iter_mut().find(|p| p.id == user.id) {
+                    p.active = active;
+                }
+                self.emit(
+                    &mut t,
                     if active {
                         "participant.joined"
                     } else {
                         "participant.left"
                     },
                     user.into(),
-                )?);
+                    None,
+                )?;
             }
         }
-        writes.push(statement("INSERT INTO channel_receipts(id,thread_id,connection_id,external_id,message_id) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(receipt),json!(thread),json!(connection),json!(m.event_id),json!(message_id)]));
-        self.commit(thread, writes).await
+        drop(t);
+        self.changed(thread);
+        Ok(())
     }
+    /// Record an outbound provider message the agent already sent.
     pub async fn provider_sent(&self, mut message: types::Message) -> Result<serde_json::Value> {
         let call_id = crate::chat::id(&message.id)?;
         let connection = crate::chat::id(&message.delivery.connection_id)?;
         let destination = message.delivery.destination.clone();
         let external = message.delivery.external_message_id.clone();
-        let configuration = self.configuration().await?;
+        let configuration = self.configuration()?;
         let c = configuration
             .connections
             .iter()
@@ -431,29 +380,53 @@ impl Runtime {
             active: true,
             ..Default::default()
         };
-        let root = types::Thread {
-            id: thread.to_string(),
-            title: destination.clone(),
-            primary_agent_id: self.agent_id.to_string(),
-            participants: vec![p.clone()],
-            channel: types::ChannelBinding {
-                connection_id: connection.to_string(),
-                provider_id: c.provider_id.clone(),
-                external_id: destination.clone(),
-                ..Default::default()
+        let (shared, created) = match self.load_external(connection, &destination).await? {
+            Some(shared) => (shared, false),
+            None => {
+                let root = types::Thread {
+                    id: thread.to_string(),
+                    title: destination.clone(),
+                    primary_agent_id: self.agent_id.to_string(),
+                    participants: vec![p.clone()],
+                    channel: types::ChannelBinding {
+                        connection_id: connection.to_string(),
+                        provider_id: c.provider_id.clone(),
+                        external_id: destination.clone(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                };
+                (
+                    self.adopt(store::ThreadState::new(root, Default::default()))?,
+                    true,
+                )
             }
-            .into(),
-            ..Default::default()
         };
         message.thread_id = thread.to_string();
         message.participant_id = participant.to_string();
         message.status = "complete".into();
         message.delivery.get_or_insert_default().status = "accepted".into();
         message.created_at = crate::chat::audit::timestamp(chrono::Utc::now()).into();
-        let _guard = self.mutation.lock().await;
-        self.commit(thread,vec![statement("INSERT INTO threads(id,title,primary_agent_id,last_activity_at,payload) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(thread),json!(destination),json!(self.agent_id),json!(now()),json!(self.seal(thread,"thread",&root)?)]),self.participant_insert(thread,&p)?,statement("INSERT INTO channel_threads(id,connection_id,external_id,thread_id,agent_id) VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING",vec![json!(thread),json!(connection),json!(destination),json!(thread),json!(self.agent_id)]),self.message_insert(&message)?,self.event(thread,"message.completed",message.into())?]).await?;
+        let mut t = shared.lock().await;
+        self.require_owner(&t)?;
+        if created {
+            let roster = t.thread.clone();
+            let assignment = t.assignment.clone();
+            self.emit(&mut t, "thread.created", roster.into(), None)?;
+            self.emit(&mut t, "participant.joined", p.clone().into(), None)?;
+            self.emit(&mut t, "participant.assigned", assignment.into(), None)?;
+        } else if !t.thread.participants.iter().any(|old| old.id == p.id) {
+            t.thread.participants.push(p.clone());
+            self.emit(&mut t, "participant.joined", p.into(), None)?;
+        }
+        t.upsert_message(message.clone());
+        self.index_message(call_id, thread);
+        self.emit(&mut t, "message.completed", message.into(), None)?;
+        drop(t);
+        self.changed(thread);
         Ok(
-            json!({"messageId":call_id,"threadId":thread,"externalMessageId":external,"accepted":true}),
+            serde_json::json!({"messageId":call_id,"threadId":thread,"externalMessageId":external,"accepted":true}),
         )
     }
 }
