@@ -521,7 +521,10 @@ the HTTP result unchanged. Provider webhooks are handed over the same way withou
 waiting. Completed messages in rooms with several sidecar agents are relayed to each
 owner; gateway-deployed agents in the same room are routed from the projection.
 Management writes to sidecar conversations forward the same way. Management reads use
-the projection.
+the projection. Registry RPCs from an agent beside a sidecar are verified by the replica,
+relayed over `Relay`, and re-verified at the gateway: token signature, agent generation,
+current owner and generation (settling a not-yet-published claim if needed), and the
+capability ceiling, before the existing registry handlers run.
 
 Attachment bytes live in bounded sidecar memory until the replica uploads them to the
 gateway, which encrypts them into S3. Replicated metadata distinguishes temporary

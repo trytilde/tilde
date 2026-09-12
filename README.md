@@ -319,7 +319,9 @@ the replicas.
 
 The replica that first receives work for a conversation owns it: turn state lives in its
 memory, the agent process is invoked over loopback, and channel replies use the
-replicated credentials. Requests that land on another replica, or on the gateway, are
+replicated credentials. Registry calls the agent makes with its invocation token are
+verified locally and relayed to the gateway, which checks the same token against its
+own ownership record and capability ceiling before answering. Requests that land on another replica, or on the gateway, are
 executed by the owner and answered through the gateway. The gateway serves reads of
 sidecar conversations from its projection, and completed messages in rooms with several
 sidecar agents are relayed to each owner.

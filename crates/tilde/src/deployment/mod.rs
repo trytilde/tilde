@@ -9,6 +9,7 @@ pub mod project;
 pub mod provider_events;
 pub mod public;
 pub mod recovery;
+mod relay;
 pub mod routing;
 pub mod rpc;
 pub mod runtime;

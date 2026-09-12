@@ -831,6 +831,58 @@ export declare type DownloadAttachmentResponse = Message<"tilde.agent_event_ingr
 export declare const DownloadAttachmentResponseSchema: GenMessage<DownloadAttachmentResponse>;
 
 /**
+ * @generated from message tilde.agent_event_ingress.v1.RelayRequest
+ */
+export declare type RelayRequest = Message<"tilde.agent_event_ingress.v1.RelayRequest"> & {
+  /**
+   * @generated from field: string instance_id = 1;
+   */
+  instanceId: string;
+
+  /**
+   * @generated from field: string path = 2;
+   */
+  path: string;
+
+  /**
+   * @generated from field: string content_type = 3;
+   */
+  contentType: string;
+
+  /**
+   * @generated from field: bytes body = 4;
+   */
+  body: Uint8Array;
+
+  /**
+   * @generated from field: string caller_token = 5;
+   */
+  callerToken: string;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RelayRequest.
+ * Use `create(RelayRequestSchema)` to create a new message.
+ */
+export declare const RelayRequestSchema: GenMessage<RelayRequest>;
+
+/**
+ * @generated from message tilde.agent_event_ingress.v1.RelayResponse
+ */
+export declare type RelayResponse = Message<"tilde.agent_event_ingress.v1.RelayResponse"> & {
+  /**
+   * @generated from field: tilde.agent_event_ingress.v1.CallResult result = 1;
+   */
+  result?: CallResult | undefined;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.RelayResponse.
+ * Use `create(RelayResponseSchema)` to create a new message.
+ */
+export declare const RelayResponseSchema: GenMessage<RelayResponse>;
+
+/**
  * @generated from message tilde.agent_event_ingress.v1.ResolveParticipantRequest
  */
 export declare type ResolveParticipantRequest = Message<"tilde.agent_event_ingress.v1.ResolveParticipantRequest"> & {
@@ -1139,6 +1191,16 @@ export declare const SidecarService: GenService<{
     methodKind: "unary";
     input: typeof ResolveParticipantRequestSchema;
     output: typeof ResolveParticipantResponseSchema;
+  },
+  /**
+   * Execute one registry call at the gateway on behalf of a verified local invocation.
+   *
+   * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Relay
+   */
+  relay: {
+    methodKind: "unary";
+    input: typeof RelayRequestSchema;
+    output: typeof RelayResponseSchema;
   },
 }>;
 

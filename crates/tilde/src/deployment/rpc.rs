@@ -359,6 +359,17 @@ impl SidecarService for Control {
             ..Default::default()
         })
     }
+    async fn relay<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::RelayRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<ingress::RelayResponse> + Send + use<'a>> {
+        let agent = self.agent(&ctx).await?;
+        Response::ok(ingress::RelayResponse {
+            result: self.0.relay(agent, r.to_owned_message()).await?.into(),
+            ..Default::default()
+        })
+    }
     async fn resolve_participant<'a>(
         &'a self,
         ctx: RequestContext,

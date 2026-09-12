@@ -114,7 +114,15 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
             name: "Sidecar".into(),
             endpoint_url: "http://127.0.0.1:1".into(),
             webhook_signing_key: SecretString::from("sidecar-test-agent-signing-key-0123456789"),
-            capabilities: Default::default(),
+            capabilities: tilde::iam::capabilities::Capabilities::from_wire(types::Capabilities {
+                agents_read: types::TargetPermission {
+                    mode: types::TargetSelection::All.into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            })
+            .unwrap(),
         })
         .await
         .unwrap();
@@ -232,6 +240,33 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     assert_eq!(invocation.assignment_generation, 1);
     assert_eq!(invocation.objective, "hello");
     assert_eq!(invocation.thread_id, thread_id.to_string());
+    // Registry calls from the agent process are relayed to the gateway under the same token.
+    let registry = |token: &str| {
+        http.post(format!(
+            "{}/tilde.runtime.v1.AgentService/ListAgents",
+            invocation.callback_url
+        ))
+        .bearer_auth(token)
+        .header("content-type", "application/json")
+        .header("connect-protocol-version", "1")
+        .body("{}")
+        .send()
+    };
+    let listed = registry(&invocation.capability).await.unwrap();
+    let status = listed.status();
+    let listed: serde_json::Value = listed.json().await.unwrap_or_default();
+    assert_eq!(status, 200, "{listed}");
+    assert!(
+        listed["agents"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["id"] == agent.to_string())
+    );
+    assert_eq!(
+        registry("not-an-invocation-token").await.unwrap().status(),
+        401
+    );
     finish.notify_one();
     // The owner's events reach Postgres without the gateway ever calling the replica.
     let projected = eventually(async || {

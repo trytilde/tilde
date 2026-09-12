@@ -82,6 +82,18 @@ pub type OwnedResolveParticipantResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RelayRequestView<'static>>`.
+pub type OwnedRelayRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RelayResponseView<'static>>`.
+pub type OwnedRelayResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::tilde::agent_event_ingress::v1::WatchResponse>
 for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::WatchResponseView<'_> {
     fn encode(
@@ -370,6 +382,42 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_event_ingress::v1::RelayResponse>
+for crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::agent_event_ingress::v1::RelayResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const SIDECAR_SERVICE_SERVICE_NAME: &str = "tilde.agent_event_ingress.v1.SidecarService";
 /// Static [`Spec`](::connectrpc::Spec) for the `Watch` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -411,6 +459,12 @@ pub const SIDECAR_SERVICE_DOWNLOAD_ATTACHMENT_SPEC: ::connectrpc::Spec = ::conne
 /// Static [`Spec`](::connectrpc::Spec) for the `ResolveParticipant` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.agent_event_ingress.v1.SidecarService/ResolveParticipant",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `Relay` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SIDECAR_SERVICE_RELAY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.agent_event_ingress.v1.SidecarService/Relay",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -625,6 +679,29 @@ pub trait SidecarService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Execute one registry call at the gateway on behalf of a verified local invocation.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn relay<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::agent_event_ingress::v1::RelayResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -862,6 +939,35 @@ impl<S: SidecarService> SidecarServiceExt for S {
                 },
             )
             .with_spec(SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC)
+            .route_view(
+                SIDECAR_SERVICE_SERVICE_NAME,
+                "Relay",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.relay(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::agent_event_ingress::v1::RelayResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SIDECAR_SERVICE_RELAY_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -956,6 +1062,12 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC),
+                )
+            }
+            "Relay" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(SIDECAR_SERVICE_RELAY_SPEC),
                 )
             }
             _ => None,
@@ -1103,6 +1215,28 @@ impl<T: SidecarService> ::connectrpc::Dispatcher for SidecarServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::agent_event_ingress::v1::ResolveParticipantResponse,
+                        >(format)
+                })
+            }
+            "Relay" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+                    >::from_parts(&req, &body);
+                    svc.relay(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::agent_event_ingress::v1::RelayResponse,
                         >(format)
                 })
             }
@@ -1558,6 +1692,47 @@ where
                 &self.config,
                 SIDECAR_SERVICE_RESOLVE_PARTICIPANT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the Relay RPC. Sends a request to /tilde.agent_event_ingress.v1.SidecarService/Relay.
+    pub async fn relay(
+        &self,
+        request: crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.relay_with_options(request, ::connectrpc::client::CallOptions::default())
+            .await
+    }
+    /// Call the Relay RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn relay_with_options(
+        &self,
+        request: crate::proto::tilde::agent_event_ingress::v1::RelayRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::agent_event_ingress::v1::__buffa::view::RelayResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SIDECAR_SERVICE_RELAY_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )

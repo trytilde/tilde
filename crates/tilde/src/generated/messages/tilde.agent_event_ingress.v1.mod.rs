@@ -62,6 +62,8 @@ pub mod __buffa {
         reg.register_json_any(super::__UPLOAD_ATTACHMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DOWNLOAD_ATTACHMENT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DOWNLOAD_ATTACHMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RELAY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RELAY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__RESOLVE_PARTICIPANT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__RESOLVE_PARTICIPANT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREDENTIAL_FIELD_JSON_ANY);
@@ -190,6 +192,14 @@ pub use self::__buffa::view::DownloadAttachmentRequestOwnedView;
 pub use self::__buffa::view::DownloadAttachmentResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::DownloadAttachmentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RelayResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ResolveParticipantRequestView;
 #[doc(inline)]

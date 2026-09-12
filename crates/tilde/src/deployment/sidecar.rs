@@ -295,6 +295,10 @@ pub async fn start(options: Options) -> Result<Sidecar> {
 impl Node {
     pub fn runtime_router(&self) -> Router {
         crate::chat::rpc::runtime::router(Chat::from_sidecar(self.runtime.clone()))
+            .route(
+                "/tilde.runtime.v1.AgentService/{*method}",
+                axum::routing::any(registry_relay).with_state(self.clone()),
+            )
             .layer(middleware::from_fn_with_state(self.clone(), runtime_guard))
             .layer(middleware::from_fn_with_state(
                 self.clone(),
@@ -495,6 +499,39 @@ async fn runtime_guard(State(node): State<Node>, mut request: Request, next: Nex
             request.extensions_mut().insert(scope);
             next.run(request).await
         }
+        Err(e) => connectrpc::ConnectError::from(e).into_response(),
+    }
+}
+/// Registry calls run at the gateway; the live invocation was verified by `runtime_guard`.
+async fn registry_relay(State(node): State<Node>, request: Request) -> Response {
+    let (parts, body) = request.into_parts();
+    let Some(token) = parts
+        .headers
+        .get(http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .map(str::to_owned)
+    else {
+        return connectrpc::ConnectError::unauthenticated("Invocation token required")
+            .into_response();
+    };
+    let content_type = parts
+        .headers
+        .get(http::header::CONTENT_TYPE)
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("")
+        .to_owned();
+    let body = match axum::body::to_bytes(body, 4 * 1024 * 1024).await {
+        Ok(body) => body.to_vec(),
+        Err(_) => return http::StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+    };
+    let path = parts.uri.path().trim_start_matches('/').to_owned();
+    match node
+        .gateway
+        .relay(node.runtime.instance_id, &path, &content_type, body, &token)
+        .await
+    {
+        Ok(result) => super::public::relay(result),
         Err(e) => connectrpc::ConnectError::from(e).into_response(),
     }
 }

@@ -20,6 +20,8 @@ service SidecarService {
   rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
   rpc ResolveParticipant(ResolveParticipantRequest) returns (ResolveParticipantResponse);
+  // Execute one registry call at the gateway on behalf of a verified local invocation.
+  rpc Relay(RelayRequest) returns (RelayResponse);
 }
 message WatchRequest { string instance_id = 1; string public_url = 2; string runtime_url = 3; }
 message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; tilde.types.v1.ParticipantAssignment assignment = 3; Directive directive = 4; Ping ping = 5; } }
@@ -57,6 +59,8 @@ message UploadAttachmentRequest { tilde.types.v1.Attachment attachment = 1; byte
 message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }
 message DownloadAttachmentRequest { string thread_id = 1; string attachment_id = 2; }
 message DownloadAttachmentResponse { bytes content = 1; }
+message RelayRequest { string instance_id = 1; string path = 2; string content_type = 3; bytes body = 4; string caller_token = 5 [debug_redact = true]; }
+message RelayResponse { CallResult result = 1; }
 message ResolveParticipantRequest { oneof key { string agent_id = 1; string user_id = 2; } }
 message ResolveParticipantResponse { string id = 1; string name = 2; }
 

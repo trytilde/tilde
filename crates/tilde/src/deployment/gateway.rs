@@ -134,6 +134,43 @@ impl Client {
             .map(|_| ())
             .map_err(|_| ChatError::Transport)
     }
+    pub async fn relay(
+        &self,
+        instance: Uuid,
+        path: &str,
+        content_type: &str,
+        body: Vec<u8>,
+        caller_token: &str,
+    ) -> Result<wire::CallResult> {
+        let request = wire::RelayRequest {
+            instance_id: instance.to_string(),
+            path: path.into(),
+            content_type: content_type.into(),
+            body,
+            caller_token: caller_token.into(),
+            ..Default::default()
+        };
+        self.inner
+            .relay_with_options(request, Self::options())
+            .await
+            .map_err(|error| match error.code {
+                connectrpc::ErrorCode::PermissionDenied
+                | connectrpc::ErrorCode::Unauthenticated => ChatError::Denied,
+                connectrpc::ErrorCode::NotFound => ChatError::NotFound,
+                connectrpc::ErrorCode::InvalidArgument => {
+                    ChatError::Invalid(error.message.unwrap_or_default())
+                }
+                _ => ChatError::Invalid(format!(
+                    "Gateway relay failed: {:?} {}",
+                    error.code,
+                    error.message.unwrap_or_default()
+                )),
+            })?
+            .into_owned()
+            .result
+            .into_option()
+            .ok_or(ChatError::Transport)
+    }
     pub async fn upload_attachment(
         &self,
         attachment: types::Attachment,
