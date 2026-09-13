@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_users(id,name) VALUES($1,$2) ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8a754631390110101929b24920ad00241d1905b0e93645ec471cef92b76d3864"
+}

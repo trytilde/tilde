@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS(SELECT 1 FROM sidecar_nodes WHERE agent_id=$1 AND instance_id=$2 AND agent_ready AND last_seen_at>NOW()-INTERVAL '15 seconds') AS \"live!\";\n",
+  "query": "SELECT EXISTS(SELECT 1 FROM sidecar_nodes WHERE agent_id=$1 AND instance_id=$2 AND last_seen_at>NOW()-INTERVAL '15 seconds') AS \"live!\";\n",
   "describe": {
     "columns": [
       {
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "525ecaa04396f4b639790bb00f666671058bcbb2e52d0e7f0c1ea1a6a3bf2afe"
+  "hash": "7c213da3e2eaebd3a0fad8af2c58fb514642314564b0652060046c2123988b85"
 }

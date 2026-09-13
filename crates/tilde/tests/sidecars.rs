@@ -101,156 +101,285 @@ async fn eventually<T>(mut probe: impl AsyncFnMut() -> Option<T>) -> T {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway() {
-    let (endpoint, mut calls, finish, host_task) = agent_host().await;
-    let db = Database::new().await;
-    let encryption = Arc::new(Encryption::initialize(&db.pool, seed(33)).await.unwrap());
-    let agents = Agents::new(db.pool.clone(), encryption.clone());
-    let agent = Uuid::new_v4();
-    agents
-        .create(CreateAgent {
-            id: agent,
-            name: "Sidecar".into(),
-            endpoint_url: "http://127.0.0.1:1".into(),
-            webhook_signing_key: SecretString::from("sidecar-test-agent-signing-key-0123456789"),
-            capabilities: tilde::iam::capabilities::Capabilities::from_wire(types::Capabilities {
-                agents_read: types::TargetPermission {
-                    mode: types::TargetSelection::All.into(),
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
+/// Two replicas of one sidecar agent behind a real gateway listener.
+struct Fixture {
+    db: Database,
+    agent: Uuid,
+    deployments: Deployments,
+    chat: Chat,
+    gateway_url: String,
+    first: Option<sidecar::Sidecar>,
+    second: Option<sidecar::Sidecar>,
+    calls: tokio::sync::mpsc::Receiver<host::InvokeRequest>,
+    finish: Arc<tokio::sync::Notify>,
+    http: reqwest::Client,
+    ingress_token: SecretString,
+    tasks: Vec<tokio::task::JoinHandle<()>>,
+    stop: tokio::sync::watch::Sender<bool>,
+}
+impl Fixture {
+    async fn new() -> Self {
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
+        let (endpoint, calls, finish, host_task) = agent_host().await;
+        let db = Database::new().await;
+        let encryption = Arc::new(Encryption::initialize(&db.pool, seed(33)).await.unwrap());
+        let agents = Agents::new(db.pool.clone(), encryption.clone());
+        let agent = Uuid::new_v4();
+        agents
+            .create(CreateAgent {
+                id: agent,
+                name: "Sidecar".into(),
+                endpoint_url: "http://127.0.0.1:1".into(),
+                webhook_signing_key: SecretString::from(
+                    "sidecar-test-agent-signing-key-0123456789",
+                ),
+                capabilities: tilde::iam::capabilities::Capabilities::from_wire(
+                    types::Capabilities {
+                        agents_read: types::TargetPermission {
+                            mode: types::TargetSelection::All.into(),
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                )
+                .unwrap(),
             })
-            .unwrap(),
-        })
-        .await
+            .await
+            .unwrap();
+        agents.pause(agent).await.unwrap();
+        let connections = Connections::new(
+            db.pool.clone(),
+            encryption.clone(),
+            "http://localhost:1".into(),
+            "http://localhost:2".into(),
+        )
         .unwrap();
-    agents.pause(agent).await.unwrap();
-    let connections = Connections::new(
-        db.pool.clone(),
-        encryption.clone(),
-        "http://localhost:1".into(),
-        "http://localhost:2".into(),
-    )
-    .unwrap();
-    let deployments = Deployments::new(
-        db.pool.clone(),
-        encryption.clone(),
-        agents.clone(),
-        connections.clone(),
-    );
-    deployments
-        .set(
+        let deployments = Deployments::new(
+            db.pool.clone(),
+            encryption.clone(),
+            agents.clone(),
+            connections.clone(),
+        );
+        deployments
+            .set(
+                agent,
+                types::DeploymentMode::Sidecar,
+                None,
+                types::SidecarFailureMode::Reassign,
+            )
+            .await
+            .unwrap();
+        agents.resume(agent).await.unwrap();
+        let token = deployments.issue_token(agent).await.unwrap();
+        assert_eq!(
+            deployments
+                .authenticate(token.expose_secret())
+                .await
+                .unwrap(),
+            agent
+        );
+        assert!(
+            deployments
+                .authenticate("unrelated-deployment-token")
+                .await
+                .is_err()
+        );
+        // The gateway: sidecar protocol plus its public ingress for this agent, over real HTTP.
+        let chat = Chat::new(
+            db.pool.clone(),
+            encryption.clone(),
+            "http://127.0.0.1:1".into(),
+        )
+        .with_connections(connections)
+        .with_deployments(deployments.clone());
+        let router = tilde::deployment::rpc::sidecar_router(deployments.clone()).merge(
+            tilde::deployment::public::router(deployments.clone(), chat.clone()),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let gateway_url = format!("http://{}", listener.local_addr().unwrap());
+        let gateway = tokio::spawn(async move {
+            let _ = axum::serve(listener, router).await;
+        });
+        let (stop, workers_rx) = tokio::sync::watch::channel(false);
+        let relay = tokio::spawn(deployments.clone().relay_worker(workers_rx.clone()));
+        let recovery = tokio::spawn(deployments.clone().recovery_worker(workers_rx));
+        let options = |gateway_url: &str| sidecar::Options {
+            gateway_url: gateway_url.to_owned(),
+            tokens: vec![token.clone()],
+            endpoints: BTreeMap::from([(agent, endpoint.clone())]),
+            runtime_listen: "127.0.0.1:0".parse().unwrap(),
+            listen: "127.0.0.1:0".parse().unwrap(),
+            public_url: None,
+        };
+        let first = sidecar::start(options(&gateway_url)).await.unwrap();
+        let second = sidecar::start(options(&gateway_url)).await.unwrap();
+        assert_eq!(deployments.nodes(agent).await.unwrap().len(), 2);
+        let ingress_token = deployments
+            .issue_ingress_token(agent, None, Uuid::nil())
+            .await
+            .unwrap();
+        Self {
+            db,
             agent,
-            types::DeploymentMode::Sidecar,
-            None,
-            types::SidecarFailureMode::Reassign,
+            deployments,
+            chat,
+            gateway_url,
+            first: Some(first),
+            second: Some(second),
+            calls,
+            finish,
+            http: reqwest::Client::new(),
+            ingress_token,
+            tasks: vec![host_task, gateway, relay, recovery],
+            stop,
+        }
+    }
+    fn first(&self) -> &sidecar::Sidecar {
+        self.first.as_ref().expect("first replica is running")
+    }
+    fn second(&self) -> &sidecar::Sidecar {
+        self.second.as_ref().expect("second replica is running")
+    }
+    fn base(&self, sidecar: &sidecar::Sidecar) -> String {
+        format!("http://{}", sidecar.address)
+    }
+    async fn call(
+        &self,
+        base: &str,
+        method: &str,
+        body: serde_json::Value,
+    ) -> (u16, serde_json::Value) {
+        ingress(
+            &self.http,
+            base,
+            self.agent,
+            &self.ingress_token,
+            method,
+            body,
         )
         .await
-        .unwrap();
-    agents.resume(agent).await.unwrap();
-    let token = deployments.issue_token(agent).await.unwrap();
-    assert_eq!(
-        deployments
-            .authenticate(token.expose_secret())
+    }
+    async fn post(
+        &self,
+        base: &str,
+        thread: Uuid,
+        participant: &str,
+        text: &str,
+    ) -> (u16, serde_json::Value) {
+        self.call(base, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread,"participantId":participant,"text":text})).await
+    }
+    /// A room created on `first`: (thread, Alice's participant, the agent's participant).
+    async fn room(&self) -> (Uuid, String, String) {
+        let base = self.base(self.first());
+        let (status, user) = self
+            .call(&base, "CreateUser", serde_json::json!({"name":"Alice"}))
+            .await;
+        assert_eq!(status, 200, "{user}");
+        let user_id = user["user"]["id"].as_str().unwrap().to_owned();
+        let (status, thread) = self
+            .call(
+                &base,
+                "CreateThread",
+                serde_json::json!({"title":"Room","primaryAgentId":self.agent,"participants":[{"userId":user_id},{"agentId":self.agent}]}),
+            )
+            .await;
+        assert_eq!(status, 200, "{thread}");
+        let thread_id = Uuid::parse_str(thread["thread"]["id"].as_str().unwrap()).unwrap();
+        let participants = thread["thread"]["participants"].as_array().unwrap();
+        let by = |key: &str| {
+            participants.iter().find(|p| p[key].is_string()).unwrap()["id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        (thread_id, by("userId"), by("agentId"))
+    }
+    async fn invocation(&mut self, expected: &str) -> host::InvokeRequest {
+        tokio::time::timeout(Duration::from_secs(10), self.calls.recv())
             .await
-            .unwrap(),
-        agent
-    );
-    assert!(
-        deployments
-            .authenticate("unrelated-deployment-token")
+            .unwrap_or_else(|_| panic!("agent invocation for {expected}"))
+            .unwrap()
+    }
+    async fn owner(&self, thread: Uuid) -> (Uuid, i64) {
+        use sqlx::Row;
+        let row = sqlx::query("SELECT owner_instance_id,generation FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2")
+            .bind(thread)
+            .bind(self.agent)
+            .fetch_one(&self.db.pool)
             .await
-            .is_err()
-    );
-    // The gateway: sidecar protocol plus its public ingress for this agent, over real HTTP.
-    let chat = Chat::new(
-        db.pool.clone(),
-        encryption.clone(),
-        "http://127.0.0.1:1".into(),
-    )
-    .with_connections(connections)
-    .with_deployments(deployments.clone());
-    let router = tilde::deployment::rpc::sidecar_router(deployments.clone()).merge(
-        tilde::deployment::public::router(deployments.clone(), chat.clone()),
-    );
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let gateway_url = format!("http://{}", listener.local_addr().unwrap());
-    let gateway = tokio::spawn(axum::serve(listener, router).into_future());
-    let (stop, workers_rx) = tokio::sync::watch::channel(false);
-    let relay = tokio::spawn(deployments.clone().relay_worker(workers_rx.clone()));
-    let recovery = tokio::spawn(deployments.clone().recovery_worker(workers_rx));
-    let options = |gateway_url: &str| sidecar::Options {
-        gateway_url: gateway_url.to_owned(),
-        tokens: vec![token.clone()],
-        endpoints: BTreeMap::from([(agent, endpoint.clone())]),
-        runtime_listen: "127.0.0.1:0".parse().unwrap(),
-        listen: "127.0.0.1:0".parse().unwrap(),
-        public_url: None,
-    };
-    let first = sidecar::start(options(&gateway_url)).await.unwrap();
-    let second = sidecar::start(options(&gateway_url)).await.unwrap();
-    assert_eq!(deployments.nodes(agent).await.unwrap().len(), 2);
-    let first_base = format!("http://{}", first.address);
-    let second_base = format!("http://{}", second.address);
-    let http = reqwest::Client::new();
-    let ingress_token = deployments
-        .issue_ingress_token(agent, None, Uuid::nil())
-        .await
-        .unwrap();
+            .unwrap();
+        (row.get("owner_instance_id"), row.get("generation"))
+    }
+    async fn projected(&self, thread: Uuid, text: &str) {
+        eventually(async || {
+            self.chat
+                .messages(thread, 20)
+                .await
+                .ok()
+                .filter(|m| m.iter().any(|m| m.text == text))
+        })
+        .await;
+    }
+    /// Age a node until the gateway treats it as dead and hands its conversation to `owner`.
+    async fn fail_over(&self, instance: Uuid, thread: Uuid, owner: Uuid, generation: i64) {
+        // A heartbeat already in flight may still land after a stop; keep aging the
+        // node until recovery (the worker or this direct call) reassigns.
+        eventually(async || {
+            sqlx::query(
+                "UPDATE sidecar_nodes SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
+            )
+            .bind(instance)
+            .execute(&self.db.pool)
+            .await
+            .unwrap();
+            self.deployments.recover().await.unwrap();
+            (self.owner(thread).await == (owner, generation)).then_some(())
+        })
+        .await;
+    }
+    async fn shutdown(self) {
+        for replica in [self.first, self.second].into_iter().flatten() {
+            replica.stop().await;
+        }
+        let _ = self.stop.send(true);
+        for task in self.tasks {
+            task.abort();
+        }
+        self.db.close().await;
+    }
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway() {
+    let mut fx = Fixture::new().await;
+    let (first_base, second_base) = (fx.base(fx.first()), fx.base(fx.second()));
     // The replica that receives the first request owns the conversation and runs the agent.
-    let (status, user) = ingress(
-        &http,
-        &first_base,
-        agent,
-        &ingress_token,
-        "CreateUser",
-        serde_json::json!({"name":"Alice"}),
-    )
-    .await;
-    assert_eq!(status, 200, "{user}");
-    let user_id = user["user"]["id"].as_str().unwrap().to_owned();
-    let (status, thread) = ingress(
-        &http,
-        &first_base,
-        agent,
-        &ingress_token,
-        "CreateThread",
-        serde_json::json!({"title":"Room","primaryAgentId":agent,"participants":[{"userId":user_id},{"agentId":agent}]}),
-    )
-    .await;
-    assert_eq!(status, 200, "{thread}");
-    let thread_id = Uuid::parse_str(thread["thread"]["id"].as_str().unwrap()).unwrap();
-    let participants = thread["thread"]["participants"].as_array().unwrap();
-    let alice = participants
-        .iter()
-        .find(|p| p["userId"].is_string())
-        .unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    let (status, posted) = ingress(&http, &first_base, agent, &ingress_token, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread_id,"participantId":alice,"text":"hello"})).await;
+    let (thread_id, alice, agent_participant) = fx.room().await;
+    let (status, posted) = fx.post(&first_base, thread_id, &alice, "hello").await;
     assert_eq!(status, 200, "{posted}");
-    let invocation = tokio::time::timeout(Duration::from_secs(10), calls.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(invocation.owner_instance_id, first.instance.to_string());
+    let invocation = fx.invocation("hello").await;
+    assert_eq!(
+        invocation.owner_instance_id,
+        fx.first().instance.to_string()
+    );
     assert_eq!(invocation.assignment_generation, 1);
     assert_eq!(invocation.objective, "hello");
     assert_eq!(invocation.thread_id, thread_id.to_string());
     // Registry calls from the agent process are relayed to the gateway under the same token.
     let registry = |token: &str| {
-        http.post(format!(
-            "{}/tilde.runtime.v1.AgentService/ListAgents",
-            invocation.callback_url
-        ))
-        .bearer_auth(token)
-        .header("content-type", "application/json")
-        .header("connect-protocol-version", "1")
-        .body("{}")
-        .send()
+        fx.http
+            .post(format!(
+                "{}/tilde.runtime.v1.AgentService/ListAgents",
+                invocation.callback_url
+            ))
+            .bearer_auth(token)
+            .header("content-type", "application/json")
+            .header("connect-protocol-version", "1")
+            .body("{}")
+            .send()
     };
     let listed = registry(&invocation.capability).await.unwrap();
     let status = listed.status();
@@ -261,17 +390,18 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
             .as_array()
             .unwrap()
             .iter()
-            .any(|a| a["id"] == agent.to_string())
+            .any(|a| a["id"] == fx.agent.to_string())
     );
     assert_eq!(
         registry("not-an-invocation-token").await.unwrap().status(),
         401
     );
-    finish.notify_one();
+    fx.finish.notify_one();
     // The owner's events reach Postgres without the gateway ever calling the replica.
     let projected = eventually(async || {
-        let messages = chat.messages(thread_id, 10).await.ok()?;
-        let run = chat
+        let messages = fx.chat.messages(thread_id, 10).await.ok()?;
+        let run = fx
+            .chat
             .run(Uuid::parse_str(&invocation.run_id).unwrap())
             .await
             .ok()?;
@@ -282,118 +412,169 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     })
     .await;
     assert_eq!(projected.status, "waiting");
-    use sqlx::Row;
-    let owner = sqlx::query("SELECT owner_instance_id,generation FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2").bind(thread_id).bind(agent).fetch_one(&db.pool).await.unwrap();
-    assert_eq!(owner.get::<Uuid, _>("owner_instance_id"), first.instance);
-    assert_eq!(owner.get::<i64, _>("generation"), 1);
+    assert_eq!(fx.owner(thread_id).await, (fx.first().instance, 1));
     // A request landing on the other replica is executed by the owner through the gateway.
-    let (status, forwarded) = ingress(&http, &second_base, agent, &ingress_token, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread_id,"participantId":alice,"text":"second"})).await;
+    let (status, forwarded) = fx.post(&second_base, thread_id, &alice, "second").await;
     assert_eq!(status, 200, "{forwarded}");
-    let invocation = tokio::time::timeout(Duration::from_secs(10), calls.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(invocation.owner_instance_id, first.instance.to_string());
+    let invocation = fx.invocation("second").await;
+    assert_eq!(
+        invocation.owner_instance_id,
+        fx.first().instance.to_string()
+    );
     assert_eq!(invocation.objective, "second");
-    // Gateway public ingress reads and writes through the owner as well.
-    let (status, read) = ingress(
-        &http,
-        &gateway_url,
-        agent,
-        &ingress_token,
-        "GetThread",
-        serde_json::json!({"id":thread_id}),
-    )
-    .await;
+    // Reads are answered from the projection wherever they land.
+    let (status, read) = fx
+        .call(
+            &fx.gateway_url.clone(),
+            "GetThread",
+            serde_json::json!({"id":thread_id}),
+        )
+        .await;
     assert_eq!(status, 200, "{read}");
     assert_eq!(
         read["thread"]["id"].as_str().unwrap(),
         thread_id.to_string()
     );
-    let (status, listed) = ingress(
-        &http,
-        &second_base,
-        agent,
-        &ingress_token,
-        "ListMessages",
-        serde_json::json!({"threadId":thread_id,"limit":10}),
-    )
-    .await;
+    let (status, listed) = fx
+        .call(
+            &second_base,
+            "ListMessages",
+            serde_json::json!({"threadId":thread_id,"limit":10}),
+        )
+        .await;
     assert_eq!(status, 200, "{listed}");
     assert_eq!(listed["messages"].as_array().unwrap().len(), 2);
+    let (status, listed) = fx
+        .call(&second_base, "ListThreads", serde_json::json!({"limit":10}))
+        .await;
+    assert_eq!(status, 200, "{listed}");
+    assert_eq!(listed["threads"].as_array().unwrap().len(), 1);
     // The owner dies mid-invocation: the gateway reassigns and the survivor restarts the run.
     let pending_run = Uuid::parse_str(&invocation.run_id).unwrap();
     eventually(async || {
-        chat.run(pending_run)
+        fx.chat
+            .run(pending_run)
             .await
             .ok()
             .filter(|r| matches!(r.invocation_status.as_str(), "pending" | "running"))
     })
     .await;
     eventually(async || {
-        deployments
-            .nodes(agent)
+        fx.deployments
+            .nodes(fx.agent)
             .await
             .ok()
             .filter(|nodes| nodes.len() == 2 && nodes.iter().all(|n| n.ready))
     })
     .await;
-    let first_instance = first.instance;
-    first.stop().await;
-    // A heartbeat already in flight may still land after the stop; age the node until
-    // the gateway (the worker or this direct call) sees it as dead and reassigns.
+    let first_instance = fx.first().instance;
+    fx.first.take().unwrap().stop().await;
+    // Work queued for the dead owner while the gateway still believed it alive follows
+    // the conversation to the survivor instead of timing out.
+    let queued = {
+        let (http, base, agent, token) = (
+            fx.http.clone(),
+            fx.gateway_url.clone(),
+            fx.agent,
+            fx.ingress_token.clone(),
+        );
+        let participant = agent_participant.clone();
+        tokio::spawn(async move {
+            ingress(&http, &base, agent, &token, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread_id,"participantId":participant,"text":"queued"})).await
+        })
+    };
+    fx.fail_over(first_instance, thread_id, fx.second().instance, 2)
+        .await;
+    let recovered = fx.invocation("recovered second").await;
+    assert_eq!(
+        recovered.owner_instance_id,
+        fx.second().instance.to_string()
+    );
+    assert_eq!(recovered.assignment_generation, 2);
+    assert_eq!(recovered.objective, "second");
+    fx.finish.notify_one();
+    fx.finish.notify_one();
+    let (status, queued) = queued.await.unwrap();
+    assert_eq!(status, 200, "{queued}");
+    fx.projected(thread_id, "queued").await;
+    assert_eq!(fx.owner(thread_id).await, (fx.second().instance, 2));
+    // Afterwards the survivor serves the conversation directly.
+    let (status, after) = fx.post(&second_base, thread_id, &alice, "third").await;
+    assert_eq!(status, 200, "{after}");
+    let invocation = fx.invocation("third").await;
+    assert_eq!(
+        invocation.owner_instance_id,
+        fx.second().instance.to_string()
+    );
+    assert_eq!(invocation.assignment_generation, 2);
+    fx.finish.notify_one();
+    fx.projected(thread_id, "third").await;
+    fx.shutdown().await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_reassigned_owner_is_fenced_and_forwards_to_the_new_owner() {
+    let mut fx = Fixture::new().await;
+    let first_base = fx.base(fx.first());
+    let (thread_id, alice, agent_participant) = fx.room().await;
+    let (status, posted) = fx.post(&first_base, thread_id, &alice, "hello").await;
+    assert_eq!(status, 200, "{posted}");
+    let invocation = fx.invocation("hello").await;
+    assert_eq!(
+        invocation.owner_instance_id,
+        fx.first().instance.to_string()
+    );
+    fx.projected(thread_id, "hello").await;
+    // The gateway moves the conversation while the first replica is still mid-invocation
+    // and has not heard about it: its heartbeats stopped arriving, so another replica's
+    // claim is granted. The first replica is alive and will keep heartbeating, so the
+    // claim must land inside one heartbeat interval.
+    let (first_instance, second_instance) = (fx.first().instance, fx.second().instance);
     eventually(async || {
         sqlx::query(
             "UPDATE sidecar_nodes SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
         )
         .bind(first_instance)
-        .execute(&db.pool)
+        .execute(&fx.db.pool)
         .await
         .unwrap();
-        deployments.recover().await.unwrap();
-        let owner = sqlx::query("SELECT owner_instance_id,generation FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2")
-            .bind(thread_id)
-            .bind(agent)
-            .fetch_one(&db.pool)
+        let claim = fx
+            .deployments
+            .claim(
+                fx.agent,
+                second_instance,
+                thread_id,
+                Uuid::parse_str(&agent_participant).unwrap(),
+            )
             .await
             .unwrap();
-        (owner.get::<i64, _>("generation") == 2 && owner.get::<Uuid, _>("owner_instance_id") == second.instance).then_some(())
+        (claim.granted && claim.generation == 2).then_some(())
     })
     .await;
-    let recovered = tokio::time::timeout(Duration::from_secs(10), calls.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(recovered.owner_instance_id, second.instance.to_string());
-    assert_eq!(recovered.assignment_generation, 2);
-    assert_eq!(recovered.objective, "second");
-    finish.notify_one();
-    finish.notify_one();
-    let owner = sqlx::query("SELECT owner_instance_id,generation FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2").bind(thread_id).bind(agent).fetch_one(&db.pool).await.unwrap();
-    assert_eq!(owner.get::<Uuid, _>("owner_instance_id"), second.instance);
-    assert_eq!(owner.get::<i64, _>("generation"), 2);
-    // Afterwards the survivor serves the conversation directly.
-    let (status, after) = ingress(&http, &second_base, agent, &ingress_token, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread_id,"participantId":alice,"text":"third"})).await;
+    fx.finish.notify_one();
+    // Whatever the stale owner publishes at generation 1 is fenced, and it gives the
+    // conversation up; the projection keeps the second replica as the owner.
+    eventually(async || (!fx.first().nodes[0].runtime.owns_thread(thread_id).await).then_some(()))
+        .await;
+    assert_eq!(fx.owner(thread_id).await, (fx.second().instance, 2));
+    // New work landing on the stale replica is executed by the new owner. The recovery
+    // worker may also have restarted the interrupted run on the new owner in the
+    // meantime; every invocation from here on belongs to the second replica at
+    // generation 2, whichever order they arrive in.
+    let (status, after) = fx.post(&first_base, thread_id, &alice, "after").await;
     assert_eq!(status, 200, "{after}");
-    let invocation = tokio::time::timeout(Duration::from_secs(10), calls.recv())
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(invocation.owner_instance_id, second.instance.to_string());
-    assert_eq!(invocation.assignment_generation, 2);
-    finish.notify_one();
-    eventually(async || {
-        chat.messages(thread_id, 10)
-            .await
-            .ok()
-            .filter(|m| m.iter().any(|m| m.text == "third"))
-    })
-    .await;
-    second.stop().await;
-    let _ = stop.send(true);
-    relay.abort();
-    recovery.abort();
-    gateway.abort();
-    host_task.abort();
-    db.close().await;
+    loop {
+        let invocation = fx.invocation("after").await;
+        assert_eq!(
+            invocation.owner_instance_id,
+            fx.second().instance.to_string()
+        );
+        assert_eq!(invocation.assignment_generation, 2);
+        fx.finish.notify_one();
+        if invocation.objective == "after" {
+            break;
+        }
+        assert_eq!(invocation.objective, "hello");
+    }
+    fx.projected(thread_id, "after").await;
+    fx.shutdown().await;
 }

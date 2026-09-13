@@ -104,6 +104,7 @@ pub fn relay_traces(runtime: &Runtime, request: &ExportTraceServiceRequest) -> R
     if payload.len() > 8 * 1024 * 1024 {
         return Err(ChatError::Invalid("Trace batch is too large".into()));
     }
+    runtime.ensure_capacity()?;
     runtime.push(
         wire::Telemetry {
             kind: wire::TelemetryKind::Traces.into(),
@@ -111,7 +112,8 @@ pub fn relay_traces(runtime: &Runtime, request: &ExportTraceServiceRequest) -> R
             ..Default::default()
         }
         .into(),
-    )
+    );
+    Ok(())
 }
 fn message_request(
     message: &Message<ResourceSpans>,

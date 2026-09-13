@@ -3952,46 +3952,33 @@ pub const __TELEMETRY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     from_json: ::buffa::type_registry::any_from_json::<Telemetry>,
     is_wkt: false,
 };
+/// Every frame is either applied, fenced, or rejected; only infrastructure failures fail a batch.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PublishResponse {
-    /// Field 1: `acks`
-    #[serde(
-        rename = "acks",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub acks: ::buffa::alloc::vec::Vec<ThreadAck>,
-    /// Field 2: `claims`
+    /// Field 1: `claims`
     #[serde(
         rename = "claims",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub claims: ::buffa::alloc::vec::Vec<ClaimResult>,
-    /// Field 3: `fences`
+    /// Field 2: `fences`
     #[serde(
         rename = "fences",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub fences: ::buffa::alloc::vec::Vec<Fence>,
-    /// Field 4: `paused`
+    /// Field 3: `rejected_event_ids`
     #[serde(
-        rename = "paused",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+        rename = "rejectedEventIds",
+        alias = "rejected_event_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub paused: bool,
-    /// Field 5: `agent_generation`
-    #[serde(
-        rename = "agentGeneration",
-        alias = "agent_generation",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub agent_generation: i64,
+    pub rejected_event_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3999,11 +3986,9 @@ pub struct PublishResponse {
 impl ::core::fmt::Debug for PublishResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("PublishResponse")
-            .field("acks", &self.acks)
             .field("claims", &self.claims)
             .field("fences", &self.fences)
-            .field("paused", &self.paused)
-            .field("agent_generation", &self.agent_generation)
+            .field("rejected_event_ids", &self.rejected_event_ids)
             .finish()
     }
 }
@@ -4034,14 +4019,6 @@ impl ::buffa::Message for PublishResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        for v in &self.acks {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
         for v in &self.claims {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
@@ -4058,13 +4035,8 @@ impl ::buffa::Message for PublishResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.paused {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if self.agent_generation != 0i64 {
-            size
-                += 1u64
-                    + ::buffa::types::int64_encoded_len(self.agent_generation) as u64;
+        for v in &self.rejected_event_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -4076,7 +4048,7 @@ impl ::buffa::Message for PublishResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        for v in &self.acks {
+        for v in &self.claims {
             ::buffa::types::put_len_delimited_header(
                 1u32,
                 u64::from(__cache.consume_next()),
@@ -4084,7 +4056,7 @@ impl ::buffa::Message for PublishResponse {
             );
             v.write_to(__cache, buf);
         }
-        for v in &self.claims {
+        for v in &self.fences {
             ::buffa::types::put_len_delimited_header(
                 2u32,
                 u64::from(__cache.consume_next()),
@@ -4092,19 +4064,8 @@ impl ::buffa::Message for PublishResponse {
             );
             v.write_to(__cache, buf);
         }
-        for v in &self.fences {
-            ::buffa::types::put_len_delimited_header(
-                3u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        if self.paused {
-            ::buffa::types::put_bool_field(4u32, self.paused, buf);
-        }
-        if self.agent_generation != 0i64 {
-            ::buffa::types::put_int64_field(5u32, self.agent_generation, buf);
+        for v in &self.rejected_event_ids {
+            ::buffa::types::put_string_field(3u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4129,7 +4090,7 @@ impl ::buffa::Message for PublishResponse {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.acks.push(elem);
+                self.claims.push(elem);
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -4141,33 +4102,18 @@ impl ::buffa::Message for PublishResponse {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.claims.push(elem);
+                self.fences.push(elem);
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                let mut elem = ::core::default::Default::default();
+                let __elem = ::buffa::types::decode_string(buf)?;
                 ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
+                    ::buffa::__private::element_footprint(&__elem),
                 )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.fences.push(elem);
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.paused = ::buffa::types::decode_bool(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.agent_generation = ::buffa::types::decode_int64(buf)?;
+                self.rejected_event_ids.push(__elem);
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -4177,11 +4123,9 @@ impl ::buffa::Message for PublishResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.acks.clear();
         self.claims.clear();
         self.fences.clear();
-        self.paused = false;
-        self.agent_generation = 0i64;
+        self.rejected_event_ids.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4212,155 +4156,6 @@ pub const __PUBLISH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.PublishResponse",
     to_json: ::buffa::type_registry::any_to_json::<PublishResponse>,
     from_json: ::buffa::type_registry::any_from_json::<PublishResponse>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ThreadAck {
-    /// Field 1: `thread_id`
-    #[serde(
-        rename = "threadId",
-        alias = "thread_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub thread_id: ::buffa::alloc::string::String,
-    /// Field 2: `sequence`
-    #[serde(
-        rename = "sequence",
-        with = "::buffa::json_helpers::int64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
-    )]
-    pub sequence: i64,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ThreadAck {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ThreadAck")
-            .field("thread_id", &self.thread_id)
-            .field("sequence", &self.sequence)
-            .finish()
-    }
-}
-impl ThreadAck {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadAck";
-}
-::buffa::impl_default_instance!(ThreadAck);
-impl ::buffa::MessageName for ThreadAck {
-    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
-    const NAME: &'static str = "ThreadAck";
-    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.ThreadAck";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadAck";
-}
-impl ::buffa::Message for ThreadAck {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.thread_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
-        }
-        if self.sequence != 0i64 {
-            size += 1u64 + ::buffa::types::int64_encoded_len(self.sequence) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.thread_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
-        }
-        if self.sequence != 0i64 {
-            ::buffa::types::put_int64_field(2u32, self.sequence, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.thread_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.sequence = ::buffa::types::decode_int64(buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.thread_id.clear();
-        self.sequence = 0i64;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ThreadAck {
-    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.ThreadAck";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ThreadAck {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __THREAD_ACK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadAck",
-    to_json: ::buffa::type_registry::any_to_json::<ThreadAck>,
-    from_json: ::buffa::type_registry::any_from_json::<ThreadAck>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -5273,14 +5068,6 @@ pub struct HydrateResponse {
         super::super::types::v1::ParticipantAssignment,
         ::buffa::Inline<super::super::types::v1::ParticipantAssignment>,
     >,
-    /// Field 6: `owner_live`
-    #[serde(
-        rename = "ownerLive",
-        alias = "owner_live",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub owner_live: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5293,7 +5080,6 @@ impl ::core::fmt::Debug for HydrateResponse {
             .field("messages", &self.messages)
             .field("runs", &self.runs)
             .field("assignment", &self.assignment)
-            .field("owner_live", &self.owner_live)
             .finish()
     }
 }
@@ -5359,9 +5145,6 @@ impl ::buffa::Message for HydrateResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.owner_live {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -5406,9 +5189,6 @@ impl ::buffa::Message for HydrateResponse {
                 buf,
             );
             self.assignment.write_to(__cache, buf);
-        }
-        if self.owner_live {
-            ::buffa::types::put_bool_field(6u32, self.owner_live, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5476,13 +5256,6 @@ impl ::buffa::Message for HydrateResponse {
                     ctx,
                 )?;
             }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.owner_live = ::buffa::types::decode_bool(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5496,7 +5269,6 @@ impl ::buffa::Message for HydrateResponse {
         self.messages.clear();
         self.runs.clear();
         self.assignment = ::buffa::MessageField::none();
-        self.owner_live = false;
         self.__buffa_unknown_fields.clear();
     }
 }

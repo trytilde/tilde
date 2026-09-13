@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT failure_mode FROM agent_deployments WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "failure_mode",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2baf804cef478bf064cdfd6dff2603e1d63e4df6d9c6ca5436299e303a78c93b"
+}

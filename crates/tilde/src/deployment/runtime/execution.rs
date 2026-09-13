@@ -94,6 +94,7 @@ impl Runtime {
         participant: Uuid,
     ) -> Result<()> {
         let thread = id(&run.thread_id)?;
+        tracing::debug!(agent_id=%self.agent_id, instance_id=%self.instance_id, thread_id=%thread, run_id=%run.id, generation=t.assignment.generation, "Invocation begins");
         let assignment = t.assignment.clone();
         if assignment.stopped {
             return Err(ChatError::Conflict);
@@ -140,7 +141,7 @@ impl Runtime {
         };
         let attempt = Uuid::new_v5(&id(&command.id)?, &assignment.generation.to_be_bytes());
         t.invocations.insert(invocation_id, invocation.clone());
-        t.commands.push(Command {
+        t.push_command(Command {
             attempt_id: attempt,
             command,
             acked_at: None,
@@ -236,7 +237,7 @@ impl Runtime {
         }
         for next in carried {
             let attempt = Uuid::new_v5(&id(&next.id)?, &generation.to_be_bytes());
-            t.commands.push(Command {
+            t.push_command(Command {
                 attempt_id: attempt,
                 command: next,
                 acked_at: None,
@@ -301,7 +302,7 @@ impl Runtime {
         };
         if t.command(&command.id).is_none() {
             let attempt = Uuid::new_v5(&id(&command.id)?, &command.generation.to_be_bytes());
-            t.commands.push(Command {
+            t.push_command(Command {
                 attempt_id: attempt,
                 command,
                 acked_at: None,
@@ -336,18 +337,6 @@ impl Runtime {
         t.runs.insert(run_id, run.clone());
         self.emit(&mut t, "invocation.ended", v.into(), None)?;
         self.emit(&mut t, "run.updated", run.into(), None)?;
-        drop(t);
-        self.changed(thread);
-        Ok(())
-    }
-    pub async fn route_message(&self, message: &types::Message) -> Result<()> {
-        let thread = id(&message.thread_id)?;
-        let shared = self.load(thread).await?;
-        let mut t = shared.lock().await;
-        if !self.owns(&t) {
-            return Ok(());
-        }
-        self.route_message_in(&mut t, message)?;
         drop(t);
         self.changed(thread);
         Ok(())
@@ -416,7 +405,7 @@ impl Runtime {
                 ..Default::default()
             };
             let attempt = Uuid::new_v5(&id(&command.id)?, &command.generation.to_be_bytes());
-            t.commands.push(Command {
+            t.push_command(Command {
                 attempt_id: attempt,
                 command,
                 acked_at: None,

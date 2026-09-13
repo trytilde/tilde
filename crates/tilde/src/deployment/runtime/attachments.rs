@@ -57,14 +57,6 @@ impl Runtime {
         self.state.outbox_notify.notify_one();
         Ok(metadata)
     }
-    pub async fn attachment_metadata(&self, thread: Uuid, key: Uuid) -> Result<types::Attachment> {
-        let shared = self.load(thread).await?;
-        let t = shared.lock().await;
-        t.attachments
-            .get(&key)
-            .map(|a| a.metadata.clone())
-            .ok_or(ChatError::NotFound)
-    }
     pub async fn download_attachment(
         &self,
         thread: Uuid,

@@ -473,6 +473,18 @@ impl Deployments {
         participant: Uuid,
     ) -> Result<wire::ClaimResult, Error> {
         crate::chat::access::lock_thread_route(tx, thread).await?;
+        // An existing conversation can only be claimed by an agent already in it.
+        if sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
+            .fetch_one(&mut **tx)
+            .await?
+            .exists
+            && !sqlx::query_file!("../../queries/deployment/thread_agent.sql", thread, agent)
+                .fetch_one(&mut **tx)
+                .await?
+                .allowed
+        {
+            return Err(Error::Denied);
+        }
         let current = sqlx::query_file!(
             "../../queries/deployment/assignment_lock.sql",
             thread,
@@ -506,17 +518,30 @@ impl Deployments {
                 if live {
                     return Ok(result(false, c.generation, c.owner_instance_id));
                 }
-                for failed in sqlx::query_file!(
-                    "../../queries/deployment/fail_old_invocations.sql",
-                    thread,
-                    agent
+                // The owner is gone: this is a recovery with the claimant as the
+                // replacement, so the interrupted run follows the same policy.
+                let generation = c.generation.checked_add(1).ok_or(Error::Conflict)?;
+                let restart_run =
+                    sqlx::query_file!("../../queries/deployment/failure_mode.sql", agent)
+                        .fetch_optional(&mut **tx)
+                        .await?
+                        .is_none_or(|d| d.failure_mode != "stop");
+                self.take_over(
+                    tx,
+                    recovery::TakeOver {
+                        thread,
+                        participant,
+                        agent,
+                        previous: c.owner_instance_id,
+                        owner: instance,
+                        generation,
+                        mark_stopped: false,
+                        restart_run,
+                    },
                 )
-                .fetch_all(&mut **tx)
-                .await?
-                {
-                    crate::chat::activity(tx, thread, "invocation.ended", failed.id, "").await?;
-                }
-                c.generation + 1
+                .await?;
+                tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, generation, "Claim took over a dead owner");
+                return Ok(result(true, generation, instance));
             }
         };
         sqlx::query_file!(
@@ -530,6 +555,7 @@ impl Deployments {
         )
         .execute(&mut **tx)
         .await?;
+        tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, generation, "Claim granted");
         Ok(result(true, generation, instance))
     }
     /// Which live replica should receive work for a thread, assigning one when needed.
@@ -720,6 +746,12 @@ impl Deployments {
                 .ok()
                 .flatten(),
         };
+        if matches!(
+            call.method.as_str(),
+            "GetThread" | "ListThreads" | "ListMessages" | "ListActivity" | "GetRun"
+        ) {
+            return self.serve_read(agent, thread, call).await;
+        }
         let (instance, generation) = self.owner_for(agent, thread).await?.ok_or_else(|| {
             Error::Invalid("No sidecar replica is available for this agent".into())
         })?;
@@ -727,6 +759,64 @@ impl Deployments {
             .direct(agent, instance, thread, generation, call.into())
             .await?;
         self.wait_directive(key, Duration::from_secs(30)).await
+    }
+    /// Reads are agent-wide, so the projection answers them for every replica.
+    async fn serve_read(
+        &self,
+        agent: Uuid,
+        thread: Option<Uuid>,
+        call: wire::IngressCall,
+    ) -> Result<wire::CallResult, Error> {
+        let claims =
+            tokens::verify_ingress(&call.caller_token, agent, &self.signing_key(agent).await?)?;
+        if let Some(thread) = thread {
+            if claims.thread_id.is_some_and(|scope| scope != thread)
+                || !sqlx::query_file!("../../queries/deployment/thread_agent.sql", thread, agent)
+                    .fetch_one(&self.pool)
+                    .await?
+                    .allowed
+            {
+                return Err(Error::Denied);
+            }
+        } else if claims.thread_id.is_some() {
+            return Err(Error::Denied);
+        }
+        let mut request = http::Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("/tilde.ingress.v1.ChatService/{}", call.method));
+        if let Ok(value) = http::HeaderValue::from_str(&call.content_type) {
+            request = request.header(http::header::CONTENT_TYPE, value);
+        }
+        let mut request = request
+            .body(axum::body::Body::from(call.body))
+            .map_err(|_| Error::Denied)?;
+        request.extensions_mut().insert(claims);
+        let response = match tower::ServiceExt::oneshot(
+            crate::chat::rpc::ingress::router(self.chat()),
+            request,
+        )
+        .await
+        {
+            Ok(response) => response,
+            Err(never) => match never {},
+        };
+        let status = response.status().as_u16() as i32;
+        let content_type = response
+            .headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_owned();
+        let body = axum::body::to_bytes(response.into_body(), 192 * 1024 * 1024)
+            .await
+            .map(|b| b.to_vec())
+            .unwrap_or_default();
+        Ok(wire::CallResult {
+            status,
+            content_type,
+            body,
+            ..Default::default()
+        })
     }
     pub async fn resolve_participant(
         &self,

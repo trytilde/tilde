@@ -16,55 +16,70 @@ pub enum Outcome {
     Duplicate,
     Fenced(u64),
 }
+/// Errors caused by the frame itself, as opposed to the gateway's own infrastructure.
+fn rejectable(error: &Error) -> bool {
+    match error {
+        Error::Denied | Error::Invalid(_) | Error::NotFound | Error::Conflict => true,
+        Error::Database(error) => error.as_database_error().is_some_and(|e| {
+            e.is_unique_violation() || e.is_foreign_key_violation() || e.is_check_violation()
+        }),
+        _ => false,
+    }
+}
 fn at(value: i64) -> Result<DateTime<Utc>, Error> {
     DateTime::from_timestamp_millis(value)
         .ok_or_else(|| Error::Invalid("Invalid event timestamp".into()))
 }
 impl Deployments {
-    /// Apply one batch in order. Any failure rejects the whole batch; the
-    /// replica resends it and receipts make the replay harmless.
+    /// Apply one batch in order. A frame the gateway cannot accept is rejected on
+    /// its own so the replica drops it; only infrastructure failures fail the batch.
     pub async fn publish(
         &self,
         agent: Uuid,
         instance: Uuid,
         request: wire::PublishRequest,
     ) -> Result<wire::PublishResponse, Error> {
-        let mut acks: BTreeMap<Uuid, i64> = BTreeMap::new();
         let mut claims = vec![];
         let mut fences: BTreeMap<Uuid, u64> = BTreeMap::new();
+        let mut rejected = vec![];
         for frame in request.frames {
             match frame.frame {
                 Some(wire::upstream::Frame::Heartbeat(heartbeat)) => {
                     self.heartbeat(agent, instance, &heartbeat).await?
                 }
-                Some(wire::upstream::Frame::Claim(claim)) => claims.push(
-                    self.claim(
-                        agent,
-                        instance,
-                        id(&claim.thread_id)?,
-                        id(&claim.participant_id)?,
-                    )
-                    .await?,
-                ),
+                Some(wire::upstream::Frame::Claim(claim)) => {
+                    let (thread, participant) = (id(&claim.thread_id)?, id(&claim.participant_id)?);
+                    match self.claim(agent, instance, thread, participant).await {
+                        Ok(result) => claims.push(result),
+                        Err(error) if rejectable(&error) => claims.push(wire::ClaimResult {
+                            thread_id: claim.thread_id,
+                            participant_id: claim.participant_id,
+                            ..Default::default()
+                        }),
+                        Err(error) => return Err(error),
+                    }
+                }
                 Some(wire::upstream::Frame::Event(event)) => {
                     let inner = event
                         .event
                         .into_option()
                         .ok_or_else(|| Error::Invalid("Event frame requires an event".into()))?;
+                    let event_id = inner.id.clone();
+                    let kind = inner.kind.clone();
                     let thread = id(&inner.thread_id)?;
-                    let sequence = inner.origin_sequence;
                     match self
                         .project_event(agent, instance, event.generation, inner)
-                        .await?
+                        .await
                     {
-                        Outcome::Fenced(current) => {
+                        Ok(Outcome::Fenced(current)) => {
                             fences.insert(thread, current);
                         }
-                        Outcome::Projected | Outcome::Duplicate => {
-                            acks.entry(thread)
-                                .and_modify(|s| *s = (*s).max(sequence))
-                                .or_insert(sequence);
+                        Ok(Outcome::Projected | Outcome::Duplicate) => {}
+                        Err(error) if rejectable(&error) => {
+                            tracing::warn!(agent_id=%agent, event_id=%event_id, kind=%kind, error=?error, "Rejected sidecar event");
+                            rejected.push(event_id);
                         }
+                        Err(error) => return Err(error),
                     }
                 }
                 Some(wire::upstream::Frame::DirectiveResult(result)) => {
@@ -77,23 +92,17 @@ impl Deployments {
                     .await?;
                 }
                 Some(wire::upstream::Frame::Telemetry(telemetry)) => {
-                    self.accept_telemetry(agent, *telemetry).await?
+                    if let Err(error) = self.accept_telemetry(agent, *telemetry).await {
+                        if !rejectable(&error) {
+                            return Err(error);
+                        }
+                        tracing::warn!(agent_id=%agent, error=%error, "Rejected sidecar telemetry");
+                    }
                 }
                 None => {}
             }
         }
-        let row = sqlx::query_file!("../../queries/deployment/get.sql", agent)
-            .fetch_one(&self.pool)
-            .await?;
         Ok(wire::PublishResponse {
-            acks: acks
-                .into_iter()
-                .map(|(thread, sequence)| wire::ThreadAck {
-                    thread_id: thread.to_string(),
-                    sequence,
-                    ..Default::default()
-                })
-                .collect(),
             claims,
             fences: fences
                 .into_iter()
@@ -103,8 +112,7 @@ impl Deployments {
                     ..Default::default()
                 })
                 .collect(),
-            paused: row.paused,
-            agent_generation: row.generation,
+            rejected_event_ids: rejected,
             ..Default::default()
         })
     }
@@ -127,18 +135,22 @@ impl Deployments {
         let mut tx = self.pool.begin().await?;
         if !thread.is_nil() {
             chat::access::lock_thread_route(&mut tx, thread).await?;
-            if let Some(current) =
-                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
+            // A claim always precedes a conversation's events; without one the
+            // replica has no authority over this thread at all. The row lock keeps
+            // the fence decision and the projection atomic against a concurrent
+            // claim or recovery, which would otherwise be able to fail this
+            // invocation between the check and the write.
+            let current =
+                sqlx::query_file!("../../queries/deployment/owner_lock.sql", thread, agent)
                     .fetch_optional(&mut *tx)
                     .await?
+                    .ok_or(Error::Denied)?;
+            let current_generation = current.generation as u64;
+            if generation < current_generation
+                || (generation == current_generation
+                    && (current.owner_instance_id != instance || current.stopped))
             {
-                let current_generation = current.generation as u64;
-                if generation < current_generation
-                    || (generation == current_generation
-                        && (current.owner_instance_id != instance || current.stopped))
-                {
-                    return Ok(Outcome::Fenced(current_generation));
-                }
+                return Ok(Outcome::Fenced(current_generation));
             }
         }
         if sqlx::query_file!(
@@ -162,15 +174,18 @@ impl Deployments {
                 .await?
                 .exists
         {
-            let placeholder = match &event.state {
-                Some(State::Thread(value)) => (**value).clone(),
-                _ => types::Thread {
-                    id: thread.to_string(),
-                    primary_agent_id: agent.to_string(),
-                    ..Default::default()
-                },
+            // Only the creating event may introduce a thread, and the agent must be in it.
+            let Some(State::Thread(value)) = &event.state else {
+                return Err(Error::Denied);
             };
-            self.project_thread(&mut tx, &placeholder).await?;
+            let member = value.primary_agent_id == agent.to_string()
+                || value
+                    .participants
+                    .iter()
+                    .any(|p| p.agent_id.as_deref() == Some(&agent.to_string()));
+            if !member {
+                return Err(Error::Denied);
+            }
         }
         match &event.state {
             Some(State::User(value)) => {
@@ -497,11 +512,12 @@ impl Deployments {
         Ok(())
     }
     /// Hand completed messages to the other sidecar agents in a room.
-    pub async fn relay_pending(&self) -> Result<bool, Error> {
+    pub async fn relay_pending(&self) -> Result<(bool, usize), Error> {
         let rows = sqlx::query_file!("../../queries/deployment/relay_pending.sql")
             .fetch_all(&self.pool)
             .await?;
         let more = rows.len() == 50;
+        let mut delivered = 0;
         let chat = self.chat();
         for row in rows {
             let Some((instance, generation)) =
@@ -529,8 +545,9 @@ impl Deployments {
             )
             .execute(&self.pool)
             .await?;
+            delivered += 1;
         }
-        Ok(more)
+        Ok((more, delivered))
     }
     pub async fn relay_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
         let notifications = crate::database::notifications::Notifications::default();
@@ -548,8 +565,11 @@ impl Deployments {
             changed.borrow_and_update();
             retry = None;
             match self.relay_pending().await {
-                Ok(true) => changed.mark_changed(),
-                Ok(false) => {}
+                Ok((true, delivered)) if delivered > 0 => changed.mark_changed(),
+                Ok((true, _)) => {
+                    retry = Some(tokio::time::Instant::now() + std::time::Duration::from_secs(1));
+                }
+                Ok((false, _)) => {}
                 Err(_) => {
                     tracing::warn!("Sidecar message relay will retry");
                     retry = Some(tokio::time::Instant::now() + std::time::Duration::from_secs(1));

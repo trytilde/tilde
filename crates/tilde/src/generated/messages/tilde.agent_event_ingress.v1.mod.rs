@@ -50,7 +50,6 @@ pub mod __buffa {
         reg.register_json_any(super::__DIRECTIVE_RESULT_JSON_ANY);
         reg.register_json_any(super::__TELEMETRY_JSON_ANY);
         reg.register_json_any(super::__PUBLISH_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__THREAD_ACK_JSON_ANY);
         reg.register_json_any(super::__CLAIM_RESULT_JSON_ANY);
         reg.register_json_any(super::__FENCE_JSON_ANY);
         reg.register_json_any(super::__HYDRATE_REQUEST_JSON_ANY);
@@ -144,10 +143,6 @@ pub use self::__buffa::view::TelemetryOwnedView;
 pub use self::__buffa::view::PublishResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::PublishResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ThreadAckView;
-#[doc(inline)]
-pub use self::__buffa::view::ThreadAckOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ClaimResultView;
 #[doc(inline)]

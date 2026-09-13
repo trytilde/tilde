@@ -13,6 +13,7 @@ use crate::chat::{self, ChatError, Result, Scope, id, text};
 use crate::proto::tilde::{agent_event_ingress::v1 as control, types::v1 as types};
 use secrecy::SecretString;
 use std::{
+    collections::HashSet,
     collections::{BTreeMap, HashMap, VecDeque},
     sync::{
         Arc, Mutex as SyncMutex, RwLock,
@@ -59,7 +60,8 @@ pub(crate) struct Memory {
     pub(crate) invocation_threads: RwLock<HashMap<Uuid, Uuid>>,
     pub(crate) agent_healthy: AtomicBool,
     external: RwLock<HashMap<(Uuid, String), Uuid>>,
-    hydrating: Mutex<()>,
+    hydrating: std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    pub(crate) directives_in_flight: std::sync::Mutex<HashSet<Uuid>>,
     pub(crate) outbox: SyncMutex<VecDeque<control::Upstream>>,
     pub(crate) outbox_notify: tokio::sync::Notify,
     pub(crate) work: SyncMutex<VecDeque<(Uuid, Uuid)>>,
@@ -98,7 +100,8 @@ impl Runtime {
                 invocation_threads: RwLock::default(),
                 agent_healthy: AtomicBool::new(false),
                 external: RwLock::default(),
-                hydrating: Mutex::new(()),
+                hydrating: std::sync::Mutex::default(),
+                directives_in_flight: std::sync::Mutex::default(),
                 outbox: SyncMutex::default(),
                 outbox_notify: tokio::sync::Notify::new(),
                 work: SyncMutex::default(),
@@ -163,18 +166,16 @@ impl Runtime {
             Err(ChatError::Denied)
         }
     }
-    pub(crate) fn push(&self, frame: control::upstream::Frame) -> Result<()> {
+    /// Queue a frame for the gateway. Capacity is checked up front by
+    /// `ensure_capacity` so that state already mutated is never left unpublished.
+    pub(crate) fn push(&self, frame: control::upstream::Frame) {
         let mut outbox = self.state.outbox.lock().unwrap_or_else(|e| e.into_inner());
-        if outbox.len() >= store::OUTBOX_LIMIT {
-            return Err(ChatError::Transport);
-        }
         outbox.push_back(control::Upstream {
             frame: Some(frame),
             ..Default::default()
         });
         drop(outbox);
         self.state.outbox_notify.notify_one();
-        Ok(())
     }
     pub(crate) fn ensure_capacity(&self) -> Result<()> {
         if self
@@ -222,7 +223,7 @@ impl Runtime {
                 ..Default::default()
             }
             .into(),
-        )?;
+        );
         t.events.push_back(event);
         t.retain_window();
         Ok(())
@@ -248,7 +249,8 @@ impl Runtime {
                 ..Default::default()
             }
             .into(),
-        )
+        );
+        Ok(())
     }
     pub(crate) fn local(&self, thread: Uuid) -> Option<Shared> {
         self.state
@@ -313,7 +315,8 @@ impl Runtime {
         if let Some(t) = self.local(thread) {
             return Ok(t);
         }
-        let _guard = self.state.hydrating.lock().await;
+        let lock = self.hydration_lock(thread.to_string());
+        let _guard = lock.lock().await;
         if let Some(t) = self.local(thread) {
             return Ok(t);
         }
@@ -348,7 +351,8 @@ impl Runtime {
         {
             return Ok(Some(t));
         }
-        let _guard = self.state.hydrating.lock().await;
+        let lock = self.hydration_lock(format!("{connection}:{external}"));
+        let _guard = lock.lock().await;
         let known = self
             .state
             .external
@@ -380,6 +384,16 @@ impl Runtime {
             return Ok(None);
         }
         Ok(Some(self.insert_thread(self.hydrated(response)?)))
+    }
+    /// One hydration per conversation at a time, without serialising unrelated ones.
+    fn hydration_lock(&self, key: String) -> Arc<Mutex<()>> {
+        let mut locks = self
+            .state
+            .hydrating
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+        locks.entry(key).or_default().clone()
     }
     fn hydrated(&self, response: control::HydrateResponse) -> Result<ThreadState> {
         let thread = response.thread.into_option().ok_or(ChatError::NotFound)?;
@@ -419,18 +433,35 @@ impl Runtime {
             ..Default::default()
         }
     }
-    /// Create a thread owned here. The claim travels ahead of the thread's events.
-    pub(crate) fn adopt(&self, mut t: ThreadState) -> Result<Shared> {
+    /// Create a thread owned here. The gateway grants ownership before any local
+    /// state exists, so a replica never executes on a conversation it may lose.
+    pub(crate) async fn adopt(&self, mut t: ThreadState) -> Result<Shared> {
         let key = id(&t.thread.id)?;
         t.assignment = self.initial_assignment(key, &t.thread);
-        self.push(
-            control::Claim {
-                thread_id: key.to_string(),
-                participant_id: t.assignment.participant_id.clone(),
-                ..Default::default()
-            }
-            .into(),
-        )?;
+        let claim = control::Claim {
+            thread_id: key.to_string(),
+            participant_id: t.assignment.participant_id.clone(),
+            ..Default::default()
+        };
+        let response = self
+            .gateway
+            .publish(
+                self.instance_id,
+                vec![control::Upstream {
+                    frame: Some(claim.into()),
+                    ..Default::default()
+                }],
+            )
+            .await?;
+        let granted = response
+            .claims
+            .into_iter()
+            .find(|c| c.thread_id == key.to_string() && c.granted)
+            .ok_or(ChatError::Denied)?;
+        t.assignment.generation = granted.generation;
+        if let Some(existing) = self.local(key) {
+            return Ok(existing);
+        }
         Ok(self.insert_thread(t))
     }
     pub async fn create_user(&self, name: &str) -> Result<types::User> {
@@ -487,7 +518,9 @@ impl Runtime {
         {
             return Err(ChatError::Invalid("Primary agent must participate".into()));
         }
-        let shared = self.adopt(ThreadState::new(thread.clone(), Default::default()))?;
+        let shared = self
+            .adopt(ThreadState::new(thread.clone(), Default::default()))
+            .await?;
         let mut t = shared.lock().await;
         let assignment = t.assignment.clone();
         self.emit(&mut t, "thread.created", thread.clone().into(), None)?;
@@ -542,6 +575,13 @@ impl Runtime {
             active: true,
             ..Default::default()
         })
+    }
+    /// Whether this replica currently holds a conversation, without hydrating it.
+    pub async fn owns_thread(&self, key: Uuid) -> bool {
+        match self.local(key) {
+            Some(shared) => self.owns(&*shared.lock().await),
+            None => false,
+        }
     }
     pub async fn thread(&self, key: Uuid) -> Result<types::Thread> {
         let shared = self.load(key).await?;
@@ -777,7 +817,8 @@ impl Runtime {
                 match self.load(thread).await {
                     Ok(shared) => shared,
                     Err(ChatError::NotFound) => {
-                        self.adopt(ThreadState::new(roster.clone(), Default::default()))?
+                        self.adopt(ThreadState::new(roster.clone(), Default::default()))
+                            .await?
                     }
                     Err(e) => return Err(e),
                 }
@@ -814,8 +855,16 @@ impl Runtime {
         for (key, shared) in candidates {
             let t = shared.lock().await;
             let idle = now() - t.last_activity_at > 15 * 60_000;
-            if idle && t.active_invocation(self.agent_id).is_none() && t.attachments.is_empty() {
+            let unpersisted = t.attachments.values().any(|a| !a.metadata.persisted);
+            if idle && t.active_invocation(self.agent_id).is_none() && !unpersisted {
                 let messages: Vec<Uuid> = t.message_keys.keys().copied().collect();
+                let runs: Vec<Uuid> = t.runs.keys().copied().collect();
+                let invocations: Vec<Uuid> = t.invocations.keys().copied().collect();
+                let external = t
+                    .thread
+                    .channel
+                    .as_option()
+                    .and_then(|c| Some((id(&c.connection_id).ok()?, c.external_id.clone())));
                 drop(t);
                 self.state
                     .threads
@@ -829,6 +878,32 @@ impl Runtime {
                     .unwrap_or_else(|e| e.into_inner());
                 for message in messages {
                     index.remove(&message);
+                }
+                drop(index);
+                let mut index = self
+                    .state
+                    .run_threads
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner());
+                for run in runs {
+                    index.remove(&run);
+                }
+                drop(index);
+                let mut index = self
+                    .state
+                    .invocation_threads
+                    .write()
+                    .unwrap_or_else(|e| e.into_inner());
+                for invocation in invocations {
+                    index.remove(&invocation);
+                }
+                drop(index);
+                if let Some(external) = external {
+                    self.state
+                        .external
+                        .write()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .remove(&external);
                 }
             }
         }

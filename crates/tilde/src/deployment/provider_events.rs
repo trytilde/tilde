@@ -229,7 +229,8 @@ impl Runtime {
                     ..Default::default()
                 };
                 (
-                    self.adopt(store::ThreadState::new(roster, Default::default()))?,
+                    self.adopt(store::ThreadState::new(roster, Default::default()))
+                        .await?,
                     true,
                 )
             }
@@ -398,7 +399,8 @@ impl Runtime {
                     ..Default::default()
                 };
                 (
-                    self.adopt(store::ThreadState::new(root, Default::default()))?,
+                    self.adopt(store::ThreadState::new(root, Default::default()))
+                        .await?,
                     true,
                 )
             }

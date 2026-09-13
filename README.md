@@ -330,8 +330,10 @@ Heartbeats travel with every publish; an owner unheard from for fifteen seconds 
 conversations. Under **Assign to new node** the gateway hands active runs to another live
 replica, which restarts them from their objective. Under **Stop** the runs fail. A
 replica that cannot reach the gateway stops executing after thirty seconds, so a
-partitioned owner never keeps running beside its replacement. External effects should
-still use idempotency keys.
+partitioned owner never keeps running beside its replacement. Writes are acknowledged
+from replica memory and reach Postgres when the replica publishes them, so a replica
+that dies loses the events it had not yet published. External effects should therefore
+use idempotency keys.
 
 Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until
 uploaded to gateway S3 storage; configure the existing `ENGINE_S3_*` settings on the

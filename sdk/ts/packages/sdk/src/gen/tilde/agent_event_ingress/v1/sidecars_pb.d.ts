@@ -494,33 +494,25 @@ export declare type Telemetry = Message<"tilde.agent_event_ingress.v1.Telemetry"
 export declare const TelemetrySchema: GenMessage<Telemetry>;
 
 /**
+ * Every frame is either applied, fenced, or rejected; only infrastructure failures fail a batch.
+ *
  * @generated from message tilde.agent_event_ingress.v1.PublishResponse
  */
 export declare type PublishResponse = Message<"tilde.agent_event_ingress.v1.PublishResponse"> & {
   /**
-   * @generated from field: repeated tilde.agent_event_ingress.v1.ThreadAck acks = 1;
-   */
-  acks: ThreadAck[];
-
-  /**
-   * @generated from field: repeated tilde.agent_event_ingress.v1.ClaimResult claims = 2;
+   * @generated from field: repeated tilde.agent_event_ingress.v1.ClaimResult claims = 1;
    */
   claims: ClaimResult[];
 
   /**
-   * @generated from field: repeated tilde.agent_event_ingress.v1.Fence fences = 3;
+   * @generated from field: repeated tilde.agent_event_ingress.v1.Fence fences = 2;
    */
   fences: Fence[];
 
   /**
-   * @generated from field: bool paused = 4;
+   * @generated from field: repeated string rejected_event_ids = 3;
    */
-  paused: boolean;
-
-  /**
-   * @generated from field: int64 agent_generation = 5;
-   */
-  agentGeneration: bigint;
+  rejectedEventIds: string[];
 };
 
 /**
@@ -528,27 +520,6 @@ export declare type PublishResponse = Message<"tilde.agent_event_ingress.v1.Publ
  * Use `create(PublishResponseSchema)` to create a new message.
  */
 export declare const PublishResponseSchema: GenMessage<PublishResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.ThreadAck
- */
-export declare type ThreadAck = Message<"tilde.agent_event_ingress.v1.ThreadAck"> & {
-  /**
-   * @generated from field: string thread_id = 1;
-   */
-  threadId: string;
-
-  /**
-   * @generated from field: int64 sequence = 2;
-   */
-  sequence: bigint;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ThreadAck.
- * Use `create(ThreadAckSchema)` to create a new message.
- */
-export declare const ThreadAckSchema: GenMessage<ThreadAck>;
 
 /**
  * @generated from message tilde.agent_event_ingress.v1.ClaimResult
@@ -694,11 +665,6 @@ export declare type HydrateResponse = Message<"tilde.agent_event_ingress.v1.Hydr
    * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 5;
    */
   assignment?: ParticipantAssignment | undefined;
-
-  /**
-   * @generated from field: bool owner_live = 6;
-   */
-  ownerLive: boolean;
 };
 
 /**

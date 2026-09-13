@@ -236,7 +236,8 @@ impl SidecarService for Control {
                     }
                     Wake::Assignments => {
                         assignments.borrow_and_update();
-                        for (assignment, updated_at) in service.assignments_since(agent, since).await? {
+                        // Look back past any transaction that started before the last send but committed after it; replicas ignore repeats.
+                        for (assignment, updated_at) in service.assignments_since(agent, since - chrono::Duration::seconds(30)).await? {
                             since = since.max(updated_at);
                             yield ingress::WatchResponse { frame: Some(assignment.into()), ..Default::default() };
                         }

@@ -54,6 +54,7 @@ pub fn relay(runtime: &Runtime, request: ExportLogsServiceRequest) -> Result<()>
     if payload.len() > 8 * 1024 * 1024 {
         return Err(ChatError::Invalid("Log batch is too large".into()));
     }
+    runtime.ensure_capacity()?;
     runtime.push(
         wire::Telemetry {
             kind: wire::TelemetryKind::Logs.into(),
@@ -61,7 +62,8 @@ pub fn relay(runtime: &Runtime, request: ExportLogsServiceRequest) -> Result<()>
             ..Default::default()
         }
         .into(),
-    )
+    );
+    Ok(())
 }
 pub fn router(node: Node) -> axum::Router {
     let (sender, mut receiver, _task) =

@@ -93,6 +93,21 @@ impl ThreadState {
         self.message_keys.insert(key, (created, key));
         self.messages.insert((created, key), message)
     }
+    /// Keep the command history bounded; only unfinished commands are still needed.
+    pub fn push_command(&mut self, command: Command) {
+        self.commands.push(command);
+        if self.commands.len() > 512 {
+            let mut excess = self.commands.len() - 512;
+            self.commands.retain(|c| {
+                if excess > 0 && c.finished_at.is_some() {
+                    excess -= 1;
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+    }
     pub fn command(&self, id: &str) -> Option<&Command> {
         self.commands.iter().rev().find(|c| c.command.id == id)
     }

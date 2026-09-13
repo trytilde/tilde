@@ -55,7 +55,7 @@ impl From<Error> for connectrpc::ConnectError {
                 Self::already_exists("Agent ID already exists with different parameters")
             }
             other => {
-                tracing::error!(error = %other, "engine operation failed");
+                tracing::error!(error = ?other, "engine operation failed");
                 Self::internal("Engine operation failed")
             }
         }

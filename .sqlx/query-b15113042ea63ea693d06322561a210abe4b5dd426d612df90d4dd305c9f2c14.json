@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.thread_id,p.participant_id,p.agent_id,p.owner_instance_id,p.generation,d.failure_mode\nFROM participant_assignments p JOIN agents a ON a.id=p.agent_id JOIN agent_deployments d ON d.agent_id=p.agent_id\nLEFT JOIN sidecar_nodes n ON n.agent_id=p.agent_id AND n.instance_id=p.owner_instance_id\nWHERE NOT p.stopped AND a.deployment_mode='sidecar' AND a.deleted_at IS NULL AND NOT a.paused\nAND (n.instance_id IS NULL OR NOT n.agent_ready OR n.last_seen_at<NOW()-INTERVAL '15 seconds')\nAND EXISTS(SELECT 1 FROM chat_invocations i WHERE i.thread_id=p.thread_id AND i.agent_id=p.agent_id AND i.status IN ('pending','running'))\nORDER BY p.updated_at LIMIT 100;\n",
+  "query": "SELECT p.thread_id,p.participant_id,p.agent_id,p.owner_instance_id,p.generation,d.failure_mode\nFROM participant_assignments p JOIN agents a ON a.id=p.agent_id JOIN agent_deployments d ON d.agent_id=p.agent_id\nLEFT JOIN sidecar_nodes n ON n.agent_id=p.agent_id AND n.instance_id=p.owner_instance_id\nWHERE NOT p.stopped AND a.deployment_mode='sidecar' AND a.deleted_at IS NULL AND NOT a.paused\nAND (n.instance_id IS NULL OR n.last_seen_at<NOW()-INTERVAL '15 seconds')\nAND EXISTS(SELECT 1 FROM chat_invocations i WHERE i.thread_id=p.thread_id AND i.agent_id=p.agent_id AND i.status IN ('pending','running'))\nORDER BY p.updated_at LIMIT 100;\n",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "1f77d0c480554b8841da3b9108513955ad47e89bbc07af6822014b3d8f003e6a"
+  "hash": "b15113042ea63ea693d06322561a210abe4b5dd426d612df90d4dd305c9f2c14"
 }

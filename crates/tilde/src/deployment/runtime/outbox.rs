@@ -70,9 +70,6 @@ impl Runtime {
                 Ok(response) => {
                     self.state.gateway_ok.store(now(), Ordering::Release);
                     self.apply_publish(response).await;
-                    if self.transfer_attachments().await.is_err() {
-                        tracing::warn!(agent_id=%self.agent_id, "Attachment transfer to the gateway will retry");
-                    }
                     if !self
                         .state
                         .outbox
@@ -101,38 +98,25 @@ impl Runtime {
         }
     }
     async fn apply_publish(&self, response: control::PublishResponse) {
-        for claim in response.claims {
-            let Ok(thread) = id(&claim.thread_id) else {
-                continue;
-            };
-            let assignment = types::ParticipantAssignment {
-                thread_id: claim.thread_id.clone(),
-                participant_id: claim.participant_id.clone(),
-                agent_id: self.agent_id.to_string(),
-                owner_instance_id: if claim.granted {
-                    self.instance_id.to_string()
-                } else {
-                    claim.owner_instance_id.clone()
-                },
-                generation: claim.generation,
-                stopped: false,
-                ..Default::default()
-            };
-            if let Some(shared) = self.local(thread) {
-                let mut t = shared.lock().await;
-                if claim.granted && t.assignment.generation <= claim.generation {
-                    t.assignment = assignment;
-                    continue;
-                }
-            }
-            if !claim.granted {
-                tracing::warn!(thread_id=%thread, "Conversation is owned by another replica");
-                let _ = self.apply_assignment(assignment).await;
-            }
-        }
         for fence in response.fences {
             if let Ok(thread) = id(&fence.thread_id) {
                 let _ = self.fence(thread, fence.generation).await;
+            }
+        }
+        for event in response.rejected_event_ids {
+            tracing::error!(agent_id=%self.agent_id, event_id=%event, "Gateway rejected an event; local state has diverged from the projection");
+        }
+    }
+    /// Upload attachment bytes separately so a slow object store never delays heartbeats.
+    pub async fn attachment_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+        let mut tick = tokio::time::interval(Duration::from_secs(2));
+        loop {
+            tokio::select! {
+                _=shutdown.changed()=>return,
+                _=tick.tick()=>{}
+            }
+            if self.transfer_attachments().await.is_err() {
+                tracing::warn!(agent_id=%self.agent_id, "Attachment transfer to the gateway will retry");
             }
         }
     }
@@ -160,8 +144,27 @@ impl Runtime {
                     self.apply_assignment(*assignment).await?
                 }
                 Some(control::watch_response::Frame::Directive(directive)) => {
+                    // Watch resends unacked directives on every reconnect; run each once.
+                    let key = id(&directive.id).unwrap_or_default();
+                    let fresh = self
+                        .state
+                        .directives_in_flight
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(key);
+                    if !fresh {
+                        continue;
+                    }
                     let node = node.clone();
-                    tokio::spawn(async move { node.directive(*directive).await });
+                    let state = self.state.clone();
+                    tokio::spawn(async move {
+                        node.directive(*directive).await;
+                        state
+                            .directives_in_flight
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .remove(&key);
+                    });
                 }
                 Some(control::watch_response::Frame::Ping(_)) | None => {}
             }

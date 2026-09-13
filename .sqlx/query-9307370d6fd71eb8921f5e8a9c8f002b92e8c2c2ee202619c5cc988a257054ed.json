@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT owner_instance_id,generation,stopped FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2 FOR UPDATE;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "owner_instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "stopped",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9307370d6fd71eb8921f5e8a9c8f002b92e8c2c2ee202619c5cc988a257054ed"
+}

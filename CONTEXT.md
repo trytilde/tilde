@@ -499,18 +499,29 @@ at the gateway. Sidecars enforce replicated permissions and serve assigned conne
 credentials from memory.
 
 Ownership is `(thread, agent participant)` and points to a sidecar process incarnation.
-The replica that first touches a conversation claims it; a claim for an unknown
-conversation is answered by hydration from the gateway's projection, which also settles
-ownership in the same call. The owner mutates thread state under one per-thread lock,
-appends typed events with a per-thread sequence, and the shipper delivers them in order.
-The gateway records event receipts for deduplication, fences events from an older
-generation or a non-owner, and projects the rest into the chat tables and activity
-history. Batches that fail are rejected whole and resent.
+A replica creating a conversation claims it synchronously, so no local state exists
+until the gateway has granted a generation; a request for a conversation it does not
+hold is answered by hydration from the gateway's projection, which settles ownership in
+the same call. Claims and projection lock the assignment row, so a fence decision and
+the write it guards are atomic against recovery. The owner mutates thread state under
+one per-thread lock, appends typed events with a per-thread sequence, and the shipper
+delivers them in order. The gateway records event receipts for deduplication, fences
+events from an older generation or a non-owner, and projects the rest into the chat
+tables and activity history. A frame the gateway cannot accept (a permission failure or
+a constraint violation) is rejected on its own and the replica drops it with an error
+log; only infrastructure failures fail a batch, which is then resent in order.
+Acknowledged writes live in replica memory until the shipper publishes them: a replica
+that dies with a non-empty outbox loses those events, and its conversations are
+recovered from the projection, which is why external effects need idempotency keys.
 
 Heartbeats travel with every publish; an owner unheard from for fifteen seconds is dead.
 Recovery locks the assignment in Postgres, bumps the generation, fails the old
-invocations, and either directs a live replica to restart the run from its objective or
-fails the run under the stop policy. A replica renews an invocation's lease only while
+invocations, re-routes the dead owner's unacknowledged directives, and either directs a
+live replica to restart the run from its objective or fails the run under the stop
+policy. A claim that finds the current owner dead performs the same takeover with the
+claimant as the replacement, so a forwarded request never orphans an interrupted run.
+Ownership changes reach replicas on the Watch stream with a thirty-second lookback, and
+a directive only raises a replica's generation, never regrants a conversation it lost. A replica renews an invocation's lease only while
 its own publishes succeed, so a replica cut off from the gateway stops within thirty
 seconds. External effects still need application idempotency.
 
@@ -520,14 +531,18 @@ directive for the owning replica, waits for its answer through notifications, an
 the HTTP result unchanged. Provider webhooks are handed over the same way without
 waiting. Completed messages in rooms with several sidecar agents are relayed to each
 owner; gateway-deployed agents in the same room are routed from the projection.
-Management writes to sidecar conversations forward the same way. Management reads use
-the projection. Registry RPCs from an agent beside a sidecar are verified by the replica,
-relayed over `Relay`, and re-verified at the gateway: token signature, agent generation,
-current owner and generation (settling a not-yet-published claim if needed), and the
-capability ceiling, before the existing registry handlers run.
+Management writes to sidecar conversations forward the same way. Reads (thread, run,
+message, activity and thread listings) are answered from the projection wherever they
+land, since only the projection sees every replica's conversations; a replica forwards
+listings and cursor pages, and serves the current window of a conversation it holds.
+Registry RPCs from an agent beside a sidecar are verified by the replica, relayed over
+`Relay`, and re-verified at the gateway: token signature, agent generation, current
+owner and generation, and the capability ceiling, before the existing registry
+handlers run.
 
-Attachment bytes live in bounded sidecar memory until the replica uploads them to the
-gateway, which encrypts them into S3. Replicated metadata distinguishes temporary
+Attachment bytes live in bounded sidecar memory until a separate worker uploads them
+to the gateway, which encrypts them into S3; a slow object store never delays
+heartbeats. Replicated metadata distinguishes temporary
 availability from persistence, and persisted bytes can be downloaded through the
 gateway by any replica. Health samples arrive with heartbeats.
 

@@ -231,6 +231,7 @@ pub async fn start(options: Options) -> Result<Sidecar> {
             .store(true, std::sync::atomic::Ordering::Release);
         workers.spawn(runtime.as_ref().clone().worker(rx.clone()));
         workers.spawn(runtime.as_ref().clone().shipper(rx.clone()));
+        workers.spawn(runtime.as_ref().clone().attachment_worker(rx.clone()));
         let watcher = node.clone();
         let mut shutdown = rx.clone();
         workers.spawn(async move {
@@ -329,6 +330,7 @@ impl Node {
             .layer(middleware::from_fn_with_state(self.clone(), local_guard))
     }
     pub(crate) async fn directive(self, directive: wire::Directive) {
+        tracing::debug!(agent_id=%self.runtime.agent_id, instance_id=%self.runtime.instance_id, directive_id=%directive.id, thread_id=%directive.thread_id, generation=directive.generation, action=?directive.action.as_ref().map(std::mem::discriminant), "Directive received");
         // The gateway decided ownership before queueing this; apply it ahead of
         // the assignment frame that may still be behind on the same stream.
         if directive.generation > 0
@@ -337,14 +339,20 @@ impl Node {
         {
             let assignment = {
                 let t = shared.lock().await;
-                types::ParticipantAssignment {
-                    owner_instance_id: self.runtime.instance_id.to_string(),
-                    generation: directive.generation,
-                    stopped: false,
-                    ..t.assignment.clone()
-                }
+                // Only a newer generation changes anything; a directive queued
+                // before this replica lost the conversation must not regrant it.
+                (directive.generation > t.assignment.generation).then(|| {
+                    types::ParticipantAssignment {
+                        owner_instance_id: self.runtime.instance_id.to_string(),
+                        generation: directive.generation,
+                        stopped: false,
+                        ..t.assignment.clone()
+                    }
+                })
             };
-            let _ = self.runtime.apply_assignment(assignment).await;
+            if let Some(assignment) = assignment {
+                let _ = self.runtime.apply_assignment(assignment).await;
+            }
         }
         let result = match directive.action {
             Some(wire::directive::Action::IngressCall(call)) => self.execute_call(*call).await,
@@ -389,20 +397,17 @@ impl Node {
                 ..Default::default()
             },
         };
-        if self
-            .runtime
-            .push(
-                wire::DirectiveResult {
-                    id: directive.id,
-                    result: result.into(),
-                    ..Default::default()
-                }
-                .into(),
-            )
-            .is_err()
-        {
-            tracing::warn!(agent_id=%self.runtime.agent_id, "Directive result could not be queued");
+        if result.status >= 400 {
+            tracing::warn!(agent_id=%self.runtime.agent_id, directive_id=%directive.id, thread_id=%directive.thread_id, status=result.status, "Directive failed");
         }
+        self.runtime.push(
+            wire::DirectiveResult {
+                id: directive.id,
+                result: result.into(),
+                ..Default::default()
+            }
+            .into(),
+        );
     }
     async fn execute_call(&self, call: wire::IngressCall) -> wire::CallResult {
         let mut request = Request::builder()
@@ -578,7 +583,21 @@ async fn public_guard(State(node): State<Node>, request: Request, next: Next) ->
         return connectrpc::ConnectError::from(e).into_response();
     }
     let chat = Chat::from_sidecar(node.runtime.clone());
+    // Agent-wide listings and history pages come from the projection, which is
+    // the only place that sees every replica's conversations.
+    let listing = method == "ListThreads"
+        || (method == "ListMessages"
+            && super::routing::decode::<crate::proto::tilde::ingress::v1::ListMessagesRequest>(
+                &body,
+                &content_type,
+            )
+            .is_ok_and(|r| !r.before_message_id.is_empty()));
     let thread = match super::routing::thread(&chat, &method, &body, &content_type).await {
+        Ok(_) if listing => Err(ChatError::NotFound),
+        Ok(thread) => Ok(thread),
+        Err(e) => Err(e),
+    };
+    let thread = match thread {
         Ok(thread) => thread,
         Err(ChatError::NotFound) => {
             // Known only elsewhere: the gateway resolves the conversation from the call.

@@ -13,7 +13,6 @@ struct RuntimeClaims {
     invocation_id: Uuid,
     run_id: Uuid,
     thread_id: Uuid,
-    participant_id: Uuid,
     capabilities: crate::iam::capabilities::Capabilities,
     assignment_generation: u64,
     agent_generation: i64,
@@ -55,34 +54,20 @@ impl Deployments {
                 "Registry relay: agent generation changed".into(),
             ));
         }
-        // A replica may relay before its optimistic claim for a new conversation has
-        // arrived; settling the claim here is idempotent with the frame that follows.
-        let (owner, generation, stopped, participant) = match sqlx::query_file!(
+        let row = sqlx::query_file!(
             "../../queries/deployment/current_owner.sql",
             claims.thread_id,
             agent
         )
         .fetch_optional(&self.pool)
         .await?
-        {
-            Some(row) => (
-                row.owner_instance_id,
-                row.generation as u64,
-                row.stopped,
-                row.participant_id,
-            ),
-            None => {
-                let claim = self
-                    .claim(agent, instance, claims.thread_id, claims.participant_id)
-                    .await?;
-                (
-                    id(&claim.owner_instance_id)?,
-                    claim.generation,
-                    !claim.granted,
-                    claims.participant_id,
-                )
-            }
-        };
+        .ok_or_else(|| Error::Invalid("Registry relay: conversation has no owner".into()))?;
+        let (owner, generation, stopped, participant) = (
+            row.owner_instance_id,
+            row.generation as u64,
+            row.stopped,
+            row.participant_id,
+        );
         if owner != instance || generation != claims.assignment_generation || stopped {
             return Err(Error::Invalid(
                 "Registry relay: replica is not the current owner".into(),

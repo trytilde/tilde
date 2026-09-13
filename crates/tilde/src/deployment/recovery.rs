@@ -3,8 +3,108 @@
 //! objective, or the run fails under the stop policy.
 use super::{Deployments, LIVENESS};
 use crate::{error::Error, proto::tilde::agent_event_ingress::v1 as wire};
+use sqlx::{Postgres, Transaction};
 use std::time::Duration;
+use uuid::Uuid;
+/// One conversation moving away from an owner that is gone.
+pub(crate) struct TakeOver {
+    pub thread: Uuid,
+    pub participant: Uuid,
+    pub agent: Uuid,
+    pub previous: Uuid,
+    pub owner: Uuid,
+    pub generation: i64,
+    /// Stop policy for a dead owner with no replacement: the assignment stays put, marked stopped.
+    pub mark_stopped: bool,
+    /// Reassign policy: the new owner restarts the run; otherwise the run fails.
+    pub restart_run: bool,
+}
 impl Deployments {
+    /// Move a conversation to a new generation: queued work and the active run follow
+    /// it, and the previous owner's invocations are over. Used by recovery and by
+    /// claims that find the current owner dead, so both paths leave the same state.
+    pub(crate) async fn take_over(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        t: TakeOver,
+    ) -> Result<(), Error> {
+        sqlx::query_file!(
+            "../../queries/deployment/assign.sql",
+            t.thread,
+            t.participant,
+            t.agent,
+            t.owner,
+            t.generation,
+            t.mark_stopped
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query_file!(
+            "../../queries/deployment/directives_reassign.sql",
+            t.thread,
+            t.previous,
+            t.owner
+        )
+        .execute(&mut **tx)
+        .await?;
+        for failed in sqlx::query_file!(
+            "../../queries/deployment/fail_old_invocations.sql",
+            t.thread,
+            t.agent
+        )
+        .fetch_all(&mut **tx)
+        .await?
+        {
+            crate::chat::activity(tx, t.thread, "invocation.ended", failed.id, "").await?;
+        }
+        crate::chat::activity(tx, t.thread, "participant.assigned", t.participant, "").await?;
+        let run = sqlx::query_file!(
+            "../../queries/deployment/recovery_run.sql",
+            t.thread,
+            t.agent
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        let Some(run) = run else {
+            return Ok(());
+        };
+        if !t.restart_run {
+            sqlx::query_file!("../../queries/deployment/stop_run.sql", run.run_id)
+                .execute(&mut **tx)
+                .await?;
+            crate::chat::activity(tx, t.thread, "run.updated", run.run_id, "").await?;
+            return Ok(());
+        }
+        let key = Uuid::new_v4();
+        let directive = wire::Directive {
+            id: key.to_string(),
+            thread_id: t.thread.to_string(),
+            generation: t.generation as u64,
+            action: Some(
+                wire::RecoverRun {
+                    run_id: run.run_id.to_string(),
+                    participant_id: t.participant.to_string(),
+                    objective: run.objective,
+                    ..Default::default()
+                }
+                .into(),
+            ),
+            ..Default::default()
+        };
+        let payload = self.seal_record(key, "directive", &directive)?;
+        sqlx::query_file!(
+            "../../queries/deployment/directive_insert.sql",
+            key,
+            t.agent,
+            t.owner,
+            Some(t.thread),
+            t.generation,
+            payload
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(())
+    }
     pub async fn recover(&self) -> Result<usize, Error> {
         let rows = sqlx::query_file!("../../queries/deployment/dead_owners.sql")
             .fetch_all(&self.pool)
@@ -54,81 +154,20 @@ impl Deployments {
                 node.instance_id
             };
             let generation = current.generation.checked_add(1).ok_or(Error::Conflict)?;
-            sqlx::query_file!(
-                "../../queries/deployment/assign.sql",
-                row.thread_id,
-                row.participant_id,
-                row.agent_id,
-                owner,
-                generation,
-                stopped
-            )
-            .execute(&mut *tx)
-            .await?;
-            for failed in sqlx::query_file!(
-                "../../queries/deployment/fail_old_invocations.sql",
-                row.thread_id,
-                row.agent_id
-            )
-            .fetch_all(&mut *tx)
-            .await?
-            {
-                crate::chat::activity(&mut tx, row.thread_id, "invocation.ended", failed.id, "")
-                    .await?;
-            }
-            crate::chat::activity(
+            self.take_over(
                 &mut tx,
-                row.thread_id,
-                "participant.assigned",
-                row.participant_id,
-                "",
+                TakeOver {
+                    thread: row.thread_id,
+                    participant: row.participant_id,
+                    agent: row.agent_id,
+                    previous: row.owner_instance_id,
+                    owner,
+                    generation,
+                    mark_stopped: stopped,
+                    restart_run: !stopped,
+                },
             )
             .await?;
-            let run = sqlx::query_file!(
-                "../../queries/deployment/recovery_run.sql",
-                row.thread_id,
-                row.agent_id
-            )
-            .fetch_optional(&mut *tx)
-            .await?;
-            if let Some(run) = run {
-                if stopped {
-                    sqlx::query_file!("../../queries/deployment/stop_run.sql", run.run_id)
-                        .execute(&mut *tx)
-                        .await?;
-                    crate::chat::activity(&mut tx, row.thread_id, "run.updated", run.run_id, "")
-                        .await?;
-                } else {
-                    let key = uuid::Uuid::new_v4();
-                    let directive = wire::Directive {
-                        id: key.to_string(),
-                        thread_id: row.thread_id.to_string(),
-                        generation: generation as u64,
-                        action: Some(
-                            wire::RecoverRun {
-                                run_id: run.run_id.to_string(),
-                                participant_id: row.participant_id.to_string(),
-                                objective: run.objective,
-                                ..Default::default()
-                            }
-                            .into(),
-                        ),
-                        ..Default::default()
-                    };
-                    let payload = self.seal_record(key, "directive", &directive)?;
-                    sqlx::query_file!(
-                        "../../queries/deployment/directive_insert.sql",
-                        key,
-                        row.agent_id,
-                        owner,
-                        Some(row.thread_id),
-                        generation,
-                        payload
-                    )
-                    .execute(&mut *tx)
-                    .await?;
-                }
-            }
             tx.commit().await?;
             count += 1;
         }
