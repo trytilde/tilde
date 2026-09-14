@@ -13,12 +13,14 @@ pub mod recovery;
 mod relay;
 pub mod routing;
 pub mod rpc;
+pub mod run;
 pub mod runtime;
 mod secrets;
 pub(crate) use secrets::random_secret;
 pub mod sidecar;
 pub mod telemetry;
 pub mod tokens;
+pub mod wake;
 use crate::proto::tilde::{agent_event_ingress::v1 as wire, types::v1 as types};
 use crate::{
     agent::Agents,
@@ -938,7 +940,18 @@ impl Deployments {
         thread: Option<Uuid>,
         action: wire::directive::Action,
     ) -> Result<Uuid, Error> {
-        let key = Uuid::new_v4();
+        self.direct_as(Uuid::new_v4(), agent, instance, thread, action)
+            .await
+    }
+    /// Queue a directive under a caller-chosen key, so the payload can carry it.
+    pub(crate) async fn direct_as(
+        &self,
+        key: Uuid,
+        agent: Uuid,
+        instance: Uuid,
+        thread: Option<Uuid>,
+        action: wire::directive::Action,
+    ) -> Result<Uuid, Error> {
         let directive = wire::Directive {
             id: key.to_string(),
             thread_id: thread.map(|t| t.to_string()).unwrap_or_default(),
@@ -993,7 +1006,7 @@ impl Deployments {
         .await?;
         Ok(())
     }
-    async fn wait_directive(
+    pub(crate) async fn wait_directive(
         &self,
         key: Uuid,
         timeout: Duration,
@@ -1011,8 +1024,11 @@ impl Deployments {
                 .await?
                 .ok_or(Error::NotFound)?;
             if row.acked_at.is_some() {
-                let result = row.result.ok_or(Error::NotFound)?;
-                return self.open_record(key, "result", &result);
+                // A wake is acknowledged without a result; calls carry one.
+                return match row.result {
+                    Some(result) => self.open_record(key, "result", &result),
+                    None => Ok(wire::CallResult::default()),
+                };
             }
             tokio::select! {
                 _ = tokio::time::sleep_until(deadline) => return Err(Error::Invalid("Sidecar did not answer in time".into())),

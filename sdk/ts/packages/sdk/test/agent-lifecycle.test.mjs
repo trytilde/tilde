@@ -8,7 +8,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import { create, toBinary } from "@bufbuild/protobuf";
 import { createClient } from "@connectrpc/connect";
 import { connectNodeAdapter, createConnectTransport } from "@connectrpc/connect-node";
-import { createAgentHandler, AgentHostService, RuntimeChatService } from "../dist/index.js";
+import {
+  createAgentHandler,
+  AgentHostService,
+  RuntimeChatService,
+  RunService,
+} from "../dist/index.js";
 import { InvokeRequestSchema } from "../dist/gen/tilde/agent_host/v1/agent_pb.js";
 import {
   InvocationControlService,
@@ -27,6 +32,7 @@ void test(
     const checkpoints = [];
     const failCheckpoint = new Set();
     const hostRequests = [];
+    const reports = [];
     const sessions = new Set();
     const callback = createServer(
       connectNodeAdapter({
@@ -34,6 +40,16 @@ void test(
           router.service(RuntimeChatService, {
             async listTools() {
               return { tools: [] };
+            },
+          });
+          router.service(RunService, {
+            async report(request, ctx) {
+              reports.push({
+                capability: ctx.requestHeader.get("authorization").slice(7),
+                invocationId: request.invocationId,
+                event: request.event,
+              });
+              return {};
             },
           });
           router.service(InvocationControlService, {
@@ -183,6 +199,19 @@ void test(
     await assert.rejects(invoke(1, late).finished);
     assert(!contexts.has(late));
     assert(hostRequests.every((path) => path.endsWith("/Invoke")));
+    // Every host reports acceptance and the end of each invocation through RunService with
+    // the invocation capability; the wake stream itself carries only legacy acceptance.
+    for (const invocation of [a.invocation, b.invocation, failed.invocation]) {
+      const own = reports.filter((r) => r.invocationId === invocation);
+      assert(own.every((r) => r.capability === invocation));
+      assert.deepEqual(
+        own.map((r) => r.event.case),
+        ["accepted", "stopped"],
+      );
+      assert.equal(own[0].event.value.commandId, invocation);
+    }
+    assert.equal(reports.filter((r) => r.invocationId === late).length, 1);
+    assert.equal(reports.find((r) => r.invocationId === late).event.case, "stopped");
     for (const method of ["Stop", "Steer", "Cancel"]) {
       const response = await fetch(
         `http://127.0.0.1:${hosts[0].address().port}/api/agent/tilde.agent_host.v1.AgentService/${method}`,

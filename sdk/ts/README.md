@@ -251,3 +251,66 @@ Control connections use the current renewed invocation token. A sustained connec
 failure aborts the local execution. Cancellation is cooperative: custom code must
 honor the signal. The host has only Invoke and Healthz; inbound Stop/Steer/Cancel
 methods and synchronous pause acknowledgements no longer exist.
+
+Invoke is a wake, not a result channel. The handler still verifies the HMAC signature
+and keeps the response open until the invocation ends (serverless platforms need the
+request alive), and it echoes `acceptedCommandId` for legacy gateways, but reasoning
+and the end of the run are no longer written to that stream. Every host shape reports
+them through `tilde.run.v1.RunService.Report` instead; see "Connected hosts".
+
+## Connected hosts
+
+A long-running process does not need an inbound endpoint or a signing key. It dials
+in with a deployment token (from the Deployments tab or `RegisterDeployment`) and
+receives wakes as frames on `tilde.run.v1.RunService.Watch`:
+
+```ts
+import { connectAgent } from '@trytilde/sdk';
+
+const host = connectAgent({
+  gatewayUrl: process.env.TILDE_RUNTIME_URL!, // the runtime listener root
+  deploymentToken: process.env.TILDE_DEPLOYMENT_TOKEN!,
+  instanceId: process.env.HOSTNAME, // optional; defaults to a random UUID
+  async run(context) {
+    // Identical to createAgentServer's run.
+  },
+  async checkpoint(context) {
+    // Optional, as for createAgentHandler.
+  },
+});
+for (const signal of ['SIGINT', 'SIGTERM'] as const)
+  process.once(signal, () => void host.close());
+```
+
+`connectAgent` opens `Watch` with `authorization: Bearer <deploymentToken>` and the
+instance ID, records the `registered` frame (`host.registration`, `onRegistered`),
+runs each `wake` frame concurrently with the same execution path as an HTTP wake
+(virtual-thread exclusivity, controls subscription, checkpoint/suspension), and ignores
+pings. It sends `Heartbeat({ instanceId, ready: true })` every 3 seconds and reconnects
+after a 1-second backoff whenever the stream ends, until `close()` is called. `close()`
+stops watching and heartbeating, stops active invocations and waits for their final
+reports. Stream wakes are authenticated by the deployment token, so no HMAC check applies.
+
+Every host, connected or serverless, reports through `RunService.Report` on the
+invocation's `callbackUrl` with `authorization: Bearer <capability>` (renewed like the
+other runtime RPCs): `accepted { commandId }` once controls are ready, one
+`reasoningDelta` per `context.reason()` call, and exactly one `stopped { pendingInputIds }`
+when the invocation ends by return, stop or suspension. Report failures are logged and
+never crash the host. `createAgentHandler`/`createAgentServer` remain the choice for
+serverless routes and hosts that must be reachable inbound.
+
+### AWS Lambda
+
+`createLambdaHandler` runs one invocation per event, where the event is the
+JSON-encoded `InvokeRequest` delivered by the cloud invoke API (which authenticates the
+wake). It needs no AWS SDK and resolves once the invocation has ended and been reported:
+
+```ts
+import { createLambdaHandler } from '@trytilde/sdk';
+
+export const handler = createLambdaHandler({
+  async run(context) {
+    // As above.
+  },
+});
+```

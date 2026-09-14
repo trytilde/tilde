@@ -492,7 +492,9 @@ impl Node {
                 .await;
                 status_result(outcome)
             }
-            None => wire::CallResult {
+            // Wakes are for hosts that dial the gateway directly; a sidecar drives its
+            // agent from its own leases. Phase 3 routes wakes to the local agent.
+            Some(wire::directive::Action::Wake(_)) | None => wire::CallResult {
                 status: 400,
                 ..Default::default()
             },

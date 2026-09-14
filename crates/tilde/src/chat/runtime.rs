@@ -658,29 +658,39 @@ impl Chat {
             sqlx::query_file!("../../queries/tracing/execution_context.sql",invocation,crate::telemetry::context::capture().0).execute(self.pg()?).await?;
             let capability = self.tokens.issue(scope.agent_id, invocation, scope.thread_id, scope.run_id).await?;
             let row=sqlx::query_file!("../../queries/chat/invocation_endpoint.sql",invocation).fetch_one(self.pg()?).await?;
-            let endpoint=row.endpoint_url.ok_or(ChatError::Transport)?;let key=self.signing_key(row.agent_id,&row.webhook_signing_key)?;
+            let key=self.signing_key(row.agent_id,&row.webhook_signing_key)?;
             let messages=self.messages(scope.thread_id,100).await?;
             let cached=self.hydrate_converted_messages(scope.agent_id,scope.thread_id,&messages.iter().map(|m|m.id.clone()).collect::<Vec<_>>()).await?;
-            let request=host::InvokeRequest{agent_generation:scope.generation,invocation_id:invocation.to_string(),run_id:scope.run_id.to_string(),thread_id:scope.thread_id.to_string(),agent_id:scope.agent_id.to_string(),objective:row.objective,callback_url:self.callback_url.clone(),capability:capability.expose_secret().to_owned(),messages, cached_messages:cached.into_iter().map(|c|runtime_pb::CachedAgentRepresentation{message_id:c.message_id,message_json:c.message_json,..Default::default()}).collect(),thread:self.thread(scope.thread_id).await?.into(),..Default::default()};
-            let mut stream=tokio::time::timeout(Duration::from_secs(10),client(&endpoint,key.expose_secret(),"Invoke",&request)?.invoke(request)).await.map_err(|_|ChatError::Transport)?.map_err(|_|ChatError::Transport)?;
+            let mut request=host::InvokeRequest{agent_generation:scope.generation,invocation_id:invocation.to_string(),run_id:scope.run_id.to_string(),thread_id:scope.thread_id.to_string(),agent_id:scope.agent_id.to_string(),objective:row.objective,callback_url:self.callback_url.clone(),capability:capability.expose_secret().to_owned(),messages, cached_messages:cached.into_iter().map(|c|runtime_pb::CachedAgentRepresentation{message_id:c.message_id,message_json:c.message_json,..Default::default()}).collect(),thread:self.thread(scope.thread_id).await?.into(),deployment_id:row.deployment_id.map(|d|d.to_string()).unwrap_or_default(),traceparent:crate::telemetry::context::capture().0,tracestate:crate::telemetry::context::capture().1,..Default::default()};
+            let woken=self.wake(scope.agent_id,scope.thread_id,invocation,row.deployment_id,row.target.as_deref(),row.target_reference.as_deref(),row.endpoint_url.as_deref(),key.expose_secret(),&mut request).await?;
             let mut heartbeat=tokio::time::interval(Duration::from_secs(2));
-            loop {
-                tokio::select! {
-                    message=stream.message()=>{
-                        let Some(message)=message.map_err(|_|ChatError::Transport)? else{break;};
-                        let view=message.view();
-                        for pending in &view.pending_input_ids {
-                            sqlx::query_file!("../../queries/chat/input_unaccept.sql",invocation,id(pending)?).execute(self.pg()?).await?;
-                        }
-                        if !view.reasoning_delta.is_empty() {
-                            let mut tx=self.pg()?.begin().await?;activity(&mut tx,scope.thread_id,"reasoning.delta",invocation,view.reasoning_delta).await?;tx.commit().await?;
-                        }
-                    },
-                    _=heartbeat.tick()=>{
-                        if sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql",invocation).execute(self.pg()?).await?.rows_affected()==0 {return Ok(());}
-                    },
-
-                }
+            match woken {
+                Woken::Stream(mut stream)=>loop {
+                    // A legacy host answers on the wake's response stream; a current one
+                    // reports through RunService and only keeps this stream open.
+                    tokio::select! {
+                        message=stream.message()=>{
+                            let Some(message)=message.map_err(|_|ChatError::Transport)? else{break;};
+                            let view=message.view();
+                            for pending in &view.pending_input_ids {
+                                sqlx::query_file!("../../queries/chat/input_unaccept.sql",invocation,id(pending)?).execute(self.pg()?).await?;
+                            }
+                            if !view.reasoning_delta.is_empty() {
+                                let mut tx=self.pg()?.begin().await?;activity(&mut tx,scope.thread_id,"reasoning.delta",invocation,view.reasoning_delta).await?;tx.commit().await?;
+                            }
+                        },
+                        _=heartbeat.tick()=>{
+                            if sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql",invocation).execute(self.pg()?).await?.rows_affected()==0 {return Ok(());}
+                        },
+                    }
+                },
+                Woken::Detached=>loop {
+                    // The host holds its own connection to the gateway and renews the lease
+                    // through it; this task only waits for the invocation to end.
+                    heartbeat.tick().await;
+                    let status=sqlx::query_file!("../../queries/chat/invocation_status.sql",invocation).fetch_optional(self.pg()?).await?.map(|r|r.status);
+                    if !matches!(status.as_deref(),Some("running")) {return Ok(());}
+                },
             } Ok(())
         }.with_context(cx.clone()).await;
         if result.is_err() {
@@ -694,6 +704,127 @@ impl Chat {
         .with_context(cx)
         .await?;
         result
+    }
+    /// Start the execution on the invocation's deployment. A live instance that dialed
+    /// in receives the wake as a frame; a direct endpoint is woken over HTTP; a Lambda
+    /// function is invoked asynchronously. Only the HTTP path yields a response stream.
+    #[allow(clippy::too_many_arguments)]
+    async fn wake(
+        &self,
+        agent: Uuid,
+        thread: Uuid,
+        invocation: Uuid,
+        deployment: Option<Uuid>,
+        target: Option<&str>,
+        reference: Option<&str>,
+        endpoint: Option<&str>,
+        key: &str,
+        request: &mut host::InvokeRequest,
+    ) -> Result<Woken> {
+        if target == Some("aws_lambda") {
+            let reference = reference.ok_or(ChatError::Transport)?;
+            let payload = serde_json::to_vec(&*request).map_err(|_| ChatError::Transport)?;
+            crate::deployment::wake::lambda(reference, &payload)
+                .await
+                .map_err(|_| ChatError::Transport)?;
+            return Ok(Woken::Detached);
+        }
+        if let (Some(deployments), Some(deployment)) = (&self.deployments, deployment)
+            && let Ok(Some(instance)) = deployments.connected_instance(agent, deployment).await
+        {
+            let command = Uuid::new_v4();
+            request.command_id = command.to_string();
+            let queued = deployments
+                .direct_as(
+                    command,
+                    agent,
+                    instance,
+                    Some(thread),
+                    crate::proto::tilde::agent_event_ingress::v1::directive::Action::Wake(
+                        Box::new(request.clone()),
+                    ),
+                )
+                .await
+                .is_ok();
+            if queued
+                && deployments
+                    .wait_directive(command, Duration::from_secs(10))
+                    .await
+                    .is_ok()
+            {
+                return Ok(Woken::Detached);
+            }
+            tracing::warn!(agent_id=%agent, instance_id=%instance, invocation_id=%invocation, "Connected instance did not accept the wake; falling back to its endpoint");
+            request.command_id.clear();
+        }
+        let endpoint = endpoint.ok_or(ChatError::Transport)?;
+        let stream = tokio::time::timeout(
+            Duration::from_secs(10),
+            client(endpoint, key, "Invoke", &*request)?.invoke(request.clone()),
+        )
+        .await
+        .map_err(|_| ChatError::Transport)?
+        .map_err(|_| ChatError::Transport)?;
+        Ok(Woken::Stream(Box::new(stream)))
+    }
+    /// A host's account of its invocation, sent with the invocation capability.
+    pub async fn report(
+        &self,
+        agent: Uuid,
+        thread: Uuid,
+        invocation: Uuid,
+        event: Option<crate::proto::tilde::run::v1::report_request::Event>,
+    ) -> Result<()> {
+        use crate::proto::tilde::run::v1::report_request::Event;
+        match event {
+            Some(Event::Accepted(accepted)) => {
+                if let (Some(deployments), Ok(command)) =
+                    (&self.deployments, id(&accepted.command_id))
+                {
+                    deployments
+                        .acknowledge_wake(agent, command)
+                        .await
+                        .map_err(|_| ChatError::Transport)?;
+                }
+                sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql", invocation)
+                    .execute(self.pg()?)
+                    .await?;
+            }
+            Some(Event::ReasoningDelta(delta)) => {
+                if !delta.is_empty() {
+                    let mut tx = self.pg()?.begin().await?;
+                    activity(&mut tx, thread, "reasoning.delta", invocation, &delta).await?;
+                    tx.commit().await?;
+                }
+                sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql", invocation)
+                    .execute(self.pg()?)
+                    .await?;
+            }
+            Some(Event::Stopped(stopped)) => {
+                for pending in &stopped.pending_input_ids {
+                    sqlx::query_file!(
+                        "../../queries/chat/input_unaccept.sql",
+                        invocation,
+                        id(pending)?
+                    )
+                    .execute(self.pg()?)
+                    .await?;
+                }
+                self.finish(invocation, "stopped").await?;
+            }
+            None => return Err(ChatError::Invalid("Report requires an event".into())),
+        }
+        Ok(())
+    }
+    /// Extend a running invocation's lease; a no-op for anything not running.
+    pub(crate) async fn renew_lease(&self, invocation: Uuid) -> Result<()> {
+        if self.local().is_some() {
+            return Ok(());
+        }
+        sqlx::query_file!("../../queries/chat/invocation_heartbeat.sql", invocation)
+            .execute(self.pg()?)
+            .await?;
+        Ok(())
     }
     async fn expire_invocations(&self) -> Result<()> {
         let mut tx = self.pg()?.begin().await?;
@@ -789,4 +920,17 @@ impl Chat {
         workers.abort_all();
         while workers.join_next().await.is_some() {}
     }
+}
+
+/// How an execution was started, and whether this task must consume a response stream.
+enum Woken {
+    Stream(
+        Box<
+            connectrpc::client::ServerStream<
+                <HttpClient as connectrpc::client::ClientTransport>::ResponseBody,
+                host::__buffa::view::InvokeResponseView<'static>,
+            >,
+        >,
+    ),
+    Detached,
 }

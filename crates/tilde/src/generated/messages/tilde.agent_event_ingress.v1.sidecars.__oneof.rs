@@ -104,6 +104,11 @@ pub mod directive {
             ::buffa::alloc::boxed::Box<super::super::super::ProviderEventDirective>,
         ),
         Relay(::buffa::alloc::boxed::Box<super::super::super::RelayMessage>),
+        Wake(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::super::agent_host::v1::InvokeRequest,
+            >,
+        ),
     }
     impl ::buffa::Oneof for Action {}
     impl From<super::super::super::IngressCall> for Action {
@@ -137,6 +142,22 @@ pub mod directive {
             Self::Some(Action::from(v))
         }
     }
+    impl From<super::super::super::super::super::agent_host::v1::InvokeRequest>
+    for Action {
+        fn from(
+            v: super::super::super::super::super::agent_host::v1::InvokeRequest,
+        ) -> Self {
+            Self::Wake(::buffa::alloc::boxed::Box::new(v))
+        }
+    }
+    impl From<super::super::super::super::super::agent_host::v1::InvokeRequest>
+    for ::core::option::Option<Action> {
+        fn from(
+            v: super::super::super::super::super::agent_host::v1::InvokeRequest,
+        ) -> Self {
+            Self::Some(Action::from(v))
+        }
+    }
     impl serde::Serialize for Action {
         fn serialize<S: serde::Serializer>(
             &self,
@@ -153,6 +174,9 @@ pub mod directive {
                 }
                 Self::Relay(v) => {
                     map.serialize_entry("relay", v)?;
+                }
+                Self::Wake(v) => {
+                    map.serialize_entry("wake", v)?;
                 }
             }
             map.end()

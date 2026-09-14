@@ -21,8 +21,10 @@ import {
   type JsonValue,
   type DescMessage,
   type Message,
+  type MessageInitShape,
 } from "@bufbuild/protobuf";
 import { createServer } from "node:http2";
+import { setTimeout as sleep } from "node:timers/promises";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { ConnectionsService } from "./gen/tilde/management/v1/connections_pb.js";
 import { AgentService as ManagementAgentService } from "./gen/tilde/management/v1/agents_pb.js";
@@ -35,12 +37,17 @@ import {
   type InvokeRequest,
 } from "./gen/tilde/agent_host/v1/agent_pb.js";
 import {
+  RunService,
+  type ReportRequestSchema,
+  type RunRegistered,
+} from "./gen/tilde/run/v1/run_pb.js";
+import {
   MessageSchema,
   type Participant,
   type Message as ChatMessage,
 } from "./gen/tilde/types/v1/chat_pb.js";
 export * from "./gen/tilde/types/v1/chat_pb.js";
-export { RuntimeChatService, AgentHostService };
+export { RuntimeChatService, AgentHostService, RunService };
 export { BinaryPermission, TargetSelection } from "./gen/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
@@ -110,43 +117,6 @@ export type ToolCatalog = Record<string, Tool>;
 export type SteeringInput = { id: string; text: string; message?: ChatMessage };
 
 class StopLoop extends Error {}
-class Queue<T> {
-  private items: T[] = [];
-  private wake?: () => void;
-  private space?: () => void;
-  closed = false;
-  error?: unknown;
-  async push(item: T) {
-    while (this.items.length >= 64 && !this.closed)
-      await new Promise<void>((r) => {
-        this.space = r;
-      });
-    if (this.closed) throw new StopLoop();
-    this.items.push(item);
-    this.wake?.();
-  }
-  end(error?: unknown) {
-    this.closed = true;
-    this.error ??= error;
-    this.wake?.();
-    this.space?.();
-  }
-  async *read() {
-    while (true) {
-      if (this.items.length) {
-        const item = this.items.shift()!;
-        this.space?.();
-        yield item;
-      } else if (this.closed) {
-        if (this.error) throw this.error;
-        return;
-      } else
-        await new Promise<void>((r) => {
-          this.wake = r;
-        });
-    }
-  }
-}
 function toolId(invocation: string, call: string, name: string) {
   if (!call) throw new Error("Tool call ID is required");
   const h = createHash("sha256").update(`${invocation}:${call}:${name}`).digest("hex");
@@ -190,6 +160,9 @@ export class AgentContext {
   private readonly accepted = new Map<string, string>();
   #headers: Headers;
   private readonly controls: RpcClient<typeof InvocationControlService>;
+  private readonly runService: RpcClient<typeof RunService>;
+  private reports: Promise<void> = Promise.resolve();
+  private stoppedReported = false;
   private suspension?: Promise<void>;
   async settleSuspension() {
     await this.suspension;
@@ -197,10 +170,8 @@ export class AgentContext {
   constructor(
     request: InvokeRequest,
     private readonly controller: AbortController,
-    private readonly output: Queue<{
-      reasoningDelta?: string;
-      stopped?: boolean;
-    }>,
+    /** Internal host hook: ends the invocation with a failure the wake caller can observe. */
+    private readonly fail: (error: ConnectError) => void,
   ) {
     this.invocationId = request.invocationId;
     this.runId = request.runId;
@@ -222,6 +193,7 @@ export class AgentContext {
     });
     this.session = connectClient(RuntimeChatService, transport);
     this.controls = connectClient(InvocationControlService, transport);
+    this.runService = connectClient(RunService, transport);
     const options = () => ({ headers: this.#headers, signal: this.signal });
     const renewal = setInterval(
       async () => {
@@ -547,7 +519,36 @@ export class AgentContext {
   /** Stream reasoning into execution activity, never into the thread transcript. */
   async reason(text: string) {
     this.signal.throwIfAborted();
-    await this.output.push({ reasoningDelta: text });
+    await this.report({ case: "reasoningDelta", value: text });
+  }
+  /**
+   * Internal host hook: report one run event through tilde.run.v1.RunService with the
+   * invocation capability. Reports are ordered, never cancelled by the invocation signal
+   * (the final `stopped` outlives it), and failures are logged rather than thrown.
+   * `stopped` is sent at most once.
+   */
+  report(
+    event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>,
+  ): Promise<void> {
+    if (event.case === "stopped") {
+      if (this.stoppedReported) return this.reports;
+      this.stoppedReported = true;
+    }
+    const invocationId = this.invocationId;
+    this.reports = this.reports.then(async () => {
+      try {
+        await this.runService.report(
+          { invocationId, event },
+          { headers: this.#headers, timeoutMs: 10_000 },
+        );
+      } catch (error) {
+        console.warn(
+          `[tilde] run report (${event.case}) for invocation ${invocationId} failed:`,
+          ConnectError.from(error).message,
+        );
+      }
+    });
+    return this.reports;
   }
   /** Consume newly steered input at the agent framework's next safe checkpoint. */
   takeInputs(): SteeringInput[] {
@@ -597,9 +598,7 @@ export class AgentContext {
                   try {
                     await this.setRunStatus("failed");
                   } finally {
-                    this.output.end(
-                      new ConnectError("Suspension checkpoint failed", Code.Internal),
-                    );
+                    this.fail(new ConnectError("Suspension checkpoint failed", Code.Internal));
                   }
                   throw error;
                 }
@@ -701,25 +700,31 @@ function verify(
   if (!timingSafeEqual(expected, Buffer.from(signature, "hex")))
     throw new ConnectError("Invalid signature", Code.Unauthenticated);
 }
-/** Create a ConnectRPC agent service. The handler's return value is intentionally ignored. */
-export function createAgentHandler(options: {
-  signingKey: string;
-  /** Prefix mounted by a serverless route, for example /api/agent. */
-  pathPrefix?: string;
+/** Options shared by every host shape: what to run and how to checkpoint it. */
+export type InvocationOptions = {
   /** Persist framework state before suspension; resume loads it in run(). */
   checkpoint?: (context: AgentContext) => Promise<void>;
   /** Existing OTel provider must include agentSpanProcessor. */
   tracing?: "existing";
   run: (context: AgentContext) => Promise<unknown>;
+};
+/** Options for hosts that receive wakes over HTTP (createAgentHandler / createAgentServer). */
+export type HandlerOptions = InvocationOptions & {
+  signingKey: string;
+  /** Prefix mounted by a serverless route, for example /api/agent. */
+  pathPrefix?: string;
   /** Called by the Healthz RPC. Honor cancellation for dependency checks; throwing reports unhealthy. */
   healthz?: (signal: AbortSignal) => boolean | Promise<boolean>;
-}): ReturnType<typeof connectNodeAdapter> {
-  if (options.signingKey.length < 32) throw new Error("A caller-generated signing key is required");
-  initializeTracing(options.tracing === "existing");
-  const finished = new Set<string>();
-  // A virtual conversation thread owns one reasoning loop at a time. Different
-  // agent/thread pairs remain independent even when this host serves many agents.
-  const virtualThreads = new Map<
+};
+
+/**
+ * Per-process state shared by every invocation a host executes, regardless of how it was
+ * woken. A virtual conversation thread owns one reasoning loop at a time. Different
+ * agent/thread pairs remain independent even when this host serves many agents.
+ */
+type HostState = {
+  finished: Set<string>;
+  virtualThreads: Map<
     string,
     {
       invocationId: string;
@@ -727,109 +732,162 @@ export function createAgentHandler(options: {
       controller: AbortController;
       completion: Promise<unknown>;
     }
-  >();
+  >;
+};
+function createHostState(): HostState {
+  return { finished: new Set(), virtualThreads: new Map() };
+}
+
+/** How a wake reached this host; absent pieces mean a stream or cloud wake without a request. */
+type Wake = {
+  /** Wake request headers (trace context). Stream wakes carry none. */
+  headers?: Headers;
+  /** Aborting ends the invocation, for example when the HTTP wake or the Watch stream closes. */
+  signal?: AbortSignal;
+  /** Called once controls are ready and acceptance has been reported. */
+  onReady?: () => void;
+};
+
+/**
+ * Execute one wake to completion. Resolves when the invocation ends (normal return, stop or
+ * suspension) and rejects with a ConnectError when it could not start or failed. Every
+ * lifecycle event is reported through tilde.run.v1.RunService.Report with the invocation
+ * capability; the wake caller never has to relay it. Authentication of the wake itself
+ * (HMAC over HTTP, deployment token on Watch, cloud IAM) is the caller's concern.
+ */
+async function runInvocation(
+  request: InvokeRequest,
+  options: InvocationOptions,
+  host: HostState,
+  wake: Wake = {},
+): Promise<void> {
+  if (host.finished.has(request.invocationId))
+    throw new ConnectError("Invocation already accepted", Code.AlreadyExists);
+  const threadKey = `${request.agentId}:${request.threadId}`;
+  for (;;) {
+    const previous = host.virtualThreads.get(threadKey);
+    if (!previous) break;
+    if (previous.generation >= request.assignmentGeneration)
+      throw new ConnectError("Conversation already has an active invocation", Code.AlreadyExists);
+    previous.controller.abort(new StopLoop());
+    await previous.completion;
+    wake.signal?.throwIfAborted();
+    if (host.virtualThreads.get(threadKey) === previous) host.virtualThreads.delete(threadKey);
+    // Another wake may have acquired the thread while we awaited.
+  }
+  const controller = new AbortController();
+  let settle!: (error?: ConnectError) => void;
+  const done = new Promise<void>((resolve, reject) => {
+    settle = (error) => (error ? reject(error) : resolve());
+  });
+  done.catch(() => {});
+  const abort = () => controller.abort(wake.signal?.reason);
+  wake.signal?.addEventListener("abort", abort, { once: true });
+  const context = new AgentContext(request, controller, settle);
+  let resolveReady!: () => void;
+  let rejectReady!: (error: unknown) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
+  const rejectAborted = () =>
+    rejectReady(
+      controller.signal.reason instanceof ConnectError
+        ? controller.signal.reason
+        : new ConnectError("Invocation is no longer active", Code.Canceled),
+    );
+  controller.signal.addEventListener("abort", rejectAborted, { once: true });
+  const controls = context.consumeControls(resolveReady, options.checkpoint).catch((error) => {
+    rejectReady(error);
+    settle(ConnectError.from(error));
+    controller.abort(error);
+  });
+  // Stream and Lambda wakes carry no request headers; the wake itself carries the context.
+  const traceHeaders = wake.headers ?? new Headers();
+  if (!traceHeaders.has("traceparent") && request.traceparent) {
+    traceHeaders.set("traceparent", request.traceparent);
+    if (request.tracestate) traceHeaders.set("tracestate", request.tracestate);
+  }
+  const telemetry = invocationTracing(request, traceHeaders, () => context.traceAuthorization());
+  let traceFailed = false;
+  const execution = telemetry.run(async () => {
+    try {
+      await ready;
+      await context.refreshTools();
+      controller.signal.throwIfAborted();
+      await options.run(context);
+      await context.settleSuspension();
+      settle();
+    } catch (error) {
+      traceFailed = !(error instanceof StopLoop || controller.signal.aborted);
+      settle(
+        error instanceof StopLoop || controller.signal.aborted
+          ? undefined
+          : new ConnectError("Agent execution failed", Code.Internal),
+      );
+    }
+  });
+  host.virtualThreads.set(threadKey, {
+    invocationId: request.invocationId,
+    generation: request.assignmentGeneration,
+    controller,
+    completion: execution,
+  });
+  try {
+    await ready;
+    if (request.commandId)
+      await context.report({ case: "accepted", value: { commandId: request.commandId } });
+    wake.onReady?.();
+    await done;
+  } finally {
+    controller.abort();
+    host.finished.add(request.invocationId);
+    if (host.finished.size > 4096) host.finished.delete(host.finished.values().next().value!);
+    void execution.finally(() => {
+      if (host.virtualThreads.get(threadKey)?.invocationId === request.invocationId)
+        host.virtualThreads.delete(threadKey);
+    });
+    wake.signal?.removeEventListener("abort", abort);
+    controller.signal.removeEventListener("abort", rejectAborted);
+    void controls;
+    await context.report({
+      case: "stopped",
+      value: { pendingInputIds: context.pendingInputIds() },
+    });
+    void telemetry.end(traceFailed);
+  }
+}
+
+/**
+ * Create a ConnectRPC agent service for hosts woken over HTTP. The handler's return value
+ * is intentionally ignored. Invoke is a wake: the response stream stays open until the
+ * invocation ends (serverless platforms need the request alive) and echoes acceptance for
+ * legacy gateways, while reasoning and the end of the run are reported through RunService.
+ */
+export function createAgentHandler(options: HandlerOptions): ReturnType<typeof connectNodeAdapter> {
+  if (options.signingKey.length < 32) throw new Error("A caller-generated signing key is required");
+  initializeTracing(options.tracing === "existing");
+  const host = createHostState();
   const handler = connectNodeAdapter({
     requestPathPrefix: options.pathPrefix,
     routes: (router) =>
       router.service(AgentHostService, {
         async *invoke(request, ctx) {
           verify(InvokeRequestSchema, request, ctx, options.signingKey, "Invoke");
-          if (finished.has(request.invocationId))
-            throw new ConnectError("Invocation already accepted", Code.AlreadyExists);
-          const threadKey = `${request.agentId}:${request.threadId}`;
-          for (;;) {
-            const previous = virtualThreads.get(threadKey);
-            if (!previous) break;
-            if (previous.generation >= request.assignmentGeneration)
-              throw new ConnectError(
-                "Conversation already has an active invocation",
-                Code.AlreadyExists,
-              );
-            previous.controller.abort(new StopLoop());
-            await previous.completion;
-            ctx.signal.throwIfAborted();
-            if (virtualThreads.get(threadKey) === previous) virtualThreads.delete(threadKey);
-            // Another request may have acquired the thread while we awaited.
-          }
-          const controller = new AbortController();
-          const output = new Queue<{
-            reasoningDelta?: string;
-            stopped?: boolean;
-          }>();
-          controller.signal.addEventListener("abort", () => output.end(), {
-            once: true,
+          let accepted!: () => void;
+          const ready = new Promise<void>((resolve) => {
+            accepted = resolve;
           });
-          const abort = () => controller.abort(ctx.signal.reason);
-          ctx.signal.addEventListener("abort", abort, { once: true });
-          const context = new AgentContext(request, controller, output);
-          let resolveReady!: () => void;
-          let rejectReady!: (error: unknown) => void;
-          const ready = new Promise<void>((resolve, reject) => {
-            resolveReady = resolve;
-            rejectReady = reject;
+          const invocation = runInvocation(request, options, host, {
+            headers: ctx.requestHeader,
+            signal: ctx.signal,
+            onReady: accepted,
           });
-          const rejectAborted = () =>
-            rejectReady(
-              controller.signal.reason instanceof ConnectError
-                ? controller.signal.reason
-                : new ConnectError("Invocation is no longer active", Code.Canceled),
-            );
-          controller.signal.addEventListener("abort", rejectAborted, { once: true });
-          const controls = context
-            .consumeControls(resolveReady, options.checkpoint)
-            .catch((error) => {
-              rejectReady(error);
-              output.end(ConnectError.from(error));
-              controller.abort(error);
-            });
-          const telemetry = invocationTracing(request, ctx.requestHeader, () =>
-            context.traceAuthorization(),
-          );
-          let traceFailed = false;
-          const execution = telemetry.run(async () => {
-            try {
-              await ready;
-              await context.refreshTools();
-              controller.signal.throwIfAborted();
-              await options.run(context);
-              await context.settleSuspension();
-              output.end();
-            } catch (error) {
-              traceFailed = !(error instanceof StopLoop || controller.signal.aborted);
-              output.end(
-                error instanceof StopLoop || controller.signal.aborted
-                  ? undefined
-                  : new ConnectError("Agent execution failed", Code.Internal),
-              );
-            }
-          });
-          virtualThreads.set(threadKey, {
-            invocationId: request.invocationId,
-            generation: request.assignmentGeneration,
-            controller,
-            completion: execution,
-          });
-          try {
-            await ready;
-            if (request.commandId) yield { acceptedCommandId: request.commandId };
-            for await (const value of output.read()) yield value;
-            finished.add(request.invocationId);
-            yield { stopped: true, pendingInputIds: context.pendingInputIds() };
-          } finally {
-            controller.abort();
-            output.end();
-            finished.add(request.invocationId);
-            if (finished.size > 4096) finished.delete(finished.values().next().value!);
-            void execution.finally(() => {
-              if (virtualThreads.get(threadKey)?.invocationId === request.invocationId)
-                virtualThreads.delete(threadKey);
-            });
-            ctx.signal.removeEventListener("abort", abort);
-            controller.signal.removeEventListener("abort", rejectAborted);
-            void controls;
-            void telemetry.end(traceFailed);
-            void execution;
-          }
+          // A failure before controls are ready surfaces on the wake; afterwards the stream
+          // only keeps the request alive.
+          await Promise.race([ready, invocation]);
+          if (request.commandId) yield { acceptedCommandId: request.commandId };
+          await invocation;
         },
         async healthz(_request, ctx) {
           try {
@@ -845,6 +903,134 @@ export function createAgentHandler(options: {
 }
 
 /** Standalone host wrapper; serverless deployments export createAgentHandler(). */
-export function createAgentServer(options: Parameters<typeof createAgentHandler>[0]) {
+export function createAgentServer(options: HandlerOptions) {
   return createServer(createAgentHandler(options));
+}
+
+/** Options for hosts that dial in to Tilde instead of exposing an endpoint. */
+export type ConnectAgentOptions = Omit<HandlerOptions, "signingKey" | "pathPrefix" | "healthz"> & {
+  /** Accepted for parity with HandlerOptions; stream wakes are authenticated by the deployment token. */
+  signingKey?: string;
+  /** Tilde's runtime listener root, for example https://tilde.example.com/runtime. */
+  gatewayUrl: string;
+  /** Deployment token from the Deployments tab or RegisterDeployment. */
+  deploymentToken: string;
+  /** Stable per-process identity; defaults to a random UUID. */
+  instanceId?: string;
+  /** Optional URL advertised to the gateway when this host is also reachable inbound. */
+  publicUrl?: string;
+  /** Receive registration details when the gateway acknowledges Watch. */
+  onRegistered?: (registration: RunRegistered) => void;
+};
+export type ConnectedAgent = {
+  readonly instanceId: string;
+  /** Last registration acknowledged by the gateway, if any. */
+  readonly registration: RunRegistered | undefined;
+  /** Stop watching and heartbeating; active invocations are stopped and reported. */
+  close(): Promise<void>;
+};
+
+/**
+ * Long-running host: open RunService.Watch with the deployment token, run every wake frame
+ * concurrently, heartbeat every 3 seconds and reconnect after 1 second whenever the stream
+ * ends, until close() is called. No inbound endpoint or signing key is required.
+ */
+export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
+  initializeTracing(options.tracing === "existing");
+  const host = createHostState();
+  const instanceId = options.instanceId ?? randomUUID();
+  const client = connectClient(
+    RunService,
+    createConnectTransport({
+      baseUrl: options.gatewayUrl,
+      httpVersion: "2",
+      interceptors: [tracingInterceptor],
+    }),
+  );
+  const headers = new Headers({ authorization: `Bearer ${options.deploymentToken}` });
+  const closed = new AbortController();
+  const active = new Set<Promise<void>>();
+  let registration: RunRegistered | undefined;
+  const heartbeat = setInterval(async () => {
+    try {
+      await client.heartbeat(
+        { instanceId, ready: true },
+        { headers, signal: closed.signal, timeoutMs: 5_000 },
+      );
+    } catch (error) {
+      if (!closed.signal.aborted)
+        console.warn(`[tilde] heartbeat for instance ${instanceId} failed:`, ConnectError.from(error).message);
+    }
+  }, 3_000);
+  const watching = (async () => {
+    while (!closed.signal.aborted) {
+      try {
+        for await (const frame of client.watch(
+          { instanceId, publicUrl: options.publicUrl ?? "" },
+          { headers, signal: closed.signal },
+        )) {
+          switch (frame.frame.case) {
+            case "registered":
+              registration = frame.frame.value;
+              options.onRegistered?.(registration);
+              break;
+            case "wake": {
+              const request = frame.frame.value;
+              const invocation = runInvocation(request, options, host, { signal: closed.signal })
+                .catch((error) => {
+                  console.warn(
+                    `[tilde] invocation ${request.invocationId} ended with an error:`,
+                    ConnectError.from(error).message,
+                  );
+                })
+                .finally(() => active.delete(invocation));
+              active.add(invocation);
+              break;
+            }
+            default:
+              break;
+          }
+        }
+      } catch (error) {
+        if (closed.signal.aborted) break;
+        console.warn(`[tilde] watch for instance ${instanceId} failed:`, ConnectError.from(error).message);
+      }
+      if (closed.signal.aborted) break;
+      await sleep(1_000, undefined, { signal: closed.signal }).catch(() => {});
+    }
+  })();
+  return {
+    instanceId,
+    get registration() {
+      return registration;
+    },
+    async close() {
+      clearInterval(heartbeat);
+      closed.abort(new StopLoop());
+      await watching;
+      await Promise.allSettled(active);
+    },
+  };
+}
+
+/**
+ * AWS Lambda host: the event is the JSON-encoded InvokeRequest delivered by the cloud invoke
+ * API, which authenticates the wake. Runs the invocation to completion and reports through
+ * RunService; failures are reported there and logged rather than rethrown, so the platform
+ * does not retry an invocation that already ended.
+ */
+export function createLambdaHandler(options: InvocationOptions): (event: unknown) => Promise<void> {
+  initializeTracing(options.tracing === "existing");
+  const host = createHostState();
+  return async (event) => {
+    const request = fromJson(InvokeRequestSchema, event as JsonValue);
+    try {
+      await runInvocation(request, options, host);
+    } catch (error) {
+      console.warn(
+        `[tilde] invocation ${request.invocationId} ended with an error:`,
+        ConnectError.from(error).message,
+      );
+    }
+  };
 }

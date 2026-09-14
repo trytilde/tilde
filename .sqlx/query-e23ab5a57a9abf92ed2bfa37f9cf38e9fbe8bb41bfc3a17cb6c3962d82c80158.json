@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT i.id,i.run_id,i.thread_id,i.agent_id,i.status,r.objective,COALESCE(d.endpoint_url,a.endpoint_url) AS \"endpoint_url?\",a.webhook_signing_key FROM chat_invocations i JOIN chat_runs r ON r.id=i.run_id JOIN agents a ON a.id=i.agent_id LEFT JOIN agent_deployments d ON d.id=i.deployment_id AND d.target='direct' WHERE i.id=$1;\n",
+  "query": "SELECT i.id,i.run_id,i.thread_id,i.agent_id,i.status,r.objective,COALESCE(d.endpoint_url,a.endpoint_url) AS \"endpoint_url?\",a.webhook_signing_key,\n i.deployment_id AS \"deployment_id?\",d.target AS \"target?\",d.target_reference AS \"target_reference?\"\nFROM chat_invocations i JOIN chat_runs r ON r.id=i.run_id JOIN agents a ON a.id=i.agent_id LEFT JOIN agent_deployments d ON d.id=i.deployment_id WHERE i.id=$1;\n",
   "describe": {
     "columns": [
       {
@@ -42,6 +42,21 @@
         "ordinal": 7,
         "name": "webhook_signing_key",
         "type_info": "Bytea"
+      },
+      {
+        "ordinal": 8,
+        "name": "deployment_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "target?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "target_reference?",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -57,8 +72,11 @@
       false,
       false,
       null,
-      false
+      false,
+      true,
+      false,
+      true
     ]
   },
-  "hash": "aa2e82ffdbb50ae8ea8cf1c7e9de1725453f14ed1c80393e74ce0acdce43297f"
+  "hash": "e23ab5a57a9abf92ed2bfa37f9cf38e9fbe8bb41bfc3a17cb6c3962d82c80158"
 }

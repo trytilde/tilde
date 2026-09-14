@@ -17,6 +17,21 @@ export declare const file_tilde_agent_host_v1_agent: GenFile;
  */
 export declare type InvokeRequest = Message<"tilde.agent_host.v1.InvokeRequest"> & {
   /**
+   * @generated from field: string deployment_id = 15;
+   */
+  deploymentId: string;
+
+  /**
+   * @generated from field: string traceparent = 16;
+   */
+  traceparent: string;
+
+  /**
+   * @generated from field: string tracestate = 17;
+   */
+  tracestate: string;
+
+  /**
    * @generated from field: string command_id = 12;
    */
   commandId: string;

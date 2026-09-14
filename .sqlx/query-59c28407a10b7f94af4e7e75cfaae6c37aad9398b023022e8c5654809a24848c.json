@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sidecar_directives SET acked_at=NOW() WHERE id=$1 AND agent_id=$2 AND acked_at IS NULL RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "59c28407a10b7f94af4e7e75cfaae6c37aad9398b023022e8c5654809a24848c"
+}

@@ -243,7 +243,10 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
                 seen.retain(|id|commands.iter().any(|c|&c.id==id));
                 for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop|Kind::Suspend));if seen.insert(command.id.clone()){yield command;}
                     if terminal{return;}}
-                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value};
+                // The open command stream is the host's liveness for this invocation: it
+                // renews the lease that expiry would otherwise reclaim.
+                let renew=tokio::time::sleep(Duration::from_secs(10));
+                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value,_=renew=>Some(chat.renew_lease(claims.invocation_id).await)};
                 match update{Some(value)=>value?,None=>break}
             }
         })

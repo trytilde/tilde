@@ -4,6 +4,7 @@ import "tilde/types/v1/agent.proto";
 import "tilde/types/v1/access.proto";
 import "tilde/types/v1/chat.proto";
 import "tilde/types/v1/runtime_event.proto";
+import "tilde/agent_host/v1/agent.proto";
 // Sidecars dial the gateway; every call authenticates one agent deployment token.
 // The gateway never opens a connection to a sidecar. Postgres is the record; a
 // replica is a cache plus a write-behind queue plus the executor for the threads
@@ -32,7 +33,7 @@ message Ping {}
 // Who executes a (thread, agent) pair. `held` is false when nobody does.
 message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; reserved 2; }
 // Gateway-originated work for one replica, acknowledged with a DirectiveResult.
-message Directive { string id = 1; string thread_id = 2; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RelayMessage relay = 13; } }
+message Directive { string id = 1; string thread_id = 2; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RelayMessage relay = 13; tilde.agent_host.v1.InvokeRequest wake = 14; } }
 // A completed message authored elsewhere in a room this agent participates in.
 message RelayMessage { tilde.types.v1.Thread thread = 1; tilde.types.v1.Message message = 2; }
 message IngressCall { string method = 1; string content_type = 2; bytes body = 3; string caller_token = 4 [debug_redact = true]; }

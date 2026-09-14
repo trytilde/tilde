@@ -3,6 +3,12 @@
 
 #[derive(Clone, Default)]
 pub struct InvokeRequestView<'a> {
+    /// Field 15: `deployment_id`
+    pub deployment_id: &'a str,
+    /// Field 16: `traceparent`
+    pub traceparent: &'a str,
+    /// Field 17: `tracestate`
+    pub tracestate: &'a str,
     /// Field 12: `command_id`
     pub command_id: &'a str,
     /// Field 13: `assignment_generation`
@@ -46,6 +52,9 @@ pub struct InvokeRequestView<'a> {
 impl<'a> ::core::fmt::Debug for InvokeRequestView<'a> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvokeRequestView")
+            .field("deployment_id", &self.deployment_id)
+            .field("traceparent", &self.traceparent)
+            .field("tracestate", &self.tracestate)
             .field("command_id", &self.command_id)
             .field("assignment_generation", &self.assignment_generation)
             .field("owner_instance_id", &self.owner_instance_id)
@@ -91,6 +100,27 @@ impl<'a> ::buffa::MessageView<'a> for InvokeRequestView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.deployment_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.traceparent = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.tracestate = ::buffa::types::borrow_str(&mut cur)?;
+            }
             12u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -251,6 +281,9 @@ impl<'a> ::buffa::MessageView<'a> for InvokeRequestView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::InvokeRequest {
+            deployment_id: self.deployment_id.to_string(),
+            traceparent: self.traceparent.to_string(),
+            tracestate: self.tracestate.to_string(),
             command_id: self.command_id.to_string(),
             assignment_generation: self.assignment_generation,
             owner_instance_id: self.owner_instance_id.to_string(),
@@ -357,6 +390,16 @@ impl<'a> ::buffa::ViewEncode<'a> for InvokeRequestView<'a> {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.owner_instance_id) as u64;
         }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
+        if !self.traceparent.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.traceparent) as u64;
+        }
+        if !self.tracestate.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.tracestate) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -425,6 +468,15 @@ impl<'a> ::buffa::ViewEncode<'a> for InvokeRequestView<'a> {
         if !self.owner_instance_id.is_empty() {
             ::buffa::types::put_string_field(14u32, &self.owner_instance_id, buf);
         }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(15u32, &self.deployment_id, buf);
+        }
+        if !self.traceparent.is_empty() {
+            ::buffa::types::put_string_field(16u32, &self.traceparent, buf);
+        }
+        if !self.tracestate.is_empty() {
+            ::buffa::types::put_string_field(17u32, &self.tracestate, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -446,6 +498,15 @@ impl<'__a> ::serde::Serialize for InvokeRequestView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.deployment_id) {
+            __map.serialize_entry("deploymentId", self.deployment_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.traceparent) {
+            __map.serialize_entry("traceparent", self.traceparent)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.tracestate) {
+            __map.serialize_entry("tracestate", self.tracestate)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.command_id) {
             __map.serialize_entry("commandId", self.command_id)?;
         }
@@ -588,6 +649,21 @@ impl InvokeRequestOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 15: `deployment_id`
+    #[must_use]
+    pub fn deployment_id(&self) -> &'_ str {
+        self.0.reborrow().deployment_id
+    }
+    /// Field 16: `traceparent`
+    #[must_use]
+    pub fn traceparent(&self) -> &'_ str {
+        self.0.reborrow().traceparent
+    }
+    /// Field 17: `tracestate`
+    #[must_use]
+    pub fn tracestate(&self) -> &'_ str {
+        self.0.reborrow().tracestate
     }
     /// Field 12: `command_id`
     #[must_use]

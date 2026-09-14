@@ -1,0 +1,3 @@
+kind: Added
+body: Wake-and-dial run protocol. Long-running hosts dial the gateway with their deployment token and receive wakes as frames, Lambda deployments are woken through the AWS invoke API, and every host reports acceptance, reasoning and completion through RunService with its invocation capability; the SDK gains connectAgent and createLambdaHandler.
+time: 2026-09-14T16:01:00.000000000+02:00

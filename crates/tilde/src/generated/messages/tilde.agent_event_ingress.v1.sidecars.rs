@@ -1405,6 +1405,14 @@ impl ::buffa::Message for Directive {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
+                __buffa::oneof::directive::Action::Wake(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -1444,6 +1452,14 @@ impl ::buffa::Message for Directive {
                 __buffa::oneof::directive::Action::Relay(x) => {
                     ::buffa::types::put_len_delimited_header(
                         13u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::directive::Action::Wake(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
@@ -1533,6 +1549,26 @@ impl ::buffa::Message for Directive {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.action = ::core::option::Option::Some(
                         __buffa::oneof::directive::Action::Relay(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::directive::Action::Wake(ref mut existing),
+                ) = self.action
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.action = ::core::option::Option::Some(
+                        __buffa::oneof::directive::Action::Wake(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -1688,6 +1724,32 @@ impl<'de> serde::Deserialize<'de> for Directive {
                                 }
                                 __oneof_action = Some(
                                     __buffa::oneof::directive::Action::Relay(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "wake" => {
+                            let v: ::core::option::Option<
+                                super::super::agent_host::v1::InvokeRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::agent_host::v1::InvokeRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_action.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'action'",
+                                        ),
+                                    );
+                                }
+                                __oneof_action = Some(
+                                    __buffa::oneof::directive::Action::Wake(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
