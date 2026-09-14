@@ -1,39 +1,170 @@
 @import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/bricolage-grotesque";
 @source "./**/*.{tsx,js}";
+
+/* Shared by the app and every bundled setup/verification iframe.
+   Brand source: tilde-marketing/campaign-manager/src/app/{globals,enterprise-home}.css.
+   Marketing's --muted is text; shadcn's --muted is a surface, so map it explicitly. */
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
+  --font-heading: "Bricolage Grotesque Variable", var(--font-sans);
+  --font-mono: "Geist Mono Variable", "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "Geist Variable", sans-serif;
+  --color-espresso: var(--espresso);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-butter: var(--butter);
+  --color-paper: var(--paper);
+  --color-forest: var(--forest);
+  --color-purple-haze: var(--purple-haze);
+  --color-sienna: var(--sienna);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
 }
+
 :root {
-  --background: #fff;
-  --foreground: #18181b;
-  --primary: #18181b;
-  --primary-foreground: #fff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #27272a;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --border: #e4e4e7;
-  --input: #d4d4d8;
-  --ring: #a1a1aa;
-  --destructive: #dc2626;
+  color-scheme: light;
+  --espresso: #3e2723;
+  --blue: #0038ae;
+  --blue-soft: #89c0ff;
+  --butter: #ffe7c4;
+  --paper: #faf9f5;
+  --white: #ffffff;
+  --forest: #032e1a;
+  --purple-haze: #7a697d;
+  --sienna: #c1630f;
+  --line: #d9dde3;
+  --line-strong: #b9b1ab;
+  --brand-muted: #686068;
+
+  --background: var(--white);
+  --foreground: var(--espresso);
+  --card: var(--white);
+  --card-foreground: var(--espresso);
+  --popover: var(--white);
+  --popover-foreground: var(--espresso);
+  --primary: var(--blue);
+  --primary-foreground: var(--white);
+  --secondary: var(--butter);
+  --secondary-foreground: var(--espresso);
+  --muted: color-mix(in srgb, var(--espresso) 5%, var(--paper));
+  --muted-foreground: var(--brand-muted);
+  --accent: color-mix(in srgb, var(--blue) 8%, var(--white));
+  --accent-foreground: var(--blue);
+  --destructive: #b42318;
+  --success: var(--forest);
+  --warning: color-mix(in srgb, var(--sienna) 85%, var(--espresso));
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--blue-soft);
+  --chart-1: var(--blue);
+  --chart-2: var(--forest);
+  --chart-3: var(--sienna);
+  --chart-4: var(--purple-haze);
+  --chart-5: var(--blue-soft);
   --radius: 0.5rem;
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--espresso);
+  --sidebar-primary: var(--blue);
+  --sidebar-primary-foreground: var(--white);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--blue);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--blue-soft);
 }
+
+/* The marketing site is light-only. Retain app dark-mode support using its palette. */
+.dark {
+  color-scheme: dark;
+  --background: #211714;
+  --foreground: var(--paper);
+  --card: #30211d;
+  --card-foreground: var(--paper);
+  --popover: #30211d;
+  --popover-foreground: var(--paper);
+  --primary: var(--blue-soft);
+  --primary-foreground: var(--espresso);
+  --secondary: var(--espresso);
+  --secondary-foreground: var(--butter);
+  --muted: #30211d;
+  --muted-foreground: #b9b1ab;
+  --accent: var(--espresso);
+  --accent-foreground: var(--butter);
+  --destructive: #ff9b8f;
+  --success: #99c9a8;
+  --warning: var(--butter);
+  --border: color-mix(in srgb, var(--paper) 18%, transparent);
+  --input: color-mix(in srgb, var(--paper) 30%, transparent);
+  --ring: var(--blue-soft);
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--paper);
+  --sidebar-primary: var(--blue-soft);
+  --sidebar-primary-foreground: var(--espresso);
+  --sidebar-accent: var(--espresso);
+  --sidebar-accent-foreground: var(--butter);
+  --sidebar-border: var(--border);
+}
+
 @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    font-synthesis: none;
+    -webkit-font-smoothing: antialiased;
+  }
   body {
     margin: 0;
-    background: var(--background);
-    color: var(--foreground);
-    font-family: system-ui, sans-serif;
+    @apply bg-background text-foreground;
+  }
+  h1,
+  h2 {
+    @apply font-heading;
+  }
+  ::selection {
+    background: var(--butter);
+    color: var(--espresso);
   }
 }

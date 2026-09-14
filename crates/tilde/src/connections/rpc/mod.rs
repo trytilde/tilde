@@ -21,6 +21,9 @@ pub(super) fn driver_number(driver: m::Driver) -> i32 {
 }
 pub(super) fn provider_wire(provider: m::Provider) -> types::Provider {
     types::Provider {
+        account_name_label: provider.account_name_label,
+        icon_url: provider.icon_url,
+        instructions: provider.instructions,
         id: provider.id,
         name: provider.name,
         kind: Some(match provider.kind {
@@ -239,6 +242,9 @@ pub(super) fn provider_model(provider: types::Provider) -> Result<m::Provider, E
         });
     }
     Ok(m::Provider {
+        account_name_label: provider.account_name_label,
+        icon_url: provider.icon_url,
+        instructions: provider.instructions,
         id: provider.id,
         name: provider.name,
         kind: match provider.kind {
@@ -323,6 +329,11 @@ pub(super) fn broker_wire(view: m::BrokerView) -> setup_pb::Brokering {
         m::Action::Cancelled => Action::Cancelled(Box::default()),
     };
     setup_pb::Brokering {
+        setup_instructions: view.setup_instructions,
+        provider_name: view.provider_name,
+        account_name_label: view.account_name_label,
+        icon_url: view.icon_url,
+        instructions: view.instructions,
         webhook_url: view.webhook_url,
         setup_id: view.setup_id.to_string(),
         connection_id: view.connection_id.to_string(),

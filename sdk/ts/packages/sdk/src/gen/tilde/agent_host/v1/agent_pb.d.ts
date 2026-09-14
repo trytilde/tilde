@@ -17,6 +17,26 @@ export declare const file_tilde_agent_host_v1_agent: GenFile;
  */
 export declare type InvokeRequest = Message<"tilde.agent_host.v1.InvokeRequest"> & {
   /**
+   * @generated from field: string command_id = 12;
+   */
+  commandId: string;
+
+  /**
+   * @generated from field: uint64 assignment_generation = 13;
+   */
+  assignmentGeneration: bigint;
+
+  /**
+   * @generated from field: string owner_instance_id = 14;
+   */
+  ownerInstanceId: string;
+
+  /**
+   * @generated from field: int64 agent_generation = 11;
+   */
+  agentGeneration: bigint;
+
+  /**
    * @generated from field: string invocation_id = 1;
    */
   invocationId: string;
@@ -78,6 +98,11 @@ export declare const InvokeRequestSchema: GenMessage<InvokeRequest>;
  */
 export declare type InvokeResponse = Message<"tilde.agent_host.v1.InvokeResponse"> & {
   /**
+   * @generated from field: string accepted_command_id = 4;
+   */
+  acceptedCommandId: string;
+
+  /**
    * @generated from field: string reasoning_delta = 1;
    */
   reasoningDelta: string;
@@ -98,77 +123,6 @@ export declare type InvokeResponse = Message<"tilde.agent_host.v1.InvokeResponse
  * Use `create(InvokeResponseSchema)` to create a new message.
  */
 export declare const InvokeResponseSchema: GenMessage<InvokeResponse>;
-
-/**
- * @generated from message tilde.agent_host.v1.SteerRequest
- */
-export declare type SteerRequest = Message<"tilde.agent_host.v1.SteerRequest"> & {
-  /**
-   * @generated from field: string invocation_id = 1;
-   */
-  invocationId: string;
-
-  /**
-   * @generated from field: string input_id = 2;
-   */
-  inputId: string;
-
-  /**
-   * @generated from field: string text = 3;
-   */
-  text: string;
-
-  /**
-   * @generated from field: tilde.types.v1.Message message = 4;
-   */
-  message?: Message$1 | undefined;
-};
-
-/**
- * Describes the message tilde.agent_host.v1.SteerRequest.
- * Use `create(SteerRequestSchema)` to create a new message.
- */
-export declare const SteerRequestSchema: GenMessage<SteerRequest>;
-
-/**
- * @generated from message tilde.agent_host.v1.SteerResponse
- */
-export declare type SteerResponse = Message<"tilde.agent_host.v1.SteerResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_host.v1.SteerResponse.
- * Use `create(SteerResponseSchema)` to create a new message.
- */
-export declare const SteerResponseSchema: GenMessage<SteerResponse>;
-
-/**
- * @generated from message tilde.agent_host.v1.CancelRequest
- */
-export declare type CancelRequest = Message<"tilde.agent_host.v1.CancelRequest"> & {
-  /**
-   * @generated from field: string invocation_id = 1;
-   */
-  invocationId: string;
-};
-
-/**
- * Describes the message tilde.agent_host.v1.CancelRequest.
- * Use `create(CancelRequestSchema)` to create a new message.
- */
-export declare const CancelRequestSchema: GenMessage<CancelRequest>;
-
-/**
- * @generated from message tilde.agent_host.v1.CancelResponse
- */
-export declare type CancelResponse = Message<"tilde.agent_host.v1.CancelResponse"> & {
-};
-
-/**
- * Describes the message tilde.agent_host.v1.CancelResponse.
- * Use `create(CancelResponseSchema)` to create a new message.
- */
-export declare const CancelResponseSchema: GenMessage<CancelResponse>;
 
 /**
  * @generated from message tilde.agent_host.v1.HealthzRequest
@@ -209,22 +163,6 @@ export declare const AgentService: GenService<{
     methodKind: "server_streaming";
     input: typeof InvokeRequestSchema;
     output: typeof InvokeResponseSchema;
-  },
-  /**
-   * @generated from rpc tilde.agent_host.v1.AgentService.Steer
-   */
-  steer: {
-    methodKind: "unary";
-    input: typeof SteerRequestSchema;
-    output: typeof SteerResponseSchema;
-  },
-  /**
-   * @generated from rpc tilde.agent_host.v1.AgentService.Cancel
-   */
-  cancel: {
-    methodKind: "unary";
-    input: typeof CancelRequestSchema;
-    output: typeof CancelResponseSchema;
   },
   /**
    * @generated from rpc tilde.agent_host.v1.AgentService.Healthz

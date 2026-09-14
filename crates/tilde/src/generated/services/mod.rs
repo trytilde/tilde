@@ -5,12 +5,30 @@
 pub mod tilde {
     use super::*;
     #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
+    pub mod agent_event_ingress {
+        use super::*;
+        #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
+        pub mod v1 {
+            use super::*;
+            include!("tilde.agent_event_ingress.v1.mod.rs");
+        }
+    }
+    #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
     pub mod agent_host {
         use super::*;
         #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
         pub mod v1 {
             use super::*;
             include!("tilde.agent_host.v1.mod.rs");
+        }
+    }
+    #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
+    pub mod ingress {
+        use super::*;
+        #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]
+        pub mod v1 {
+            use super::*;
+            include!("tilde.ingress.v1.mod.rs");
         }
     }
     #[allow(non_camel_case_types, dead_code, unused_imports, unused_qualifications, clippy::derivable_impls, clippy::match_single_binding, clippy::uninlined_format_args, clippy::doc_lazy_continuation, clippy::module_inception)]

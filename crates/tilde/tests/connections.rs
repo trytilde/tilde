@@ -52,6 +52,9 @@ fn custom(id: &str, driver: Driver, oauth: Option<OAuth>) -> Provider {
         Driver::Custom => CredentialSource::Custom,
     };
     Provider {
+        account_name_label: None,
+        icon_url: None,
+        instructions: None,
         id: id.into(),
         name: "Custom account".into(),
         kind: ProviderKind::Configured,
@@ -107,6 +110,7 @@ async fn service(db: &Database) -> Connections {
         db.pool.clone(),
         Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
         "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
     )
     .unwrap()
 }
@@ -122,6 +126,8 @@ async fn custom_fields_are_encrypted_durable_and_reconnect_is_atomic() {
         .unwrap();
     let mut replacement = custom("custom/acme", Driver::Static, None);
     replacement.name = "Updated account".into();
+    replacement.icon_url = Some("https://cdn.example.com/acme.svg".into());
+    replacement.instructions = Some("Use the API key from your Acme account.".into());
     service.register_provider(replacement, None).await.unwrap();
     assert_eq!(
         service.provider("custom/acme").await.unwrap().name,
@@ -139,6 +145,21 @@ async fn custom_fields_are_encrypted_durable_and_reconnect_is_atomic() {
         .await
         .unwrap();
     let (flow, token) = parse_brokering_url(&start.brokering_url);
+    let presentation = service.view(flow, &token).await.unwrap();
+    assert_eq!(
+        presentation.icon_url.as_deref(),
+        Some("https://cdn.example.com/acme.svg")
+    );
+    assert_eq!(
+        presentation.instructions.as_deref(),
+        Some("Use the API key from your Acme account.")
+    );
+    let catalog = service.provider("custom/acme").await.unwrap();
+    assert_eq!(catalog.icon_url, presentation.icon_url);
+    assert_eq!(catalog.instructions, presentation.instructions);
+    assert!(presentation.setup_instructions.is_empty());
+    assert!(presentation.webhook_url.is_none());
+
     assert_eq!(
         service
             .start(id, "Account", "custom/acme", "account", &[])
@@ -206,6 +227,7 @@ async fn custom_fields_are_encrypted_durable_and_reconnect_is_atomic() {
         db.pool.clone(),
         Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
         "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
     )
     .unwrap();
     assert_eq!(
@@ -361,6 +383,12 @@ async fn slack_create(State(state): State<Fixture>, Json(body): Json<Value>) -> 
             .unwrap()
             .iter()
             .any(|v| v == "chat:write")
+    );
+    assert!(
+        manifest["settings"]["event_subscriptions"]["request_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://ingress.example/connections/webhooks/")
     );
     state.calls.lock().unwrap().push("slack-create".into());
     Json(
@@ -543,6 +571,7 @@ async fn github_and_slack_apps_use_the_broker_and_type_scoped_channel_capability
         db.pool.clone(),
         Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
         "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
         endpoints,
     )
     .unwrap();
@@ -570,6 +599,19 @@ async fn github_and_slack_apps_use_the_broker_and_type_scoped_channel_capability
         )
         .await
         .unwrap();
+    if let Action::FormPost { fields, .. } = &view.action {
+        let manifest: serde_json::Value =
+            serde_json::from_str(&fields.iter().find(|(key, _)| key == "manifest").unwrap().1)
+                .unwrap();
+        assert_eq!(
+            manifest["hook_attributes"]["url"],
+            format!("https://ingress.example/connections/webhooks/{id}")
+        );
+        assert_eq!(
+            manifest["redirect_url"],
+            "http://127.0.0.1:18888/connections/callback"
+        );
+    }
     assert!(matches!(view.action, Action::FormPost { .. }));
     let (_, state_token) = callback_state(&view.action);
     service
@@ -813,6 +855,7 @@ async fn generated_client_and_native_callback_use_the_same_durable_broker() {
         db.pool.clone(),
         Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
         origin.clone(),
+        "https://ingress.example".into(),
     )
     .unwrap();
     service.seed().await.unwrap();
@@ -1004,6 +1047,7 @@ async fn provider_owned_forms_still_require_valid_credentials_without_ui_descrip
         let (id, connection_setup_token) = parse_brokering_url(&started.brokering_url);
         let state = service.view(id, &connection_setup_token).await.unwrap();
         assert_eq!(state.ui_path, "/catalog/_standard/ui");
+        assert!(!state.setup_instructions.is_empty());
         assert!(
             service
                 .advance(id, &connection_setup_token, state.action_id, Values::new())
@@ -1033,6 +1077,7 @@ async fn remote_provider_sdk_drafts_callbacks_assets_and_cancel_are_end_to_end()
         db.pool.clone(),
         Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
         origin.clone(),
+        "https://ingress.example".into(),
     )
     .unwrap();
     let router = tilde::connections::rpc::management::router(service.clone())
@@ -1247,8 +1292,13 @@ async fn unversioned_provider_migration_preserves_encrypted_backend_credentials(
         plaintext.expose_secret(),
         "legacy-backend-credential-0123456789"
     );
-    let service =
-        Connections::new(db.pool.clone(), crypto, "http://127.0.0.1:18888".into()).unwrap();
+    let service = Connections::new(
+        db.pool.clone(),
+        crypto,
+        "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     let provider = service.provider(provider_id).await.unwrap();
     assert!(matches!(provider.kind, ProviderKind::Remote(_)));
     assert_eq!(provider.categories, vec!["other"]);
@@ -1437,6 +1487,194 @@ async fn oauth_additional_signing_key_uses_standard_inputs_and_shared_callback()
         service.resolve(started.connection.id).await.unwrap()["signing_secret"].expose_secret(),
         "private-signing-secret"
     );
+    server.abort();
+    db.close().await;
+}
+
+#[tokio::test]
+async fn account_name_is_scoped_to_setup_and_never_becomes_a_credential() {
+    let db = Database::new().await;
+    let service = service(&db).await;
+    let mut provider = custom("named-account", Driver::Static, None);
+    provider.account_name_label = Some("Acme account".into());
+    service.register_provider(provider, None).await.unwrap();
+    let started = service
+        .start(Uuid::new_v4(), "Temporary", "named-account", "account", &[])
+        .await
+        .unwrap();
+    let (id, token) = parse_brokering_url(&started.brokering_url);
+    let initial = service.view(id, &token).await.unwrap();
+    assert_eq!(initial.account_name_label, "Acme account");
+    assert!(
+        service
+            .set_connection_name(id, "wrong-token", initial.action_id, "Spoofed")
+            .await
+            .is_err()
+    );
+    let named = service
+        .set_connection_name(id, &token, initial.action_id, "  Personal account  ")
+        .await
+        .unwrap();
+    assert_eq!(named.connection_name, "Personal account");
+    assert_ne!(named.action_id, initial.action_id);
+    assert!(
+        service
+            .set_connection_name(id, &token, initial.action_id, "Stale write")
+            .await
+            .is_err()
+    );
+    let complete = service
+        .save_credentials(
+            id,
+            &token,
+            named.action_id,
+            values(&[("strange_secret-key", "private-key"), ("workspace", "work")]),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(complete.action, Action::Complete));
+    assert_eq!(
+        service.get(started.connection.id).await.unwrap().name,
+        "Personal account"
+    );
+    let credentials = service.resolve(started.connection.id).await.unwrap();
+    assert!(!credentials.contains_key("name"));
+    assert!(!credentials.contains_key("account_name"));
+    assert!(
+        service
+            .set_connection_name(id, &token, complete.action_id, "After completion")
+            .await
+            .is_err()
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+async fn account_name_bindings_share_projection_validation_and_encrypted_staging() {
+    let db = Database::new().await;
+    let app = Router::new()
+        .route(
+            "/inboxes/assistant@agentmail.to",
+            get(|| async { Json(json!({})) }),
+        )
+        .route("/phone-numbers", get(|| async { Json(json!({})) }))
+        .route(
+            "/messaging_profiles/profile",
+            get(|| async { Json(json!({})) }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let service = Connections::with_endpoints(
+        db.pool.clone(),
+        Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
+        "http://127.0.0.1:18888".into(),
+        "https://ingress.example".into(),
+        Endpoints(BTreeMap::from([
+            ("agentmail_api".into(), origin.clone()),
+            ("linq_api".into(), origin.clone()),
+            ("telnyx_api".into(), origin),
+        ])),
+    )
+    .unwrap();
+    service.seed().await.unwrap();
+    let public_key = base64::engine::general_purpose::STANDARD.encode([1; 32]);
+    for (provider, typ, field, account, credentials) in [
+        (
+            "agentmail",
+            "inbox",
+            "inbox_id",
+            "assistant@agentmail.to",
+            values(&[
+                ("api_key", "inbox-scoped-key"),
+                ("webhook_secret", "signing-secret"),
+            ]),
+        ),
+        (
+            "linq",
+            "account",
+            "phone_number",
+            "+15550001111",
+            values(&[
+                ("api_token", "linq-key"),
+                ("webhook_signing_secret", "signing-secret"),
+            ]),
+        ),
+        (
+            "telnyx",
+            "whatsapp",
+            "phone_number",
+            "+15550002222",
+            values(&[
+                ("api_key", "telnyx-key"),
+                ("messaging_profile_id", "profile"),
+                ("public_key", public_key.as_str()),
+            ]),
+        ),
+    ] {
+        let start = service
+            .start(Uuid::new_v4(), provider, provider, typ, &[])
+            .await
+            .unwrap();
+        let (id, token) = parse_brokering_url(&start.brokering_url);
+        let initial = service.view(id, &token).await.unwrap();
+        if provider == "agentmail" {
+            assert_eq!(initial.setup_instructions.len(), 4);
+            assert!(initial.setup_instructions[2].contains("all received events"));
+        }
+        let schema = initial.input_schema.as_ref().unwrap();
+        assert!(schema["properties"].get(field).is_none());
+        assert!(
+            !schema["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|value| value.as_str() == Some(field))
+        );
+        assert_eq!(
+            initial.webhook_url,
+            Some(format!(
+                "https://ingress.example/connections/webhooks/{}",
+                start.connection.id
+            ))
+        );
+        let mut action = initial.action_id;
+        if field == "phone_number" {
+            let invalid = service
+                .set_connection_name(id, &token, action, "not-a-phone-number")
+                .await
+                .unwrap();
+            assert!(
+                service
+                    .advance(id, &token, invalid.action_id, credentials.clone())
+                    .await
+                    .is_err()
+            );
+            let after = service.view(id, &token).await.unwrap();
+            assert_eq!(after.step, "fields");
+            action = after.action_id;
+        }
+        let named = service
+            .set_connection_name(id, &token, action, account)
+            .await
+            .unwrap();
+        let mut spoofed = credentials.clone();
+        spoofed.insert(field.into(), SecretString::from("another-account"));
+        assert!(
+            service
+                .advance(id, &token, named.action_id, spoofed)
+                .await
+                .is_err()
+        );
+        let completed = service
+            .advance(id, &token, named.action_id, credentials)
+            .await
+            .unwrap();
+        assert!(matches!(completed.action, Action::Complete));
+        let resolved = service.resolve(start.connection.id).await.unwrap();
+        assert_eq!(resolved[field].expose_secret(), account);
+        drop(resolved);
+    }
     server.abort();
     db.close().await;
 }

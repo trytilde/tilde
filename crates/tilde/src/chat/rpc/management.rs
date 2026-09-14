@@ -38,7 +38,7 @@ impl ChatService for Rpc {
             cursor,
             i64::from(size) + 1
         )
-        .fetch_all(&self.0.pool)
+        .fetch_all(self.0.pg()?)
         .await
         .map_err(crate::chat::ChatError::from)?;
         let more = rows.len() > size as usize;
@@ -280,6 +280,16 @@ impl ChatService for Rpc {
             ..Default::default()
         })
     }
+    async fn suspend_invocation<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        r: ServiceRequest<'_, management::SuspendInvocationRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::SuspendInvocationResponse> + Send + use<'a>,
+    > {
+        self.0.suspend_invocation(id(r.invocation_id)?).await?;
+        Response::ok(management::SuspendInvocationResponse::default())
+    }
     async fn cancel_invocation<'a>(
         &'a self,
         _ctx: RequestContext,
@@ -319,7 +329,7 @@ impl ChatService for Rpc {
         let chat = self.0.clone();
         let mut changed = chat
             .activity_notifications
-            .subscribe(&chat.pool, "tilde_chat_activity")
+            .subscribe(chat.pg()?, "tilde_chat_activity")
             .await
             .map_err(crate::chat::ChatError::from)?;
         let mut cursor = request.after_sequence;

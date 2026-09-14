@@ -9,6 +9,7 @@ pub(super) fn id(value: &str) -> Result<Uuid, Error> {
 pub(super) fn wire(
     agent: crate::agent::Agent,
     metrics: Option<types::AgentMetrics>,
+    avatar_url: Option<String>,
 ) -> types::Agent {
     let timestamp =
         |date: chrono::DateTime<chrono::Utc>| buffa_types::google::protobuf::Timestamp {
@@ -17,6 +18,9 @@ pub(super) fn wire(
             ..Default::default()
         };
     let mut result = types::Agent {
+        avatar_seed: agent.avatar_seed.to_string(),
+        avatar_url,
+        paused: agent.paused,
         capabilities: agent.capabilities.wire().into(),
         id: agent.id.to_string(),
         name: agent.name,
@@ -31,10 +35,11 @@ pub(super) fn wire(
     result
 }
 
-pub(super) async fn project(
+pub(crate) async fn project(
     agents: &Agents,
     agent: crate::agent::Agent,
 ) -> Result<types::Agent, Error> {
     let metrics = agents.metrics(&[agent.id]).await?.remove(&agent.id);
-    Ok(wire(agent, metrics))
+    let avatar_url = agents.avatar_url(&agent).await?;
+    Ok(wire(agent, metrics, avatar_url))
 }

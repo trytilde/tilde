@@ -24,10 +24,6 @@ pub mod __buffa {
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__INVOKE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__INVOKE_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__STEER_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__STEER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CANCEL_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CANCEL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__HEALTHZ_REQUEST_JSON_ANY);
         reg.register_json_any(super::__HEALTHZ_RESPONSE_JSON_ANY);
     }
@@ -40,22 +36,6 @@ pub use self::__buffa::view::InvokeRequestOwnedView;
 pub use self::__buffa::view::InvokeResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::InvokeResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::SteerRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::SteerRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::SteerResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::SteerResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CancelRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::CancelRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CancelResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::CancelResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::HealthzRequestView;
 #[doc(inline)]

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agents SET deployment_mode=$2,endpoint_url=$3,generation=generation+CASE WHEN deployment_mode<>$2 THEN 1 ELSE 0 END,updated_at=NOW() WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "94e1d6fa2ce5d6e7927888f55eb6f8feb71e11c12165cc938424039d1a264136"
+}

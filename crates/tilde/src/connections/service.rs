@@ -21,39 +21,57 @@ use uuid::Uuid;
 pub struct Connections {
     pub(crate) pool: PgPool,
     pub(super) crypto: Arc<Encryption>,
-    pub(super) public_url: String,
+    /// Browser-facing setup pages and OAuth redirects on management.
+    pub(crate) public_url: String,
+    /// Provider webhook delivery only, independently exposed from management.
+    pub(crate) public_event_ingress_url: String,
     pub(crate) http: Http,
     pub(crate) endpoints: Endpoints,
 }
 impl Connections {
-    pub fn new(pool: PgPool, crypto: Arc<Encryption>, public_url: String) -> Result<Self, Error> {
-        Self::with_endpoints(pool, crypto, public_url, Endpoints::default())
+    pub fn new(
+        pool: PgPool,
+        crypto: Arc<Encryption>,
+        public_url: String,
+        public_event_ingress_url: String,
+    ) -> Result<Self, Error> {
+        Self::with_endpoints(
+            pool,
+            crypto,
+            public_url,
+            public_event_ingress_url,
+            Endpoints::default(),
+        )
     }
     /// Explicit endpoint injection supports isolated provider fixtures without changing production config.
     pub fn with_endpoints(
         pool: PgPool,
         crypto: Arc<Encryption>,
         public_url: String,
+        public_event_ingress_url: String,
         endpoints: Endpoints,
     ) -> Result<Self, Error> {
-        let url = url::Url::parse(&public_url).map_err(|_| invalid("Invalid public URL"))?;
-        if !matches!(url.scheme(), "http" | "https")
-            || url.host_str().is_none()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.fragment().is_some()
-        {
-            return Err(invalid(
-                "Public URL must be HTTP(S) without credentials or fragment",
-            ));
-        }
-        if url.query().is_some() {
-            return Err(invalid("Public URL cannot contain a query"));
+        for origin in [&public_url, &public_event_ingress_url] {
+            let url = url::Url::parse(origin).map_err(|_| invalid("Invalid public URL"))?;
+            if !matches!(url.scheme(), "http" | "https")
+                || url.host_str().is_none()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || url.fragment().is_some()
+            {
+                return Err(invalid(
+                    "Public URL must be HTTP(S) without credentials or fragment",
+                ));
+            }
+            if url.query().is_some() {
+                return Err(invalid("Public URL cannot contain a query"));
+            }
         }
         Ok(Self {
             pool,
             crypto,
             public_url: public_url.trim_end_matches('/').into(),
+            public_event_ingress_url: public_event_ingress_url.trim_end_matches('/').into(),
             http: Http::new()?,
             endpoints,
         })
@@ -474,11 +492,40 @@ impl Connections {
         };
         let draft = self.draft(&setup).await?;
         let auth_driver = typ.driver();
-        let input_schema = typ.credential_source.input_schema();
+        let mut input_schema = typ.credential_source.input_schema();
+        if let (Some(field), Some(schema)) = (runtime.account_name_field(&typ), &mut input_schema) {
+            if let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) {
+                properties.remove(field);
+            }
+            if let Some(required) = schema.get_mut("required").and_then(|v| v.as_array_mut()) {
+                required.retain(|value| value.as_str() != Some(field));
+            }
+        }
         Ok(BrokerView {
-            webhook_url: connection
-                .channel_capable
-                .then(|| format!("{}/connections/webhooks/{}", self.public_url, connection.id)),
+            setup_instructions: runtime
+                .instructions(&typ)
+                .iter()
+                .map(|step| (*step).to_owned())
+                .collect(),
+            provider_name: provider.name.clone(),
+            account_name_label: provider
+                .account_name_label
+                .clone()
+                .unwrap_or_else(|| "Account name".into()),
+            icon_url: provider.icon_url.clone(),
+            instructions: provider.instructions.clone().or_else(|| {
+                input_schema
+                    .as_ref()?
+                    .get("description")?
+                    .as_str()
+                    .map(str::to_owned)
+            }),
+            webhook_url: connection.channel_capable.then(|| {
+                format!(
+                    "{}/connections/webhooks/{}",
+                    self.public_event_ingress_url, connection.id
+                )
+            }),
             setup_id: setup.id,
             connection_id: setup.connection_id,
             connection_name: connection.name,
@@ -563,16 +610,24 @@ impl Connections {
         id: Uuid,
         connection_setup_token: &str,
         action: Uuid,
-        values: Values,
+        mut values: Values,
     ) -> Result<BrokerView, Error> {
         let setup = self.authorize(id, connection_setup_token).await?;
         let connection = self.get(setup.connection_id).await?;
         let typ = self.connection_type(&connection).await?;
-        catalog::runtime(&connection.provider_id, &connection.type_id).validate_input(
-            &typ,
-            &setup.step,
-            &values,
-        )?;
+        let runtime = catalog::runtime(&connection.provider_id, &connection.type_id);
+        if setup.step == "fields"
+            && let Some(field) = runtime.account_name_field(&typ)
+        {
+            if values.contains_key(field) {
+                return Err(invalid(
+                    "Account name must be supplied through SetConnectionName",
+                ));
+            }
+            values.insert(field.into(), SecretString::from(connection.name.clone()));
+        }
+        // Validate against the full schema after applying the server-owned account-name binding.
+        runtime.validate_input(&typ, &setup.step, &values)?;
         self.claim(&setup, action, &setup.step).await?;
         let result = self.start_method(&setup, &connection, &typ, values).await;
         if let Err(error) = result {

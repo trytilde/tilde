@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM agent_health WHERE sidecar_event_id IS NULL AND checked_at < $1::TIMESTAMPTZ - INTERVAL '14 days';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce4c5c196a2e75336de1403b03542bdf77a4cb7c71444bd0a39e9590a2141937"
+}

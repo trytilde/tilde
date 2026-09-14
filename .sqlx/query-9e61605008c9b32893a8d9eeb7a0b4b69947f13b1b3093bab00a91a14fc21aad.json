@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH e AS (DELETE FROM sidecar_events WHERE archived_at<NOW()-INTERVAL '7 days'),\n d AS (DELETE FROM sidecar_directives WHERE acked_at<NOW()-INTERVAL '1 hour' OR created_at<NOW()-INTERVAL '7 days'),\n n AS (DELETE FROM agent_instances WHERE last_seen_at<NOW()-INTERVAL '1 day' AND NOT EXISTS(SELECT 1 FROM thread_leases l WHERE l.agent_id=agent_instances.agent_id AND l.instance_id=agent_instances.instance_id))\nSELECT 1 AS \"ok!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ok!",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9e61605008c9b32893a8d9eeb7a0b4b69947f13b1b3093bab00a91a14fc21aad"
+}

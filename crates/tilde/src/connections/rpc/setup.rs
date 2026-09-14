@@ -90,6 +90,26 @@ async fn handle_callback(service: Connections, query: Callback) -> axum::respons
     response
 }
 impl ConnectionSetupService for Rpc {
+    async fn set_connection_name<'a>(
+        &'a self,
+        _: RequestContext,
+        request: ServiceRequest<'_, setup_pb::SetConnectionNameRequest>,
+    ) -> ServiceResult<impl Encodable<setup_pb::SetConnectionNameResponse> + Send + use<'a>> {
+        let view = self
+            .0
+            .set_connection_name(
+                id(request.setup_id)?,
+                request.connection_setup_token,
+                id(request.action_id)?,
+                request.name,
+            )
+            .await?;
+        Response::ok(setup_pb::SetConnectionNameResponse {
+            state: broker_wire(view).into(),
+            ..Default::default()
+        })
+    }
+
     async fn save_draft<'a>(
         &'a self,
         _: RequestContext,

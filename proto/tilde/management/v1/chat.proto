@@ -14,6 +14,7 @@ service ChatService {
   rpc StartRun(StartRunRequest) returns (StartRunResponse);
   rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
   rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  rpc SuspendInvocation(SuspendInvocationRequest) returns (SuspendInvocationResponse);
   rpc CancelInvocation(CancelInvocationRequest) returns (CancelInvocationResponse);
   rpc SteerInvocation(SteerInvocationRequest) returns (SteerInvocationResponse);
   rpc AddParticipant(AddParticipantRequest) returns (AddParticipantResponse);
@@ -96,3 +97,6 @@ message DownloadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; b
 message WatchThreadRequest { string thread_id = 1; int64 after_sequence = 2; }
 
 message WatchThreadResponse { tilde.types.v1.Activity activity = 1; }
+
+message SuspendInvocationRequest { string invocation_id = 1; }
+message SuspendInvocationResponse {}

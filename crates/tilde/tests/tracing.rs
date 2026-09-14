@@ -149,7 +149,7 @@ async fn wait_count(collector: &Collector, count: usize) {
     .unwrap();
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn rotel_forwards_without_storage_and_retries_collector_outages() {
+async fn durable_trace_relay_retries_collector_outages() {
     let db = Database::new().await;
     sqlx::raw_sql(include_str!("sql/tracing_fixture.sql"))
         .execute(&db.pool)
@@ -326,6 +326,21 @@ async fn rotel_forwards_without_storage_and_retries_collector_outages() {
     server.abort();
     runtime.shutdown().await;
     assert_eq!(collector.received.load(Ordering::SeqCst), 1539);
+    assert!(
+        sqlx::query_scalar::<_, bool>("SELECT to_regclass('sidecar_traces') IS NULL")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM telemetry_delivery WHERE payload IS NOT NULL"
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap(),
+        0
+    );
     remote_task.abort();
     db.close().await;
 }
@@ -459,8 +474,13 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
     let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into());
     let agent_token = chat.tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
     let agents = Agents::new(db.pool.clone(), crypto.clone());
-    let connections =
-        Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()).unwrap();
+    let connections = Connections::new(
+        db.pool.clone(),
+        crypto.clone(),
+        "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     let oidc = Oidc::new(
         db.pool.clone(),
         crypto.clone(),

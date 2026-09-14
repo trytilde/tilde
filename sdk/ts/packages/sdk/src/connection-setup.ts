@@ -54,17 +54,20 @@ export function createConnectionSetupClient() {
     actionId?: string,
     fields?: SetupValues,
     action?: string,
+    connectionName?: string,
   ): Promise<Brokering> {
     await ready;
     if (closed) throw new Error("Setup client closed");
     return new Promise((resolve, reject) => {
       const id = ++nextId;
       pending.set(id, { resolve, reject });
-      port!.postMessage({ id, method, actionId, fields, action });
+      port!.postMessage({ id, method, actionId, fields, action, connectionName });
     });
   }
   return {
     getSetup: () => call("read"),
+    setConnectionName: (actionId: string, name: string) =>
+      call("setConnectionName", actionId, undefined, undefined, name),
     saveDraft: (actionId: string, draft: SetupValues) => call("saveDraft", actionId, draft),
     startOAuth: (actionId: string, fields: SetupValues) => call("startOAuth", actionId, fields),
     saveCredentials: (actionId: string, fields: SetupValues) =>

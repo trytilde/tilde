@@ -8,7 +8,7 @@ pub(super) fn manifest(
     homepage: &str,
     callback: &str,
     state: &str,
-    connection_id: uuid::Uuid,
+    webhook_url: &str,
 ) -> Result<Action, Error> {
     let kind = value(values, "owner_type")?;
     let segments = if kind == "organization" {
@@ -29,7 +29,7 @@ pub(super) fn manifest(
     action.query_pairs_mut().append_pair("state", state);
     // The app has channel-capable permissions. The channel binding must configure/activate
     // webhook delivery; no unbound messages should be acknowledged or silently discarded here.
-    let manifest = json!({"name":value(values,"app_name")?,"url":homepage,"redirect_url":callback,"setup_url":callback,"callback_urls":[callback],"public":false,"default_permissions":{"metadata":"read","issues":"write","pull_requests":"write","contents":"read"},"hook_attributes":{"url":format!("{}/connections/webhooks/{connection_id}",homepage.trim_end_matches('/')),"active":true},"default_events":["issue_comment","pull_request_review_comment","pull_request_review","pull_request","issues"]});
+    let manifest = json!({"name":value(values,"app_name")?,"url":homepage,"redirect_url":callback,"setup_url":callback,"callback_urls":[callback],"public":false,"default_permissions":{"metadata":"read","issues":"write","pull_requests":"write","contents":"read"},"hook_attributes":{"url":webhook_url,"active":true},"default_events":["issue_comment","pull_request_review_comment","pull_request_review","pull_request","issues"]});
     Ok(Action::FormPost {
         url: action.to_string(),
         fields: vec![("manifest".into(), manifest.to_string())],

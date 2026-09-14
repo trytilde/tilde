@@ -1,7 +1,6 @@
-// Packaged startup matrix: management API and embedded React serving are independent.
+// Packaged startup matrix: route groups and embedded React serving are independent on one port.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createServer } from "node:net";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { resolve } from "node:path";
@@ -12,24 +11,20 @@ const seed = randomBytes(32).toString("base64");
 try {
   for (const management of [true, false])
     for (const web of [true, false]) {
-      const occupied = createServer();
-      occupied.listen(0, "127.0.0.1");
-      await once(occupied, "listening");
-      const bindPort = !management && !web ? occupied.address().port : 0;
       const env = {
         ...process.env,
         DATABASE_URL: process.env.TEST_DATABASE_URL,
         ENGINE_ENCRYPTION_BACKEND: "seed",
         ENGINE_ENCRYPTION_KEY: seed,
         ENGINE_KMS_KEY_ID: "",
-        ENGINE_MANAGEMENT_ENABLED: String(management),
+        ENGINE_SERVE: management ? "all" : "ingress,runtime,sidecar",
         ENGINE_WEB_ENABLED: String(web),
-        ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
+        ENGINE_INGRESS_PUBLIC_URL: "https://events.example.com",
         RUST_LOG: "tilde=info",
       };
       for (const name of [
-        "ENGINE_MANAGEMENT_PUBLIC_URL",
-        "ENGINE_AGENT_RUNTIME_PUBLIC_URL",
+        "ENGINE_PUBLIC_URL",
+        "ENGINE_RUNTIME_PUBLIC_URL",
         "ENGINE_OIDC_ISSUER",
         "ENGINE_OIDC_CLIENT_ID",
         "ENGINE_OIDC_CLIENT_SECRET",
@@ -38,7 +33,7 @@ try {
       if (management) Object.assign(env, oidc.env);
       const child = spawn(
         resolve(process.env.ENGINE_TEST_BINARY ?? "target/debug/tilde"),
-        ["--management-listen", `127.0.0.1:${bindPort}`],
+        ["--listen", "127.0.0.1:0"],
         { env, stdio: ["ignore", "pipe", "pipe"] },
       );
       let logs = "";
@@ -59,10 +54,16 @@ try {
             reject(new Error(logs));
           });
         });
-        const runtime = `http://${logs.match(/agent_runtime_address=(127\.0\.0\.1:\d+)/)[1]}`;
+        assert(
+          logs.includes(
+            `serve=${management ? "management,ingress,runtime,sidecar" : "ingress,runtime,sidecar"}`,
+          ),
+        );
+        const origin = `http://${logs.match(/ address=(127\.0\.0\.1:\d+)/)[1]}`;
+        // Agent runtime routes require an invocation token; management routes exist only when served.
         assert.equal(
           (
-            await fetch(`${runtime}/tilde.management.v1.AgentService/ListAgents`, {
+            await fetch(`${origin}/tilde.runtime.v1.ChatService/ListGoals`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: "{}",
@@ -70,36 +71,43 @@ try {
           ).status,
           401,
         );
-        if (management || web) {
-          const origin = `http://${logs.match(/management_address=(127\.0\.0\.1:\d+)/)[1]}`;
+        assert.equal(
+          (
+            await fetch(`${origin}/tilde.management.v1.AgentService/ListAgents`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+            })
+          ).status,
+          management ? 401 : 404,
+        );
+        assert.equal(
+          (
+            await fetch(`${origin}/connections/webhooks/00000000-0000-0000-0000-000000000001`, {
+              method: "POST",
+              headers: { Host: "events.example.com" },
+              body: "{}",
+            })
+          ).status,
+          400,
+          "Webhook reaches signature/connection validation on the shared port",
+        );
+        assert.equal(
+          (await fetch(`${origin}/`, { headers: { Accept: "text/html" } })).status,
+          web ? 200 : 404,
+        );
+        if (management) await loginManagement(origin);
+        else
           assert.equal(
-            (await fetch(`${origin}/`, { headers: { Accept: "text/html" } })).status,
-            web ? 200 : 404,
+            (
+              await fetch(`${origin}/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: "{}",
+              })
+            ).status,
+            404,
           );
-          if (management) await loginManagement(origin);
-          else {
-            assert.equal(
-              (
-                await fetch(`${origin}/auth/login`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: "{}",
-                })
-              ).status,
-              404,
-            );
-            assert.equal(
-              (
-                await fetch(`${origin}/tilde.management.v1.AgentService/ListAgents`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: "{}",
-                })
-              ).status,
-              404,
-            );
-          }
-        } else assert(logs.includes("management_listener=false"));
       } finally {
         if (child.exitCode === null) {
           const ended = once(child, "exit");
@@ -108,11 +116,10 @@ try {
           await ended;
           clearTimeout(timer);
         }
-        await new Promise((resolve) => occupied.close(resolve));
       }
     }
   console.log(
-    "PASS: all four management/web startup combinations, OIDC optional when disabled, occupied disabled port, runtime remains authenticated.",
+    "PASS: all four management/web modes on one listener; ingress and runtime stay active, management routes exist only when served.",
   );
 } finally {
   await oidc.stop();

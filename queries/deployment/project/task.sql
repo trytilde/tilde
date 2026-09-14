@@ -1,0 +1,1 @@
+INSERT INTO chat_tasks(id,thread_id,agent_id,title,status,goal_id,blocked_reason) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET status=EXCLUDED.status,blocked_reason=EXCLUDED.blocked_reason;

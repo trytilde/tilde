@@ -751,6 +751,34 @@ export declare type WatchThreadResponse = Message<"tilde.management.v1.WatchThre
 export declare const WatchThreadResponseSchema: GenMessage<WatchThreadResponse>;
 
 /**
+ * @generated from message tilde.management.v1.SuspendInvocationRequest
+ */
+export declare type SuspendInvocationRequest = Message<"tilde.management.v1.SuspendInvocationRequest"> & {
+  /**
+   * @generated from field: string invocation_id = 1;
+   */
+  invocationId: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.SuspendInvocationRequest.
+ * Use `create(SuspendInvocationRequestSchema)` to create a new message.
+ */
+export declare const SuspendInvocationRequestSchema: GenMessage<SuspendInvocationRequest>;
+
+/**
+ * @generated from message tilde.management.v1.SuspendInvocationResponse
+ */
+export declare type SuspendInvocationResponse = Message<"tilde.management.v1.SuspendInvocationResponse"> & {
+};
+
+/**
+ * Describes the message tilde.management.v1.SuspendInvocationResponse.
+ * Use `create(SuspendInvocationResponseSchema)` to create a new message.
+ */
+export declare const SuspendInvocationResponseSchema: GenMessage<SuspendInvocationResponse>;
+
+/**
  * @generated from service tilde.management.v1.ChatService
  */
 export declare const ChatService: GenService<{
@@ -825,6 +853,14 @@ export declare const ChatService: GenService<{
     methodKind: "unary";
     input: typeof GetRunRequestSchema;
     output: typeof GetRunResponseSchema;
+  },
+  /**
+   * @generated from rpc tilde.management.v1.ChatService.SuspendInvocation
+   */
+  suspendInvocation: {
+    methodKind: "unary";
+    input: typeof SuspendInvocationRequestSchema;
+    output: typeof SuspendInvocationResponseSchema;
   },
   /**
    * @generated from rpc tilde.management.v1.ChatService.CancelInvocation

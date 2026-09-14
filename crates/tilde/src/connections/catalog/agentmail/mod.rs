@@ -3,6 +3,9 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        account_name_label: Some("AgentMail email address".into()),
+        icon_url: Some("https://www.agentmail.to/favicon.ico".into()),
+        instructions: Some("Connect your AgentMail inbox to this agent.".into()),
         id: "agentmail".into(),
         name: "AgentMail".into(),
         kind: ProviderKind::BuiltIn,
@@ -23,6 +26,19 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Agentmail;
 #[async_trait::async_trait]
 impl Runtime for Agentmail {
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[
+            "Create an inbox and enter its AgentMail email address below.",
+            "Generate an API key scoped to that inbox and enter it below.",
+            "Go to Webhooks, create a new webhook, and paste the Webhook URL from below. Subscribe to all received events.",
+            "Copy the generated signing secret from AgentMail and enter it below.",
+        ]
+    }
+
+    fn account_name_field(&self, _typ: &ConnectionType) -> Option<&'static str> {
+        Some("inbox_id")
+    }
+
     async fn validate(
         &self,
         service: &Connections,

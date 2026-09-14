@@ -5,6 +5,38 @@
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct InvokeRequest {
+    /// Field 12: `command_id`
+    #[serde(
+        rename = "commandId",
+        alias = "command_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub command_id: ::buffa::alloc::string::String,
+    /// Field 13: `assignment_generation`
+    #[serde(
+        rename = "assignmentGeneration",
+        alias = "assignment_generation",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub assignment_generation: u64,
+    /// Field 14: `owner_instance_id`
+    #[serde(
+        rename = "ownerInstanceId",
+        alias = "owner_instance_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub owner_instance_id: ::buffa::alloc::string::String,
+    /// Field 11: `agent_generation`
+    #[serde(
+        rename = "agentGeneration",
+        alias = "agent_generation",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub agent_generation: i64,
     /// Field 1: `invocation_id`
     #[serde(
         rename = "invocationId",
@@ -92,6 +124,10 @@ pub struct InvokeRequest {
 impl ::core::fmt::Debug for InvokeRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvokeRequest")
+            .field("command_id", &self.command_id)
+            .field("assignment_generation", &self.assignment_generation)
+            .field("owner_instance_id", &self.owner_instance_id)
+            .field("agent_generation", &self.agent_generation)
             .field("invocation_id", &self.invocation_id)
             .field("run_id", &self.run_id)
             .field("thread_id", &self.thread_id)
@@ -178,6 +214,25 @@ impl ::buffa::Message for InvokeRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.agent_generation != 0i64 {
+            size
+                += 1u64
+                    + ::buffa::types::int64_encoded_len(self.agent_generation) as u64;
+        }
+        if !self.command_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.command_id) as u64;
+        }
+        if self.assignment_generation != 0u64 {
+            size
+                += 1u64
+                    + ::buffa::types::uint64_encoded_len(self.assignment_generation)
+                        as u64;
+        }
+        if !self.owner_instance_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.owner_instance_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -232,6 +287,18 @@ impl ::buffa::Message for InvokeRequest {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if self.agent_generation != 0i64 {
+            ::buffa::types::put_int64_field(11u32, self.agent_generation, buf);
+        }
+        if !self.command_id.is_empty() {
+            ::buffa::types::put_string_field(12u32, &self.command_id, buf);
+        }
+        if self.assignment_generation != 0u64 {
+            ::buffa::types::put_uint64_field(13u32, self.assignment_generation, buf);
+        }
+        if !self.owner_instance_id.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.owner_instance_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -330,6 +397,34 @@ impl ::buffa::Message for InvokeRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.cached_messages.push(elem);
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.agent_generation = ::buffa::types::decode_int64(buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.command_id, buf)?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.assignment_generation = ::buffa::types::decode_uint64(buf)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.owner_instance_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -348,6 +443,10 @@ impl ::buffa::Message for InvokeRequest {
         self.messages.clear();
         self.thread = ::buffa::MessageField::none();
         self.cached_messages.clear();
+        self.agent_generation = 0i64;
+        self.command_id.clear();
+        self.assignment_generation = 0u64;
+        self.owner_instance_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -384,6 +483,14 @@ pub const __INVOKE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct InvokeResponse {
+    /// Field 4: `accepted_command_id`
+    #[serde(
+        rename = "acceptedCommandId",
+        alias = "accepted_command_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub accepted_command_id: ::buffa::alloc::string::String,
     /// Field 1: `reasoning_delta`
     #[serde(
         rename = "reasoningDelta",
@@ -414,6 +521,7 @@ pub struct InvokeResponse {
 impl ::core::fmt::Debug for InvokeResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvokeResponse")
+            .field("accepted_command_id", &self.accepted_command_id)
             .field("reasoning_delta", &self.reasoning_delta)
             .field("stopped", &self.stopped)
             .field("pending_input_ids", &self.pending_input_ids)
@@ -458,6 +566,12 @@ impl ::buffa::Message for InvokeResponse {
         for v in &self.pending_input_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if !self.accepted_command_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.accepted_command_id)
+                        as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -476,6 +590,9 @@ impl ::buffa::Message for InvokeResponse {
         }
         for v in &self.pending_input_ids {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if !self.accepted_command_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.accepted_command_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -515,6 +632,13 @@ impl ::buffa::Message for InvokeResponse {
                 )?;
                 self.pending_input_ids.push(__elem);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.accepted_command_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -526,6 +650,7 @@ impl ::buffa::Message for InvokeResponse {
         self.reasoning_delta.clear();
         self.stopped = false;
         self.pending_input_ids.clear();
+        self.accepted_command_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -556,551 +681,6 @@ pub const __INVOKE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     type_url: "type.googleapis.com/tilde.agent_host.v1.InvokeResponse",
     to_json: ::buffa::type_registry::any_to_json::<InvokeResponse>,
     from_json: ::buffa::type_registry::any_from_json::<InvokeResponse>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct SteerRequest {
-    /// Field 1: `invocation_id`
-    #[serde(
-        rename = "invocationId",
-        alias = "invocation_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub invocation_id: ::buffa::alloc::string::String,
-    /// Field 2: `input_id`
-    #[serde(
-        rename = "inputId",
-        alias = "input_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub input_id: ::buffa::alloc::string::String,
-    /// Field 3: `text`
-    #[serde(
-        rename = "text",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub text: ::buffa::alloc::string::String,
-    /// Field 4: `message`
-    #[serde(
-        rename = "message",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub message: ::buffa::MessageField<
-        super::super::types::v1::Message,
-        ::buffa::Inline<super::super::types::v1::Message>,
-    >,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for SteerRequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("SteerRequest")
-            .field("invocation_id", &self.invocation_id)
-            .field("input_id", &self.input_id)
-            .field("text", &self.text)
-            .field("message", &self.message)
-            .finish()
-    }
-}
-impl SteerRequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.SteerRequest";
-}
-::buffa::impl_default_instance!(SteerRequest);
-impl ::buffa::MessageName for SteerRequest {
-    const PACKAGE: &'static str = "tilde.agent_host.v1";
-    const NAME: &'static str = "SteerRequest";
-    const FULL_NAME: &'static str = "tilde.agent_host.v1.SteerRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.SteerRequest";
-}
-impl ::buffa::Message for SteerRequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.invocation_id.is_empty() {
-            size
-                += 1u64 + ::buffa::types::string_encoded_len(&self.invocation_id) as u64;
-        }
-        if !self.input_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.input_id) as u64;
-        }
-        if !self.text.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.text) as u64;
-        }
-        if self.message.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.message.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.invocation_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.invocation_id, buf);
-        }
-        if !self.input_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.input_id, buf);
-        }
-        if !self.text.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.text, buf);
-        }
-        if self.message.is_set() {
-            ::buffa::types::put_len_delimited_header(
-                4u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            self.message.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.invocation_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.input_id, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.text, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.message.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.invocation_id.clear();
-        self.input_id.clear();
-        self.text.clear();
-        self.message = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for SteerRequest {
-    const PROTO_FQN: &'static str = "tilde.agent_host.v1.SteerRequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for SteerRequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __STEER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_host.v1.SteerRequest",
-    to_json: ::buffa::type_registry::any_to_json::<SteerRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<SteerRequest>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct SteerResponse {
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for SteerResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("SteerResponse").finish()
-    }
-}
-impl SteerResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.SteerResponse";
-}
-::buffa::impl_default_instance!(SteerResponse);
-impl ::buffa::MessageName for SteerResponse {
-    const PACKAGE: &'static str = "tilde.agent_host.v1";
-    const NAME: &'static str = "SteerResponse";
-    const FULL_NAME: &'static str = "tilde.agent_host.v1.SteerResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.SteerResponse";
-}
-impl ::buffa::Message for SteerResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for SteerResponse {
-    const PROTO_FQN: &'static str = "tilde.agent_host.v1.SteerResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for SteerResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __STEER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_host.v1.SteerResponse",
-    to_json: ::buffa::type_registry::any_to_json::<SteerResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<SteerResponse>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct CancelRequest {
-    /// Field 1: `invocation_id`
-    #[serde(
-        rename = "invocationId",
-        alias = "invocation_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub invocation_id: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for CancelRequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CancelRequest")
-            .field("invocation_id", &self.invocation_id)
-            .finish()
-    }
-}
-impl CancelRequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.CancelRequest";
-}
-::buffa::impl_default_instance!(CancelRequest);
-impl ::buffa::MessageName for CancelRequest {
-    const PACKAGE: &'static str = "tilde.agent_host.v1";
-    const NAME: &'static str = "CancelRequest";
-    const FULL_NAME: &'static str = "tilde.agent_host.v1.CancelRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.CancelRequest";
-}
-impl ::buffa::Message for CancelRequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.invocation_id.is_empty() {
-            size
-                += 1u64 + ::buffa::types::string_encoded_len(&self.invocation_id) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.invocation_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.invocation_id, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.invocation_id, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.invocation_id.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for CancelRequest {
-    const PROTO_FQN: &'static str = "tilde.agent_host.v1.CancelRequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for CancelRequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __CANCEL_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_host.v1.CancelRequest",
-    to_json: ::buffa::type_registry::any_to_json::<CancelRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<CancelRequest>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct CancelResponse {
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for CancelResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("CancelResponse").finish()
-    }
-}
-impl CancelResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.CancelResponse";
-}
-::buffa::impl_default_instance!(CancelResponse);
-impl ::buffa::MessageName for CancelResponse {
-    const PACKAGE: &'static str = "tilde.agent_host.v1";
-    const NAME: &'static str = "CancelResponse";
-    const FULL_NAME: &'static str = "tilde.agent_host.v1.CancelResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_host.v1.CancelResponse";
-}
-impl ::buffa::Message for CancelResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for CancelResponse {
-    const PROTO_FQN: &'static str = "tilde.agent_host.v1.CancelResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for CancelResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __CANCEL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_host.v1.CancelResponse",
-    to_json: ::buffa::type_registry::any_to_json::<CancelResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<CancelResponse>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

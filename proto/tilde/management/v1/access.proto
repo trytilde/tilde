@@ -1,0 +1,24 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/access.proto";
+service AgentAccessService {
+ rpc ListChannelAccess(ListChannelAccessRequest) returns (ListChannelAccessResponse);
+ rpc SetChannelAccess(SetChannelAccessRequest) returns (SetChannelAccessResponse);
+ rpc ListChannelIdentities(ListChannelIdentitiesRequest) returns (ListChannelIdentitiesResponse);
+ rpc SetIdentityAccess(SetIdentityAccessRequest) returns (SetIdentityAccessResponse);
+ rpc RequestIdentityVerification(RequestIdentityVerificationRequest) returns (RequestIdentityVerificationResponse);
+}
+message ListChannelAccessRequest { string agent_id = 1; uint32 page_size = 2; string page_token = 3; }
+message ListChannelAccessResponse { repeated tilde.types.v1.ChannelAccess routes = 1; string next_page_token = 2; }
+message SetChannelAccessRequest { string agent_id = 1; string connection_id = 2; tilde.types.v1.ChannelAccessMode mode = 3; }
+message SetChannelAccessResponse {}
+message ListChannelIdentitiesRequest { string agent_id = 1; optional string connection_id = 2; uint32 page_size = 3; string page_token = 4; }
+message ListChannelIdentitiesResponse { repeated tilde.types.v1.ChannelIdentity identities = 1; string next_page_token = 2; }
+message SetIdentityAccessRequest { string agent_id = 1; string connection_id = 2; string identity_id = 3; bool allowed = 4; }
+message SetIdentityAccessResponse {}
+message RequestIdentityVerificationRequest {
+ string id = 1; string agent_id = 2; string connection_id = 3; string value = 4; tilde.types.v1.IdentityType identity_type = 7;
+ // Optional approved WhatsApp template with one body parameter containing the approval URL.
+ optional string template_name = 5; optional string template_language = 6;
+}
+message RequestIdentityVerificationResponse { string verification_id = 1; string status = 2; }

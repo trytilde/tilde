@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agents(id,name,endpoint_url,webhook_signing_key,capabilities,avatar_seed,deployment_mode) VALUES($1,$2,NULL,$3,$4,$1,'sidecar') ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b82c217d3a5e6ff916b8d6ec4c3555a543993718bb9b0b3191661a9f28310573"
+}

@@ -643,8 +643,15 @@ where
     let otlp_payload = otlp_req.otlp_into();
     let count = BatchSizer::size_of(otlp_payload.as_slice());
 
+    let wait_for_ack = output.wait_for_ack;
+    let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(1);
+    let metadata = wait_for_ack.then(|| {
+        crate::topology::payload::MessageMetadata::forwarder(
+            crate::topology::payload::ForwarderMetadata::new(String::new(), Some(ack_tx)),
+        )
+    });
     let message = Message {
-        metadata: None,
+        metadata,
         request_context: http_request_ctx,
         payload: otlp_payload,
     };
@@ -653,8 +660,26 @@ where
             return response_4xx(StatusCode::from_u16(code).unwrap_or(StatusCode::BAD_REQUEST));
         }
     }
+    // Empty requests are valid OTLP. There is no batch to persist or acknowledge.
+    if count == 0 {
+        return Ok(rb
+            .body(Full::new(compute_ok_resp::<ExpResp>(json_resp).unwrap()))
+            .unwrap());
+    }
     match output.send(message).await {
         Ok(_) => {
+            if wait_for_ack {
+                use crate::topology::payload::ForwarderAcknowledgement;
+                match ack_rx.next().await {
+                    Some(ForwarderAcknowledgement::Ack(_)) => {}
+                    Some(ForwarderAcknowledgement::Rejected(code)) => {
+                        return response_4xx(
+                            StatusCode::from_u16(code).unwrap_or(StatusCode::BAD_REQUEST),
+                        );
+                    }
+                    _ => return response_4xx(StatusCode::SERVICE_UNAVAILABLE),
+                }
+            }
             // No partial success at the moment
             let body = compute_ok_resp::<ExpResp>(json_resp).unwrap();
 

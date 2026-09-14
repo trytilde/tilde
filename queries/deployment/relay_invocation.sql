@@ -1,0 +1,1 @@
+SELECT i.status,p.id AS "participant_id?" FROM chat_invocations i LEFT JOIN chat_participants p ON p.thread_id=i.thread_id AND p.agent_id=i.agent_id AND p.active WHERE i.id=$1 AND i.agent_id=$2 AND i.thread_id=$3 AND i.run_id=$4;

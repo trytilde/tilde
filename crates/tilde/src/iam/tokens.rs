@@ -30,12 +30,12 @@ pub struct Claims {
     pub exp: i64,
 }
 #[derive(Clone)]
-pub struct Tokens {
+pub struct PostgresTokens {
     pool: PgPool,
     encryption: Arc<Encryption>,
     key: Arc<OnceCell<SecretString>>,
 }
-impl Tokens {
+impl PostgresTokens {
     pub fn new(pool: PgPool, encryption: Arc<Encryption>) -> Self {
         Self {
             pool,
@@ -193,5 +193,60 @@ impl Tokens {
             return Err(ChatError::Denied);
         }
         Ok(claims)
+    }
+}
+
+/// Concrete runtime token authorities share the public API without giving a
+/// sidecar a Postgres pool or the installation signing key.
+#[derive(Clone)]
+pub enum Tokens {
+    Postgres(PostgresTokens),
+    Sidecar(Arc<crate::deployment::runtime::Runtime>),
+}
+impl Tokens {
+    pub fn new(pool: PgPool, encryption: Arc<Encryption>) -> Self {
+        Self::Postgres(PostgresTokens::new(pool, encryption))
+    }
+    pub fn sidecar(runtime: Arc<crate::deployment::runtime::Runtime>) -> Self {
+        Self::Sidecar(runtime)
+    }
+    pub async fn issue(
+        &self,
+        agent: Uuid,
+        invocation: Uuid,
+        thread: Uuid,
+        run: Uuid,
+    ) -> Result<SecretString> {
+        match self {
+            Self::Postgres(tokens) => tokens.issue(agent, invocation, thread, run).await,
+            Self::Sidecar(runtime) => {
+                let state = runtime.invocation(invocation).await?;
+                if state.agent_id != agent.to_string()
+                    || state.thread_id != thread.to_string()
+                    || state.run_id != run.to_string()
+                {
+                    return Err(ChatError::Denied);
+                }
+                runtime.issue_token(&state).await
+            }
+        }
+    }
+    pub async fn renew(&self, token: &str) -> Result<SecretString> {
+        match self {
+            Self::Postgres(tokens) => tokens.renew(token).await,
+            Self::Sidecar(runtime) => runtime.renew_token(token).await,
+        }
+    }
+    pub async fn verify(&self, token: &str) -> Result<Claims> {
+        match self {
+            Self::Postgres(tokens) => tokens.verify(token).await,
+            Self::Sidecar(runtime) => runtime.verified_claims(token, false).await,
+        }
+    }
+    pub async fn verify_trace(&self, token: &str) -> Result<Claims> {
+        match self {
+            Self::Postgres(tokens) => tokens.verify_trace(token).await,
+            Self::Sidecar(runtime) => runtime.verified_claims(token, true).await,
+        }
     }
 }

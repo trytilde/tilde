@@ -2,7 +2,7 @@
 //! The shared adapter only selects ready assignments, decrypts credentials and audits execution.
 use crate::proto::tilde::types::v1 as types;
 pub mod agentmail;
-mod files;
+pub(crate) mod files;
 pub mod github;
 pub mod ingress;
 pub mod linq;
@@ -29,8 +29,8 @@ pub struct Channels {
 pub struct Access {
     pub connection_id: Uuid,
     pub values: Values,
-    http: crate::connections::oauth::Http,
-    endpoints: crate::connections::catalog::Endpoints,
+    pub(crate) http: crate::connections::oauth::Http,
+    pub(crate) endpoints: crate::connections::catalog::Endpoints,
 }
 impl Access {
     pub fn secret(&self, key: &str) -> ToolResult<&str> {
@@ -66,6 +66,24 @@ impl Access {
 }
 /// Two operations; no universal message body or mandatory send method.
 pub trait Adapter: Send + Sync {
+    fn identity_types(&self) -> &'static [types::IdentityType];
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity>;
+    fn verification_supported(&self) -> bool {
+        true
+    }
+    fn supports_verification_template(&self) -> bool {
+        false
+    }
+    fn send_verification<'a>(
+        &'a self,
+        access: &'a Access,
+        message: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>>;
+
     fn tools(&self) -> Vec<types::ToolDefinition>;
     fn webhook<'a>(
         &'a self,
@@ -81,7 +99,7 @@ pub trait Adapter: Send + Sync {
         input: Value,
     ) -> BoxFuture<'a, ToolResult<Value>>;
 }
-fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
+pub(crate) fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     match (provider, typ) {
         ("slack", "slack_app") => Some(&slack::Slack),
         ("github", "github_app") => Some(&github::Github),
@@ -93,6 +111,14 @@ fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     }
 }
 impl Channels {
+    pub(crate) async fn access(&self, connection: Uuid) -> ToolResult<Access> {
+        Ok(Access {
+            connection_id: connection,
+            values: self.connections.resolve(connection).await?,
+            http: self.connections.http.clone(),
+            endpoints: self.connections.endpoints.clone(),
+        })
+    }
     pub fn new(connections: Connections) -> Self {
         Self { connections }
     }
@@ -247,6 +273,25 @@ pub async fn sent(
     // The upstream effect already happened. Record its acceptance even if the invocation was
     // canceled while the request was in flight; authorization was checked before dispatch.
     let scope = context.scope();
+    if let Some(local) = context.chat.local() {
+        return Ok(local
+            .provider_sent(crate::proto::tilde::types::v1::Message {
+                id: context.call_id.to_string(),
+                text: text.into(),
+                format: format.into(),
+                subject: subject.map(str::to_owned),
+                delivery: crate::proto::tilde::types::v1::MessageDelivery {
+                    connection_id: access.connection_id.to_string(),
+                    destination: destination.into(),
+                    external_message_id: external.into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            })
+            .await?);
+    }
+
     let thread = ingress::stable(
         access.connection_id,
         "thread",
@@ -256,7 +301,7 @@ pub async fn sent(
     let message = context.call_id;
     let mut tx = context
         .chat
-        .pool
+        .pg()?
         .begin()
         .await
         .map_err(super::ChatError::from)?;

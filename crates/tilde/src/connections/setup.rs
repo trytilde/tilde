@@ -71,6 +71,52 @@ impl Connections {
         tx.commit().await?;
         Ok(())
     }
+    /// Store the user-facing name independently of credentials, consuming the current form action.
+    pub async fn set_connection_name(
+        &self,
+        id: Uuid,
+        token: &str,
+        action: Uuid,
+        name: &str,
+    ) -> Result<BrokerView, Error> {
+        let name = name.trim();
+        if name.is_empty() || name.len() > 200 {
+            return Err(invalid(
+                "Account name is required and must be at most 200 bytes",
+            ));
+        }
+        let authorized = self.authorize(id, token).await?;
+        let mut tx = self.pool.begin().await?;
+        sqlx::query_file!(
+            "../../queries/connections/connection_lock.sql",
+            authorized.connection_id.to_string()
+        )
+        .execute(&mut *tx)
+        .await?;
+        let current = sqlx::query_file_as!(Setup, "../../queries/connections/setup_lock.sql", id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if terminal(&current.step)
+            || current.expires_at <= chrono::Utc::now()
+            || current.action_id != action
+            || current.claimed_at.is_some()
+        {
+            return Err(invalid(
+                "Setup changed before the account name could be saved",
+            ));
+        }
+        sqlx::query_file!(
+            "../../queries/connections/setup_name.sql",
+            current.connection_id,
+            name,
+            id,
+            Uuid::new_v4()
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        self.view(id, token).await
+    }
     /// Merge provider-owned draft keys with optimistic concurrency; never change OAuth or lifecycle state.
     pub async fn save_draft(
         &self,

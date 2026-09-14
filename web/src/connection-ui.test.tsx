@@ -1,10 +1,20 @@
-import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { Form, Input, Label, useConnectionForm, type Setup } from "@trytilde/connection-ui";
+import {
+  Form,
+  Input,
+  Label,
+  useConnectionForm,
+  useForm,
+  type Setup,
+} from "@trytilde/connection-ui";
 afterEach(cleanup);
 it("registers provider inputs with React Hook Form and clears submitted secrets", async () => {
   const submit = vi.fn().mockResolvedValue(undefined);
+  const accountNameForm = renderHook(() => useForm<{ name: string }>()).result.current;
   const setup = {
+    formId: "provider-form",
+    accountNameForm,
     state: undefined,
     error: "",
     busy: false,
@@ -45,7 +55,10 @@ it("renders JSON Schema secret, boolean, enum and numeric fields without provide
   const { BrokeringSchema, AuthDriver } = await import("./gen/tilde/setup/v1/connections_pb.js");
   const { CredentialForm } = await import("@trytilde/connection-ui");
   const submit = vi.fn().mockResolvedValue(undefined);
+  const accountNameForm = renderHook(() => useForm<{ name: string }>()).result.current;
   const setup = {
+    formId: "provider-form",
+    accountNameForm,
     state: undefined,
     error: "",
     busy: false,

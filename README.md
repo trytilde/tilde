@@ -273,32 +273,125 @@ Seed mode needs no AWS configuration or network calls.
 
 See the [chat domain](CONTEXT.md#chat) and the [TypeScript SDK and example agent](sdk/ts/README.md).
 
-## IAM and API listeners
+## Serverless agent execution
 
-One Tilde process serves two APIs:
+Agents may export the SDK's `createAgentHandler` from a Node serverless route,
+including a Vercel deployment. The gateway invokes the deployment URL once; the
+running request opens an outbound invocation control stream to its callback URL.
+Steering, cancellation and suspension reach that exact execution through the stream,
+so subsequent requests do not need to land on the same host instance.
 
-| API | Default bind | Authentication |
+The same protocol runs against a local sidecar. The SDK must establish its control
+subscription before user code executes. Suspension uses a framework checkpoint hook
+and ends execution; resume starts a new invocation. See the
+[SDK serverless setup](sdk/ts/README.md#serverless-invocation-controls).
+
+## Deployments
+
+Every agent has deployments: the declared record of what is running, tied to a commit,
+created by CI with `DeploymentService.RegisterDeployment` (idempotent on your deployment
+id) or by hand in the agent's **Deployments** tab. Registering returns a token once; the
+process that runs the deployment dials in with it. New threads route to the serving
+deployment (`Latest` promotes each new one automatically, `Manual` waits for you) and
+existing threads stay pinned to theirs. Targets:
+
+- **Direct**: the gateway invokes an HTTP endpoint (serverless handlers included).
+- **AWS Lambda**: registered now for routing and history; the gateway-side Lambda invoke
+  arrives with the run protocol.
+- **Sidecar**: replicas of `tilde-sidecar` dial in with the token; see below.
+
+## Sidecar deployments
+
+Gateway-only deployments need nothing beyond the gateway. To run an agent beside a
+sidecar, choose **Sidecar** in its **Deployment** tab, select the failure policy, and
+issue a deployment token. Use the same token for every replica of that agent. Pause an
+existing agent before changing its mode.
+
+Register a sidecar deployment in the **Deployments** tab (or from CI with
+`RegisterDeployment`) and use its token for every replica. The release archive and
+container include `tilde` and `tilde-sidecar`. Run the sidecar next to your SDK-hosted
+agent process:
+
+```bash
+export ENGINE_SIDECAR_GATEWAY_URL=https://tilde.example.com
+export ENGINE_SIDECAR_AGENT_TOKENS='<deployment-token>'
+export ENGINE_SIDECAR_AGENT_ENDPOINTS='<agent-id>=http://127.0.0.1:3000'
+tilde-sidecar
+```
+
+For multiple agents, separate tokens and `agent-id=endpoint` entries with commas. The
+sidecar keeps no state on disk. It dials the gateway's `sidecar` route group over one
+connection, receives configuration, credentials and thread leases from that stream, and
+publishes typed events back for projection into Postgres. The gateway never connects to
+a sidecar, so replicas may sit behind NAT.
+
+The sidecar binds two listeners: `ENGINE_SIDECAR_RUNTIME_LISTEN` (default
+`127.0.0.1:8081`, loopback only) for the agent process, and `ENGINE_SIDECAR_LISTEN`
+(default `0.0.0.0:8082`) for provider webhooks and native ingress. Agent routes are
+prefixed with `/agents/<agent-id>`; provider webhooks use
+`/agents/<agent-id>/connections/webhooks/<connection-id>`. Set `ENGINE_SIDECAR_PUBLIC_URL`
+to the externally reachable origin of that listener and put a load balancer in front of
+the replicas.
+
+The replica that first receives work for a conversation takes its lease in the same
+gateway call that hydrates it, and holds it while the conversation stays warm: turn state
+lives in its memory, the agent process is invoked over loopback, channel replies use the
+replicated credentials, and events on that conversation cost no further gateway calls on
+the hot path. Registry calls the agent makes with its invocation token are verified
+locally and relayed to the gateway, which checks the same token against the thread lease
+and capability ceiling before answering. Requests that land on another replica are handed
+straight to the holder, sidecar to sidecar; requests on the gateway are queued for the
+holder and answered through the gateway. The gateway serves reads of sidecar
+conversations from its projection, and completed messages in rooms with several sidecar
+agents are relayed to each holder. Conversations idle for
+`ENGINE_SIDECAR_THREAD_IDLE_SECONDS` leave memory and release their lease.
+
+Replicas heartbeat every three seconds; a holder unheard from for fifteen seconds loses
+its leases. Under **Assign to new node** the gateway hands active runs to another live
+replica, which restarts them from their objective. Under **Stop** the runs fail. A
+replica whose publishes go unacknowledged for ten seconds stops executing, so a
+partitioned holder never keeps running beside its replacement. Writes are acknowledged
+from replica memory and reach Postgres when the replica publishes them in batches, so a
+replica that dies loses the events it had not yet published, and a replica whose
+outbox fills sheds streaming deltas first and then its oldest frames rather than failing
+callers. External effects should therefore use idempotency keys.
+
+Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until
+uploaded to gateway S3 storage; configure the existing `ENGINE_S3_*` settings on the
+gateway. Use `task dev:sidecar` for local development; `task test:sidecar` runs two
+in-process replicas against Postgres and exercises leases, projection, hand-off and
+failover.
+
+## Route groups and authentication
+
+One listener (`ENGINE_LISTEN` / `--listen`, default `127.0.0.1:8080`) serves every
+route group. `ENGINE_SERVE` / `--serve` selects the groups a process mounts:
+
+| Group | Routes | Authentication |
 | --- | --- | --- |
-| Management API | `127.0.0.1:8080` | User bearer session from OIDC |
-| Agent runtime API | `127.0.0.1:8081` | Signed invocation connect token |
+| `management` | Management RPCs, OIDC, connection setup, embedded UI | User bearer session from OIDC |
+| `runtime` | Agent runtime RPCs, invocation controls, OTLP uploads | Signed invocation connect token |
+| `ingress` | Provider webhooks and native conversation ingress | Provider signatures or scoped ingress tokens |
+| `sidecar` | The sidecar protocol | Agent deployment tokens |
+
+The default is `all`. Operators who want network isolation run separate processes with
+different `ENGINE_SERVE` values rather than separate ports. Binding outside loopback
+requires `--allow-network`.
 
 Every user admitted by the configured OIDC provider has unrestricted management
 access. There is no role model or API-key support. Configure the provider's login
 admission policy accordingly. Agent runtimes never receive user tokens.
 
 Configure `ENGINE_OIDC_ISSUER`, `ENGINE_OIDC_CLIENT_ID` and
-`ENGINE_OIDC_CLIENT_SECRET`. Register
-`<ENGINE_MANAGEMENT_PUBLIC_URL>/auth/callback` at the provider. The management
-public URL is the browser-facing origin, including Vite's port in development.
-Production requires HTTPS; `ENGINE_OIDC_ALLOW_HTTP=true` is for local development.
-The initial OIDC implementation validates RS256 ID tokens.
+`ENGINE_OIDC_CLIENT_SECRET`. Register `<ENGINE_PUBLIC_URL>/auth/callback` at the
+provider. The public URL is the browser-facing origin, including Vite's port in
+development. Production requires HTTPS; `ENGINE_OIDC_ALLOW_HTTP=true` is for local
+development. The initial OIDC implementation validates RS256 ID tokens.
 
-Use `ENGINE_MANAGEMENT_LISTEN` / `--management-listen` and
-`ENGINE_AGENT_RUNTIME_LISTEN` / `--agent-runtime-listen` for bind addresses.
-`ENGINE_AGENT_RUNTIME_PUBLIC_URL` must be reachable by agent servers and is the
-callback URL delivered on invocation. Both listeners require `--allow-network`
-when binding outside loopback. These names replace `ENGINE_LISTEN`,
-`ENGINE_PUBLIC_URL` and `--listen`.
+`ENGINE_PUBLIC_URL` is also the default origin for provider webhooks and agent
+callbacks. Set `ENGINE_INGRESS_PUBLIC_URL` when providers reach the engine through a
+different origin, and `ENGINE_RUNTIME_PUBLIC_URL` when agent hosts do; the latter is
+the callback URL delivered on invocation.
 
 The browser stores its eight-hour user token in local storage and sends it through
 `Authorization: Bearer`; no authentication cookies are issued or accepted. Logout
@@ -322,28 +415,28 @@ To start only Dex manually: `POSTGRES_PASSWORD=unused-local-dev docker compose
 
 ### Agent capabilities
 
-Create/update agents with a `capabilities.grants` map, or use the registry editor:
+Create/update agents with typed `capabilities` fields, or use the registry editor:
 
 ```json
 {
-  "grants": {
-    "tools.invoke": {"mode": "only", "ids": ["sendMessage"]},
-    "work.read": {"mode": "any"},
-    "work.write": {"mode": "any"},
-    "run.update": {"mode": "any"},
-    "agents.invoke": {"mode": "only", "ids": ["TARGET-AGENT-UUID"]}
-  }
+  "toolsInvoke": {"mode": "TARGET_SELECTION_SELECTED", "ids": ["sendMessage"]},
+  "workRead": "BINARY_PERMISSION_YES",
+  "workWrite": "BINARY_PERMISSION_YES",
+  "runUpdate": "BINARY_PERMISSION_YES",
+  "agentsInvoke": {"mode": "TARGET_SELECTION_SELECTED", "ids": ["TARGET-AGENT-UUID"]}
 }
 ```
 
-Missing grants deny. Valid names are `agents.read`, `agents.create`,
-`agents.update`, `agents.delete`, `agents.invoke`, `agents.grant_capabilities`,
-`thread.read`, `work.read`, `work.write`, `run.update`, and `tools.invoke`.
-Agent targets use UUIDs; tool targets use catalog names. `agents.create`,
-`thread.read`, `work.read`, `work.write` and `run.update` support `none`/`any`
-only; thread and work operations remain restricted to the invocation scope.
-Omitting capabilities on update preserves them; supplying an empty grants map
-clears them. Grants cannot exceed the grantor's invocation authority.
+`agentsCreate`, `threadRead`, `workRead`, `workWrite` and `runUpdate` use the
+`BinaryPermission` enum (`NO` or `YES`). The other capability fields use
+`TargetPermission`, with `TargetSelection.NONE`, `ALL`, or `SELECTED` and IDs
+only for `SELECTED`. Agent targets use UUIDs; tool targets use catalog names.
+Missing fields deny. Omitting capabilities on update preserves them; an empty
+capabilities message clears them. Grants cannot exceed the grantor's authority.
+The edit screen saves toggle changes immediately and agent selections on modal
+confirmation. Tool-name edits save on blur or Enter. Failed saves restore the last
+saved setting and display an error; creation submits its initial permissions with
+the registration request.
 
 Connect tokens expire after 15 minutes. The SDK renews them every five minutes
 while the invocation is active, retaining or narrowing its original authority.
@@ -356,41 +449,57 @@ The SDK exposes invocation-authenticated `ctx.agents` registry methods and
 `ctx.invokeAgent({agentId, objective})` for agents already participating in the
 current thread. Management clients accept an OIDC-derived `accessToken` option.
 
-### Optional management API and React serving
+### Optional management routes and React serving
 
 Set these independently in the process environment or development `.env`:
 
 ```dotenv
-ENGINE_MANAGEMENT_ENABLED=true
+ENGINE_SERVE=all
 ENGINE_WEB_ENABLED=true
 ```
 
-Both default to `true`. `ENGINE_MANAGEMENT_ENABLED=false` removes management,
-OIDC and connection-brokering routes and makes OIDC configuration optional.
-The agent runtime API and background workers continue running.
+`ENGINE_SERVE=ingress,runtime,sidecar` removes management, OIDC and
+connection-brokering routes and makes OIDC configuration optional. Agent-facing routes
+and background workers continue running. The dev launcher exposes this switch as
+`ENGINE_MANAGEMENT_ENABLED=false`.
 
 `ENGINE_WEB_ENABLED=false` disables embedded React assets in packaged builds
-and prevents Vite from starting under `pnpm dev`. It does not disable management
+and prevents Vite from starting under `task dev`. It does not disable management
 RPCs or OIDC endpoints. Development starts Dex only when management is enabled.
 
-In packaged builds, React shares `ENGINE_MANAGEMENT_LISTEN`: with management off
-and web on, that address serves the UI and health endpoints only. With both off,
-it is not bound at all. Builds without the `embedded-web` feature do not bind an
-extra listener for static assets. A separately served UI needs its API/auth paths
-proxied to an enabled management API; dev Vite supports `ENGINE_DEV_URL` for that
-upstream. When web is disabled, the dev management public URL defaults to the API
-port rather than Vite's port.
+In packaged builds the embedded UI is served by the same listener as the API. A
+separately served UI needs its API/auth paths proxied to an enabled management group;
+dev Vite supports `ENGINE_DEV_URL` for that upstream. When web is disabled, the dev
+public URL defaults to the API port rather than Vite's port.
 
-Development orchestration lives in `Taskfile.yml`; `pnpm dev` and `pnpm build`
-are aliases for `task dev` and `task build`. Task runs the API and Vite in parallel
-with live interleaved output after configuration validation and optional Dex startup.
-A service failure stops the other development services (fail-fast). Ctrl+C also
-stops all processes.
-`task sqlx:prepare` owns migration/query preparation; use `task sqlx:prepare --
---check` to verify metadata. Test sequencing also lives in Task; the retained
-Postgres shell wrapper owns temporary database allocation and cleanup. JavaScript
-scripts remain for code-generator installation, generated-file verification and
-protocol/process integration tests.
+### Local provider webhooks with ngrok
+
+Install the [ngrok CLI](https://ngrok.com/download), then add to `.env.local`:
+
+```dotenv
+NGROK_ENABLED=true
+NGROK_DOMAIN=your-domain.ngrok-free.app
+NGROK_AUTHTOKEN=your-token
+```
+
+`task secrets:load` also loads `ngrok_authtoken` from SOPS into the private dev
+dotenv file. Run `task dev`; ngrok forwards to the engine port at `ADDRESS:API_PORT`.
+The launcher sets `ENGINE_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any
+configured ingress public URL while ngrok is enabled. This also updates the webhook
+URLs displayed and copied in connection setup iframes. Management and runtime routes on
+the tunnelled port still require their own credentials.
+
+All connection webhook URLs and provider manifests use the ingress public origin.
+Existing provider webhook registrations must be updated to the new URL shown on
+the connection; starting the engine does not rewrite provider registrations.
+`/connections/webhooks/{connection_id}` belongs to the ingress group, which remains
+active when management and web are disabled. Configure the externally reachable
+origin with `ENGINE_INGRESS_PUBLIC_URL`.
+
+Ngrok is disabled by default and belongs only to Task's dev launcher; the packaged
+Rust server never starts it. It stops with Ctrl+C or a dev service failure.
+`task dev:ngrok` can attach a dev tunnel separately; the running API must already
+use the matching ingress public URL and port.
 
 ### Development over Tailscale
 
@@ -425,24 +534,62 @@ also start the default local database separately.
 
 ## Invocation tracing
 
-Tilde embeds Rotel to forward platform and agent spans to your collector. Enable
-tracing by setting the complete OTLP/HTTP protobuf traces URL:
+Langfuse stores platform and agent traces. Configure it on the gateway:
 
 ```sh
-ENGINE_TRACING_EXPORT_ENDPOINT=https://collector.example.com/v1/traces
-ENGINE_TRACING_EXPORT_HEADERS='Authorization=Bearer your-collector-token'
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+# Optional browser-facing origin for self-hosted Langfuse:
+# LANGFUSE_PUBLIC_URL=https://langfuse.example.com
 ```
 
-Without an endpoint, tracing is disabled. Agents send OTLP/HTTP to `/v1/traces`
-on `ENGINE_AGENT_RUNTIME_PUBLIC_URL` with their connect token. The TypeScript SDK
-propagates context across model/tool instrumentation and streamed callbacks.
-Webhook/API ancestry survives durable message scheduling and invocation dispatch.
+Agents upload OTLP to `/v1/traces` on their runtime listener with their invocation
+token. A sidecar stamps accepted spans with the verified invocation scope and ships
+them to the gateway in its publish stream; the gateway forwards to Langfuse. Only the
+gateway has Langfuse credentials. The management tracing tab reads from Langfuse;
+Postgres does not retain permanent trace history.
 
-Rotel batches asynchronously through bounded queues. Ingestion success means
-acceptance into memory; collector failures retry for up to five minutes per batch.
-Overload returns retryable 503 responses. There is no local trace storage or replay,
-and queued telemetry may be lost on process failure or exhausted retry budgets.
-Final agent uploads remain authorized for five minutes after invocation end.
+The sidecar relay and gateway delivery queue are bounded. Sidecar batches leave memory
+once the gateway accepts them, and gateway payloads are cleared after delivery.
+Temporary gateway replay receipts suppress repeated batches; delivery retries use
+Postgres notifications and scheduled deadlines. Overload returns retryable errors.
+Gateway delivery records expire after seven days. Conversation retention settings
+do not delete Langfuse history.
 
-See [tracing implementation](crates/tilde/src/tracing/README.md) for queue limits,
-authentication and delivery semantics. Postgres trace storage is a separate follow-up.
+Without Langfuse configuration, tracing is disabled. Final agent uploads remain
+authorized for five minutes after invocation end. See the
+[tracing implementation](crates/tilde/src/tracing/README.md) for delivery and
+scope details.
+
+Agent creation requires an HTTP(S) endpoint. Custom avatar uploads use the `ENGINE_S3_*`
+settings in `.env.example`; `task dev` starts MinIO and creates the private avatar bucket.
+`task dev:s3` starts only storage, and `task test:avatars` checks real S3 upload/read/replace.
+When setting `ADDRESS` for Tailscale, `task dev` uses that address for signed avatar URLs.
+For other deployments, set `ENGINE_S3_PUBLIC_ENDPOINT` if the browser-facing storage URL
+is different from `ENGINE_S3_ENDPOINT`; Docker Compose also accepts `ENGINE_S3_CONTAINER_ENDPOINT`.
+
+## Agent logs
+
+`task dev` also starts a dedicated local ClickHouse service for agent log history.
+The **Logs** tab on an agent supports time/severity/message filters, invocation and
+trace correlation, record inspection, pagination, and a bounded live view.
+Send instrumented OTel logs to the runtime callback URL plus `/v1/logs`, using the
+agent connect token as a Bearer credential. Standard OTLP/HTTP JSON and protobuf
+are supported; application stdout capture requires OTel instrumentation.
+
+Set `DEV_LOGS_ENABLED=0` to skip local ClickHouse. To use an existing database, set
+`LOGS_CLICKHOUSE_URL`, `LOGS_CLICKHOUSE_DATABASE`, `LOGS_CLICKHOUSE_USER`, and
+`LOGS_CLICKHOUSE_PASSWORD` in `.env`. Tilde creates the log table in that database.
+Optional `LOGS_OTLP_ENDPOINT` and `LOGS_OTLP_HEADERS` forward to another collector
+independently of local storage. Without a storage URL, the history UI is disabled;
+forwarding can remain enabled. Without either destination, valid authenticated
+uploads are discarded.
+
+Logs are batched into bounded, persistent disk delivery queues under
+`LOGS_QUEUE_DIR`; use a distinct persistent volume for each gateway. Historical
+logs never pass through application Postgres. Pending delivery expires after 24
+hours, history after seven days. External forwarding can drop copies if its queue
+fills while local storage continues. See the [logs boundary](crates/tilde/src/logs/README.md)
+for limits, overload behavior, and sidecar semantics. Run `task test:logs` to test
+against a disposable Postgres database and isolated ClickHouse database.

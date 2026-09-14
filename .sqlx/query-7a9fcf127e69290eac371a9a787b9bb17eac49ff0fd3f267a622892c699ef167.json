@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO invocation_control_receipts(invocation_id,command_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING command_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "command_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7a9fcf127e69290eac371a9a787b9bb17eac49ff0fd3f267a622892c699ef167"
+}

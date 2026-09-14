@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployment_settings SET serving_deployment_id=NULL WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "73a9f4bdf6822d357321af80191fae2008ead1c9bb2856d231b82d00a1150c60"
+}

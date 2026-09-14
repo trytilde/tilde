@@ -1,0 +1,36 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "tilde/types/v1/chat.proto";
+import "tilde/types/v1/access.proto";
+message InvocationState { string traceparent = 12; string tracestate = 13; int64 ended_at = 11; string id = 1; string thread_id = 2; string run_id = 3; string agent_id = 4; string participant_id = 5; string owner_instance_id = 6; uint64 generation = 7; string status = 8; int64 lease_expires_at = 9; string objective = 10; }
+// Immutable, explicitly typed domain events. The owning replica assigns
+// origin_sequence per thread; the gateway projects them in that order.
+message RuntimeEvent {
+ string id = 1; string thread_id = 2; string agent_id = 3; string origin_instance_id = 4;
+ int64 origin_sequence = 5; int64 created_at = 6; string kind = 7; string invocation_id = 8; string participant_id = 9; string origin_agent_id = 33;
+ oneof state {
+  Thread thread = 10; User user = 11; Participant participant = 12;
+  Message message = 13; Run run = 14; InvocationState invocation = 15;
+  Goal goal = 16; Task task = 17; ToolCall tool_call = 18;
+  Attachment attachment = 19; Activity activity = 20; Typing typing = 21;
+  ConvertedMessageState converted_message = 22;
+  ChannelDecision channel_decision = 24; AttachmentSource attachment_source = 25;
+ }
+ reserved 23;
+}
+message AgentCommand {
+ string id = 1; string thread_id = 2; string participant_id = 3; string agent_id = 4;
+ string owner_instance_id = 5; uint64 generation = 6; int64 created_at = 7;
+ oneof action { InvokeCommand invoke = 10; SteerCommand steer = 11; }
+}
+message InvokeCommand { string invocation_id = 1; string run_id = 2; string objective = 3; }
+message SteerCommand { string invocation_id = 1; string input_id = 2; string text = 3; Message message = 4; }
+
+message ConvertedMessageState { string message_id = 1; string message_json = 2; }
+
+message ChannelDecision { string connection_id = 1; string event_id = 2; string identity_id = 3; IdentityType identity_type = 4; string value = 5; bool accepted = 6; ChannelAccessMode access_mode = 7; }
+
+message AttachmentSource { Attachment attachment = 1; string connection_id = 2; optional string provider_reference = 3; optional string url = 4 [debug_redact = true]; }
+enum ProviderEventKind { PROVIDER_EVENT_KIND_UNSPECIFIED = 0; PROVIDER_EVENT_KIND_MESSAGE = 1; PROVIDER_EVENT_KIND_UPDATED = 2; PROVIDER_EVENT_KIND_DELETED = 3; PROVIDER_EVENT_KIND_TYPING = 4; PROVIDER_EVENT_KIND_MEMBERSHIP = 5; }
+message ProviderEvent { ProviderEventKind kind = 1; string event_id = 2; string message_id = 3; string thread_id = 4; IdentityType identity_type = 5; string identity_value = 6; string sender_name = 7; string text = 8; string format = 9; optional string reply_to = 10; optional string subject = 11; bool active = 12; repeated ProviderAttachment attachments = 13; }
+message ProviderAttachment { string id = 1; string filename = 2; string media_type = 3; int64 size = 4; optional string url = 5 [debug_redact = true]; optional string provider_reference = 6; }

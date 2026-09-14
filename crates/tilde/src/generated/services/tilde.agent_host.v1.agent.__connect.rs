@@ -6,22 +6,6 @@ pub type OwnedInvokeRequestView = ::buffa::view::OwnedView<
 pub type OwnedInvokeResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::agent_host::v1::__buffa::view::InvokeResponseView<'static>,
 >;
-///Shorthand for `OwnedView<SteerRequestView<'static>>`.
-pub type OwnedSteerRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::SteerRequestView<'static>,
->;
-///Shorthand for `OwnedView<SteerResponseView<'static>>`.
-pub type OwnedSteerResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::SteerResponseView<'static>,
->;
-///Shorthand for `OwnedView<CancelRequestView<'static>>`.
-pub type OwnedCancelRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::CancelRequestView<'static>,
->;
-///Shorthand for `OwnedView<CancelResponseView<'static>>`.
-pub type OwnedCancelResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<'static>,
->;
 ///Shorthand for `OwnedView<HealthzRequestView<'static>>`.
 pub type OwnedHealthzRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::agent_host::v1::__buffa::view::HealthzRequestView<'static>,
@@ -42,74 +26,6 @@ for crate::proto::tilde::agent_host::v1::__buffa::view::InvokeResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::InvokeResponse>
 for ::buffa::view::OwnedView<
     crate::proto::tilde::agent_host::v1::__buffa::view::InvokeResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::SteerResponse>
-for crate::proto::tilde::agent_host::v1::__buffa::view::SteerResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::SteerResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::SteerResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::CancelResponse>
-for crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::agent_host::v1::CancelResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -172,18 +88,6 @@ pub const AGENT_SERVICE_SERVICE_NAME: &str = "tilde.agent_host.v1.AgentService";
 pub const AGENT_SERVICE_INVOKE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.agent_host.v1.AgentService/Invoke",
         ::connectrpc::StreamType::ServerStream,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `Steer` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_STEER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_host.v1.AgentService/Steer",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `Cancel` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const AGENT_SERVICE_CANCEL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.agent_host.v1.AgentService/Cancel",
-        ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `Healthz` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -264,52 +168,6 @@ pub trait AgentService: Send + Sync + 'static {
                     crate::proto::tilde::agent_host::v1::InvokeResponse,
                 > + Send + use<Self>,
             >,
-        >,
-    > + Send;
-    /// Handle the Steer RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn steer<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::agent_host::v1::SteerRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_host::v1::SteerResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Handle the Cancel RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn cancel<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::agent_host::v1::CancelRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::agent_host::v1::CancelResponse,
-            > + Send + use<'a, Self>,
         >,
     > + Send;
     /// Handle the Healthz RPC.
@@ -395,64 +253,6 @@ impl<S: AgentService> AgentServiceExt for S {
                 }),
             )
             .with_spec(AGENT_SERVICE_INVOKE_SPEC)
-            .route_view(
-                AGENT_SERVICE_SERVICE_NAME,
-                "Steer",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_host::v1::__buffa::view::SteerRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_host::v1::SteerRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.steer(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::agent_host::v1::SteerResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(AGENT_SERVICE_STEER_SPEC)
-            .route_view(
-                AGENT_SERVICE_SERVICE_NAME,
-                "Cancel",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::agent_host::v1::__buffa::view::CancelRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::agent_host::v1::CancelRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.cancel(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::agent_host::v1::CancelResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(AGENT_SERVICE_CANCEL_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
                 "Healthz",
@@ -542,18 +342,6 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .with_spec(AGENT_SERVICE_INVOKE_SPEC),
                 )
             }
-            "Steer" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_STEER_SPEC),
-                )
-            }
-            "Cancel" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AGENT_SERVICE_CANCEL_SPEC),
-                )
-            }
             "Healthz" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -575,50 +363,6 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "Steer" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_host::v1::SteerRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_host::v1::__buffa::view::SteerRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_host::v1::SteerRequest,
-                    >::from_parts(&req, &body);
-                    svc.steer(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::agent_host::v1::SteerResponse,
-                        >(format)
-                })
-            }
-            "Cancel" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::agent_host::v1::CancelRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::agent_host::v1::__buffa::view::CancelRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::agent_host::v1::CancelRequest,
-                    >::from_parts(&req, &body);
-                    svc.cancel(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::agent_host::v1::CancelResponse,
-                        >(format)
-                })
-            }
             "Healthz" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -829,88 +573,6 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_INVOKE_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the Steer RPC. Sends a request to /tilde.agent_host.v1.AgentService/Steer.
-    pub async fn steer(
-        &self,
-        request: crate::proto::tilde::agent_host::v1::SteerRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_host::v1::__buffa::view::SteerResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.steer_with_options(request, ::connectrpc::client::CallOptions::default())
-            .await
-    }
-    /// Call the Steer RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn steer_with_options(
-        &self,
-        request: crate::proto::tilde::agent_host::v1::SteerRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_host::v1::__buffa::view::SteerResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                AGENT_SERVICE_STEER_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the Cancel RPC. Sends a request to /tilde.agent_host.v1.AgentService/Cancel.
-    pub async fn cancel(
-        &self,
-        request: crate::proto::tilde::agent_host::v1::CancelRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.cancel_with_options(request, ::connectrpc::client::CallOptions::default())
-            .await
-    }
-    /// Call the Cancel RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn cancel_with_options(
-        &self,
-        request: crate::proto::tilde::agent_host::v1::CancelRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::agent_host::v1::__buffa::view::CancelResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                AGENT_SERVICE_CANCEL_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )

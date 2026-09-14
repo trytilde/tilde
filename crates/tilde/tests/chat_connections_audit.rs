@@ -19,7 +19,7 @@ async fn agent(db: &common::Database, crypto: Arc<Encryption>, name: &str) -> Uu
         .create(CreateAgent {
             id: Uuid::new_v4(),
             name: name.into(),
-            endpoint_url: Some("http://127.0.0.1:9999".into()),
+            endpoint_url: "http://127.0.0.1:9999".into(),
             webhook_signing_key: SecretString::from("test-signing-key-with-at-least-32-bytes"),
             capabilities: Default::default(),
         })
@@ -37,8 +37,13 @@ async fn assignment_is_atomic_exclusive_by_chat_capability_and_paginated_with_ag
     );
     let a = agent(&db, crypto.clone(), "A").await;
     let b = agent(&db, crypto.clone(), "B").await;
-    let service =
-        Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()).unwrap();
+    let service = Connections::new(
+        db.pool.clone(),
+        crypto.clone(),
+        "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     service.seed().await.unwrap();
     let invalid = Uuid::new_v4();
     assert!(
@@ -336,8 +341,13 @@ async fn dynamic_channel_catalog_tracks_ready_assignment_without_exporting_crede
             .unwrap(),
     );
     let a = agent(&db, crypto.clone(), "Agent").await;
-    let connections =
-        Connections::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()).unwrap();
+    let connections = Connections::new(
+        db.pool.clone(),
+        crypto.clone(),
+        "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
+    )
+    .unwrap();
     connections.seed().await.unwrap();
     let (configured, cursor) = connections.providers("", None, 100).await.unwrap();
     assert!(cursor.is_empty());
@@ -362,7 +372,7 @@ async fn dynamic_channel_catalog_tracks_ready_assignment_without_exporting_crede
     let mut capabilities = BTreeMap::new();
     capabilities.insert(
         tilde::iam::capabilities::Capability::ToolsInvoke,
-        tilde::iam::capabilities::Reach::Any,
+        tilde::iam::capabilities::Reach::All,
     );
     let scope = Scope {
         capabilities: tilde::iam::capabilities::Capabilities(capabilities),
@@ -489,7 +499,7 @@ async fn channel_send_and_callback(selected_provider: &str) {
     let agent_id = agent(&db, crypto.clone(), "Channels").await;
     let caps = tilde::iam::capabilities::Capabilities(BTreeMap::from([(
         tilde::iam::capabilities::Capability::ToolsInvoke,
-        tilde::iam::capabilities::Reach::Any,
+        tilde::iam::capabilities::Reach::All,
     )]));
     Agents::new(db.pool.clone(), crypto.clone())
         .update(tilde::agent::UpdateAgent {
@@ -549,6 +559,7 @@ async fn channel_send_and_callback(selected_provider: &str) {
         db.pool.clone(),
         crypto.clone(),
         "http://127.0.0.1".into(),
+        "https://ingress.example".into(),
         endpoints,
     )
     .unwrap();
@@ -592,7 +603,7 @@ async fn channel_send_and_callback(selected_provider: &str) {
     let origin = format!("http://{}", listener.local_addr().unwrap());
     let router =
         tilde::chat::rpc::runtime::router_with_tools(chat.clone(), Registry::for_chat(&chat))
-            .merge(tilde::chat::providers::ingress::router(
+            .merge(tilde::iam::listeners::public_event_ingress_router(
                 chat.clone(),
                 connections.clone(),
             ));
@@ -697,6 +708,10 @@ async fn channel_send_and_callback(selected_provider: &str) {
         sqlx::query("UPDATE connections SET status='ready' WHERE id=$1")
             .bind(connection)
             .execute(&db.pool)
+            .await
+            .unwrap();
+        tilde::chat::access::AgentAccess::new(connections.clone(), chat.clone())
+            .set_mode(connection, agent_id, types::ChannelAccessMode::Public)
             .await
             .unwrap();
         let call = Uuid::new_v4();

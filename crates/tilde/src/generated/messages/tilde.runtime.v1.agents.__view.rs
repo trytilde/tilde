@@ -10,8 +10,10 @@ pub struct CreateAgentRequestView<'a> {
     pub id: &'a str,
     /// Field 2: `name`
     pub name: &'a str,
+    /// Required HTTP(S) endpoint for the agent-hosted service.
+    ///
     /// Field 4: `endpoint_url`
-    pub endpoint_url: ::core::option::Option<&'a str>,
+    pub endpoint_url: &'a str,
     /// Required caller-generated shared secret. Stored encrypted and never returned.
     /// 32-1024 printable non-whitespace ASCII characters; no decoding or prefix requirement.
     ///
@@ -81,7 +83,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                view.endpoint_url = Some(::buffa::types::borrow_str(&mut cur)?);
+                view.endpoint_url = ::buffa::types::borrow_str(&mut cur)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -135,7 +137,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
         ::core::result::Result::Ok(super::super::CreateAgentRequest {
             id: self.id.to_string(),
             name: self.name.to_string(),
-            endpoint_url: self.endpoint_url.map(|s| s.to_string()),
+            endpoint_url: self.endpoint_url.to_string(),
             webhook_signing_key: self.webhook_signing_key.to_string(),
             capabilities: match self.capabilities.as_option() {
                 Some(v) => {
@@ -165,8 +167,8 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
         }
-        if let Some(ref v) = self.endpoint_url {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        if !self.endpoint_url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.endpoint_url) as u64;
         }
         if !self.webhook_signing_key.is_empty() {
             size
@@ -199,8 +201,8 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
         }
-        if let Some(ref v) = self.endpoint_url {
-            ::buffa::types::put_string_field(4u32, v, buf);
+        if !self.endpoint_url.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.endpoint_url, buf);
         }
         if !self.webhook_signing_key.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.webhook_signing_key, buf);
@@ -240,8 +242,8 @@ impl<'__a> ::serde::Serialize for CreateAgentRequestView<'__a> {
         if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
             __map.serialize_entry("name", self.name)?;
         }
-        if let ::core::option::Option::Some(__v) = self.endpoint_url {
-            __map.serialize_entry("endpointUrl", __v)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.endpoint_url) {
+            __map.serialize_entry("endpointUrl", self.endpoint_url)?;
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.webhook_signing_key) {
             __map.serialize_entry("webhookSigningKey", self.webhook_signing_key)?;
@@ -359,9 +361,11 @@ impl CreateAgentRequestOwnedView {
     pub fn name(&self) -> &'_ str {
         self.0.reborrow().name
     }
+    /// Required HTTP(S) endpoint for the agent-hosted service.
+    ///
     /// Field 4: `endpoint_url`
     #[must_use]
-    pub fn endpoint_url(&self) -> ::core::option::Option<&'_ str> {
+    pub fn endpoint_url(&self) -> &'_ str {
         self.0.reborrow().endpoint_url
     }
     /// Required caller-generated shared secret. Stored encrypted and never returned.
@@ -1824,7 +1828,7 @@ pub struct UpdateAgentRequestView<'a> {
     pub id: &'a str,
     /// Field 2: `name`
     pub name: ::core::option::Option<&'a str>,
-    /// Present empty string removes an endpoint; absence preserves the current value.
+    /// If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
     ///
     /// Field 4: `endpoint_url`
     pub endpoint_url: ::core::option::Option<&'a str>,
@@ -2138,7 +2142,7 @@ impl UpdateAgentRequestOwnedView {
     pub fn name(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().name
     }
-    /// Present empty string removes an endpoint; absence preserves the current value.
+    /// If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
     ///
     /// Field 4: `endpoint_url`
     #[must_use]

@@ -383,6 +383,11 @@ export declare const TypingSchema: GenMessage<Typing>;
  */
 export declare type Attachment = Message$1<"tilde.types.v1.Attachment"> & {
   /**
+   * @generated from field: bool persisted = 7;
+   */
+  persisted: boolean;
+
+  /**
    * @generated from field: string id = 1;
    */
   id: string;
@@ -552,6 +557,26 @@ export declare const MessageChunkSchema: GenMessage<MessageChunk>;
  * @generated from message tilde.types.v1.Activity
  */
 export declare type Activity = Message$1<"tilde.types.v1.Activity"> & {
+  /**
+   * @generated from field: string event_id = 13;
+   */
+  eventId: string;
+
+  /**
+   * @generated from field: string origin_instance_id = 14;
+   */
+  originInstanceId: string;
+
+  /**
+   * @generated from field: int64 origin_sequence = 15;
+   */
+  originSequence: bigint;
+
+  /**
+   * @generated from field: string origin_agent_id = 16;
+   */
+  originAgentId: string;
+
   /**
    * @generated from field: int64 sequence = 1;
    */

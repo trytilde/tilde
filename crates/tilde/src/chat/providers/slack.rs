@@ -3,6 +3,61 @@ use super::*;
 use crate::proto::tilde::types::v1 as types;
 pub struct Slack;
 impl Adapter for Slack {
+    fn identity_types(&self) -> &'static [types::IdentityType] {
+        &[types::IdentityType::Username]
+    }
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity> {
+        let recipient = provider_identity(value)?;
+        if recipient.identity_type != identity_type {
+            return Err(ConnectError::invalid_argument(
+                "This provider does not support that identity type",
+            ));
+        }
+        recipient.validate()?;
+        Ok(recipient)
+    }
+    fn send_verification<'a>(
+        &'a self,
+        a: &'a Access,
+        m: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>> {
+        Box::pin(async move {
+            let dm = a
+                .json(
+                    a.post(
+                        a.url(
+                            "slack_api",
+                            "https://slack.com/api",
+                            &["conversations.open"],
+                        )?,
+                        "access_token",
+                    )?
+                    .json(&json!({"users":m.value})),
+                )
+                .await?;
+            if dm["ok"] != true {
+                return Err(ConnectError::failed_precondition(
+                    "Slack could not open a private message. Check the app's chat and im permissions.",
+                ));
+            }
+            let channel = dm
+                .pointer("/channel/id")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ConnectError::internal("Slack did not return a private channel"))?;
+            let result=a.json(a.post(a.url("slack_api","https://slack.com/api",&["chat.postMessage"])?,"access_token")?.json(&json!({"channel":channel,"text":m.text,"unfurl_links":false,"unfurl_media":false}))).await?;
+            if result["ok"] != true {
+                return Err(ConnectError::failed_precondition(
+                    "Slack could not deliver verification",
+                ));
+            }
+            Ok(())
+        })
+    }
+
     fn webhook<'a>(
         &'a self,
         a: &'a Access,
@@ -70,7 +125,7 @@ impl Adapter for Slack {
                 event_id: required(&p, "event_id")?.into(),
                 message_id: ts.into(),
                 thread_id: reference,
-                sender_id: sender.into(),
+                sender: provider_identity(sender)?,
                 sender_name: sender.into(),
                 text: optional(event, "text").unwrap_or("").into(),
                 format: "slack_mrkdwn",
@@ -174,4 +229,12 @@ impl Adapter for Slack {
             }
         })
     }
+}
+
+/// Canonical sender values belong to this provider adapter.
+fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {
+    Ok(crate::chat::access::identity::Identity {
+        identity_type: types::IdentityType::Username,
+        value: raw.trim().to_owned(),
+    })
 }

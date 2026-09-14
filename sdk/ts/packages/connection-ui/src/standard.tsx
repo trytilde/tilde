@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
 import { Page, Form, useSetup, useConnectionForm, type Setup } from "./setup.js";
 import { Input } from "./components/input.js";
-import { Button } from "./components/button.js";
 import { Label, Textarea, NativeSelect } from "./components/controls.js";
 
 type Property = {
@@ -97,7 +96,6 @@ export function CredentialForm({ setup, state }: { setup: Setup; state: Brokerin
   }
   return (
     <Form setup={setup} form={form} onSubmit={(values) => setup.submit(payload(values))}>
-      {schema.description && <p className="text-sm text-muted-foreground">{schema.description}</p>}
       {state.authDriver === AuthDriver.OAUTH_CODE && (
         <p className="text-sm">
           OAuth redirect URL:{" "}
@@ -167,21 +165,13 @@ export function CredentialForm({ setup, state }: { setup: Setup; state: Brokerin
           </div>
         );
       })}
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={setup.busy}
-        onClick={() => void setup.saveDraft(payload(form.getValues()))}
-      >
-        Save draft
-      </Button>
     </Form>
   );
 }
 export function StandardSetup() {
   const setup = useSetup();
   return (
-    <Page setup={setup} title={setup.state?.typeName ?? "Connect account"}>
+    <Page setup={setup}>
       {setup.state?.inputSchemaJson && (
         <CredentialForm key={setup.state.inputSchemaJson} setup={setup} state={setup.state} />
       )}

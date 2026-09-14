@@ -247,6 +247,23 @@ export declare const CustomCredentialSourceSchema: GenMessage<CustomCredentialSo
  */
 export declare type Provider = Message<"tilde.types.v1.Provider"> & {
   /**
+   * @generated from field: optional string account_name_label = 13;
+   */
+  accountNameLabel?: string | undefined;
+
+  /**
+   * @generated from field: optional string icon_url = 11;
+   */
+  iconUrl?: string | undefined;
+
+  /**
+   * Plain-text setup guidance rendered below the provider title.
+   *
+   * @generated from field: optional string instructions = 12;
+   */
+  instructions?: string | undefined;
+
+  /**
    * @generated from field: string id = 1;
    */
   id: string;

@@ -238,6 +238,11 @@ impl ProviderKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Provider {
+    pub account_name_label: Option<String>,
+    /// Public image URL, rendered by clients without authentication headers.
+    pub icon_url: Option<String>,
+    /// Plain-text setup guidance shared by all connection methods.
+    pub instructions: Option<String>,
     pub id: String,
     pub name: String,
     pub kind: ProviderKind,
@@ -281,6 +286,11 @@ pub struct Started {
     pub brokering_url: String,
 }
 pub struct BrokerView {
+    pub setup_instructions: Vec<String>,
+    pub provider_name: String,
+    pub account_name_label: String,
+    pub icon_url: Option<String>,
+    pub instructions: Option<String>,
     pub webhook_url: Option<String>,
     pub setup_id: Uuid,
     pub connection_id: Uuid,
@@ -367,6 +377,26 @@ pub fn identifier(id: &str) -> Result<(), Error> {
 }
 impl Provider {
     pub fn validate(&self) -> Result<(), Error> {
+        if self
+            .account_name_label
+            .as_ref()
+            .is_some_and(|label| label.trim().is_empty() || label.len() > 200)
+        {
+            return Err(invalid("Invalid account name label"));
+        }
+        if let Some(icon_url) = &self.icon_url {
+            if icon_url.len() > 2048 {
+                return Err(invalid("Provider icon URL is too long"));
+            }
+            endpoint(icon_url)?;
+        }
+        if self
+            .instructions
+            .as_ref()
+            .is_some_and(|text| text.len() > 8000)
+        {
+            return Err(invalid("Provider instructions are too long"));
+        }
         if self.categories.is_empty() || self.categories.len() > 32 {
             return Err(invalid("Provider categories are required"));
         }

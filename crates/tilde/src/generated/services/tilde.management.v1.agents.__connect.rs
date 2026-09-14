@@ -1,3 +1,15 @@
+///Shorthand for `OwnedView<UploadAgentAvatarRequestView<'static>>`.
+pub type OwnedUploadAgentAvatarRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UploadAgentAvatarResponseView<'static>>`.
+pub type OwnedUploadAgentAvatarResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CreateAgentRequestView<'static>>`.
 pub type OwnedCreateAgentRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::CreateAgentRequestView<'static>,
@@ -30,6 +42,22 @@ pub type OwnedUpdateAgentRequestView = ::buffa::view::OwnedView<
 pub type OwnedUpdateAgentResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::UpdateAgentResponseView<'static>,
 >;
+///Shorthand for `OwnedView<PauseAgentRequestView<'static>>`.
+pub type OwnedPauseAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PauseAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<PauseAgentResponseView<'static>>`.
+pub type OwnedPauseAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PauseAgentResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ResumeAgentRequestView<'static>>`.
+pub type OwnedResumeAgentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ResumeAgentRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ResumeAgentResponseView<'static>>`.
+pub type OwnedResumeAgentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ResumeAgentResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<DeleteAgentRequestView<'static>>`.
 pub type OwnedDeleteAgentRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::DeleteAgentRequestView<'static>,
@@ -38,6 +66,48 @@ pub type OwnedDeleteAgentRequestView = ::buffa::view::OwnedView<
 pub type OwnedDeleteAgentResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::DeleteAgentResponseView<'static>,
 >;
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::UploadAgentAvatarResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::UploadAgentAvatarResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::CreateAgentResponse>
 for crate::proto::tilde::management::v1::__buffa::view::CreateAgentResponseView<'_> {
     fn encode(
@@ -174,6 +244,74 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::PauseAgentResponse>
+for crate::proto::tilde::management::v1::__buffa::view::PauseAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::PauseAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PauseAgentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ResumeAgentResponse>
+for crate::proto::tilde::management::v1::__buffa::view::ResumeAgentResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ResumeAgentResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ResumeAgentResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::DeleteAgentResponse>
 for crate::proto::tilde::management::v1::__buffa::view::DeleteAgentResponseView<'_> {
     fn encode(
@@ -210,6 +348,12 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const AGENT_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.AgentService";
+/// Static [`Spec`](::connectrpc::Spec) for the `UploadAgentAvatar` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_UPLOAD_AGENT_AVATAR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.AgentService/UploadAgentAvatar",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CreateAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_CREATE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.AgentService/CreateAgent",
@@ -231,6 +375,18 @@ pub const AGENT_SERVICE_LIST_AGENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spe
 /// Static [`Spec`](::connectrpc::Spec) for the `UpdateAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const AGENT_SERVICE_UPDATE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.AgentService/UpdateAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `PauseAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_PAUSE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.AgentService/PauseAgent",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ResumeAgent` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const AGENT_SERVICE_RESUME_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.AgentService/ResumeAgent",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -291,6 +447,29 @@ pub const AGENT_SERVICE_DELETE_AGENT_SPEC: ::connectrpc::Spec = ::connectrpc::Sp
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait AgentService: Send + Sync + 'static {
+    /// Handle the UploadAgentAvatar RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn upload_agent_avatar<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::UploadAgentAvatarResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the CreateAgent RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -383,6 +562,52 @@ pub trait AgentService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Handle the PauseAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn pause_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::PauseAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::PauseAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ResumeAgent RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn resume_agent<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ResumeAgentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ResumeAgentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Handle the DeleteAgent RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -438,6 +663,35 @@ impl<S: AgentService> AgentServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "UploadAgentAvatar",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.upload_agent_avatar(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::UploadAgentAvatarResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_UPLOAD_AGENT_AVATAR_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
                 "CreateAgent",
@@ -556,6 +810,64 @@ impl<S: AgentService> AgentServiceExt for S {
             .with_spec(AGENT_SERVICE_UPDATE_AGENT_SPEC)
             .route_view(
                 AGENT_SERVICE_SERVICE_NAME,
+                "PauseAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::PauseAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::PauseAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.pause_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::PauseAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_PAUSE_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
+                "ResumeAgent",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ResumeAgentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ResumeAgentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.resume_agent(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ResumeAgentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AGENT_SERVICE_RESUME_AGENT_SPEC)
+            .route_view(
+                AGENT_SERVICE_SERVICE_NAME,
                 "DeleteAgent",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -637,6 +949,12 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("tilde.management.v1.AgentService/")?;
         match method {
+            "UploadAgentAvatar" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_UPLOAD_AGENT_AVATAR_SPEC),
+                )
+            }
             "CreateAgent" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -661,6 +979,18 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .with_spec(AGENT_SERVICE_UPDATE_AGENT_SPEC),
                 )
             }
+            "PauseAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_PAUSE_AGENT_SPEC),
+                )
+            }
+            "ResumeAgent" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AGENT_SERVICE_RESUME_AGENT_SPEC),
+                )
+            }
             "DeleteAgent" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -682,6 +1012,28 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "UploadAgentAvatar" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+                    >::from_parts(&req, &body);
+                    svc.upload_agent_avatar(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::UploadAgentAvatarResponse,
+                        >(format)
+                })
+            }
             "CreateAgent" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -767,6 +1119,50 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::UpdateAgentResponse,
+                        >(format)
+                })
+            }
+            "PauseAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::PauseAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::PauseAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::PauseAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.pause_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::PauseAgentResponse,
+                        >(format)
+                })
+            }
+            "ResumeAgent" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ResumeAgentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ResumeAgentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ResumeAgentRequest,
+                    >::from_parts(&req, &body);
+                    svc.resume_agent(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ResumeAgentResponse,
                         >(format)
                 })
             }
@@ -859,7 +1255,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = AgentServiceClient::new(conn, config);
-/// let response = client.create_agent(request).await?;
+/// let response = client.upload_agent_avatar(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -871,7 +1267,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = AgentServiceClient::new(http, config);
-/// let response = client.create_agent(request).await?;
+/// let response = client.upload_agent_avatar(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -881,7 +1277,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.create_agent(request).await?;
+/// let resp = client.upload_agent_avatar(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -889,7 +1285,7 @@ impl<T: AgentService> ::connectrpc::Dispatcher for AgentServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.create_agent(request).await?.into_owned();
+/// let owned = client.upload_agent_avatar(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -919,6 +1315,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the UploadAgentAvatar RPC. Sends a request to /tilde.management.v1.AgentService/UploadAgentAvatar.
+    pub async fn upload_agent_avatar(
+        &self,
+        request: crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.upload_agent_avatar_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UploadAgentAvatar RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn upload_agent_avatar_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::UploadAgentAvatarRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::UploadAgentAvatarResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_UPLOAD_AGENT_AVATAR_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
     }
     /// Call the CreateAgent RPC. Sends a request to /tilde.management.v1.AgentService/CreateAgent.
     pub async fn create_agent(
@@ -1094,6 +1535,96 @@ where
                 &self.transport,
                 &self.config,
                 AGENT_SERVICE_UPDATE_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PauseAgent RPC. Sends a request to /tilde.management.v1.AgentService/PauseAgent.
+    pub async fn pause_agent(
+        &self,
+        request: crate::proto::tilde::management::v1::PauseAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PauseAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.pause_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PauseAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn pause_agent_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::PauseAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PauseAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_PAUSE_AGENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ResumeAgent RPC. Sends a request to /tilde.management.v1.AgentService/ResumeAgent.
+    pub async fn resume_agent(
+        &self,
+        request: crate::proto::tilde::management::v1::ResumeAgentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ResumeAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.resume_agent_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ResumeAgent RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn resume_agent_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ResumeAgentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ResumeAgentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AGENT_SERVICE_RESUME_AGENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

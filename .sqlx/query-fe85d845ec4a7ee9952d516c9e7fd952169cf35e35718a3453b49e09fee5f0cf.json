@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.id,v.connection_id,v.agent_id,v.identity_id,v.token_hash,v.status,v.expires_at,i.value,i.identity_type,c.name AS account_name,p.name AS provider_name,p.icon_url,a.name AS agent_name\nFROM chat_identity_verifications v JOIN chat_channel_identities i ON i.id=v.identity_id JOIN connections c ON c.id=v.connection_id\nJOIN connection_providers p ON p.provider_id=c.provider_id JOIN agents a ON a.id=v.agent_id WHERE v.id=$1 AND a.deleted_at IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "connection_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "identity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "token_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "value",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "identity_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "account_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "provider_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "icon_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "agent_name",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "fe85d845ec4a7ee9952d516c9e7fd952169cf35e35718a3453b49e09fee5f0cf"
+}

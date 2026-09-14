@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM telemetry_delivery WHERE created_at<NOW()-INTERVAL '7 days';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "47cb83bb75b5055e8d7fd7178197207d85e62ba4b4d744c7c1adea6e68018be0"
+}

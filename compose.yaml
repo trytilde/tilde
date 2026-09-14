@@ -1,4 +1,34 @@
 services:
+  minio:
+    image: minio/minio:latest
+    profiles: [dev]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${ENGINE_S3_SECRET_ACCESS_KEY:-minioadmin}
+    ports:
+      - "${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}:9000"
+      - "${ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  minio-init:
+    image: minio/mc:latest
+    profiles: [dev]
+    environment:
+      ACCESS_KEY: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
+      SECRET_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-minioadmin}
+      BUCKET: ${ENGINE_S3_BUCKET:-tilde-avatars}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'mc alias set tilde http://minio:9000 "$$ACCESS_KEY" "$$SECRET_KEY" >/dev/null; mc mb --ignore-existing "tilde/$$BUCKET"'
+    depends_on:
+      minio:
+        condition: service_healthy
   dex:
     image: ghcr.io/dexidp/dex:v2.43.1
     profiles: [dev]
@@ -29,27 +59,34 @@ services:
       retries: 20
   engine:
     build: .
-    command:
-      [
-        "--management-listen",
-        "0.0.0.0:8080",
-        "--agent-runtime-listen",
-        "0.0.0.0:8081",
-        "--allow-network",
-      ]
+    command: ["--listen", "0.0.0.0:8080", "--allow-network"]
     ports:
       - "127.0.0.1:${ENGINE_PORT:-8080}:8080"
-      - "127.0.0.1:${ENGINE_AGENT_RUNTIME_PORT:-8081}:8081"
+    volumes: [log-queue:/var/lib/tilde/log-queue]
     environment:
       DATABASE_URL: postgres://engine:${POSTGRES_PASSWORD}@postgres:5432/engine
+      LOGS_CLICKHOUSE_URL: ${LOGS_CLICKHOUSE_CONTAINER_URL:-${LOGS_CLICKHOUSE_URL:-}}
+      LOGS_CLICKHOUSE_DATABASE: ${LOGS_CLICKHOUSE_DATABASE:-tilde_logs}
+      LOGS_CLICKHOUSE_USER: ${LOGS_CLICKHOUSE_USER:-default}
+      LOGS_CLICKHOUSE_PASSWORD: ${LOGS_CLICKHOUSE_PASSWORD:-}
+      LOGS_OTLP_ENDPOINT: ${LOGS_OTLP_ENDPOINT:-}
+      LOGS_OTLP_HEADERS: ${LOGS_OTLP_HEADERS:-}
+      LOGS_QUEUE_DIR: /var/lib/tilde/log-queue
       ENGINE_ENCRYPTION_BACKEND: ${ENGINE_ENCRYPTION_BACKEND:-seed}
       ENGINE_ENCRYPTION_KEY: ${ENGINE_ENCRYPTION_KEY:-}
       ENGINE_KMS_KEY_ID: ${ENGINE_KMS_KEY_ID:-}
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      ENGINE_MANAGEMENT_ENABLED: ${ENGINE_MANAGEMENT_ENABLED:-true}
+      ENGINE_S3_BUCKET: ${ENGINE_S3_BUCKET:-}
+      ENGINE_S3_REGION: ${ENGINE_S3_REGION:-us-east-1}
+      ENGINE_S3_ENDPOINT: ${ENGINE_S3_CONTAINER_ENDPOINT:-http://minio:9000}
+      ENGINE_S3_PUBLIC_ENDPOINT: ${ENGINE_S3_PUBLIC_ENDPOINT:-http://127.0.0.1:19000}
+      ENGINE_S3_ACCESS_KEY_ID: ${ENGINE_S3_ACCESS_KEY_ID:-}
+      ENGINE_S3_SECRET_ACCESS_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-}
+      ENGINE_SERVE: ${ENGINE_SERVE:-all}
       ENGINE_WEB_ENABLED: ${ENGINE_WEB_ENABLED:-true}
-      ENGINE_MANAGEMENT_PUBLIC_URL: ${ENGINE_MANAGEMENT_PUBLIC_URL:-http://127.0.0.1:8080}
-      ENGINE_AGENT_RUNTIME_PUBLIC_URL: ${ENGINE_AGENT_RUNTIME_PUBLIC_URL:-http://127.0.0.1:8081}
+      ENGINE_PUBLIC_URL: ${ENGINE_PUBLIC_URL:-http://127.0.0.1:8080}
+      ENGINE_INGRESS_PUBLIC_URL: ${ENGINE_INGRESS_PUBLIC_URL:-}
+      ENGINE_RUNTIME_PUBLIC_URL: ${ENGINE_RUNTIME_PUBLIC_URL:-}
       ENGINE_OIDC_ISSUER: ${ENGINE_OIDC_ISSUER:-}
       ENGINE_OIDC_CLIENT_ID: ${ENGINE_OIDC_CLIENT_ID:-}
       ENGINE_OIDC_CLIENT_SECRET: ${ENGINE_OIDC_CLIENT_SECRET:-}
@@ -58,5 +95,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  logs-clickhouse:
+    image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
+    profiles: [logs]
+    environment:
+      CLICKHOUSE_DB: ${LOGS_CLICKHOUSE_DATABASE:-tilde_logs}
+      CLICKHOUSE_USER: ${LOGS_CLICKHOUSE_USER:-tilde}
+      CLICKHOUSE_PASSWORD: ${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports: ["127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}:8123"]
+    volumes: [logs-clickhouse:/var/lib/clickhouse]
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8123/ping]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
 volumes:
+  logs-clickhouse:
+  log-queue:
+  minio-data:
   postgres-data:

@@ -6,6 +6,60 @@ pub struct Whatsapp {
     pub telnyx: bool,
 }
 impl Adapter for Whatsapp {
+    fn identity_types(&self) -> &'static [types::IdentityType] {
+        &[types::IdentityType::PhoneNumber]
+    }
+    fn verification_recipient(
+        &self,
+        identity_type: types::IdentityType,
+        value: &str,
+    ) -> ToolResult<crate::chat::access::identity::Identity> {
+        let recipient = provider_identity(value)?;
+        if recipient.identity_type != identity_type {
+            return Err(ConnectError::invalid_argument(
+                "This provider does not support that identity type",
+            ));
+        }
+        recipient.validate()?;
+        Ok(recipient)
+    }
+    fn supports_verification_template(&self) -> bool {
+        true
+    }
+    fn send_verification<'a>(
+        &'a self,
+        a: &'a Access,
+        m: crate::chat::access::identity::VerificationMessage<'a>,
+    ) -> BoxFuture<'a, ToolResult<()>> {
+        Box::pin(async move {
+            let mut body = if let Some(name) = m.template_name {
+                json!({"type":"template","template":{"name":name,"language":{"code":m.template_language.unwrap_or("en")},"components":[{"type":"body","parameters":[{"type":"text","text":m.url}]}]}})
+            } else {
+                json!({"type":"text","text":{"body":m.text,"preview_url":false}})
+            };
+            if self.telnyx {
+                a.json(a.post(a.url("telnyx_api","https://api.telnyx.com/v2",&["messages","whatsapp"])?,"api_key")?.json(&json!({"from":a.secret("phone_number")?,"to":m.value,"type":"WHATSAPP","messaging_profile_id":a.secret("messaging_profile_id")?,"whatsapp_message":body}))).await?;
+            } else {
+                body["messaging_product"] = json!("whatsapp");
+                body["recipient_type"] = json!("individual");
+                body["to"] = json!(m.value.trim_start_matches('+'));
+                a.json(
+                    a.post(
+                        a.url(
+                            "meta_graph",
+                            "https://graph.facebook.com/v23.0",
+                            &[a.secret("phone_number_id")?, "messages"],
+                        )?,
+                        "access_token",
+                    )?
+                    .json(&body),
+                )
+                .await?;
+            }
+            Ok(())
+        })
+    }
+
     fn webhook<'a>(
         &'a self,
         a: &'a Access,
@@ -75,7 +129,7 @@ impl Adapter for Whatsapp {
                         .into(),
                     message_id: required(m, "id")?.into(),
                     thread_id: sender.chars().filter(char::is_ascii_digit).collect(),
-                    sender_id: sender.into(),
+                    sender: provider_identity(sender)?,
                     sender_name: sender.into(),
                     text: optional(m, "text").unwrap_or("").into(),
                     format: "whatsapp",
@@ -135,7 +189,7 @@ impl Adapter for Whatsapp {
                                             .chars()
                                             .filter(char::is_ascii_digit)
                                             .collect(),
-                                        sender_id: sender.into(),
+                                        sender: provider_identity(sender)?,
                                         sender_name: at(v, "/contacts/0/profile/name")
                                             .unwrap_or(sender)
                                             .into(),
@@ -329,4 +383,19 @@ impl Adapter for Whatsapp {
             }
         })
     }
+}
+
+/// Canonical sender values belong to this provider adapter.
+fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {
+    let value = raw.trim();
+    let digits = value.strip_prefix('+').unwrap_or(value);
+    if !(7..=15).contains(&digits.len()) || !digits.bytes().all(|c| c.is_ascii_digit()) {
+        return Err(ConnectError::invalid_argument(
+            "Use an international WhatsApp number",
+        ));
+    }
+    Ok(crate::chat::access::identity::Identity {
+        identity_type: types::IdentityType::PhoneNumber,
+        value: format!("+{digits}"),
+    })
 }

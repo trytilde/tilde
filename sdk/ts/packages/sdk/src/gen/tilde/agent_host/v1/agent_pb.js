@@ -10,7 +10,7 @@ import { file_tilde_types_v1_chat } from "../../types/v1/chat_pb.js";
  * Describes the file tilde/agent_host/v1/agent.proto.
  */
 export const file_tilde_agent_host_v1_agent = /*@__PURE__*/
-  fileDesc("Ch90aWxkZS9hZ2VudF9ob3N0L3YxL2FnZW50LnByb3RvEhN0aWxkZS5hZ2VudF9ob3N0LnYxIrYCCg1JbnZva2VSZXF1ZXN0EhUKDWludm9jYXRpb25faWQYASABKAkSDgoGcnVuX2lkGAIgASgJEhEKCXRocmVhZF9pZBgDIAEoCRIQCghhZ2VudF9pZBgEIAEoCRIRCglvYmplY3RpdmUYBSABKAkSFAoMY2FsbGJhY2tfdXJsGAYgASgJEhcKCmNhcGFiaWxpdHkYByABKAlCA4ABARIpCghtZXNzYWdlcxgIIAMoCzIXLnRpbGRlLnR5cGVzLnYxLk1lc3NhZ2USJgoGdGhyZWFkGAkgASgLMhYudGlsZGUudHlwZXMudjEuVGhyZWFkEkQKD2NhY2hlZF9tZXNzYWdlcxgKIAMoCzIrLnRpbGRlLnJ1bnRpbWUudjEuQ2FjaGVkQWdlbnRSZXByZXNlbnRhdGlvbiJVCg5JbnZva2VSZXNwb25zZRIXCg9yZWFzb25pbmdfZGVsdGEYASABKAkSDwoHc3RvcHBlZBgCIAEoCBIZChFwZW5kaW5nX2lucHV0X2lkcxgDIAMoCSJvCgxTdGVlclJlcXVlc3QSFQoNaW52b2NhdGlvbl9pZBgBIAEoCRIQCghpbnB1dF9pZBgCIAEoCRIMCgR0ZXh0GAMgASgJEigKB21lc3NhZ2UYBCABKAsyFy50aWxkZS50eXBlcy52MS5NZXNzYWdlIg8KDVN0ZWVyUmVzcG9uc2UiJgoNQ2FuY2VsUmVxdWVzdBIVCg1pbnZvY2F0aW9uX2lkGAEgASgJIhAKDkNhbmNlbFJlc3BvbnNlIhAKDkhlYWx0aHpSZXF1ZXN0IiAKD0hlYWx0aHpSZXNwb25zZRINCgVyZWFkeRgBIAEoCDLcAgoMQWdlbnRTZXJ2aWNlElMKBkludm9rZRIiLnRpbGRlLmFnZW50X2hvc3QudjEuSW52b2tlUmVxdWVzdBojLnRpbGRlLmFnZW50X2hvc3QudjEuSW52b2tlUmVzcG9uc2UwARJOCgVTdGVlchIhLnRpbGRlLmFnZW50X2hvc3QudjEuU3RlZXJSZXF1ZXN0GiIudGlsZGUuYWdlbnRfaG9zdC52MS5TdGVlclJlc3BvbnNlElEKBkNhbmNlbBIiLnRpbGRlLmFnZW50X2hvc3QudjEuQ2FuY2VsUmVxdWVzdBojLnRpbGRlLmFnZW50X2hvc3QudjEuQ2FuY2VsUmVzcG9uc2USVAoHSGVhbHRoehIjLnRpbGRlLmFnZW50X2hvc3QudjEuSGVhbHRoelJlcXVlc3QaJC50aWxkZS5hZ2VudF9ob3N0LnYxLkhlYWx0aHpSZXNwb25zZWIGcHJvdG8z", [file_tilde_runtime_v1_cache, file_tilde_types_v1_chat]);
+  fileDesc("Ch90aWxkZS9hZ2VudF9ob3N0L3YxL2FnZW50LnByb3RvEhN0aWxkZS5hZ2VudF9ob3N0LnYxIp4DCg1JbnZva2VSZXF1ZXN0EhIKCmNvbW1hbmRfaWQYDCABKAkSHQoVYXNzaWdubWVudF9nZW5lcmF0aW9uGA0gASgEEhkKEW93bmVyX2luc3RhbmNlX2lkGA4gASgJEhgKEGFnZW50X2dlbmVyYXRpb24YCyABKAMSFQoNaW52b2NhdGlvbl9pZBgBIAEoCRIOCgZydW5faWQYAiABKAkSEQoJdGhyZWFkX2lkGAMgASgJEhAKCGFnZW50X2lkGAQgASgJEhEKCW9iamVjdGl2ZRgFIAEoCRIUCgxjYWxsYmFja191cmwYBiABKAkSFwoKY2FwYWJpbGl0eRgHIAEoCUIDgAEBEikKCG1lc3NhZ2VzGAggAygLMhcudGlsZGUudHlwZXMudjEuTWVzc2FnZRImCgZ0aHJlYWQYCSABKAsyFi50aWxkZS50eXBlcy52MS5UaHJlYWQSRAoPY2FjaGVkX21lc3NhZ2VzGAogAygLMisudGlsZGUucnVudGltZS52MS5DYWNoZWRBZ2VudFJlcHJlc2VudGF0aW9uInIKDkludm9rZVJlc3BvbnNlEhsKE2FjY2VwdGVkX2NvbW1hbmRfaWQYBCABKAkSFwoPcmVhc29uaW5nX2RlbHRhGAEgASgJEg8KB3N0b3BwZWQYAiABKAgSGQoRcGVuZGluZ19pbnB1dF9pZHMYAyADKAkiEAoOSGVhbHRoelJlcXVlc3QiIAoPSGVhbHRoelJlc3BvbnNlEg0KBXJlYWR5GAEgASgIMrkBCgxBZ2VudFNlcnZpY2USUwoGSW52b2tlEiIudGlsZGUuYWdlbnRfaG9zdC52MS5JbnZva2VSZXF1ZXN0GiMudGlsZGUuYWdlbnRfaG9zdC52MS5JbnZva2VSZXNwb25zZTABElQKB0hlYWx0aHoSIy50aWxkZS5hZ2VudF9ob3N0LnYxLkhlYWx0aHpSZXF1ZXN0GiQudGlsZGUuYWdlbnRfaG9zdC52MS5IZWFsdGh6UmVzcG9uc2ViBnByb3RvMw", [file_tilde_runtime_v1_cache, file_tilde_types_v1_chat]);
 
 /**
  * Describes the message tilde.agent_host.v1.InvokeRequest.
@@ -27,46 +27,18 @@ export const InvokeResponseSchema = /*@__PURE__*/
   messageDesc(file_tilde_agent_host_v1_agent, 1);
 
 /**
- * Describes the message tilde.agent_host.v1.SteerRequest.
- * Use `create(SteerRequestSchema)` to create a new message.
- */
-export const SteerRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 2);
-
-/**
- * Describes the message tilde.agent_host.v1.SteerResponse.
- * Use `create(SteerResponseSchema)` to create a new message.
- */
-export const SteerResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 3);
-
-/**
- * Describes the message tilde.agent_host.v1.CancelRequest.
- * Use `create(CancelRequestSchema)` to create a new message.
- */
-export const CancelRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 4);
-
-/**
- * Describes the message tilde.agent_host.v1.CancelResponse.
- * Use `create(CancelResponseSchema)` to create a new message.
- */
-export const CancelResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 5);
-
-/**
  * Describes the message tilde.agent_host.v1.HealthzRequest.
  * Use `create(HealthzRequestSchema)` to create a new message.
  */
 export const HealthzRequestSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 6);
+  messageDesc(file_tilde_agent_host_v1_agent, 2);
 
 /**
  * Describes the message tilde.agent_host.v1.HealthzResponse.
  * Use `create(HealthzResponseSchema)` to create a new message.
  */
 export const HealthzResponseSchema = /*@__PURE__*/
-  messageDesc(file_tilde_agent_host_v1_agent, 7);
+  messageDesc(file_tilde_agent_host_v1_agent, 3);
 
 /**
  * @generated from service tilde.agent_host.v1.AgentService

@@ -3,6 +3,12 @@ package tilde.types.v1;
 import "google/protobuf/timestamp.proto";
 
 message Agent {
+  // Stable random seed for the generated avatar; retained after custom uploads.
+  string avatar_seed = 11;
+  // Short-lived signed URL for a custom avatar, when present.
+  optional string avatar_url = 12;
+  // Paused agents remain health checked but receive no invocations.
+  bool paused = 10;
   string id = 1;
   string name = 2;
   reserved 3;
@@ -38,10 +44,38 @@ message AgentHealthHour {
   uint32 failed_checks = 3;
 }
 
-message Capabilities { map<string, CapabilityScope> grants = 1; }
+// Missing fields deny access. Binary actions cannot carry target IDs.
+message Capabilities {
+  reserved 1;
+  reserved "grants";
+  TargetPermission agents_read = 2;
+  BinaryPermission agents_create = 3;
+  TargetPermission agents_update = 4;
+  TargetPermission agents_delete = 5;
+  TargetPermission agents_invoke = 6;
+  TargetPermission agents_grant_capabilities = 7;
+  BinaryPermission thread_read = 8;
+  BinaryPermission work_read = 9;
+  BinaryPermission work_write = 10;
+  BinaryPermission run_update = 11;
+  TargetPermission tools_invoke = 12;
+}
 
-message CapabilityScope {
-  // none, any, or only. IDs are supported only for target-scoped actions.
-  string mode = 1;
+enum BinaryPermission {
+  BINARY_PERMISSION_UNSPECIFIED = 0;
+  BINARY_PERMISSION_NO = 1;
+  BINARY_PERMISSION_YES = 2;
+}
+
+enum TargetSelection {
+  TARGET_SELECTION_UNSPECIFIED = 0;
+  TARGET_SELECTION_NONE = 1;
+  TARGET_SELECTION_ALL = 2;
+  TARGET_SELECTION_SELECTED = 3;
+}
+
+message TargetPermission {
+  TargetSelection mode = 1;
+  // Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
   repeated string ids = 2;
 }

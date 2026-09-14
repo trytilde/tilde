@@ -29,9 +29,11 @@ export declare type CreateAgentRequest = Message<"tilde.runtime.v1.CreateAgentRe
   name: string;
 
   /**
-   * @generated from field: optional string endpoint_url = 4;
+   * Required HTTP(S) endpoint for the agent-hosted service.
+   *
+   * @generated from field: string endpoint_url = 4;
    */
-  endpointUrl?: string | undefined;
+  endpointUrl: string;
 
   /**
    * Required caller-generated shared secret. Stored encrypted and never returned.
@@ -158,7 +160,7 @@ export declare type UpdateAgentRequest = Message<"tilde.runtime.v1.UpdateAgentRe
   name?: string | undefined;
 
   /**
-   * Present empty string removes an endpoint; absence preserves the current value.
+   * If supplied, must be a nonempty HTTP(S) endpoint; absence preserves the current value.
    *
    * @generated from field: optional string endpoint_url = 4;
    */

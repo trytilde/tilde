@@ -70,6 +70,18 @@ pub type OwnedGetRunRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetRunResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::GetRunResponseView<'static>,
 >;
+///Shorthand for `OwnedView<SuspendInvocationRequestView<'static>>`.
+pub type OwnedSuspendInvocationRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SuspendInvocationResponseView<'static>>`.
+pub type OwnedSuspendInvocationResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<CancelInvocationRequestView<'static>>`.
 pub type OwnedCancelInvocationRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::CancelInvocationRequestView<
@@ -450,6 +462,48 @@ for crate::proto::tilde::management::v1::__buffa::view::GetRunResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetRunResponse>
 for ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::GetRunResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SuspendInvocationResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SuspendInvocationResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -874,6 +928,12 @@ pub const CHAT_SERVICE_GET_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::se
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SuspendInvocation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_SUSPEND_INVOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.ChatService/SuspendInvocation",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `CancelInvocation` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHAT_SERVICE_CANCEL_INVOCATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.ChatService/CancelInvocation",
@@ -1183,6 +1243,29 @@ pub trait ChatService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::GetRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the SuspendInvocation RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn suspend_invocation<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::SuspendInvocationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::SuspendInvocationResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1688,6 +1771,35 @@ impl<S: ChatService> ChatServiceExt for S {
             .with_spec(CHAT_SERVICE_GET_RUN_SPEC)
             .route_view(
                 CHAT_SERVICE_SERVICE_NAME,
+                "SuspendInvocation",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::SuspendInvocationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.suspend_invocation(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::SuspendInvocationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_SUSPEND_INVOCATION_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
                 "CancelInvocation",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -2054,6 +2166,12 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .with_spec(CHAT_SERVICE_GET_RUN_SPEC),
                 )
             }
+            "SuspendInvocation" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_SUSPEND_INVOCATION_SPEC),
+                )
+            }
             "CancelInvocation" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -2318,6 +2436,28 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::GetRunResponse,
+                        >(format)
+                })
+            }
+            "SuspendInvocation" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::SuspendInvocationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::SuspendInvocationRequest,
+                    >::from_parts(&req, &body);
+                    svc.suspend_invocation(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::SuspendInvocationResponse,
                         >(format)
                 })
             }
@@ -3047,6 +3187,51 @@ where
                 &self.transport,
                 &self.config,
                 CHAT_SERVICE_GET_RUN_SPEC.with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SuspendInvocation RPC. Sends a request to /tilde.management.v1.ChatService/SuspendInvocation.
+    pub async fn suspend_invocation(
+        &self,
+        request: crate::proto::tilde::management::v1::SuspendInvocationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.suspend_invocation_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SuspendInvocation RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn suspend_invocation_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::SuspendInvocationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SuspendInvocationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_SUSPEND_INVOCATION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )

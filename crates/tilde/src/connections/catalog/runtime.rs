@@ -16,6 +16,15 @@ pub(crate) trait Runtime: Send + Sync {
     fn ui(&self) -> &'static str {
         "_standard"
     }
+    /// Ordered setup steps for the selected connection type, below the provider overview.
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[]
+    }
+    /// Credential supplied from the saved account name during the fields step.
+    /// Keep it in the canonical schema for validation; the broker omits it from the form.
+    fn account_name_field(&self, _typ: &ConnectionType) -> Option<&'static str> {
+        None
+    }
     fn validate_input(
         &self,
         typ: &ConnectionType,

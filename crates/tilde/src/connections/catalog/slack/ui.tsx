@@ -13,11 +13,7 @@ function Slack() {
   const step = setup.state?.step;
   const form = useConnectionForm();
   return (
-    <Page setup={setup} title="Connect Slack">
-      <p>
-        After authorizing, verify the Events API request URL in your Slack app’s settings. New apps
-        include the event subscriptions in their manifest.
-      </p>
+    <Page setup={setup}>
       {step === "fields" ? (
         <div className="space-y-4">
           <p>Create a Slack app in your workspace, or connect an app you already own.</p>

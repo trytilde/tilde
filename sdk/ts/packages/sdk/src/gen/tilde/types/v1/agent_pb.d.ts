@@ -16,6 +16,27 @@ export declare const file_tilde_types_v1_agent: GenFile;
  */
 export declare type Agent = Message<"tilde.types.v1.Agent"> & {
   /**
+   * Stable random seed for the generated avatar; retained after custom uploads.
+   *
+   * @generated from field: string avatar_seed = 11;
+   */
+  avatarSeed: string;
+
+  /**
+   * Short-lived signed URL for a custom avatar, when present.
+   *
+   * @generated from field: optional string avatar_url = 12;
+   */
+  avatarUrl?: string | undefined;
+
+  /**
+   * Paused agents remain health checked but receive no invocations.
+   *
+   * @generated from field: bool paused = 10;
+   */
+  paused: boolean;
+
+  /**
    * @generated from field: string id = 1;
    */
   id: string;
@@ -125,13 +146,65 @@ export declare type AgentHealthHour = Message<"tilde.types.v1.AgentHealthHour"> 
 export declare const AgentHealthHourSchema: GenMessage<AgentHealthHour>;
 
 /**
+ * Missing fields deny access. Binary actions cannot carry target IDs.
+ *
  * @generated from message tilde.types.v1.Capabilities
  */
 export declare type Capabilities = Message<"tilde.types.v1.Capabilities"> & {
   /**
-   * @generated from field: map<string, tilde.types.v1.CapabilityScope> grants = 1;
+   * @generated from field: tilde.types.v1.TargetPermission agents_read = 2;
    */
-  grants: { [key: string]: CapabilityScope };
+  agentsRead?: TargetPermission | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.BinaryPermission agents_create = 3;
+   */
+  agentsCreate: BinaryPermission;
+
+  /**
+   * @generated from field: tilde.types.v1.TargetPermission agents_update = 4;
+   */
+  agentsUpdate?: TargetPermission | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.TargetPermission agents_delete = 5;
+   */
+  agentsDelete?: TargetPermission | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.TargetPermission agents_invoke = 6;
+   */
+  agentsInvoke?: TargetPermission | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.TargetPermission agents_grant_capabilities = 7;
+   */
+  agentsGrantCapabilities?: TargetPermission | undefined;
+
+  /**
+   * @generated from field: tilde.types.v1.BinaryPermission thread_read = 8;
+   */
+  threadRead: BinaryPermission;
+
+  /**
+   * @generated from field: tilde.types.v1.BinaryPermission work_read = 9;
+   */
+  workRead: BinaryPermission;
+
+  /**
+   * @generated from field: tilde.types.v1.BinaryPermission work_write = 10;
+   */
+  workWrite: BinaryPermission;
+
+  /**
+   * @generated from field: tilde.types.v1.BinaryPermission run_update = 11;
+   */
+  runUpdate: BinaryPermission;
+
+  /**
+   * @generated from field: tilde.types.v1.TargetPermission tools_invoke = 12;
+   */
+  toolsInvoke?: TargetPermission | undefined;
 };
 
 /**
@@ -141,27 +214,27 @@ export declare type Capabilities = Message<"tilde.types.v1.Capabilities"> & {
 export declare const CapabilitiesSchema: GenMessage<Capabilities>;
 
 /**
- * @generated from message tilde.types.v1.CapabilityScope
+ * @generated from message tilde.types.v1.TargetPermission
  */
-export declare type CapabilityScope = Message<"tilde.types.v1.CapabilityScope"> & {
+export declare type TargetPermission = Message<"tilde.types.v1.TargetPermission"> & {
   /**
-   * none, any, or only. IDs are supported only for target-scoped actions.
-   *
-   * @generated from field: string mode = 1;
+   * @generated from field: tilde.types.v1.TargetSelection mode = 1;
    */
-  mode: string;
+  mode: TargetSelection;
 
   /**
+   * Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+   *
    * @generated from field: repeated string ids = 2;
    */
   ids: string[];
 };
 
 /**
- * Describes the message tilde.types.v1.CapabilityScope.
- * Use `create(CapabilityScopeSchema)` to create a new message.
+ * Describes the message tilde.types.v1.TargetPermission.
+ * Use `create(TargetPermissionSchema)` to create a new message.
  */
-export declare const CapabilityScopeSchema: GenMessage<CapabilityScope>;
+export declare const TargetPermissionSchema: GenMessage<TargetPermission>;
 
 /**
  * @generated from enum tilde.types.v1.AgentHealthStatus
@@ -192,4 +265,59 @@ export enum AgentHealthStatus {
  * Describes the enum tilde.types.v1.AgentHealthStatus.
  */
 export declare const AgentHealthStatusSchema: GenEnum<AgentHealthStatus>;
+
+/**
+ * @generated from enum tilde.types.v1.BinaryPermission
+ */
+export enum BinaryPermission {
+  /**
+   * @generated from enum value: BINARY_PERMISSION_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: BINARY_PERMISSION_NO = 1;
+   */
+  NO = 1,
+
+  /**
+   * @generated from enum value: BINARY_PERMISSION_YES = 2;
+   */
+  YES = 2,
+}
+
+/**
+ * Describes the enum tilde.types.v1.BinaryPermission.
+ */
+export declare const BinaryPermissionSchema: GenEnum<BinaryPermission>;
+
+/**
+ * @generated from enum tilde.types.v1.TargetSelection
+ */
+export enum TargetSelection {
+  /**
+   * @generated from enum value: TARGET_SELECTION_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: TARGET_SELECTION_NONE = 1;
+   */
+  NONE = 1,
+
+  /**
+   * @generated from enum value: TARGET_SELECTION_ALL = 2;
+   */
+  ALL = 2,
+
+  /**
+   * @generated from enum value: TARGET_SELECTION_SELECTED = 3;
+   */
+  SELECTED = 3,
+}
+
+/**
+ * Describes the enum tilde.types.v1.TargetSelection.
+ */
+export declare const TargetSelectionSchema: GenEnum<TargetSelection>;
 

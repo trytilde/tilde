@@ -1,8 +1,10 @@
-//! Embedded Rotel receiver and bounded asynchronous collector forwarding.
-//! No trace payloads are stored locally.
+//! Langfuse ingestion, durable transient delivery, and management-only trace queries.
 pub mod context;
+pub mod delivery;
 mod forwarding;
-mod ingress;
+pub(crate) mod ingress;
+pub mod mapping;
+pub mod viewer;
 
 use crate::iam::tokens::Tokens;
 use axum::{
@@ -58,7 +60,10 @@ pub struct Runtime {
     pub provider: SdkTracerProvider,
     pipeline: tokio::task::JoinHandle<()>,
     forwarder: tokio::task::JoinHandle<()>,
+    collector: tokio::task::JoinHandle<()>,
+    pub queue: delivery::Queue,
     cancel: CancellationToken,
+    pipeline_cancel: CancellationToken,
 }
 impl Runtime {
     pub fn start(
@@ -83,35 +88,22 @@ impl Runtime {
             vec![],
         );
         let cancel = CancellationToken::new();
-        let pipeline_cancel = cancel.clone();
+        let pipeline_cancel = CancellationToken::new();
+        let pipeline_stop = pipeline_cancel.clone();
         let pipeline = tokio::spawn(async move {
-            let _ = pipeline.start(NoInspect, pipeline_cancel).await;
+            let _ = pipeline.start(NoInspect, pipeline_stop).await;
         });
-        let forward_cancel = cancel.clone();
+        let queue = delivery::Queue::new(pool.clone(), enabled);
+        let collect_queue = queue.clone();
+        let collector = tokio::spawn(async move {
+            collect_queue.collect(export_rx).await;
+        });
+        let export_queue = queue.clone();
+        let export_cancel = cancel.clone();
         let forwarder = tokio::spawn(async move {
-            forwarding::run(export_rx, destination, forward_cancel).await;
+            export_queue.export(destination, export_cancel).await;
         });
-        let processor = BatchSpanProcessor::builder(PlatformExporter {
-            sender: sender.clone(),
-            resource: Resource::builder().with_service_name("tilde").build(),
-        })
-        .with_batch_config(
-            BatchConfigBuilder::default()
-                .with_max_queue_size(4096)
-                .with_max_export_batch_size(256)
-                .with_scheduled_delay(Duration::from_millis(200))
-                .build(),
-        )
-        .build();
-        let provider = SdkTracerProvider::builder()
-            .with_sampler(if enabled {
-                Sampler::AlwaysOn
-            } else {
-                Sampler::AlwaysOff
-            })
-            .with_span_processor(processor)
-            .with_resource(Resource::builder().with_service_name("tilde").build())
-            .build();
+        let provider = platform_provider(sender.clone(), enabled, "tilde");
         Self {
             tracing: Tracing {
                 sender,
@@ -123,7 +115,10 @@ impl Runtime {
             provider,
             pipeline,
             forwarder,
+            collector,
+            queue,
             cancel,
+            pipeline_cancel,
         }
     }
     pub async fn shutdown(mut self) {
@@ -134,27 +129,45 @@ impl Runtime {
         )
         .await;
         drop(self.tracing);
-        // Rotel cancellation drains its input; the exporter drains completed batches.
-        self.cancel.cancel();
+        // Drain ingress into the durable queue before stopping the external worker.
+        self.pipeline_cancel.cancel();
         let drain = async {
             let _ = (&mut self.pipeline).await;
-            let _ = (&mut self.forwarder).await;
+            let _ = (&mut self.collector).await;
+            let _ = tokio::time::timeout(Duration::from_secs(5), self.queue.wait_empty()).await;
         };
         if tokio::time::timeout(Duration::from_secs(20), drain)
             .await
             .is_err()
         {
             self.pipeline.abort();
+            self.collector.abort();
+            ::tracing::warn!("Trace ingestion drain timed out; unacknowledged clients must retry");
+        }
+        self.cancel.cancel();
+        if tokio::time::timeout(Duration::from_secs(10), &mut self.forwarder)
+            .await
+            .is_err()
+        {
             self.forwarder.abort();
-            ::tracing::warn!("Trace shutdown drain timed out; unacknowledged clients must retry");
         }
     }
 }
 impl Tracing {
+    pub fn authorize_router(&self, router: Router) -> Router {
+        router.layer(middleware::from_fn_with_state(self.clone(), authorize))
+    }
+
     /// Only the runtime listener's composition exposes this OTLP/HTTP receiver.
     pub(crate) fn agent_ingestion_router(&self) -> Router {
+        let output = OTLPOutput::new(self.sender.clone()).with_validator(ingress::validate_request);
+        let output = if self.enabled {
+            output.with_ack()
+        } else {
+            output.with_discard(true)
+        };
         let service = build_service(
-            Some(OTLPOutput::new(self.sender.clone()).with_validator(ingress::validate_request)),
+            Some(output),
             None,
             None,
             AGENT_TRACES_PATH.into(),
@@ -199,9 +212,6 @@ async fn authorize(State(state): State<Tracing>, mut request: Request, next: Nex
         Ok(claims) => claims,
         Err(_) => return http::StatusCode::UNAUTHORIZED.into_response(),
     };
-    if !state.enabled {
-        return busy();
-    }
     let scope =
         match sqlx::query_file!("../../queries/tracing/invocation.sql", claims.invocation_id)
             .fetch_optional(&state.pool)
@@ -233,8 +243,8 @@ async fn authorize(State(state): State<Tracing>, mut request: Request, next: Nex
             .parse()
             .expect("UUID header"),
     );
-    // Bound upload and queue admission. Success acknowledges in-memory acceptance,
-    // not remote delivery; collectors must tolerate duplicates after retries.
+    // Enabled requests wait for durable queue acceptance; disabled requests are
+    // decoded and validated by Rotel before successful discard.
     match tokio::time::timeout(Duration::from_secs(15), next.run(request)).await {
         Ok(response) => response,
         Err(_) => busy(),
@@ -281,3 +291,32 @@ impl SpanExporter for PlatformExporter {
     }
 }
 pub use forwarding::Destination;
+
+/// Shared platform provider; sidecars route its bounded output through their local relay.
+pub fn platform_provider(
+    sender: BoundedSender<Message<ResourceSpans>>,
+    enabled: bool,
+    service: &'static str,
+) -> SdkTracerProvider {
+    let processor = BatchSpanProcessor::builder(PlatformExporter {
+        sender,
+        resource: Resource::builder().with_service_name(service).build(),
+    })
+    .with_batch_config(
+        BatchConfigBuilder::default()
+            .with_max_queue_size(4096)
+            .with_max_export_batch_size(256)
+            .with_scheduled_delay(Duration::from_millis(200))
+            .build(),
+    )
+    .build();
+    SdkTracerProvider::builder()
+        .with_sampler(if enabled {
+            Sampler::AlwaysOn
+        } else {
+            Sampler::AlwaysOff
+        })
+        .with_span_processor(processor)
+        .with_resource(Resource::builder().with_service_name(service).build())
+        .build()
+}

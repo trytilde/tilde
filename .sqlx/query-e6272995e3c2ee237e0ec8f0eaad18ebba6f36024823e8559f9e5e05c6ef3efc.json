@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id,thread_id FROM chat_invocations WHERE agent_id=$1 AND (status='running' OR ($2 AND status='pending')) ORDER BY thread_id,id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e6272995e3c2ee237e0ec8f0eaad18ebba6f36024823e8559f9e5e05c6ef3efc"
+}

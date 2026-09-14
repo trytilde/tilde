@@ -5,6 +5,7 @@ import "tilde/types/v1/connections.proto";
 // Public broker commands authenticate with their own expiring connection setup token, independently of management sessions.
 
 service ConnectionSetupService {
+  rpc SetConnectionName(SetConnectionNameRequest) returns (SetConnectionNameResponse);
   rpc GetSetup(GetSetupRequest) returns (GetSetupResponse);
   rpc SaveDraft(SaveDraftRequest) returns (SaveDraftResponse);
   rpc StartOAuth(StartOAuthRequest) returns (StartOAuthResponse);
@@ -37,7 +38,16 @@ message CancelSetupRequest { string setup_id = 1; string connection_setup_token 
 
 message CancelSetupResponse { Brokering state = 1; }
 
+message SetConnectionNameRequest { string setup_id = 1; string connection_setup_token = 2 [debug_redact = true]; string action_id = 3; string name = 4; }
+message SetConnectionNameResponse { Brokering state = 1; }
+
 message Brokering {
+  // Ordered setup steps for the selected connection type, below the provider overview.
+  repeated string setup_instructions = 26;
+  string provider_name = 24;
+  string account_name_label = 25;
+  optional string icon_url = 22;
+  optional string instructions = 23;
   string setup_id = 1; string connection_id = 2; string action_id = 3; string step = 4; optional string error_code = 5;
   reserved 6;
   string ui_path = 16;

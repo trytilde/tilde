@@ -18,7 +18,7 @@ fn input(id: Uuid, name: &str) -> CreateAgent {
         id,
         name: name.into(),
         webhook_signing_key: SecretString::from(KEY),
-        endpoint_url: Some("http://127.0.0.1:3000/agent".into()),
+        endpoint_url: "http://127.0.0.1:3000/agent".into(),
     }
 }
 const KEY: &str = "tilde_whsec_0123456789abcdef0123456789abcdef";
@@ -63,12 +63,26 @@ async fn central_migrations_and_agent_lifecycle() {
             capabilities: None,
             id,
             name: Some("Grace".into()),
-            endpoint_url: Some(String::new()),
+            endpoint_url: Some("https://grace.example.com".into()),
         })
         .await
         .unwrap();
     assert_eq!(updated.name, "Grace");
-    assert!(updated.endpoint_url.is_none());
+    assert_eq!(
+        updated.endpoint_url.as_deref(),
+        Some("https://grace.example.com/")
+    );
+    assert!(matches!(
+        service
+            .update(UpdateAgent {
+                capabilities: None,
+                id,
+                name: None,
+                endpoint_url: Some(String::new())
+            })
+            .await,
+        Err(Error::Invalid(_))
+    ));
     let untouched = service
         .update(UpdateAgent {
             capabilities: None,
@@ -79,10 +93,15 @@ async fn central_migrations_and_agent_lifecycle() {
         .await
         .unwrap();
     assert_eq!(untouched.name, "Grace");
+    assert!(matches!(
+        service.delete(id).await,
+        Err(Error::AgentNotPaused)
+    ));
+    service.pause(id).await.unwrap();
     service.delete(id).await.unwrap();
     service.delete(id).await.unwrap();
     assert!(matches!(service.get(id).await, Err(Error::NotFound)));
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents")
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE deleted_at IS NULL")
         .fetch_one(&db.pool)
         .await
         .unwrap();
@@ -279,10 +298,20 @@ async fn pagination_keeps_equal_timestamps_and_input_validation_prevents_bad_rec
     assert!(b.next_page_token.is_empty());
     assert!(!a.agents.iter().any(|x| x.id == b.agents[0].id));
     assert!(service.list(20, "invalid").await.is_err());
+    let search = service.list_filtered(1, "", "b").await.unwrap();
+    assert_eq!(search.agents.len(), 1);
+    assert_eq!(search.agents[0].name, "B");
+    assert!(search.next_page_token.is_empty());
     assert!(service.create(input(Uuid::new_v4(), "   ")).await.is_err());
     let mut bad = input(Uuid::new_v4(), "Credentials in URL");
-    bad.endpoint_url = Some("https://example.com/?token=secret".into());
+    bad.endpoint_url = "https://example.com/?token=secret".into();
     assert!(service.create(bad).await.is_err());
+    let mut missing = input(Uuid::new_v4(), "Missing endpoint");
+    missing.endpoint_url.clear();
+    assert!(matches!(
+        service.create(missing).await,
+        Err(Error::Invalid(_))
+    ));
     for key in [
         String::new(),
         "too-short".into(),
@@ -323,7 +352,7 @@ async fn expired_invocation_fails_atomically_and_can_be_explicitly_resumed() {
             capabilities: Default::default(),
             id: Uuid::new_v4(),
             name: "Recovery".into(),
-            endpoint_url: None,
+            endpoint_url: "http://127.0.0.1:9999".into(),
             webhook_signing_key: SecretString::from("tilde_whsec_0123456789abcdef0123456789abcdef"),
         })
         .await

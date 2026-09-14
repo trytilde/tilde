@@ -14,6 +14,14 @@ identify the checked commit; a partially published release is retried at that co
 
 ## Connections
 
+For local provider callbacks, `task dev` optionally runs an ngrok CLI tunnel
+(`NGROK_ENABLED`, `NGROK_DOMAIN`, `NGROK_AUTHTOKEN`) to the event ingress API.
+Its HTTPS domain overrides `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL` while enabled, including
+explicit local URL settings, for all connection
+webhooks and provider manifests. Management owns setup links and OAuth callbacks
+on its own origin; ngrok is started only by the development launcher.
+Task owns tunnel shutdown, and the SOPS loader exports its token only for dev.
+
 Connections own self-managed credential lifecycle, encrypted Postgres storage and
 short-lived connection setup tokens. Providers have a BuiltIn, Configured or Remote kind and one current catalog definition;
 custom providers can declare static fields or standard OAuth flows at runtime.
@@ -30,6 +38,39 @@ template and served at `/catalog/<provider>/ui`. Static and OAuth methods use th
 shared `/catalog/_standard/ui` page and a canonical JSON Schema for rendering and
 server validation. Rust serves the setup host/assets and proxies Vite during development.
 Opaque-origin frames use a scoped MessagePort bridge; only the host holds the setup token.
+The agent's chat-provider pills list catalog connection types with the channel capability.
+Each menu offers an available existing connection or a new setup method. The new-connection
+dialog opens the hosted brokering iframe immediately. Creation assigns chat to the agent
+atomically using a temporary provider title; the iframe collects the actual account name
+alongside credentials. Providers own `account_name_label`. SetConnectionName authenticates
+the setup token and rotates its action before credential submission, keeping display names
+out of arbitrary credential fields. Setup pages share the sidebar's Tilde wordmark, followed
+by × and the provider icon, with “Connect {provider} to Tilde”, instructions, then fields.
+There is no user-facing Save draft control.
+
+Connection setup overviews remain provider catalog `instructions`. Ordered
+`setup_instructions` come from `Runtime::instructions(&ConnectionType)` on the
+adapter selected by provider and connection type. The iframe renders them below
+its overview. Channel-capable setups expose a read-only Webhook URL below the
+account name with a copy action, rather than generic webhook guidance appended
+to every setup. The field is not a credential or submitted form value.
+`Runtime::account_name_field(&ConnectionType)` optionally binds the account name
+to a credential field. The shared broker omits that field from the projected form,
+rejects client-supplied overrides, then injects the saved account name before full
+schema validation and encrypted staging. The canonical schema retains the field
+and its constraints. AgentMail binds `inbox_id`; Linq and Telnyx bind `phone_number`.
+Unmapped connection types keep account names separate from credentials.
+Assigned cards show that account name, provider branding, and a status-colored badge. Provider `icon_url`
+and plain-text `instructions` are persisted catalog metadata and included in broker state.
+Pills, cards and setup iframes use that icon URL; the iframe renders instructions directly
+beneath its title. The modal has no header or close icon and dismisses on an outside click,
+including while its initial setup request is in flight. Dismissal never cancels credentials.
+Built-in icons use theSVG's jsDelivr URLs where available and official provider favicons
+otherwise. Missing images receive a neutral frontend fallback.
+The outer frame is the trusted broker; provider code remains in its opaque-origin child.
+Completion/cancellation notifications are checked against the frame window, origin and
+connection ID. Embedded authorization redirects and manifest posts open a separate window;
+the original provider UI polls setup state through its existing bridge to follow callbacks.
 A connection setup token authorizes only its setup session. Browser clients open the
 returned brokering URL; the setup client does not send management bearer credentials.
 OAuth callback state is separate from the connection setup token.
@@ -88,11 +129,117 @@ identity; the migration retains existing ciphertext bindings without versioned p
 - Run: a durable objective that can wait across invocations.
 - Invocation: one active reasoning loop for an agent in a thread; stop ends only this loop.
 - Steering input: durable additional input delivered idempotently to an invocation.
-- Agent runtime: an agent-hosted ConnectRPC service for Invoke, Steer, Cancel and Healthz.
+- Agent runtime: an agent-hosted ConnectRPC service for Invoke, Steer, Cancel, Stop and Healthz.
 - Agent session: capability-scoped ConnectRPC callbacks to Tilde for message streaming and work tools.
 
 Provider tools are a dynamic catalog. Stop is always available in the SDK, and
 ordinary reasoning/return values never automatically become messages. Child jobs, compaction and budgets remain outside the current runtime.
+
+## Shared frontend theme
+
+The web app and bundled connection/identity-verification iframes import the same Tailwind
+foundation from `sdk/ts/packages/connection-ui/src/style.css`. Its light palette follows
+`tilde-marketing/campaign-manager/src/app/{globals,enterprise-home}.css`: paper, espresso,
+blue, butter, forest, purple haze and sienna. Semantic status colors map to those tokens.
+Default body, main-card and iframe surfaces are white; deep beige is scoped to the sidebar
+and the outer canvas behind the main content card.
+Geist, Geist Mono and Bricolage Grotesque fonts ship locally with connection-ui, so embedded
+forms and the main application share typography without third-party font requests.
+
+The sidebar reuses the marketing result cards' deep beige GrainGradient, with a static
+PaperTexture and frosted-glass overlay. Shader rendering is bounded, pauses offscreen or
+when the page is hidden, and respects reduced motion. A CSS background remains without WebGL.
+
+## Frontend routing
+
+TanStack Router owns browser navigation through file routes in `web/src/routes`.
+The Vite plugin generates `web/src/routeTree.gen.ts`; `_app` is the pathless
+authenticated layout, and public brokering lives outside it. Agent routes live in
+`_app/agent/`, with the shared editor and its tabs grouped in `$agentId/`.
+Standalone Connections and Chat pages are not exposed. Agent rows open `/agent/{id}/capabilities`;
+`/agent/{id}/chat-providers` and `/agent/{id}/iam` are sibling tab routes under a shared
+agent editor. Agent details are fetched by ID after the management session check,
+so direct URLs and refreshes do not depend on previously loading the registry. The
+shared editor preserves local state across tab navigation and browser Back/Forward. The dashboard header
+shows Agent Registry / agent-name breadcrumbs, updated from loaded and saved route data.
+Pages can contribute a DashboardNavigation slot beside the breadcrumbs; agent tabs use a
+React portal so their panel context and keyboard behavior remain intact. Sign out lives
+in the sidebar footer and notifies the existing authentication boundary after revocation.
+`/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
+separate public route outside the authenticated app layout. Connection setup and
+identity verification host modules live under `web/src/routes/connections/` with
+`-` prefixes to exclude them from route generation. Shared connection UI loading
+keeps embedded content mounted but hidden until ready, with bouncing dots and
+Motion fades that respect reduced motion preferences.
+
+## Agent access and identity verification
+
+The agent IAM tab uses management-only AgentAccessService RPCs. Access belongs to the
+agent/channel assignment, with private, public, and disabled modes. Existing assignments
+migrate as public; new assignments start private (GitHub starts disabled). Public still
+records every sender identity; private accepts only verified identities explicitly allowed
+for that agent; disabled accepts no provider traffic into agent conversations. Blocked
+callbacks retain a deduplicated access-decision audit without exposing their content to
+agent history. Mode/grant changes invalidate runtime access and cancel affected invocations.
+Queued messages and claims recheck current policies under the connection lock.
+
+An identity is a provider-owned string `value` with an `email`, `phone_number`, or `username`
+type, unique within the connected account. Core IAM never normalizes identity values;
+provider adapters construct inbound identities and validate verification recipients.
+Verification is independent of an agent's allow flag. Management creates a pending request
+and the provider privately delivers the secret approval link. Only its hash is stored.
+The link expires after ten minutes; resends supersede prior proofs and are throttled.
+Reading the page never approves. An explicit public Approve RPC consumes the delivered
+proof and grants only the bound identity/account/agent. Management clients never receive
+the token or approval URL. Removing the assignment invalidates its proofs and grants.
+
+`/identity/verify/{id}` hosts the public, no-login approval flow and a sandboxed shared React
+iframe; only the host holds the identity-verification token. AgentMail, Slack, Linq, Meta
+WhatsApp and Telnyx deliver verification messages through their existing credentials.
+WhatsApp can use an approved one-parameter template outside its customer-service window.
+GitHub supports public/disabled only in this pass because it has no private message API.
+Native/management invocations remain separate from provider-triggered runs; an outbound
+channel binding must not silently revoke a native invocation's existing authority.
+
+## Agent pause and deletion
+
+Management PauseAgent persists `paused`, cancels active invocations and revokes
+ordinary runtime access. Executions observe cancellation through their own outbound
+control subscriptions. Pause reports the durable state change; it does not claim
+synchronous host acknowledgement. Pending work waits for ResumeAgent. Each invocation
+must establish its control subscription before running user code, so late requests
+cannot bypass pause/revocation even on a different serverless instance.
+
+`InvocationControlService` on the runtime listener streams scoped steering, stop and
+suspend controls. It allows a narrowly scoped terminal-token window to acknowledge
+stops without restoring ordinary RPC access. PostgreSQL LISTEN/NOTIFY at the gateway, or
+in-memory change notifications on a sidecar, wake delivery; unacknowledged steering replays after reconnect. SDK
+input IDs deduplicate delivery. Control subscriptions are renewed with current tokens
+and the SDK aborts work after a prolonged loss of the control connection.
+
+SuspendInvocation transitions the run through `suspending`; the SDK checkpoint hook
+must quiesce and persist framework state before returning. Execution then exits into
+`waiting`. ResumeRun starts a new invocation and carries unconsumed input forward.
+Framework code restores its checkpoint using the stable conversation ID. The host
+service now exposes only Invoke and Healthz. The inbound Steer, Cancel and Stop RPCs,
+per-host stop fences, synchronous pause receipt and redundant sidecar push jobs are
+removed. HTTP/1 serverless handlers and standalone hosts use the same SDK lifecycle.
+Deletion requires pause, erases the signing key and grants, removes connection assignments,
+and retires the registry entry and thread participation. Conversation and audit history
+remain readable; retired IDs cannot be reused. Paused state is independent of health.
+
+## Agent identity and avatars
+
+Creation requires a nonempty HTTP(S) endpoint in Rust and both RPC contracts; updates
+cannot clear it. Historical endpointless registrations can be read but need an endpoint
+before they can be updated. Retired records may clear their endpoint.
+Each agent has a stable random avatar seed, derived from its UUID at creation. The
+MIT-licensed Dispatch avatar renderer lives in `sdk/ts/packages/agent-avatar` and animates
+in the registry. Custom raster images are uploaded through management UploadAgentAvatar,
+stored in private S3 objects, and exposed by short-lived signed read URLs. Replacing an
+image preserves the generated seed and removes the old object after the database commit.
+S3 is configured with ENGINE_S3_*; task dev starts a local MinIO bucket. Agent capability
+targets use a stacked-avatar picker backed by management name search before pagination.
 
 ## Agent health and registry metrics
 
@@ -137,16 +284,18 @@ qualify if they were valid at termination. Other actions and renewal still requi
 live invocation state and unexpired tokens. No separate telemetry credential exists.
 
 Message and invocation rows retain W3C trace context across durable dispatch.
-Platform request/response-stream spans, invocation execution, and SDK agent/callback
-spans enter a bounded Rotel batching pipeline and forward to an environment-configured
-OTLP/HTTP collector. No trace payloads or export queues are stored in Postgres.
-Ingestion acknowledges in-memory queue acceptance. Retry budgets and queues are bounded;
-process failure or exhausted retries can lose queued telemetry. The destination must
-tolerate duplicate delivery. Tracing is disabled without an export endpoint, and the
-SDK skips export for unsampled invocations. Authenticated uploads remain scoped through
-application invocation records. Postgres trace persistence is a separate follow-up.
-The SDK batches and rotates bearer credentials per invocation; its OTLP URL preserves
-the runtime callback path prefix. Trace viewing/query APIs are not implemented.
+Langfuse is the trace system of record. Sidecars accept scoped OTLP, stamp it with the
+verified invocation scope, and ship it to the gateway as telemetry frames in their
+publish stream. The gateway re-stamps the agent from the authenticated deployment and
+accepts batches into its bounded delivery queue. It forwards to Langfuse and clears
+delivered payloads. Postgres holds only temporary delivery payloads and expiring replay
+receipts, never permanent trace history. Delivery wakes through LISTEN/NOTIFY and
+uses scheduled retry deadlines. Langfuse credentials remain at the gateway.
+
+Management trace reads query Langfuse. Without Langfuse configuration, tracing is
+disabled. Invocation tokens authorize agent uploads, including the terminal upload
+grace period; management tokens cannot authorize ingestion. The SDK batches per
+invocation and preserves the runtime callback path prefix in its OTLP URL.
 
 `sdk/ts/langsmith-agent` is an isolated AI SDK 6 / LangSmith demo. It loads the
 OpenAI key from SOPS, sends synthetic recipe/tool traces to LangSmith for UI
@@ -171,8 +320,14 @@ inspection, and can optionally host the same agent through Tilde ConnectRPC.
   five minutes. Existing tokens retain their snapshot until expiry; cancellation
   revokes agent actions for that invocation immediately. Trace ingestion alone
   retains the five-minute terminal upload window described above.
-- Capability: a known action mapped to None (default), Any, or Only target IDs
-  where appropriate. Agent actions are read/create/update/delete/invoke and
+- Capability: a known action mapped to No/Yes for agent creation, thread reads,
+  work reads/writes and own-run updates; other actions use None/All/Selected target
+  IDs. RPCs expose a typed field per capability: BinaryPermission for binary actions
+  and TargetPermission with a TargetSelection enum for targeted actions. Stored grants
+  and signed claims retain the typed Rust action map (`no`/`yes`, `none`/`all`/`selected`).
+  Missing grants deny; unknown enums and target IDs on non-selected modes are rejected.
+  The edit UI saves toggles immediately and selected agents on modal confirmation,
+  rolls back failed updates, and has no capability Save/Cancel footer. Agent actions are read/create/update/delete/invoke and
   grant_capabilities. Thread reads, work reads/writes, own-run updates and tool
   invocation are separate capabilities. Any thread/work grant still stays inside
   the invocation's thread/agent scope. Tool targets are catalog tool names.
@@ -194,7 +349,11 @@ management routes and React serving, defaulting to true. Management-off instance
 require no OIDC configuration. Packaged React assets share the management bind;
 that listener is absent when neither management nor embedded web is enabled.
 Development omits Vite when web is disabled and Dex when management is disabled.
-The agent runtime listener and background workers remain active in every mode.
+The agent runtime and event ingress listeners and background workers remain active
+in every mode. Event ingress defaults to `127.0.0.1:8082` and mounts only signed
+provider webhook routes; management never mounts webhook ingress.
+`ENGINE_PUBLIC_EVENT_INGRESS_LISTEN` and `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL` control its
+bind and advertised webhook origin independently of management.
 
 Taskfile owns development startup, build/test sequencing and SQLx preparation.
 Task loads `.env`, validates Rust configuration before starting services, then runs
@@ -231,7 +390,7 @@ WhatsApp and Telnyx WhatsApp. They own dynamic tool definitions and provider wir
 formats. Tool names include the connection ID to distinguish multiple accounts. Meta
 read/typing actions are not advertised for Telnyx, and email has no reaction tool.
 Connection credentials resolve through the existing encrypted store and refresh path.
-Verified callbacks at `/connections/webhooks/{connection_id}` bypass management login
+Verified callbacks at `/connections/webhooks/{connection_id}` run only on event ingress
 and check provider signatures, timestamp windows where available, and account identity.
 Conversation/thread creation, participants, message and callback receipt commit together;
 duplicate deliveries cannot create duplicate messages. Historical channel threads retain
@@ -301,7 +460,7 @@ All previously permitted runtime registry operations remain available.
 Connection management and public setup commands are separate complete services. The
 ConnectionSetupService and native OAuth callback are composed outside management login;
 every setup command validates its connection setup token. Remote provider HandleSetup
-belongs to provider/v1; agent-host Invoke, Steer, Cancel and Healthz belong to agent_host/v1.
+belongs to provider/v1; agent-host Invoke and Healthz belong to agent_host/v1. Invocation controls are outbound runtime subscriptions.
 This changes protocol paths and generated clients, with no legacy namespace aliases.
 It retains the single binary, common domain implementations and central database migrations.
 
@@ -322,30 +481,132 @@ notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
 refreshes every 30 seconds; it does not yet have a registry subscription API.
 
-## Sidecar deployment decisions (planned, not implemented)
+## Deployments and instances
 
-Gateway-only deployment remains supported. An agent may instead register HA
-sidecars using one gateway-issued token shared by those replicas. Sidecar
-configuration accepts a comma-separated list of agent tokens so one process can
-serve multiple agents; per-replica credential exchange is not required.
+An agent has many deployments. `agent_deployments` is the declared half of "what is
+running": created by CI (`RegisterDeployment`, idempotent on a caller-supplied external
+id) or by hand in the Deployments tab, with a source, a target (`direct`, `sidecar` or
+`aws_lambda`), the wake address or function ARN, repository and commit. Registering a
+deployment issues its token once; the token is the join between the record and whatever
+runs. `agent_instances` is the observed half: every process that dials in with a
+deployment token, heartbeating on a short cadence. Every instance belongs to exactly one
+deployment, the gateway rejects registration otherwise, and local agents never federate
+into a deployed registry. Retiring a deployment invalidates its token. Policy
+(capabilities, connections, IAM) stays on the agent; execution mode (gateway or sidecar)
+also stays on the agent for now, so every deployment of an agent shares it and a
+deployment's target must match. Creating an agent with an endpoint mints its initial
+manual direct deployment, and changing the endpoint mints another; promotion mirrors a
+direct deployment's endpoint back onto the agent for legacy readers.
 
-Management owns central IAM, grants, registry administration and connection setup.
-The complete agent runtime API is available on one agent-facing sidecar port,
-with permissions enforced locally from gateway authority. A separate external
-event API accepts authenticated provider webhooks and application triggers at
-either gateway or sidecar, forwarding commands to the executing agent as needed.
-Health observations, telemetry and committed runtime events flow back to the
-gateway. Replication between separate databases is distinct from LISTEN/NOTIFY
-within a shared database and has not been implemented.
+Routing is per agent: `latest` serves each newly registered deployment of the matching
+target at once, `manual` waits for `PromoteDeployment`. A (thread, agent) pair is pinned
+to the serving deployment on its first invocation and stays pinned while that
+deployment is registered; invocations record their deployment. Failover stays within a
+deployment. Moving a thread across deployments is an explicit act, not yet exposed.
 
-An active invocation needs one execution owner; subscriptions may be served by
-any instance with access to its events. Assigning an entire conversation to one
-sidecar group is not an accepted requirement. Cross-database event ordering,
-invocation claims and provider-event deduplication still need coordination design.
+## Agent deployments and sidecars
 
-Sidecar attachment bytes should live only in bounded memory or tmpfs and be sent
-to the gateway for upload to S3. Attachment identity remains stable across local
-and gateway copies. Local availability precedes S3 durability; eviction of pending
-uploads and acknowledgement semantics must respect that distinction. The current
-implementation still stores encrypted bytes in Postgres; sidecar storage and the
-S3 upload path are not implemented yet.
+Agents select gateway or sidecar deployment in the Deployment settings tab. Gateway
+mode uses Postgres for everything and invokes the serving direct deployment's endpoint. Sidecar mode
+runs replicas that dial in with a sidecar deployment's token. `tilde-sidecar` accepts
+comma-separated deployment tokens, one per agent, and an agent-ID-to-local-endpoint map,
+and keeps no state on disk.
+
+The gateway serves four route groups on one listener: management, runtime, ingress and
+sidecar. A sidecar binds a loopback runtime listener for its agent process and one
+network listener for provider webhooks and native ingress. Every other interaction is an
+outbound connection from the sidecar to the gateway's sidecar group: a held `Watch`
+stream that delivers a snapshot, configuration changes, lease changes and directives,
+and `Publish` calls that carry heartbeats, typed events, directive results, lease
+releases and telemetry. Central IAM, registry changes and credential setup stay at the
+gateway. Sidecars enforce replicated permissions and serve assigned connection
+credentials from memory.
+
+Postgres is the record. A replica is a cache of the threads it touched, a write-behind
+queue, and the executor for the threads it holds a lease on. Execution exclusivity is
+one lease per `(thread, agent)` in `thread_leases`, pointing at a replica incarnation;
+data carries no ownership. A thread costs one gateway call when a replica first touches
+it: `Hydrate` returns the projection's state and takes the lease in the same
+transaction. After that, events on that thread cost no SQL and no gateway call on the
+hot path: the holder mutates state under one per-thread lock, appends typed events with
+a per-thread sequence, and the shipper drains them asynchronously in batches. A thread
+idle past the configured window leaves memory and its lease is released, so the next
+replica to touch it takes over cleanly.
+
+Lease validity is the holder's liveness: the instance heartbeat, sent every three
+seconds independently of the event queue, implicitly renews every lease the replica
+holds, and a holder unheard from for fifteen seconds is dead. A replica whose publishes
+have not been acknowledged for ten seconds stops executing on all its threads, strictly
+inside the gateway's dead-detection window, so a partitioned holder never runs beside
+its replacement. Only run, invocation and tool-call state is checked against the lease
+at projection time; messages, users, thread changes, traces and logs from any replica
+are accepted. Run state from a replica that no longer holds the thread is answered
+with the current lease rather than an error, and the replica fails its local work for
+that thread. The gateway projects a batch in one transaction with an idempotency
+receipt per event; only a frame the gateway cannot accept (a permission failure or a
+constraint violation) is rejected on its own, and only infrastructure failures fail a
+batch, which is then resent in order. Acknowledged writes live in replica memory until
+the shipper publishes them: a replica that dies with a non-empty outbox loses those
+events, and the gateway decides the order of near-simultaneous appends from different
+replicas, both accepted risks in exchange for a hot path without round trips. External
+effects still need application idempotency keys.
+
+Recovery scans leases whose holder is dead. A lease with no active invocation is simply
+dropped. One with interrupted work locks the thread route, fails the old invocations,
+re-routes the dead holder's unacknowledged directives, and either moves the lease to a
+live replica, which hydrates the thread and restarts the run from its objective, or
+fails the run under the stop policy. A hydrate that finds the current holder dead
+performs the same takeover with the claimant as the replacement, so a forwarded request
+never orphans an interrupted run. Lease changes reach replicas on the Watch stream.
+
+Requests for a thread that land on a replica which does not hold it are handed to the
+holder directly, sidecar to sidecar, when the gateway's lease answer named a live one;
+when nobody holds it the receiving replica takes the lease and runs the turn itself.
+Requests on the gateway's ingress for a sidecar agent are queued as durable directives
+for the holder, or for any live replica when the thread is unheld, and the HTTP result
+is relayed unchanged. Provider webhooks are handed over the same way without waiting.
+Completed messages in rooms with several sidecar agents are relayed to each holder;
+gateway-deployed agents in the same room are routed from the projection. Management
+writes to sidecar conversations forward the same way. Reads (thread, run, message,
+activity and thread listings) are answered from the projection wherever they land,
+since only the projection sees every replica's conversations; a replica forwards
+listings and cursor pages, and serves the current window of a thread it holds.
+Registry RPCs from an agent beside a sidecar are verified by the replica, relayed over
+`Relay`, and re-verified at the gateway: token signature, agent generation, the
+thread lease, and the capability ceiling, before the existing registry handlers run.
+The projection may lag a young invocation or roster, so only an invocation the gateway
+already knows to be over is refused there.
+
+Attachment bytes live in bounded sidecar memory until a separate worker uploads them
+to the gateway, which encrypts them into S3; a slow object store never delays
+heartbeats. Replicated metadata distinguishes temporary
+availability from persistence, and persisted bytes can be downloaded through the
+gateway by any replica. Health samples arrive with heartbeats.
+
+## Langfuse observability integration
+
+Gateway configuration owns LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY,
+LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Only tracing_enabled is
+included in sidecar configuration. Disabled telemetry is validated and discarded;
+gateway outages keep batches in the bounded sidecar outbox. Gateway acceptance places
+them in the shared transient telemetry_delivery queue. Stable payload receipts
+deduplicate reconnect replay; Langfuse owns all trace history. Platform spans use a process-wide
+provider routed to the correct local agent, preserving invocation context and
+terminal trace-token grace. The agent Tracing tab queries scoped Langfuse public
+APIs through management-only RPCs. No Langfuse credentials reach agents or browsers.
+
+## Agent log history
+
+OTel logs use Rotel and the same verified invocation scope and terminal grace as
+traces. ClickHouse owns log history in a standard OTel Map schema with explicit
+agent, invocation, thread, and record identities. Gateway disk queues independently
+buffer local history and optional external OTLP delivery; application Postgres
+never stores bulk logs. Queue limits, 24-hour pending expiry, and seven-day history
+retention bound resource use. Sidecars ship immutable log batches in their publish
+stream until durable gateway acceptance and receive enablement only.
+
+The management-only LogsService enforces agent scoping and fixed-window cursor
+pagination. The agent Logs tab provides filters, record inspection, native trace
+links, and a bounded live view. Local ClickHouse is enabled by default for task dev,
+uses Compose defaults and .env overrides, and can be opted out independently of
+Langfuse with DEV_LOGS_ENABLED=0.

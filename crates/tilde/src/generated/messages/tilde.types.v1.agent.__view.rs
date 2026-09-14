@@ -3,6 +3,18 @@
 
 #[derive(Clone, Debug, Default)]
 pub struct AgentView<'a> {
+    /// Stable random seed for the generated avatar; retained after custom uploads.
+    ///
+    /// Field 11: `avatar_seed`
+    pub avatar_seed: &'a str,
+    /// Short-lived signed URL for a custom avatar, when present.
+    ///
+    /// Field 12: `avatar_url`
+    pub avatar_url: ::core::option::Option<&'a str>,
+    /// Paused agents remain health checked but receive no invocations.
+    ///
+    /// Field 10: `paused`
+    pub paused: bool,
     /// Field 1: `id`
     pub id: &'a str,
     /// Field 2: `name`
@@ -55,6 +67,27 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.avatar_seed = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.avatar_url = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.paused = ::buffa::types::decode_bool(&mut cur)?;
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -182,6 +215,9 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Agent {
+            avatar_seed: self.avatar_seed.to_string(),
+            avatar_url: self.avatar_url.map(|s| s.to_string()),
+            paused: self.paused,
             id: self.id.to_string(),
             name: self.name.to_string(),
             endpoint_url: self.endpoint_url.map(|s| s.to_string()),
@@ -273,6 +309,15 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.paused {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.avatar_seed.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.avatar_seed) as u64;
+        }
+        if let Some(ref v) = self.avatar_url {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -325,6 +370,15 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
             );
             self.capabilities.write_to(__cache, buf);
         }
+        if self.paused {
+            ::buffa::types::put_bool_field(10u32, self.paused, buf);
+        }
+        if !self.avatar_seed.is_empty() {
+            ::buffa::types::put_string_field(11u32, &self.avatar_seed, buf);
+        }
+        if let Some(ref v) = self.avatar_url {
+            ::buffa::types::put_string_field(12u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -346,6 +400,15 @@ impl<'__a> ::serde::Serialize for AgentView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.avatar_seed) {
+            __map.serialize_entry("avatarSeed", self.avatar_seed)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.avatar_url {
+            __map.serialize_entry("avatarUrl", __v)?;
+        }
+        if self.paused {
+            __map.serialize_entry("paused", &self.paused)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
             __map.serialize_entry("id", self.id)?;
         }
@@ -461,6 +524,27 @@ impl AgentOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Stable random seed for the generated avatar; retained after custom uploads.
+    ///
+    /// Field 11: `avatar_seed`
+    #[must_use]
+    pub fn avatar_seed(&self) -> &'_ str {
+        self.0.reborrow().avatar_seed
+    }
+    /// Short-lived signed URL for a custom avatar, when present.
+    ///
+    /// Field 12: `avatar_url`
+    #[must_use]
+    pub fn avatar_url(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().avatar_url
+    }
+    /// Paused agents remain health checked but receive no invocations.
+    ///
+    /// Field 10: `paused`
+    #[must_use]
+    pub fn paused(&self) -> bool {
+        self.0.reborrow().paused
     }
     /// Field 1: `id`
     #[must_use]
@@ -1343,13 +1427,42 @@ impl ::serde::Serialize for AgentHealthHourOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// Missing fields deny access. Binary actions cannot carry target IDs.
 #[derive(Clone, Debug, Default)]
 pub struct CapabilitiesView<'a> {
-    /// Field 1: `grants` (map)
-    pub grants: ::buffa::MapView<
-        'a,
-        &'a str,
-        super::super::__buffa::view::CapabilityScopeView<'a>,
+    /// Field 2: `agents_read`
+    pub agents_read: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Field 3: `agents_create`
+    pub agents_create: ::buffa::EnumValue<super::super::BinaryPermission>,
+    /// Field 4: `agents_update`
+    pub agents_update: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Field 5: `agents_delete`
+    pub agents_delete: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Field 6: `agents_invoke`
+    pub agents_invoke: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Field 7: `agents_grant_capabilities`
+    pub agents_grant_capabilities: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Field 8: `thread_read`
+    pub thread_read: ::buffa::EnumValue<super::super::BinaryPermission>,
+    /// Field 9: `work_read`
+    pub work_read: ::buffa::EnumValue<super::super::BinaryPermission>,
+    /// Field 10: `work_write`
+    pub work_write: ::buffa::EnumValue<super::super::BinaryPermission>,
+    /// Field 11: `run_update`
+    pub run_update: ::buffa::EnumValue<super::super::BinaryPermission>,
+    /// Field 12: `tools_invoke`
+    pub tools_invoke: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
     >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
@@ -1381,51 +1494,176 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
-            1u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                let entry_bytes = ::buffa::types::borrow_bytes(&mut cur)?;
-                let mut entry_cur: &'a [u8] = entry_bytes;
-                let mut key = "";
-                let mut val = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&key)
-                        + ::buffa::__private::element_footprint(&val),
-                )?;
-                while !entry_cur.is_empty() {
-                    let entry_tag = ::buffa::encoding::Tag::decode(&mut entry_cur)?;
-                    match entry_tag.field_number() {
-                        1 => {
-                            ::buffa::encoding::check_wire_type(
-                                entry_tag,
-                                ::buffa::encoding::WireType::LengthDelimited,
-                            )?;
-                            key = ::buffa::types::borrow_str(&mut entry_cur)?;
-                        }
-                        2 => {
-                            ::buffa::encoding::check_wire_type(
-                                entry_tag,
-                                ::buffa::encoding::WireType::LengthDelimited,
-                            )?;
-                            let __sub_ctx = ctx.descend()?;
-                            let sub = ::buffa::types::borrow_bytes(&mut entry_cur)?;
-                            val = <super::super::__buffa::view::CapabilityScopeView as ::buffa::MessageView>::decode_view_ctx(
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_read.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_read = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
                                 sub,
                                 __sub_ctx,
-                            )?;
-                        }
-                        _ => {
-                            ::buffa::encoding::skip_field_depth(
-                                entry_tag,
-                                &mut entry_cur,
-                                ctx.depth(),
-                            )?;
-                        }
+                            )?,
+                        );
                     }
                 }
-                view.grants.push(key, val);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.agents_create = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_update.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_update = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_delete.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_delete = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_invoke.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_invoke = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_grant_capabilities.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_grant_capabilities = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.thread_read = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.work_read = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.work_write = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.run_update = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.tools_invoke.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.tools_invoke = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
             }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -1449,16 +1687,65 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Capabilities {
-            grants: self
-                .grants
-                .iter()
-                .map(|(k, v)| {
-                    ::core::result::Result::<
-                        _,
-                        ::buffa::DecodeError,
-                    >::Ok((k.to_string(), v.to_owned_from_source(__buffa_src)?))
-                })
-                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            agents_read: match self.agents_read.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_create: self.agents_create,
+            agents_update: match self.agents_update.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_delete: match self.agents_delete.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_invoke: match self.agents_invoke.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_grant_capabilities: match self.agents_grant_capabilities.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            thread_read: self.thread_read,
+            work_read: self.work_read,
+            work_write: self.work_write,
+            run_update: self.run_update,
+            tools_invoke: match self.tools_invoke.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1470,17 +1757,83 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        #[allow(clippy::for_kv_map)]
-        for (k, v) in &self.grants {
-            let entry_size: u64 = 1u64 + ::buffa::types::string_encoded_len(k) as u64
-                + 1u64
-                + {
-                    let __slot = __cache.reserve();
-                    let inner = v.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    ::buffa::encoding::varint_len(inner as u64) as u64 + inner as u64
-                };
-            size += 1u64 + ::buffa::encoding::varint_len(entry_size) as u64 + entry_size;
+        if self.agents_read.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_read.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        {
+            let val = self.agents_create.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.agents_update.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_update.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_delete.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_delete.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_invoke.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_invoke.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.agents_grant_capabilities.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_grant_capabilities.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        {
+            let val = self.thread_read.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.work_read.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.work_write.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.run_update.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.tools_invoke.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.tools_invoke.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -1493,31 +1846,83 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        for (k, v) in &self.grants {
-            let __v_len = __cache.consume_next();
-            let entry_size: u64 = 1u64 + ::buffa::types::string_encoded_len(k) as u64
-                + 1u64
-                + (::buffa::encoding::varint_len(__v_len as u64) as u64
-                    + __v_len as u64);
-            ::buffa::encoding::Tag::new(
-                    1u32,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )
-                .encode(buf);
-            ::buffa::encoding::encode_varint(entry_size, buf);
-            ::buffa::encoding::Tag::new(
-                    1u32,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )
-                .encode(buf);
-            ::buffa::types::encode_string(k, buf);
-            ::buffa::encoding::Tag::new(
-                    2u32,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )
-                .encode(buf);
-            ::buffa::encoding::encode_varint(__v_len as u64, buf);
-            v.write_to(__cache, buf);
+        if self.agents_read.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_read.write_to(__cache, buf);
+        }
+        {
+            let val = self.agents_create.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.agents_update.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_update.write_to(__cache, buf);
+        }
+        if self.agents_delete.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_delete.write_to(__cache, buf);
+        }
+        if self.agents_invoke.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_invoke.write_to(__cache, buf);
+        }
+        if self.agents_grant_capabilities.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_grant_capabilities.write_to(__cache, buf);
+        }
+        {
+            let val = self.thread_read.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
+        }
+        {
+            let val = self.work_read.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
+        }
+        {
+            let val = self.work_write.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
+        }
+        {
+            let val = self.run_update.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(11u32, val, buf);
+            }
+        }
+        if self.tools_invoke.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                12u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.tools_invoke.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1540,29 +1945,53 @@ impl<'__a> ::serde::Serialize for CapabilitiesView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
-        if !self.grants.is_empty() {
-            struct _WM<'__a, '__x>(
-                &'__x ::buffa::MapView<
-                    '__x,
-                    &'__a str,
-                    super::super::__buffa::view::CapabilityScopeView<'__a>,
-                >,
-            );
-            impl<'__a> ::serde::Serialize for _WM<'__a, '_> {
-                fn serialize<__S: ::serde::Serializer>(
-                    &self,
-                    __s: __S,
-                ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                    use ::serde::ser::SerializeMap as _;
-                    let mut __m = __s
-                        .serialize_map(::core::option::Option::Some(self.0.len()))?;
-                    for (k, v) in self.0.iter_unique() {
-                        __m.serialize_entry(k, v)?;
-                    }
-                    __m.end()
-                }
+        {
+            if let ::core::option::Option::Some(__v) = self.agents_read.as_option() {
+                __map.serialize_entry("agentsRead", __v)?;
             }
-            __map.serialize_entry("grants", &_WM(&self.grants))?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.agents_create) {
+            __map.serialize_entry("agentsCreate", &self.agents_create)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.agents_update.as_option() {
+                __map.serialize_entry("agentsUpdate", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.agents_delete.as_option() {
+                __map.serialize_entry("agentsDelete", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.agents_invoke.as_option() {
+                __map.serialize_entry("agentsInvoke", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self
+                .agents_grant_capabilities
+                .as_option()
+            {
+                __map.serialize_entry("agentsGrantCapabilities", __v)?;
+            }
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.thread_read) {
+            __map.serialize_entry("threadRead", &self.thread_read)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.work_read) {
+            __map.serialize_entry("workRead", &self.work_read)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.work_write) {
+            __map.serialize_entry("workWrite", &self.work_write)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.run_update) {
+            __map.serialize_entry("runUpdate", &self.run_update)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.tools_invoke.as_option() {
+                __map.serialize_entry("toolsInvoke", __v)?;
+            }
         }
         __map.end()
     }
@@ -1655,16 +2084,84 @@ impl CapabilitiesOwnedView {
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
     }
-    /// Field 1: `grants` (map)
+    /// Field 2: `agents_read`
     #[must_use]
-    pub fn grants(
+    pub fn agents_read(
         &self,
-    ) -> &::buffa::MapView<
-        '_,
-        &'_ str,
-        super::super::__buffa::view::CapabilityScopeView<'_>,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
     > {
-        &self.0.reborrow().grants
+        &self.0.reborrow().agents_read
+    }
+    /// Field 3: `agents_create`
+    #[must_use]
+    pub fn agents_create(&self) -> ::buffa::EnumValue<super::super::BinaryPermission> {
+        self.0.reborrow().agents_create
+    }
+    /// Field 4: `agents_update`
+    #[must_use]
+    pub fn agents_update(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_update
+    }
+    /// Field 5: `agents_delete`
+    #[must_use]
+    pub fn agents_delete(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_delete
+    }
+    /// Field 6: `agents_invoke`
+    #[must_use]
+    pub fn agents_invoke(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_invoke
+    }
+    /// Field 7: `agents_grant_capabilities`
+    #[must_use]
+    pub fn agents_grant_capabilities(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_grant_capabilities
+    }
+    /// Field 8: `thread_read`
+    #[must_use]
+    pub fn thread_read(&self) -> ::buffa::EnumValue<super::super::BinaryPermission> {
+        self.0.reborrow().thread_read
+    }
+    /// Field 9: `work_read`
+    #[must_use]
+    pub fn work_read(&self) -> ::buffa::EnumValue<super::super::BinaryPermission> {
+        self.0.reborrow().work_read
+    }
+    /// Field 10: `work_write`
+    #[must_use]
+    pub fn work_write(&self) -> ::buffa::EnumValue<super::super::BinaryPermission> {
+        self.0.reborrow().work_write
+    }
+    /// Field 11: `run_update`
+    #[must_use]
+    pub fn run_update(&self) -> ::buffa::EnumValue<super::super::BinaryPermission> {
+        self.0.reborrow().run_update
+    }
+    /// Field 12: `tools_invoke`
+    #[must_use]
+    pub fn tools_invoke(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().tools_invoke
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<CapabilitiesView<'static>>>
@@ -1698,17 +2195,17 @@ impl ::serde::Serialize for CapabilitiesOwnedView {
     }
 }
 #[derive(Clone, Debug, Default)]
-pub struct CapabilityScopeView<'a> {
-    /// none, any, or only. IDs are supported only for target-scoped actions.
-    ///
+pub struct TargetPermissionView<'a> {
     /// Field 1: `mode`
-    pub mode: &'a str,
+    pub mode: ::buffa::EnumValue<super::super::TargetSelection>,
+    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    ///
     /// Field 2: `ids`
     pub ids: ::buffa::RepeatedView<'a, &'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
-impl<'a> ::buffa::MessageView<'a> for CapabilityScopeView<'a> {
-    type Owned = super::super::CapabilityScope;
+impl<'a> ::buffa::MessageView<'a> for TargetPermissionView<'a> {
+    type Owned = super::super::TargetPermission;
     fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
         let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
         <Self as ::buffa::MessageView>::decode_view_ctx(
@@ -1738,9 +2235,11 @@ impl<'a> ::buffa::MessageView<'a> for CapabilityScopeView<'a> {
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                    ::buffa::encoding::WireType::Varint,
                 )?;
-                view.mode = ::buffa::types::borrow_str(&mut cur)?;
+                view.mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1763,33 +2262,36 @@ impl<'a> ::buffa::MessageView<'a> for CapabilityScopeView<'a> {
     }
     fn to_owned_message(
         &self,
-    ) -> ::core::result::Result<super::super::CapabilityScope, ::buffa::DecodeError> {
+    ) -> ::core::result::Result<super::super::TargetPermission, ::buffa::DecodeError> {
         self.to_owned_from_source(None)
     }
     #[allow(clippy::useless_conversion, clippy::needless_update)]
     fn to_owned_from_source(
         &self,
         __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-    ) -> ::core::result::Result<super::super::CapabilityScope, ::buffa::DecodeError> {
+    ) -> ::core::result::Result<super::super::TargetPermission, ::buffa::DecodeError> {
         #[allow(unused_imports)]
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
-        ::core::result::Result::Ok(super::super::CapabilityScope {
-            mode: self.mode.to_string(),
+        ::core::result::Result::Ok(super::super::TargetPermission {
+            mode: self.mode,
             ids: self.ids.iter().map(|s| s.to_string()).collect(),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
     }
 }
-impl<'a> ::buffa::ViewEncode<'a> for CapabilityScopeView<'a> {
+impl<'a> ::buffa::ViewEncode<'a> for TargetPermissionView<'a> {
     #[allow(clippy::needless_borrow, clippy::let_and_return)]
     fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        if !self.mode.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.mode) as u64;
+        {
+            let val = self.mode.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
         }
         for v in &self.ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
@@ -1805,8 +2307,11 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilityScopeView<'a> {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if !self.mode.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.mode, buf);
+        {
+            let val = self.mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
         }
         for v in &self.ids {
             ::buffa::types::put_string_field(2u32, v, buf);
@@ -1825,15 +2330,15 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilityScopeView<'a> {
 /// fields depends on default-omission rules; serializers that require
 /// known map lengths (e.g. `bincode`) will return a runtime error.
 /// Use the owned message type for those formats.
-impl<'__a> ::serde::Serialize for CapabilityScopeView<'__a> {
+impl<'__a> ::serde::Serialize for TargetPermissionView<'__a> {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
-        if !::buffa::json_helpers::skip_if::is_empty_str(self.mode) {
-            __map.serialize_entry("mode", self.mode)?;
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.mode) {
+            __map.serialize_entry("mode", &self.mode)?;
         }
         if !self.ids.is_empty() {
             __map.serialize_entry("ids", &*self.ids)?;
@@ -1841,22 +2346,22 @@ impl<'__a> ::serde::Serialize for CapabilityScopeView<'__a> {
         __map.end()
     }
 }
-impl<'a> ::buffa::MessageName for CapabilityScopeView<'a> {
+impl<'a> ::buffa::MessageName for TargetPermissionView<'a> {
     const PACKAGE: &'static str = "tilde.types.v1";
-    const NAME: &'static str = "CapabilityScope";
-    const FULL_NAME: &'static str = "tilde.types.v1.CapabilityScope";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.CapabilityScope";
+    const NAME: &'static str = "TargetPermission";
+    const FULL_NAME: &'static str = "tilde.types.v1.TargetPermission";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.TargetPermission";
 }
-::buffa::impl_default_view_instance!(CapabilityScopeView);
-::buffa::impl_view_reborrow!(CapabilityScopeView);
-/** Self-contained, `'static` owned view of a `CapabilityScope` message.
+::buffa::impl_default_view_instance!(TargetPermissionView);
+::buffa::impl_view_reborrow!(TargetPermissionView);
+/** Self-contained, `'static` owned view of a `TargetPermission` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`CapabilityScopeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`TargetPermissionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CapabilityScopeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TargetPermissionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
 #[derive(Clone, Debug)]
-pub struct CapabilityScopeOwnedView(::buffa::OwnedView<CapabilityScopeView<'static>>);
-impl CapabilityScopeOwnedView {
+pub struct TargetPermissionOwnedView(::buffa::OwnedView<TargetPermissionView<'static>>);
+impl TargetPermissionOwnedView {
     /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
     ///
     /// The view borrows directly from the buffer's data; the buffer is
@@ -1870,7 +2375,7 @@ impl CapabilityScopeOwnedView {
         bytes: ::buffa::bytes::Bytes,
     ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
         ::core::result::Result::Ok(
-            CapabilityScopeOwnedView(::buffa::OwnedView::decode(bytes)?),
+            TargetPermissionOwnedView(::buffa::OwnedView::decode(bytes)?),
         )
     }
     /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
@@ -1885,7 +2390,7 @@ impl CapabilityScopeOwnedView {
         opts: &::buffa::DecodeOptions,
     ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
         ::core::result::Result::Ok(
-            CapabilityScopeOwnedView(
+            TargetPermissionOwnedView(
                 ::buffa::OwnedView::decode_with_options(bytes, opts)?,
             ),
         )
@@ -1899,15 +2404,15 @@ impl CapabilityScopeOwnedView {
     /// another [`::buffa::DecodeError`] if the re-encoded bytes are
     /// somehow invalid (should not happen for well-formed messages).
     pub fn from_owned(
-        msg: &super::super::CapabilityScope,
+        msg: &super::super::TargetPermission,
     ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
         ::core::result::Result::Ok(
-            CapabilityScopeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+            TargetPermissionOwnedView(::buffa::OwnedView::from_owned(msg)?),
         )
     }
-    /// Borrow the full [`CapabilityScopeView`] with its lifetime tied to `&self`.
+    /// Borrow the full [`TargetPermissionView`] with its lifetime tied to `&self`.
     #[must_use]
-    pub fn view(&self) -> &CapabilityScopeView<'_> {
+    pub fn view(&self) -> &TargetPermissionView<'_> {
         self.0.reborrow()
     }
     /// Convert to the owned message type.
@@ -1918,7 +2423,7 @@ impl CapabilityScopeOwnedView {
     /// whose contract also governs handles converted from a raw
     /// [`::buffa::OwnedView`].
     #[must_use]
-    pub fn to_owned_message(&self) -> super::super::CapabilityScope {
+    pub fn to_owned_message(&self) -> super::super::TargetPermission {
         self.0.to_owned_message()
     }
     /// The underlying bytes buffer.
@@ -1931,42 +2436,42 @@ impl CapabilityScopeOwnedView {
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
     }
-    /// none, any, or only. IDs are supported only for target-scoped actions.
-    ///
     /// Field 1: `mode`
     #[must_use]
-    pub fn mode(&self) -> &'_ str {
+    pub fn mode(&self) -> ::buffa::EnumValue<super::super::TargetSelection> {
         self.0.reborrow().mode
     }
+    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    ///
     /// Field 2: `ids`
     #[must_use]
     pub fn ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().ids
     }
 }
-impl ::core::convert::From<::buffa::OwnedView<CapabilityScopeView<'static>>>
-for CapabilityScopeOwnedView {
-    fn from(inner: ::buffa::OwnedView<CapabilityScopeView<'static>>) -> Self {
-        CapabilityScopeOwnedView(inner)
+impl ::core::convert::From<::buffa::OwnedView<TargetPermissionView<'static>>>
+for TargetPermissionOwnedView {
+    fn from(inner: ::buffa::OwnedView<TargetPermissionView<'static>>) -> Self {
+        TargetPermissionOwnedView(inner)
     }
 }
-impl ::core::convert::From<CapabilityScopeOwnedView>
-for ::buffa::OwnedView<CapabilityScopeView<'static>> {
-    fn from(wrapper: CapabilityScopeOwnedView) -> Self {
+impl ::core::convert::From<TargetPermissionOwnedView>
+for ::buffa::OwnedView<TargetPermissionView<'static>> {
+    fn from(wrapper: TargetPermissionOwnedView) -> Self {
         wrapper.0
     }
 }
-impl ::core::convert::AsRef<::buffa::OwnedView<CapabilityScopeView<'static>>>
-for CapabilityScopeOwnedView {
-    fn as_ref(&self) -> &::buffa::OwnedView<CapabilityScopeView<'static>> {
+impl ::core::convert::AsRef<::buffa::OwnedView<TargetPermissionView<'static>>>
+for TargetPermissionOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<TargetPermissionView<'static>> {
         &self.0
     }
 }
-impl ::buffa::HasMessageView for super::super::CapabilityScope {
-    type View<'a> = CapabilityScopeView<'a>;
-    type ViewHandle = CapabilityScopeOwnedView;
+impl ::buffa::HasMessageView for super::super::TargetPermission {
+    type View<'a> = TargetPermissionView<'a>;
+    type ViewHandle = TargetPermissionOwnedView;
 }
-impl ::serde::Serialize for CapabilityScopeOwnedView {
+impl ::serde::Serialize for TargetPermissionOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

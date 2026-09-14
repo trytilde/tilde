@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sidecar_directives SET instance_id=$3 WHERE thread_id=$1 AND instance_id=$2 AND acked_at IS NULL;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "810d778a9b3ae112227d2a1a00b901c4ccd8e1d83c7afbe3f68bf7c9552eee2d"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_identity_verifications SET expires_at=NOW() WHERE identity_id=$1 AND agent_id=$2 AND status<>'approved';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e2638cba3aa7122f4b260014f4c96f2950377d3c51c1a2bef1b8fd69a7a1624c"
+}

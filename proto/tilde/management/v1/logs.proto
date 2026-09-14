@@ -1,0 +1,39 @@
+syntax = "proto3";
+package tilde.management.v1;
+
+service LogsService {
+  rpc GetLogsStatus(GetLogsStatusRequest) returns (GetLogsStatusResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+message GetLogsStatusRequest { string agent_id = 1; }
+enum LogsState { LOGS_STATE_UNSPECIFIED = 0; LOGS_STATE_DISABLED = 1; LOGS_STATE_READY = 2; LOGS_STATE_UNAVAILABLE = 3; }
+message GetLogsStatusResponse { LogsState state = 1; string message = 2; bool forwarding_enabled = 3; }
+message LogFilter {
+  string from_time = 1;
+  string to_time = 2;
+  uint32 minimum_severity = 3;
+  string search = 4;
+  string invocation_id = 5;
+  string trace_id = 6;
+  string service = 7;
+}
+// A fixed time window and opaque cursor keep pagination stable while new logs arrive.
+message ListLogsRequest { string agent_id = 1; LogFilter filter = 2; string cursor = 3; }
+message LogAttribute { string key = 1; string value = 2; }
+message LogRecord {
+  string id = 1;
+  string timestamp = 2;
+  string severity = 3;
+  uint32 severity_number = 4;
+  string body = 5;
+  string service = 6;
+  string trace_id = 7;
+  string span_id = 8;
+  string invocation_id = 9;
+  string thread_id = 10;
+  repeated LogAttribute attributes = 11;
+  repeated LogAttribute resource_attributes = 12;
+  repeated LogAttribute scope_attributes = 13;
+  string scope_name = 14;
+}
+message ListLogsResponse { repeated LogRecord records = 1; string next_cursor = 2; bool partial = 3; }

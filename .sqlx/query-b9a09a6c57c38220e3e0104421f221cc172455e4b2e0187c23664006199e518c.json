@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM chat_identity_verifications WHERE expires_at < NOW()-INTERVAL '1 day';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "b9a09a6c57c38220e3e0104421f221cc172455e4b2e0187c23664006199e518c"
+}

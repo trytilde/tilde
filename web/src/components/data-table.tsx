@@ -1,6 +1,7 @@
+import { AgentAvatar } from "./agent-avatar";
 import { useMemo } from "react";
 import { createColumnHelper, FlexRender, tableFeatures, useTable } from "@tanstack/react-table";
-import { PencilIcon, Trash2Icon } from "lucide-react";
+import { PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
 import { HealthBadge, HealthHistory, responseTime } from "@/components/agent-health";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,18 @@ export function DataTable({
   loaded,
   onEdit,
   onDelete,
+  onPause,
+  onResume,
+  busy,
 }: {
   data: Agent[];
   loading: boolean;
   loaded: boolean;
   onEdit: (agent: Agent) => void;
   onDelete: (agent: Agent) => void;
+  onPause: (agent: Agent) => void;
+  onResume: (agent: Agent) => void;
+  busy: boolean;
 }) {
   const columns = useMemo(
     () =>
@@ -35,14 +42,11 @@ export function DataTable({
           header: "Name",
           cell: ({ row }) => (
             <div className="flex items-center gap-2">
-              <Button
-                variant="link"
-                className="h-auto p-0 text-foreground"
-                disabled={loading}
-                onClick={() => onEdit(row.original)}
-              >
-                {row.original.name}
-              </Button>
+              <AgentAvatar agent={row.original} animated />
+              <span className="font-medium">{row.original.name}</span>
+              {row.original.paused && (
+                <span className="rounded bg-muted px-2 py-0.5 text-xs">Paused</span>
+              )}
               <HealthBadge metrics={row.original.metrics} />
             </div>
           ),
@@ -105,26 +109,35 @@ export function DataTable({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={`Edit ${row.original.name}`}
-                disabled={loading}
-                onClick={() => onEdit(row.original)}
+                aria-label={`${row.original.paused ? "Resume" : "Pause"} ${row.original.name}`}
+                disabled={loading || busy}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (row.original.paused) onResume(row.original);
+                  else onPause(row.original);
+                }}
               >
-                <PencilIcon />
+                {row.original.paused ? <PlayIcon /> : <PauseIcon />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Delete ${row.original.name}`}
-                disabled={loading}
-                onClick={() => onDelete(row.original)}
-              >
-                <Trash2Icon />
-              </Button>
+              {row.original.paused && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete ${row.original.name}`}
+                  disabled={loading || busy}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(row.original);
+                  }}
+                >
+                  <Trash2Icon />
+                </Button>
+              )}
             </div>
           ),
         }),
       ]),
-    [loading, onEdit, onDelete],
+    [loading, busy, onPause, onResume, onDelete],
   );
   // Pagination belongs to the server. Only the returned page is given to the table.
   const table = useTable({
@@ -150,7 +163,22 @@ export function DataTable({
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                tabIndex={0}
+                aria-label={`Edit ${row.original.name}`}
+                className="cursor-pointer hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline focus-visible:outline-ring"
+                onClick={() => onEdit(row.original)}
+                onKeyDown={(event) => {
+                  if (
+                    event.target === event.currentTarget &&
+                    (event.key === "Enter" || event.key === " ")
+                  ) {
+                    event.preventDefault();
+                    onEdit(row.original);
+                  }
+                }}
+              >
                 {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id} className="h-14 px-4">
                     <FlexRender cell={cell} />

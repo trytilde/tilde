@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_identity_verifications(id,connection_id,agent_id,identity_id,token_hash,status,expires_at) VALUES($1,$2,$3,$4,$5,'pending',NOW()+INTERVAL '10 minutes');\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "495495e3003a4368cde2ded1c06f150d7bf66f36818cb7d9ab5313ce4aa3ff07"
+}

@@ -39,7 +39,7 @@ async fn fixture(
     )
         .into_response()
 }
-async fn create(agents: &Agents, endpoint: Option<String>) -> Uuid {
+async fn create(agents: &Agents, endpoint: String) -> Uuid {
     let id = Uuid::new_v4();
     agents
         .create(CreateAgent {
@@ -73,14 +73,14 @@ async fn health_polling_history_retention_and_shutdown() {
         .route("/tilde.agent_host.v1.AgentService/Healthz", post(fixture))
         .with_state(mode.clone());
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    let id = create(&agents, Some(endpoint.clone())).await;
-    let unconfigured = create(&agents, None).await;
+    let id = create(&agents, endpoint.clone()).await;
     health.poll_once().await.unwrap();
-    let view = metrics(&db.pool, &[id, unconfigured], Utc::now())
+    let unpolled = create(&agents, endpoint.clone()).await;
+    let view = metrics(&db.pool, &[id, unpolled], Utc::now())
         .await
         .unwrap();
     assert_eq!(view[&id].health, AgentHealthStatus::Healthy);
-    assert_eq!(view[&unconfigured].health, AgentHealthStatus::Unknown);
+    assert_eq!(view[&unpolled].health, AgentHealthStatus::Unknown);
     assert_eq!(view[&id].health_history.len(), 12);
     assert_eq!(
         view[&id]
@@ -169,13 +169,25 @@ async fn health_polling_history_retention_and_shutdown() {
         .unwrap();
     mode.store(0, Ordering::SeqCst);
     health.poll_once().await.unwrap();
+    agents.pause(id).await.unwrap();
+    health.poll_once().await.unwrap();
+    assert_eq!(
+        agents.metrics(&[id]).await.unwrap()[&id].health,
+        AgentHealthStatus::Healthy
+    );
+    let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_health WHERE agent_id=$1")
+        .bind(id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
     agents.delete(id).await.unwrap();
+    health.poll_once().await.unwrap();
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_health WHERE agent_id=$1")
         .bind(id)
         .fetch_one(&db.pool)
         .await
         .unwrap();
-    assert_eq!(count, 0);
+    assert_eq!(count, before, "retired agents receive no further checks");
     server.abort();
     db.close().await;
 }
@@ -189,8 +201,8 @@ async fn registry_metrics_count_sessions_and_measure_first_visible_reply() {
             .unwrap(),
     );
     let agents = Agents::new(db.pool.clone(), encryption);
-    let agent = create(&agents, None).await;
-    let other = create(&agents, None).await;
+    let agent = create(&agents, "http://127.0.0.1:9999".into()).await;
+    let other = create(&agents, "http://127.0.0.1:9999".into()).await;
     let thread = Uuid::new_v4();
     let empty_thread = Uuid::new_v4();
     let participant = Uuid::new_v4();

@@ -10,9 +10,9 @@ export function HealthBadge({ metrics }: { metrics?: AgentMetrics }) {
       variant="outline"
       className={
         healthy
-          ? "border-emerald-600/20 bg-emerald-500/10 text-emerald-700"
+          ? "border-success/20 bg-success/10 text-success"
           : unhealthy
-            ? "border-red-600/20 bg-red-500/10 text-red-700"
+            ? "border-destructive/20 bg-destructive/10 text-destructive"
             : "text-muted-foreground"
       }
       title={
@@ -55,7 +55,7 @@ export function HealthHistory({ metrics }: { metrics?: AgentMetrics }) {
           key={index}
           data-health={bucket.state}
           title={bucket.label}
-          className={`block h-6 w-2 rounded-xs ${bucket.state === "healthy" ? "bg-emerald-500" : bucket.state === "unhealthy" ? "bg-red-500" : "bg-muted-foreground/20"}`}
+          className={`block h-6 w-2 rounded-xs ${bucket.state === "healthy" ? "bg-success" : bucket.state === "unhealthy" ? "bg-destructive" : "bg-muted-foreground/20"}`}
         />
       ))}
     </div>

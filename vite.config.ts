@@ -8,6 +8,7 @@ const generated = [
   "**/dist/**",
   "**/provider-dist/**",
   "**/gen/**",
+  "**/routeTree.gen.ts",
   "**/generated/**",
   "target/**",
   ".tools/**",

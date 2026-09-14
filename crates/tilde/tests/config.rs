@@ -27,7 +27,8 @@ fn typed_environment_validates_before_initializing_encryption() {
         ("WEB_PORT", "65536"),
         ("API_PORT", "not-a-port"),
         ("ENGINE_ALLOW_NETWORK", "perhaps"),
-        ("ENGINE_MANAGEMENT_LISTEN", "invalid"),
+        ("ENGINE_LISTEN", "invalid"),
+        ("ENGINE_SERVE", "management,gossip"),
         ("ENGINE_ENCRYPTION_BACKEND", "invalid"),
     ] {
         let mut values = base.clone();
@@ -42,6 +43,8 @@ fn typed_environment_validates_before_initializing_encryption() {
         ("WEB_PORT", "8080"),
         ("ENGINE_ENCRYPTION_KEY", "private-invalid-key"),
         ("DATABASE_URL", ""),
+        ("ENGINE_INGRESS_PUBLIC_URL", "https://events.example/path"),
+        ("ENGINE_PUBLIC_URL", "ftp://tilde.example"),
     ] {
         let mut values = base.clone();
         values.insert(name.into(), value.into());
@@ -72,7 +75,7 @@ fn typed_environment_validates_before_initializing_encryption() {
 }
 
 #[test]
-fn runtime_only_configuration_does_not_require_oidc_or_management_ports() {
+fn agent_facing_groups_do_not_require_oidc() {
     let mut values = HashMap::from([
         (
             "DATABASE_URL".into(),
@@ -82,9 +85,8 @@ fn runtime_only_configuration_does_not_require_oidc_or_management_ports() {
             "ENGINE_ENCRYPTION_KEY".into(),
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into(),
         ),
-        ("ENGINE_MANAGEMENT_ENABLED".into(), "false".into()),
+        ("ENGINE_SERVE".into(), "ingress,runtime,sidecar".into()),
         ("ENGINE_WEB_ENABLED".into(), "false".into()),
-        ("API_PORT".into(), "0".into()),
         ("WEB_PORT".into(), "0".into()),
     ]);
     assert!(
@@ -93,7 +95,7 @@ fn runtime_only_configuration_does_not_require_oidc_or_management_ports() {
             .key_protection()
             .is_ok()
     );
-    values.insert("ENGINE_MANAGEMENT_ENABLED".into(), "true".into());
+    values.insert("ENGINE_SERVE".into(), "all".into());
     assert!(
         Config::init_from_hashmap(&values)
             .unwrap()

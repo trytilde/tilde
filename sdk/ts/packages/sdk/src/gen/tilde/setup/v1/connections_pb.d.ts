@@ -279,9 +279,83 @@ export declare type CancelSetupResponse = Message<"tilde.setup.v1.CancelSetupRes
 export declare const CancelSetupResponseSchema: GenMessage<CancelSetupResponse>;
 
 /**
+ * @generated from message tilde.setup.v1.SetConnectionNameRequest
+ */
+export declare type SetConnectionNameRequest = Message<"tilde.setup.v1.SetConnectionNameRequest"> & {
+  /**
+   * @generated from field: string setup_id = 1;
+   */
+  setupId: string;
+
+  /**
+   * @generated from field: string connection_setup_token = 2;
+   */
+  connectionSetupToken: string;
+
+  /**
+   * @generated from field: string action_id = 3;
+   */
+  actionId: string;
+
+  /**
+   * @generated from field: string name = 4;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message tilde.setup.v1.SetConnectionNameRequest.
+ * Use `create(SetConnectionNameRequestSchema)` to create a new message.
+ */
+export declare const SetConnectionNameRequestSchema: GenMessage<SetConnectionNameRequest>;
+
+/**
+ * @generated from message tilde.setup.v1.SetConnectionNameResponse
+ */
+export declare type SetConnectionNameResponse = Message<"tilde.setup.v1.SetConnectionNameResponse"> & {
+  /**
+   * @generated from field: tilde.setup.v1.Brokering state = 1;
+   */
+  state?: Brokering | undefined;
+};
+
+/**
+ * Describes the message tilde.setup.v1.SetConnectionNameResponse.
+ * Use `create(SetConnectionNameResponseSchema)` to create a new message.
+ */
+export declare const SetConnectionNameResponseSchema: GenMessage<SetConnectionNameResponse>;
+
+/**
  * @generated from message tilde.setup.v1.Brokering
  */
 export declare type Brokering = Message<"tilde.setup.v1.Brokering"> & {
+  /**
+   * Ordered setup steps for the selected connection type, below the provider overview.
+   *
+   * @generated from field: repeated string setup_instructions = 26;
+   */
+  setupInstructions: string[];
+
+  /**
+   * @generated from field: string provider_name = 24;
+   */
+  providerName: string;
+
+  /**
+   * @generated from field: string account_name_label = 25;
+   */
+  accountNameLabel: string;
+
+  /**
+   * @generated from field: optional string icon_url = 22;
+   */
+  iconUrl?: string | undefined;
+
+  /**
+   * @generated from field: optional string instructions = 23;
+   */
+  instructions?: string | undefined;
+
   /**
    * @generated from field: string setup_id = 1;
    */
@@ -542,6 +616,14 @@ export declare const AuthDriverSchema: GenEnum<AuthDriver>;
  * @generated from service tilde.setup.v1.ConnectionSetupService
  */
 export declare const ConnectionSetupService: GenService<{
+  /**
+   * @generated from rpc tilde.setup.v1.ConnectionSetupService.SetConnectionName
+   */
+  setConnectionName: {
+    methodKind: "unary";
+    input: typeof SetConnectionNameRequestSchema;
+    output: typeof SetConnectionNameResponseSchema;
+  },
   /**
    * @generated from rpc tilde.setup.v1.ConnectionSetupService.GetSetup
    */

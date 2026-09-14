@@ -1,3 +1,10 @@
+import { LogsService } from "./gen/tilde/management/v1/logs_pb.js";
+import {
+  InvocationControlService,
+  InvocationCommandKind,
+} from "./gen/tilde/runtime/v1/controls_pb.js";
+import { TracingService } from "./gen/tilde/management/v1/tracing_pb.js";
+import { AgentAccessService } from "./gen/tilde/management/v1/access_pb.js";
 import { initializeTracing, invocationTracing, tracingInterceptor } from "./tracing.js";
 export { agentSpanProcessor } from "./tracing.js";
 import {
@@ -25,8 +32,6 @@ import { ChatService as RuntimeChatService } from "./gen/tilde/runtime/v1/chat_p
 import {
   AgentService as AgentHostService,
   InvokeRequestSchema,
-  SteerRequestSchema,
-  CancelRequestSchema,
   type InvokeRequest,
 } from "./gen/tilde/agent_host/v1/agent_pb.js";
 import {
@@ -36,6 +41,7 @@ import {
 } from "./gen/tilde/types/v1/chat_pb.js";
 export * from "./gen/tilde/types/v1/chat_pb.js";
 export { RuntimeChatService, AgentHostService };
+export { BinaryPermission, TargetSelection } from "./gen/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
@@ -57,14 +63,20 @@ function transport(options: ClientOptions) {
   });
 }
 export class ManagementClient {
+  readonly access: RpcClient<typeof AgentAccessService>;
   readonly agents: RpcClient<typeof ManagementAgentService>;
   readonly chat: RpcClient<typeof ManagementChatService>;
   readonly connections: RpcClient<typeof ConnectionsService>;
+  readonly logs: RpcClient<typeof LogsService>;
+  readonly traces: RpcClient<typeof TracingService>;
   constructor(options: ClientOptions) {
     const rpc = transport(options);
+    this.access = connectClient(AgentAccessService, rpc);
     this.agents = connectClient(ManagementAgentService, rpc);
     this.chat = connectClient(ManagementChatService, rpc);
     this.connections = connectClient(ConnectionsService, rpc);
+    this.logs = connectClient(LogsService, rpc);
+    this.traces = connectClient(TracingService, rpc);
   }
 }
 export class RuntimeClient {
@@ -115,7 +127,7 @@ class Queue<T> {
   }
   end(error?: unknown) {
     this.closed = true;
-    this.error = error;
+    this.error ??= error;
     this.wake?.();
     this.space?.();
   }
@@ -156,6 +168,7 @@ export class AgentContext {
   readonly runId: string;
   readonly threadId: string;
   readonly agentId: string;
+  readonly agentGeneration: bigint;
   readonly objective: string;
   private messageHistory: ChatMessage[];
   get messages(): readonly ChatMessage[] {
@@ -176,6 +189,11 @@ export class AgentContext {
   private readonly steering: SteeringInput[] = [];
   private readonly accepted = new Map<string, string>();
   #headers: Headers;
+  private readonly controls: RpcClient<typeof InvocationControlService>;
+  private suspension?: Promise<void>;
+  async settleSuspension() {
+    await this.suspension;
+  }
   constructor(
     request: InvokeRequest,
     private readonly controller: AbortController,
@@ -188,6 +206,7 @@ export class AgentContext {
     this.runId = request.runId;
     this.threadId = request.threadId;
     this.agentId = request.agentId;
+    this.agentGeneration = request.agentGeneration;
     this.objective = request.objective;
     this.messageHistory = request.messages;
     this.cachedMessages = request.cachedMessages;
@@ -202,6 +221,7 @@ export class AgentContext {
       interceptors: [tracingInterceptor],
     });
     this.session = connectClient(RuntimeChatService, transport);
+    this.controls = connectClient(InvocationControlService, transport);
     const options = () => ({ headers: this.#headers, signal: this.signal });
     const renewal = setInterval(
       async () => {
@@ -541,6 +561,94 @@ export class AgentContext {
   traceAuthorization(): string {
     return this.#headers.get("authorization")!;
   }
+  /** The running request subscribes outward; control never needs host affinity. */
+  async consumeControls(ready: () => void, checkpoint?: (context: AgentContext) => Promise<void>) {
+    let connected = Date.now();
+    while (!this.signal.aborted) {
+      try {
+        for await (const command of this.controls.watchCommands(
+          {},
+          { headers: this.#headers, signal: this.signal },
+        )) {
+          connected = Date.now();
+          if (command.kind === InvocationCommandKind.READY) {
+            ready();
+            continue;
+          }
+          if (command.kind === InvocationCommandKind.STEER) {
+            this.acceptInput({
+              id: command.inputId,
+              text: command.text,
+              ...(command.message ? { message: command.message } : {}),
+            });
+            await this.controls.acknowledgeCommand(
+              { id: command.id },
+              { headers: this.#headers, signal: this.signal },
+            );
+          } else if (
+            command.kind === InvocationCommandKind.STOP ||
+            command.kind === InvocationCommandKind.SUSPEND
+          ) {
+            const complete = async () => {
+              if (command.kind === InvocationCommandKind.SUSPEND && checkpoint) {
+                try {
+                  await checkpoint(this);
+                } catch (error) {
+                  try {
+                    await this.setRunStatus("failed");
+                  } finally {
+                    this.output.end(
+                      new ConnectError("Suspension checkpoint failed", Code.Internal),
+                    );
+                  }
+                  throw error;
+                }
+              }
+              await this.controls.acknowledgeCommand(
+                { id: command.id },
+                { headers: this.#headers, signal: this.signal },
+              );
+            };
+            const completion = complete();
+            if (command.kind === InvocationCommandKind.SUSPEND) this.suspension = completion;
+            try {
+              await completion;
+            } finally {
+              this.controller.abort(new StopLoop());
+            }
+            return;
+          } else {
+            throw new ConnectError("Unknown invocation control", Code.InvalidArgument);
+          }
+        }
+      } catch (error) {
+        if (this.signal.aborted) return;
+        const code = ConnectError.from(error).code;
+        if (
+          [
+            Code.Unauthenticated,
+            Code.PermissionDenied,
+            Code.NotFound,
+            Code.InvalidArgument,
+            Code.AlreadyExists,
+            Code.ResourceExhausted,
+          ].includes(code)
+        )
+          throw error;
+      }
+      if (Date.now() - connected >= 15_000)
+        throw new ConnectError("Invocation control connection lost", Code.Unavailable);
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          this.signal.removeEventListener("abort", done);
+          resolve();
+        };
+        const timer = setTimeout(done, 250);
+        this.signal.addEventListener("abort", done, { once: true });
+      });
+    }
+  }
   /** Internal server hook; duplicate IDs replay acknowledgment, different content is rejected. */
   acceptInput(input: SteeringInput) {
     this.signal.throwIfAborted();
@@ -594,25 +702,55 @@ function verify(
     throw new ConnectError("Invalid signature", Code.Unauthenticated);
 }
 /** Create a ConnectRPC agent service. The handler's return value is intentionally ignored. */
-export function createAgentServer(options: {
+export function createAgentHandler(options: {
   signingKey: string;
+  /** Prefix mounted by a serverless route, for example /api/agent. */
+  pathPrefix?: string;
+  /** Persist framework state before suspension; resume loads it in run(). */
+  checkpoint?: (context: AgentContext) => Promise<void>;
   /** Existing OTel provider must include agentSpanProcessor. */
   tracing?: "existing";
   run: (context: AgentContext) => Promise<unknown>;
   /** Called by the Healthz RPC. Honor cancellation for dependency checks; throwing reports unhealthy. */
   healthz?: (signal: AbortSignal) => boolean | Promise<boolean>;
-}) {
+}): ReturnType<typeof connectNodeAdapter> {
   if (options.signingKey.length < 32) throw new Error("A caller-generated signing key is required");
   initializeTracing(options.tracing === "existing");
-  const active = new Map<string, { context: AgentContext; controller: AbortController }>();
   const finished = new Set<string>();
+  // A virtual conversation thread owns one reasoning loop at a time. Different
+  // agent/thread pairs remain independent even when this host serves many agents.
+  const virtualThreads = new Map<
+    string,
+    {
+      invocationId: string;
+      generation: bigint;
+      controller: AbortController;
+      completion: Promise<unknown>;
+    }
+  >();
   const handler = connectNodeAdapter({
+    requestPathPrefix: options.pathPrefix,
     routes: (router) =>
       router.service(AgentHostService, {
         async *invoke(request, ctx) {
           verify(InvokeRequestSchema, request, ctx, options.signingKey, "Invoke");
-          if (active.has(request.invocationId) || finished.has(request.invocationId))
+          if (finished.has(request.invocationId))
             throw new ConnectError("Invocation already accepted", Code.AlreadyExists);
+          const threadKey = `${request.agentId}:${request.threadId}`;
+          for (;;) {
+            const previous = virtualThreads.get(threadKey);
+            if (!previous) break;
+            if (previous.generation >= request.assignmentGeneration)
+              throw new ConnectError(
+                "Conversation already has an active invocation",
+                Code.AlreadyExists,
+              );
+            previous.controller.abort(new StopLoop());
+            await previous.completion;
+            ctx.signal.throwIfAborted();
+            if (virtualThreads.get(threadKey) === previous) virtualThreads.delete(threadKey);
+            // Another request may have acquired the thread while we awaited.
+          }
           const controller = new AbortController();
           const output = new Queue<{
             reasoningDelta?: string;
@@ -624,15 +762,37 @@ export function createAgentServer(options: {
           const abort = () => controller.abort(ctx.signal.reason);
           ctx.signal.addEventListener("abort", abort, { once: true });
           const context = new AgentContext(request, controller, output);
-          active.set(request.invocationId, { context, controller });
+          let resolveReady!: () => void;
+          let rejectReady!: (error: unknown) => void;
+          const ready = new Promise<void>((resolve, reject) => {
+            resolveReady = resolve;
+            rejectReady = reject;
+          });
+          const rejectAborted = () =>
+            rejectReady(
+              controller.signal.reason instanceof ConnectError
+                ? controller.signal.reason
+                : new ConnectError("Invocation is no longer active", Code.Canceled),
+            );
+          controller.signal.addEventListener("abort", rejectAborted, { once: true });
+          const controls = context
+            .consumeControls(resolveReady, options.checkpoint)
+            .catch((error) => {
+              rejectReady(error);
+              output.end(ConnectError.from(error));
+              controller.abort(error);
+            });
           const telemetry = invocationTracing(request, ctx.requestHeader, () =>
             context.traceAuthorization(),
           );
           let traceFailed = false;
           const execution = telemetry.run(async () => {
             try {
+              await ready;
               await context.refreshTools();
+              controller.signal.throwIfAborted();
               await options.run(context);
+              await context.settleSuspension();
               output.end();
             } catch (error) {
               traceFailed = !(error instanceof StopLoop || controller.signal.aborted);
@@ -643,37 +803,33 @@ export function createAgentServer(options: {
               );
             }
           });
+          virtualThreads.set(threadKey, {
+            invocationId: request.invocationId,
+            generation: request.assignmentGeneration,
+            controller,
+            completion: execution,
+          });
           try {
+            await ready;
+            if (request.commandId) yield { acceptedCommandId: request.commandId };
             for await (const value of output.read()) yield value;
-            active.delete(request.invocationId);
             finished.add(request.invocationId);
             yield { stopped: true, pendingInputIds: context.pendingInputIds() };
           } finally {
             controller.abort();
             output.end();
-            active.delete(request.invocationId);
             finished.add(request.invocationId);
             if (finished.size > 4096) finished.delete(finished.values().next().value!);
+            void execution.finally(() => {
+              if (virtualThreads.get(threadKey)?.invocationId === request.invocationId)
+                virtualThreads.delete(threadKey);
+            });
             ctx.signal.removeEventListener("abort", abort);
+            controller.signal.removeEventListener("abort", rejectAborted);
+            void controls;
             void telemetry.end(traceFailed);
             void execution;
           }
-        },
-        async steer(request, ctx) {
-          verify(SteerRequestSchema, request, ctx, options.signingKey, "Steer");
-          const entry = active.get(request.invocationId);
-          if (!entry) throw new ConnectError("Invocation is not active", Code.NotFound);
-          entry.context.acceptInput({
-            id: request.inputId,
-            text: request.text,
-            ...(request.message ? { message: request.message } : {}),
-          });
-          return {};
-        },
-        async cancel(request, ctx) {
-          verify(CancelRequestSchema, request, ctx, options.signingKey, "Cancel");
-          active.get(request.invocationId)?.controller.abort(new StopLoop());
-          return {};
         },
         async healthz(_request, ctx) {
           try {
@@ -685,5 +841,10 @@ export function createAgentServer(options: {
       }),
   });
   // Plaintext HTTP/2 for localhost/reverse-proxy deployment. Terminate public TLS at the proxy.
-  return createServer(handler);
+  return handler;
+}
+
+/** Standalone host wrapper; serverless deployments export createAgentHandler(). */
+export function createAgentServer(options: Parameters<typeof createAgentHandler>[0]) {
+  return createServer(createAgentHandler(options));
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM telemetry_delivery;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "595be89f3bf413d60ff103680a0cc87be23d45043ba953fc2d2c7a0f75e5e485"
+}

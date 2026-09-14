@@ -10,5 +10,9 @@
     },
     "types": []
   },
-  "include": ["../crates/tilde/src/connections/catalog/**/*.tsx", "src/connection-setup-host.tsx"]
+  "include": [
+    "../crates/tilde/src/connections/catalog/**/*.tsx",
+    "src/routes/connections/-connection-setup-host.tsx",
+    "src/routes/connections/-identity-verification.tsx"
+  ]
 }

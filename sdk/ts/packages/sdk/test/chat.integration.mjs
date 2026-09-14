@@ -1,3 +1,4 @@
+import { BinaryPermission, TargetSelection } from "../dist/gen/tilde/types/v1/agent_pb.js";
 import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -35,6 +36,7 @@ const chunkGate = new Promise((r) => {
 const sessions = new Set();
 const errors = [];
 const contexts = [];
+const checkpoints = new Set();
 let goalId,
   taskId,
   firstRunId,
@@ -47,6 +49,9 @@ let healthReady = true;
 let healthThrows = false;
 const server = createAgentServer({
   signingKey,
+  async checkpoint(ctx) {
+    checkpoints.add(ctx.invocationId);
+  },
   healthz() {
     if (healthThrows) throw new Error("private dependency failure");
     return healthReady;
@@ -183,7 +188,6 @@ async function start() {
   const env = {
     ...process.env,
     ...oidc.env,
-    ENGINE_AGENT_RUNTIME_LISTEN: "127.0.0.1:0",
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     ENGINE_ENCRYPTION_BACKEND: "seed",
     ENGINE_ENCRYPTION_KEY: seed,
@@ -192,8 +196,8 @@ async function start() {
     API_PORT: "18111",
     WEB_PORT: "18112",
   };
-  delete env.ENGINE_MANAGEMENT_PUBLIC_URL;
-  child = spawn(binary, ["--management-listen", "127.0.0.1:0"], {
+  delete env.ENGINE_PUBLIC_URL;
+  child = spawn(binary, ["--listen", "127.0.0.1:0"], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -201,7 +205,7 @@ async function start() {
     const timer = setTimeout(() => reject(new Error("Tilde did not start")), 15000);
     const data = (chunk) => {
       logs += chunk;
-      const match = logs.match(/address=(127\.0\.0\.1:\d+)/);
+      const match = logs.match(/ address=(127\.0\.0\.1:\d+)/);
       if (match) {
         clearTimeout(timer);
         resolve(`http://${match[1]}`);
@@ -240,14 +244,10 @@ try {
   assert.equal((await runtime.healthz({})).ready, false);
   healthThrows = false;
   healthReady = true;
-  await assert.rejects(
-    runtime.cancel({ invocationId: randomUUID() }),
-    (e) => e.code === Code.Unauthenticated,
-  );
   const unbound = rpcClient(
     RuntimeChatService,
     createConnectTransport({
-      baseUrl: `http://${logs.match(/agent_runtime_address=(127\.0\.0\.1:\d+)/)[1]}`,
+      baseUrl: url,
       httpVersion: "2",
     }),
   );
@@ -257,12 +257,10 @@ try {
   const agent = (
     await client.agents.createAgent({
       capabilities: {
-        grants: Object.fromEntries(
-          ["tools.invoke", "work.read", "work.write", "run.update"].map((name) => [
-            name,
-            { mode: "any" },
-          ]),
-        ),
+        toolsInvoke: { mode: TargetSelection.ALL },
+        workRead: BinaryPermission.YES,
+        workWrite: BinaryPermission.YES,
+        runUpdate: BinaryPermission.YES,
       },
       name: "Coordinator",
       endpointUrl: endpoint,
@@ -272,12 +270,10 @@ try {
   const second = (
     await client.agents.createAgent({
       capabilities: {
-        grants: Object.fromEntries(
-          ["tools.invoke", "work.read", "work.write", "run.update"].map((name) => [
-            name,
-            { mode: "any" },
-          ]),
-        ),
+        toolsInvoke: { mode: TargetSelection.ALL },
+        workRead: BinaryPermission.YES,
+        workWrite: BinaryPermission.YES,
+        runUpdate: BinaryPermission.YES,
       },
       name: "Specialist",
       endpointUrl: endpoint,
@@ -492,6 +488,40 @@ try {
   await eventually(
     () => contexts.find((c) => c.invocationId === cancel.invocationId).signal.aborted,
   );
+  const suspension = await invoke("cancel me");
+  await eventually(() => contexts.find((c) => c.invocationId === suspension.invocationId));
+  await client.chat.suspendInvocation({ invocationId: suspension.invocationId });
+  await eventually(() => checkpoints.has(suspension.invocationId));
+  await eventually(
+    async () =>
+      (await client.chat.getRun({ id: suspension.id })).run.invocationStatus === "stopped",
+  );
+  assert.equal((await client.chat.getRun({ id: suspension.id })).run.status, "waiting");
+  const continuation = (await client.chat.resumeRun({ id: suspension.id })).run;
+  assert.notEqual(continuation.invocationId, suspension.invocationId);
+  await eventually(() => contexts.find((c) => c.invocationId === continuation.invocationId));
+  await client.chat.cancelInvocation({ invocationId: continuation.invocationId });
+  const pauseRun = await invoke("cancel me");
+  const pausedContext = await eventually(() =>
+    contexts.find((c) => c.invocationId === pauseRun.invocationId),
+  );
+  const paused = await client.agents.pauseAgent({ id: agent.id });
+  assert(paused.agent.paused);
+  await eventually(() => pausedContext.signal.aborted);
+  assert.equal((await client.chat.getRun({ id: pauseRun.id })).run.invocationStatus, "canceled");
+  assert((await runtime.healthz({})).ready);
+  await assert.rejects(invoke("cancel me"), (e) => e.code === Code.FailedPrecondition);
+  assert.equal((await client.agents.resumeAgent({ id: agent.id })).agent.paused, false);
+  const resumedRun = await invoke("cancel me");
+  const resumedContext = await eventually(() =>
+    contexts.find((c) => c.invocationId === resumedRun.invocationId),
+  );
+  assert(resumedContext.agentGeneration > pausedContext.agentGeneration);
+  assert((await client.agents.pauseAgent({ id: agent.id })).agent.paused);
+  await eventually(() => resumedContext.signal.aborted);
+  await client.agents.deleteAgent({ id: agent.id });
+  await assert.rejects(client.agents.getAgent({ id: agent.id }), (e) => e.code === Code.NotFound);
+  assert((await client.chat.listMessages({ threadId: thread.id })).messages.length > 0);
   watchAbort.abort();
   await watcher;
   assert.deepEqual(errors, []);

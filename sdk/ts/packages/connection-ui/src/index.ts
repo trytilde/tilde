@@ -7,3 +7,7 @@ export { useForm, Controller, FormProvider, useFormContext } from "react-hook-fo
 export { AuthDriver, type Brokering, type SetupValues } from "@trytilde/sdk/connection-setup";
 
 export { StandardSetup, CredentialForm } from "./standard.js";
+
+export { TildeWordmark } from "./wordmark.js";
+
+export { LoadingReveal } from "./loading-reveal.js";

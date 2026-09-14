@@ -22,7 +22,7 @@ async fn committed_activity_reaches_another_instance_and_drains_multiple_pages()
         .create(CreateAgent {
             id: Uuid::new_v4(),
             name: "Notifications".into(),
-            endpoint_url: None,
+            endpoint_url: "http://127.0.0.1:9999".into(),
             webhook_signing_key: SecretString::from("notification-test-agent-signing-key"),
             capabilities: Default::default(),
         })

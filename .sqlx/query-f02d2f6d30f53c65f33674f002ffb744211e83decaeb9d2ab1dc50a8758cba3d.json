@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployment_settings SET encrypted_secrets=COALESCE(encrypted_secrets,$2) WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f02d2f6d30f53c65f33674f002ffb744211e83decaeb9d2ab1dc50a8758cba3d"
+}

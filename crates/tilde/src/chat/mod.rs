@@ -9,9 +9,13 @@
 //!
 //! Native and external threads share this model. Connection-backed adapters live in `providers`;
 //! provider-defined tool transport lives in `tools`, execution in `runtime`.
+pub mod controls;
 use crate::chat as application;
 use crate::proto::tilde::types::v1 as types;
+pub mod access;
+pub(crate) mod agent_lifecycle;
 pub mod audit;
+mod ingress;
 pub mod providers;
 use audit::AttachmentRecords;
 pub mod rpc;
@@ -27,6 +31,8 @@ use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChatError {
+    #[error("Conversation moved to gateway storage")]
+    Archived,
     #[error("{0}")]
     Invalid(String),
     #[error("Record not found in this scope")]
@@ -48,6 +54,7 @@ impl From<ChatError> for ConnectError {
             ChatError::Conflict => {
                 Self::failed_precondition("Conflicting request or terminal state")
             }
+            ChatError::Archived => Self::unavailable("Conversation moved to gateway storage"),
             ChatError::Denied => Self::unauthenticated("Invalid or expired invocation capability"),
             ChatError::Database(ref error)
                 if error
@@ -72,12 +79,19 @@ pub type Result<T> = std::result::Result<T, ChatError>;
 pub struct Chat {
     pub(crate) activity_notifications: Arc<crate::database::notifications::Notifications>,
     pub(crate) work_notifications: Arc<crate::database::notifications::Notifications>,
-    pub(crate) input_notifications: Arc<crate::database::notifications::Notifications>,
+    pub(crate) control_notifications: Arc<crate::database::notifications::Notifications>,
     pub(crate) channels: Option<providers::Channels>,
+    pub(crate) deployments: Option<crate::deployment::Deployments>,
     pub tokens: crate::iam::tokens::Tokens,
-    pub(crate) pool: PgPool,
+    pub(crate) store: RuntimeStore,
+    pub(crate) objects: Option<crate::agent::avatar::AvatarStore>,
     pub(crate) encryption: Arc<Encryption>,
     pub(crate) callback_url: String,
+}
+#[derive(Clone)]
+pub enum RuntimeStore {
+    Postgres(PgPool),
+    Sidecar(Arc<crate::deployment::runtime::Runtime>),
 }
 #[derive(Clone)]
 pub struct Scope {
@@ -100,6 +114,21 @@ pub fn text(value: &str) -> Result<()> {
     Ok(())
 }
 /// Append activity in commit order, locking only the affected thread.
+/// Pin a (thread, agent) pair to the deployment that will execute it: the existing
+/// pin while that deployment is registered, otherwise the agent's serving deployment.
+/// Failover stays within the deployment; moving across deployments is explicit.
+pub(crate) async fn pin_deployment(
+    tx: &mut Transaction<'_, Postgres>,
+    thread: Uuid,
+    agent: Uuid,
+) -> Result<Option<Uuid>> {
+    Ok(
+        sqlx::query_file!("../../queries/chat/deployment_pin.sql", thread, agent)
+            .fetch_optional(&mut **tx)
+            .await?
+            .and_then(|r| r.deployment_id),
+    )
+}
 pub async fn activity(
     tx: &mut Transaction<'_, Postgres>,
     thread: Uuid,
@@ -110,6 +139,62 @@ pub async fn activity(
     audit::snapshot(tx, thread, kind, entity, delta).await
 }
 impl Chat {
+    pub fn with_deployments(mut self, deployments: crate::deployment::Deployments) -> Self {
+        self.deployments = Some(deployments);
+        self
+    }
+    pub fn with_objects(mut self, objects: Option<crate::agent::avatar::AvatarStore>) -> Self {
+        self.objects = objects;
+        self
+    }
+
+    pub fn from_sidecar(runtime: Arc<crate::deployment::runtime::Runtime>) -> Self {
+        Self {
+            activity_notifications: Arc::default(),
+            work_notifications: Arc::default(),
+            control_notifications: Arc::default(),
+            objects: None,
+            channels: None,
+            deployments: None,
+            tokens: crate::iam::tokens::Tokens::sidecar(runtime.clone()),
+            encryption: Arc::new(
+                Encryption::from_agent_key(runtime.agent_id, crate::deployment::random_secret())
+                    .expect("random agent key"),
+            ),
+            callback_url: runtime.callback_url.clone(),
+            store: RuntimeStore::Sidecar(runtime),
+        }
+    }
+    pub(crate) async fn has_channel(&self, thread: Uuid) -> Result<bool> {
+        if let Some(local) = self.local() {
+            return match local.thread(thread).await {
+                Ok(thread) => Ok(thread.channel.is_set()),
+                Err(ChatError::NotFound) => Ok(false),
+                Err(error) => Err(error),
+            };
+        }
+        Ok(
+            sqlx::query_file!("../../queries/chat/channel_binding.sql", thread)
+                .fetch_optional(self.pg()?)
+                .await?
+                .is_some(),
+        )
+    }
+    pub(crate) fn local(&self) -> Option<&Arc<crate::deployment::runtime::Runtime>> {
+        match &self.store {
+            RuntimeStore::Sidecar(runtime) => Some(runtime),
+            _ => None,
+        }
+    }
+    pub(crate) fn pg(&self) -> Result<&PgPool> {
+        match &self.store {
+            RuntimeStore::Postgres(pool) => Ok(pool),
+            _ => Err(ChatError::Invalid(
+                "Postgres operation reached a sidecar".into(),
+            )),
+        }
+    }
+
     pub fn with_connections(
         mut self,
         connections: crate::connections::service::Connections,
@@ -123,22 +208,27 @@ impl Chat {
         Self {
             activity_notifications: Arc::default(),
             work_notifications: Arc::default(),
-            input_notifications: Arc::default(),
+            control_notifications: Arc::default(),
+            objects: None,
             channels: None,
+            deployments: None,
             tokens: crate::iam::tokens::Tokens::new(pool.clone(), encryption.clone()),
-            pool,
+            store: RuntimeStore::Postgres(pool),
             encryption,
             callback_url,
         }
     }
     /// Create a human conversation identity, independent of login or provider accounts.
     pub async fn create_user(&self, name: &str) -> Result<types::User> {
+        if let Some(local) = self.local() {
+            return local.create_user(name).await;
+        }
         text(name)?;
         if name.chars().count() > 200 {
             return Err(ChatError::Invalid("Name is too long".into()));
         }
         let row = sqlx::query_file!("../../queries/chat/user_create.sql", Uuid::new_v4(), name)
-            .fetch_one(&self.pool)
+            .fetch_one(self.pg()?)
             .await?;
         Ok(types::User {
             id: row.id.to_string(),
@@ -148,6 +238,25 @@ impl Chat {
     }
     /// Create native threads with one or many humans and agents. Provider bindings are not implemented yet.
     pub async fn create_thread(&self, r: application::CreateThread) -> Result<types::Thread> {
+        if let Some(local) = self.local() {
+            return local.create_thread(r).await;
+        }
+        let forwarded: Option<crate::proto::tilde::ingress::v1::CreateThreadResponse> = self
+            .forward_sidecar(
+                id(&r.primary_agent_id)?,
+                None,
+                "CreateThread",
+                &crate::proto::tilde::ingress::v1::CreateThreadRequest {
+                    title: r.title.clone(),
+                    participants: r.participants.clone(),
+                    primary_agent_id: r.primary_agent_id.clone(),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        if let Some(response) = forwarded {
+            return response.thread.into_option().ok_or(ChatError::Transport);
+        }
         text(&r.title)?;
         if r.participants.is_empty() || r.participants.len() > 100 {
             return Err(ChatError::Invalid(
@@ -156,7 +265,7 @@ impl Chat {
         }
         let primary = id(&r.primary_agent_id)?;
         let thread = Uuid::new_v4();
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!(
             "../../queries/chat/thread_create.sql",
             thread,
@@ -196,12 +305,15 @@ impl Chat {
     }
     /// Return the thread and its complete roster without synthetic inbox instances.
     pub async fn thread(&self, thread: Uuid) -> Result<types::Thread> {
+        if let Some(local) = self.local() {
+            return local.thread(thread).await;
+        }
         let row = sqlx::query_file!("../../queries/chat/thread_get.sql", thread)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?
             .ok_or(ChatError::NotFound)?;
         let participants = sqlx::query_file!("../../queries/chat/participants.sql", thread)
-            .fetch_all(&self.pool)
+            .fetch_all(self.pg()?)
             .await?
             .into_iter()
             .map(|p| types::Participant {
@@ -214,7 +326,7 @@ impl Chat {
             })
             .collect();
         let binding = sqlx::query_file!("../../queries/chat/channel_binding.sql", thread)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?;
         Ok(types::Thread {
             channel: binding
@@ -234,13 +346,16 @@ impl Chat {
     }
     /// Read bounded recent history. Returned messages are ordered oldest first.
     pub async fn messages(&self, thread: Uuid, limit: u32) -> Result<Vec<types::Message>> {
+        if let Some(local) = self.local() {
+            return local.messages(thread, limit).await;
+        }
         self.thread(thread).await?;
         let rows = sqlx::query_file!(
             "../../queries/chat/messages.sql",
             thread,
             limit.clamp(1, 100) as i64
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.pg()?)
         .await?;
         Ok(rows
             .into_iter()
@@ -270,8 +385,11 @@ impl Chat {
     }
     /// Fetch the persisted canonical message, including incomplete/aborted streams.
     pub async fn message(&self, message: Uuid) -> Result<types::Message> {
+        if let Some(local) = self.local() {
+            return local.message(message).await;
+        }
         let r = sqlx::query_file!("../../queries/chat/message_get.sql", message)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.pg()?)
             .await?
             .ok_or(ChatError::NotFound)?;
         Ok(types::Message {
@@ -298,6 +416,12 @@ impl Chat {
     }
     /// Persist human input. Agent authorship is available only through invocation-bound streaming.
     pub async fn post(&self, r: application::PostMessage) -> Result<types::Message> {
+        if let Some(local) = self.local() {
+            return local.post(r).await;
+        }
+        if let Some(message) = self.forward_post(&r).await? {
+            return Ok(message);
+        }
         if r.text.is_empty() {
             if r.attachment_ids.is_empty() {
                 return Err(ChatError::Invalid(
@@ -322,7 +446,7 @@ impl Chat {
         {
             return Err(ChatError::Denied);
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", thread)
             .fetch_one(&mut *tx)
             .await?;
@@ -401,7 +525,10 @@ impl Chat {
     }
     /// Finalize an interrupted stream and record its terminal activity atomically.
     pub(crate) async fn abort_message(&self, message: Uuid, thread: Uuid) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        if let Some(local) = self.local() {
+            return local.abort_message(message, thread).await;
+        }
+        let mut tx = self.pg()?.begin().await?;
         if sqlx::query_file!("../../queries/chat/message_finish.sql", message, "aborted")
             .execute(&mut *tx)
             .await?
@@ -414,7 +541,7 @@ impl Chat {
         Ok(())
     }
     pub(crate) async fn expire_messages(&self) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         let rows = sqlx::query_file!("../../queries/chat/message_cleanup.sql")
             .fetch_all(&mut *tx)
             .await?;
@@ -454,12 +581,15 @@ impl Chat {
     }
     /// Resolve a bearer capability to exactly one active invocation; never accept model-authored scope.
     pub async fn scope(&self, capability: &str) -> Result<Scope> {
+        if let Some(local) = self.local() {
+            return local.scope(capability).await;
+        }
         let claims = self.tokens.verify(capability).await?;
         let r = sqlx::query_file!(
             "../../queries/chat/invocation_scope.sql",
             claims.invocation_id
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pg()?)
         .await?
         .ok_or(ChatError::Denied)?;
         Ok(Scope {
@@ -486,9 +616,12 @@ impl Chat {
     }
     /// Create agent-owned goals, replaying the same ID only for identical input.
     pub async fn create_goal(&self, s: &Scope, r: application::CreateGoal) -> Result<types::Goal> {
+        if let Some(local) = self.local() {
+            return local.create_goal(s, r).await;
+        }
         text(&r.objective)?;
         let key = id(&r.id)?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!(
             "../../queries/chat/goal_create.sql",
             key,
@@ -521,9 +654,12 @@ impl Chat {
     }
     /// List only work owned by the executing agent in the executing thread.
     pub async fn goals(&self, s: &Scope) -> Result<Vec<types::Goal>> {
+        if let Some(local) = self.local() {
+            return local.goals(s).await;
+        }
         Ok(
             sqlx::query_file!("../../queries/chat/goals.sql", s.thread_id, s.agent_id)
-                .fetch_all(&self.pool)
+                .fetch_all(self.pg()?)
                 .await?
                 .into_iter()
                 .map(|r| types::Goal {
@@ -537,10 +673,13 @@ impl Chat {
     }
     /// Terminal goals cannot be reopened by an ordinary tool call.
     pub async fn update_goal(&self, s: &Scope, r: application::UpdateGoal) -> Result<types::Goal> {
+        if let Some(local) = self.local() {
+            return local.update_goal(s, r).await;
+        }
         if !["active", "completed", "failed", "canceled"].contains(&r.status.as_str()) {
             return Err(ChatError::Invalid("Invalid goal status".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         let key = id(&r.id)?;
         let row = sqlx::query_file!(
             "../../queries/chat/goal_update.sql",
@@ -563,6 +702,9 @@ impl Chat {
     }
     /// Dependencies are immutable and must already exist in this scope, making cycles impossible.
     pub async fn create_task(&self, s: &Scope, r: application::CreateTask) -> Result<types::Task> {
+        if let Some(local) = self.local() {
+            return local.create_task(s, r).await;
+        }
         text(&r.title)?;
         let key = id(&r.id)?;
         let goal = r.goal_id.as_deref().map(id).transpose()?;
@@ -575,7 +717,7 @@ impl Chat {
         if deps.len() > 100 || deps.contains(&key) || deps.windows(2).any(|v| v[0] == v[1]) {
             return Err(ChatError::Invalid("Invalid task dependencies".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", s.thread_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -634,9 +776,12 @@ impl Chat {
     }
     /// Return the executing agent's durable task ledger.
     pub async fn tasks(&self, s: &Scope) -> Result<Vec<types::Task>> {
+        if let Some(local) = self.local() {
+            return local.tasks(s).await;
+        }
         Ok(
             sqlx::query_file!("../../queries/chat/tasks.sql", s.thread_id, s.agent_id)
-                .fetch_all(&self.pool)
+                .fetch_all(self.pg()?)
                 .await?
                 .into_iter()
                 .map(|r| types::Task {
@@ -653,6 +798,9 @@ impl Chat {
     }
     /// Reject terminal reopening and starting/completing tasks whose dependencies are unfinished.
     pub async fn update_task(&self, s: &Scope, r: application::UpdateTask) -> Result<types::Task> {
+        if let Some(local) = self.local() {
+            return local.update_task(s, r).await;
+        }
         if ![
             "pending",
             "working",
@@ -669,7 +817,7 @@ impl Chat {
             return Err(ChatError::Invalid("Reason is too long".into()));
         }
         let key = id(&r.id)?;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/thread_lock.sql", s.thread_id)
             .fetch_one(&mut *tx)
             .await?;
@@ -710,10 +858,13 @@ impl Chat {
     }
     /// Run lifecycle is explicit; stopping an invocation only moves active work to waiting.
     pub async fn set_run_status(&self, s: &Scope, status: &str) -> Result<()> {
+        if let Some(local) = self.local() {
+            return local.set_run_status(s, status).await;
+        }
         if !["waiting", "completed", "failed", "canceled"].contains(&status) {
             return Err(ChatError::Invalid("Invalid run status".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pg()?.begin().await?;
         sqlx::query_file!("../../queries/chat/run_status.sql", s.run_id, status)
             .execute(&mut *tx)
             .await?;

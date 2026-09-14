@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agent_deployments(id,agent_id,source,target,endpoint_url,target_reference,repository,commit_sha,external_id,label,token_hash)\nVALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bb1aef0473fbded863b22135247515dee7d20d4f9042c3dab69881b1d557eab0"
+}

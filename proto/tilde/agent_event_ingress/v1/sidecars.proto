@@ -1,0 +1,71 @@
+syntax = "proto3";
+package tilde.agent_event_ingress.v1;
+import "tilde/types/v1/agent.proto";
+import "tilde/types/v1/access.proto";
+import "tilde/types/v1/chat.proto";
+import "tilde/types/v1/runtime_event.proto";
+// Sidecars dial the gateway; every call authenticates one agent deployment token.
+// The gateway never opens a connection to a sidecar. Postgres is the record; a
+// replica is a cache plus a write-behind queue plus the executor for the threads
+// it holds a lease on.
+service SidecarService {
+  // Held open for the life of a replica: a snapshot first, then configuration,
+  // lease changes and directives as they change.
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  // Heartbeats, typed events, directive results, lease releases and telemetry, in order.
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  // Conversation state from the projection, taking the thread lease in the same call when asked.
+  rpc Hydrate(HydrateRequest) returns (HydrateResponse);
+  // Run one ingress call on a live replica and relay its answer.
+  rpc Forward(ForwardRequest) returns (ForwardResponse);
+  rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
+  rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
+  rpc ResolveParticipant(ResolveParticipantRequest) returns (ResolveParticipantResponse);
+  // Registry RPCs from the agent process, re-verified at the gateway.
+  rpc Relay(RelayRequest) returns (RelayResponse);
+}
+message WatchRequest { string instance_id = 1; string public_url = 2; string runtime_url = 3; }
+message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; ThreadLease lease = 3; Directive directive = 4; Ping ping = 5; } }
+// Leases in the snapshot are the ones this instance holds.
+message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; }
+message Ping {}
+// Who executes a (thread, agent) pair. `held` is false when nobody does.
+message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; reserved 2; }
+// Gateway-originated work for one replica, acknowledged with a DirectiveResult.
+message Directive { string id = 1; string thread_id = 2; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RelayMessage relay = 13; } }
+// A completed message authored elsewhere in a room this agent participates in.
+message RelayMessage { tilde.types.v1.Thread thread = 1; tilde.types.v1.Message message = 2; }
+message IngressCall { string method = 1; string content_type = 2; bytes body = 3; string caller_token = 4 [debug_redact = true]; }
+message CallResult { int32 status = 1; string content_type = 2; bytes body = 3; }
+message ProviderEventDirective { string connection_id = 1; tilde.types.v1.ProviderEvent event = 2; }
+message PublishRequest { string instance_id = 1; repeated Upstream frames = 2; }
+message Upstream { oneof frame { Heartbeat heartbeat = 1; Event event = 3; DirectiveResult directive_result = 4; Telemetry telemetry = 5; Release release = 6; } }
+message Heartbeat { string sample_id = 1; bool ready = 2; bool agent_ready = 3; int32 latency_ms = 4; }
+// The replica evicted an idle thread and no longer executes on it.
+message Release { string thread_id = 1; }
+message Event { tilde.types.v1.RuntimeEvent event = 1; }
+message DirectiveResult { string id = 1; CallResult result = 2; }
+// Immutable telemetry batches (traces, logs) accepted once by payload receipt.
+message Telemetry { TelemetryKind kind = 1; bytes payload = 2; }
+enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; TELEMETRY_KIND_LOGS = 2; }
+// Frames the gateway would not accept are named so the replica drops them; run
+// state from a replica that no longer holds the thread also reports the lease.
+message PublishResponse { repeated string rejected_event_ids = 3; repeated ThreadLease lost = 4; }
+message HydrateRequest { oneof key { string thread_id = 1; ExternalKey external = 2; } bool lease = 3; string instance_id = 4; }
+message ExternalKey { string connection_id = 1; string external_id = 2; }
+message HydrateResponse { bool found = 1; tilde.types.v1.Thread thread = 2; repeated tilde.types.v1.Message messages = 3; repeated tilde.types.v1.Run runs = 4; ThreadLease lease = 5; }
+message ForwardRequest { string thread_id = 1; IngressCall call = 2; }
+message ForwardResponse { CallResult result = 1; }
+message UploadAttachmentRequest { tilde.types.v1.Attachment attachment = 1; bytes content = 2; }
+message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }
+message DownloadAttachmentRequest { string thread_id = 1; string attachment_id = 2; }
+message DownloadAttachmentResponse { bytes content = 1; }
+message RelayRequest { string instance_id = 1; string path = 2; string content_type = 3; bytes body = 4; string caller_token = 5 [debug_redact = true]; }
+message RelayResponse { CallResult result = 1; }
+message ResolveParticipantRequest { oneof key { string agent_id = 1; string user_id = 2; } }
+message ResolveParticipantResponse { string id = 1; string name = 2; }
+
+message CredentialField { string name = 1; string value = 2 [debug_redact = true]; }
+message ConnectionConfiguration { tilde.types.v1.ChannelAccessMode access_mode = 9; repeated IdentityGrant identities = 10; int64 expires_at = 11; string id = 1; string provider_id = 2; string type_id = 3; string name = 4; string status = 5; string account_label = 6; int64 credential_version = 7; repeated CredentialField credentials = 8; }
+message GetConfigurationResponse { bool logs_enabled = 6; bool tracing_enabled = 5; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; string webhook_signing_key = 3 [debug_redact = true]; repeated ConnectionConfiguration connections = 4; }
+message IdentityGrant { string id = 1; tilde.types.v1.IdentityType identity_type = 2; string value = 3; bool verified = 4; bool allowed = 5; }

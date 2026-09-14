@@ -30,18 +30,18 @@ its port. Register that origin using exactly the same signing key. Run the
 following from an application depending on `@trytilde/sdk`:
 
 ```ts
-import { createManagementClient } from '@trytilde/sdk';
+import { createManagementClient, BinaryPermission, TargetSelection } from '@trytilde/sdk';
 import { randomUUID } from 'node:crypto';
 
 // A short-lived user session obtained through OIDC login, not an API key.
 const tilde = createManagementClient({ baseUrl: 'http://127.0.0.1:8080', accessToken: process.env.TILDE_ACCESS_TOKEN! });
 const { agent } = await tilde.agents.createAgent({
-  capabilities: { grants: {
-    'tools.invoke': { mode: 'only', ids: ['sendMessage'] },
-    'work.read': { mode: 'any' },
-    'work.write': { mode: 'any' },
-    'run.update': { mode: 'any' },
-  } },
+  capabilities: {
+    toolsInvoke: { mode: TargetSelection.SELECTED, ids: ['sendMessage'] },
+    workRead: BinaryPermission.YES,
+    workWrite: BinaryPermission.YES,
+    runUpdate: BinaryPermission.YES,
+  },
   name: 'Example',
   endpointUrl: 'http://127.0.0.1:3001',
   webhookSigningKey: process.env.AGENT_SIGNING_KEY!,
@@ -178,7 +178,7 @@ only the agent runtime API callback URL. The SDK renews these tokens while the
 invocation is live. Tokens and capabilities cannot be selected by the model.
 Configure grants when creating or updating an agent; every capability defaults
 to deny. For a native agent that sends messages and manages goals/tasks, grant
-`tools.invoke` (only `sendMessage`), `work.read`, `work.write` and `run.update`.
+`toolsInvoke` (selected `sendMessage`), `workRead`, `workWrite` and `runUpdate`.
 
 `ctx.agents.create/get/list/update/delete` call the registry using the current
 invocation token. `ctx.invokeAgent({agentId, objective})` starts work for an
@@ -210,3 +210,44 @@ Runtime thread reads, attachment operations and typing derive scope from the con
 `AgentContext.getMessages()` returns canonical `messages` and a separate `cachedMessages`
 collection. Initial conversions are available through `AgentContext.cachedMessages`.
 Canonical messages have no cache field, including those returned to management callers.
+
+## Serverless invocation controls
+
+`createAgentHandler()` exposes the same implementation as `createAgentServer()`
+as a Node HTTP request handler. Use it in a serverless route instead of starting
+an HTTP server. `pathPrefix` must match the deployed endpoint prefix:
+
+```ts
+import { createAgentHandler } from '@trytilde/sdk';
+
+export default createAgentHandler({
+  signingKey: process.env.AGENT_SIGNING_KEY!,
+  pathPrefix: '/api/agent',
+  async run(context) {
+    // Restore framework state by context.threadId, then run your agent.
+    // Pass context.signal to model and tool calls.
+  },
+  async checkpoint(context) {
+    // Quiesce your framework and persist its state before resolving.
+  },
+});
+```
+
+Mount a catch-all route below that prefix so ConnectRPC method paths reach the
+handler; preserve the raw request stream (disable framework body parsing). The
+handler supports HTTP/1 requests, including those behind a serverless ingress.
+No session affinity is required for control requests.
+
+Each running invocation opens `InvocationControlService.WatchCommands` to its
+callback URL before user code starts. Steering is accepted into that execution's
+input queue and acknowledged. Stop aborts its signal. Suspend runs the optional
+checkpoint hook, acknowledges it, and ends the request; resume is a fresh invocation
+that restores framework state. Already-persisted conversation state remains in Tilde;
+the hook owns any additional framework checkpoint. It must not merely copy mutable
+state while the framework continues executing.
+
+Unacknowledged input replays after reconnect and is deduplicated by input ID.
+Control connections use the current renewed invocation token. A sustained connection
+failure aborts the local execution. Cancellation is cooperative: custom code must
+honor the signal. The host has only Invoke and Healthz; inbound Stop/Steer/Cancel
+methods and synchronous pause acknowledgements no longer exist.

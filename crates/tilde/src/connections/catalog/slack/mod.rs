@@ -3,6 +3,12 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        account_name_label: Some("Slack workspace".into()),
+        icon_url: Some(
+            "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/slack/default.svg"
+                .into(),
+        ),
+        instructions: Some("Connect a Slack app to receive workspace conversations.".into()),
         id: "slack".into(),
         name: "Slack".into(),
         kind: ProviderKind::BuiltIn,
@@ -140,6 +146,13 @@ use crate::connections::service::Connections;
 pub(crate) struct Slack;
 #[async_trait::async_trait]
 impl Runtime for Slack {
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[
+            "Create a Slack app or connect an existing app using the form below.",
+            "After authorizing, verify the Webhook URL below as the Events API request URL in your Slack app settings.",
+        ]
+    }
+
     fn ui(&self) -> &'static str {
         "slack"
     }
@@ -226,7 +239,7 @@ impl Runtime for Slack {
                 &service.callback_url(setup)?,
                 &format!(
                     "{}/connections/webhooks/{}",
-                    service.public_url, setup.connection_id
+                    service.public_event_ingress_url, setup.connection_id
                 ),
             )
             .await?;

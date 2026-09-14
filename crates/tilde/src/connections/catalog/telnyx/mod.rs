@@ -3,6 +3,11 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        account_name_label: Some("Telnyx WhatsApp phone number".into()),
+        icon_url: Some("https://telnyx.com/favicon.ico".into()),
+        instructions: Some(
+            "Enter your Telnyx API key and WhatsApp account details to connect this agent.".into(),
+        ),
         id: "telnyx".into(),
         name: "Telnyx WhatsApp".into(),
         kind: ProviderKind::BuiltIn,
@@ -23,6 +28,17 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Telnyx;
 #[async_trait::async_trait]
 impl Runtime for Telnyx {
+    fn account_name_field(&self, _typ: &ConnectionType) -> Option<&'static str> {
+        Some("phone_number")
+    }
+
+    fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
+        &[
+            "Enter your Telnyx API key, sending phone number, messaging profile ID, and public key below.",
+            "Configure your Telnyx webhook with the Webhook URL below.",
+        ]
+    }
+
     async fn validate(
         &self,
         service: &Connections,

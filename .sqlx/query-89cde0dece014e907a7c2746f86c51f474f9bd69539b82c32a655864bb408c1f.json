@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_attachments(id,thread_id,filename,media_type,size_bytes,sha256,content) VALUES($1,$2,$3,$4,$5,$6,''::bytea) ON CONFLICT(id) DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "89cde0dece014e907a7c2746f86c51f474f9bd69539b82c32a655864bb408c1f"
+}

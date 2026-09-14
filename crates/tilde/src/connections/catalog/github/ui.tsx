@@ -16,7 +16,7 @@ function Github() {
   const form = useConnectionForm({ owner_type: "user" });
   const owner = form.watch("owner_type") ?? "user";
   return (
-    <Page setup={setup} title="Connect GitHub">
+    <Page setup={setup}>
       {step === "fields" ? (
         <div className="space-y-4">
           <p>Create a GitHub App or connect an existing installation.</p>

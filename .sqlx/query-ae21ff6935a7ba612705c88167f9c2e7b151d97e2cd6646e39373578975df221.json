@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE telemetry_delivery SET payload=NULL,completed_at=NOW() WHERE id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ae21ff6935a7ba612705c88167f9c2e7b151d97e2cd6646e39373578975df221"
+}

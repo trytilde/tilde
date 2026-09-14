@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connection_agents(connection_id,capability,agent_id,access_mode) SELECT $1,$2,$3,CASE WHEN provider_id='github' THEN 'disabled' ELSE 'private' END FROM connections WHERE id=$1 ON CONFLICT DO NOTHING;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "022026ec1720de3ff4291505af54f2b4f28493cd7dff38a4b0036ac9ec12d52e"
+}

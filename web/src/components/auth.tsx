@@ -43,27 +43,5 @@ export function Auth({ children }: { children: ReactNode }) {
         </div>
       </main>
     );
-  return (
-    <>
-      <div className="fixed right-4 top-3 z-50">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={async () => {
-            const response = await fetch("/auth/logout", {
-              method: "POST",
-              headers: authHeaders(),
-            });
-            if (response.ok || response.status === 401) {
-              clearAccessToken();
-              setState("signed-out");
-            }
-          }}
-        >
-          Sign out
-        </Button>
-      </div>
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
