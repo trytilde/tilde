@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT l.instance_id,l.updated_at,n.public_url AS \"public_url?\",COALESCE(n.ready AND n.last_seen_at>NOW()-INTERVAL '15 seconds',FALSE) AS \"live!\"\nFROM thread_leases l LEFT JOIN agent_instances n ON n.agent_id=l.agent_id AND n.instance_id=l.instance_id\nWHERE l.thread_id=$1 AND l.agent_id=$2;\n",
+  "query": "SELECT l.instance_id,l.updated_at,n.public_url AS \"public_url?\",COALESCE(n.ready AND n.last_seen_at>NOW()-make_interval(secs=>$3::float8),FALSE) AS \"live!\"\nFROM thread_leases l LEFT JOIN agent_instances n ON n.agent_id=l.agent_id AND n.instance_id=l.instance_id\nWHERE l.thread_id=$1 AND l.agent_id=$2;\n",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,8 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Uuid",
+        "Float8"
       ]
     },
     "nullable": [
@@ -37,5 +38,5 @@
       null
     ]
   },
-  "hash": "cbf45619e9ed441474fd729702fbd34b2392abd27e4fc06d5ea898ba11ac0d92"
+  "hash": "39bacf44889c8fb0966818e8e5f5ec2512dd717813ef0ab512b50eeffbfb419c"
 }

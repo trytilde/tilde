@@ -1,7 +1,7 @@
 //! Events published by replicas become canonical Postgres state. A batch is one
 //! transaction; receipts deduplicate replays; run state is accepted only from the
 //! replica holding the thread's lease. Data appends carry no ownership at all.
-use super::{Deployments, Holder, id, lease_frame};
+use super::{Deployments, Holder, id, lease_frame, liveness_secs};
 use crate::proto::tilde::{
     agent_event_ingress::v1 as wire,
     types::v1::{self as types, runtime_event::State},
@@ -236,7 +236,8 @@ impl Deployments {
                         let row = sqlx::query_file!(
                             "../../queries/deployment/lease_holder.sql",
                             thread,
-                            agent
+                            agent,
+                            liveness_secs()
                         )
                         .fetch_optional(&mut **tx)
                         .await?;
@@ -621,9 +622,12 @@ impl Deployments {
     }
     /// Hand completed messages to the other sidecar agents in a room.
     pub async fn relay_pending(&self) -> Result<(bool, usize), Error> {
-        let rows = sqlx::query_file!("../../queries/deployment/relay_pending.sql")
-            .fetch_all(&self.pool)
-            .await?;
+        let rows = sqlx::query_file!(
+            "../../queries/deployment/relay_pending.sql",
+            liveness_secs()
+        )
+        .fetch_all(&self.pool)
+        .await?;
         let more = rows.len() == 50;
         let mut delivered = 0;
         let chat = self.chat();

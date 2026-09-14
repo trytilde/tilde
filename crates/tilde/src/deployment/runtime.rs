@@ -1079,9 +1079,10 @@ impl Runtime {
     }
     /// Leave cleanly before the process exits. Idle threads release their leases so the
     /// next replica to touch them takes over without a takeover. Threads mid-invocation
-    /// keep theirs, and the final not-ready heartbeat makes the gateway treat this
-    /// instance as gone at once, so recovery moves that work now instead of after the
-    /// liveness window. The outbox is flushed in one publish.
+    /// keep theirs: their invocations end locally, which turns the agent process's open
+    /// command stream into a stop, and the final not-ready heartbeat makes the gateway
+    /// treat this instance as gone at once, so recovery restarts that work now instead of
+    /// after the liveness window. The outbox is flushed in one publish.
     pub(crate) async fn drain(&self) {
         let threads: Vec<(Uuid, Shared)> = self
             .state
@@ -1093,9 +1094,13 @@ impl Runtime {
             .collect();
         for (key, shared) in threads {
             let mut t = shared.lock().await;
-            if t.lease.holder != Some(self.instance_id)
-                || t.active_invocation(self.agent_id).is_some()
-            {
+            if t.lease.holder != Some(self.instance_id) {
+                continue;
+            }
+            if t.active_invocation(self.agent_id).is_some() {
+                self.end_local_work(&mut t, "draining");
+                drop(t);
+                self.changed(key);
                 continue;
             }
             t.lease.holder = None;

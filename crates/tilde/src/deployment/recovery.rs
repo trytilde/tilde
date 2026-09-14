@@ -2,7 +2,7 @@
 //! invocations end; under the reassign policy the lease moves to a live replica,
 //! which restarts the run from its objective when it hydrates the thread; under
 //! the stop policy the run fails and the lease is dropped.
-use super::{Deployments, LIVENESS};
+use super::{Deployments, LIVENESS, liveness_secs};
 use crate::error::Error;
 use sqlx::{Postgres, Transaction};
 use std::time::Duration;
@@ -66,7 +66,7 @@ impl Deployments {
         Ok(())
     }
     pub async fn recover(&self) -> Result<usize, Error> {
-        let rows = sqlx::query_file!("../../queries/deployment/dead_leases.sql")
+        let rows = sqlx::query_file!("../../queries/deployment/dead_leases.sql", liveness_secs())
             .fetch_all(&self.pool)
             .await?;
         let mut count = 0;
@@ -87,7 +87,8 @@ impl Deployments {
                 || sqlx::query_file!(
                     "../../queries/deployment/instance_live.sql",
                     row.agent_id,
-                    row.instance_id
+                    row.instance_id,
+                    liveness_secs()
                 )
                 .fetch_one(&mut *tx)
                 .await?
@@ -116,7 +117,8 @@ impl Deployments {
                     "../../queries/deployment/live_node.sql",
                     row.agent_id,
                     Some(row.instance_id),
-                    row.deployment_id
+                    row.deployment_id,
+                    liveness_secs()
                 )
                 .fetch_optional(&mut *tx)
                 .await?

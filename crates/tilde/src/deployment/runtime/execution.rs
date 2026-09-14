@@ -922,10 +922,13 @@ impl Runtime {
             return Ok(());
         }
         if !self.owns(&t) || t.lease.epoch != v.generation {
-            // The lease moved on; the new holder's state is canonical.
+            // The lease moved on; the new holder's state is canonical. Waking the
+            // thread turns the agent process's command stream into a stop.
             v.status = "failed".into();
             v.ended_at = now();
-            t.invocations.insert(key, v);
+            t.invocations.insert(key, v.clone());
+            drop(t);
+            self.changed(id(&v.thread_id)?);
             return Ok(());
         }
         v.status = status.into();
@@ -1027,25 +1030,25 @@ impl Runtime {
         if lease.held {
             self.note_held_elsewhere(thread, lease.holder_public_url);
         }
-        let stale: Vec<Uuid> = t
-            .invocations
-            .iter()
-            .filter(|(_, v)| matches!(v.status.as_str(), "pending" | "running"))
-            .map(|(k, _)| *k)
-            .collect();
-        for key in stale {
-            if let Some(v) = t.invocations.get_mut(&key) {
+        self.end_local_work(&mut t, "lease_changed");
+        drop(t);
+        self.changed(thread);
+        Ok(())
+    }
+    /// Fail this replica's live work on a thread without publishing: the record is
+    /// settled elsewhere (by the new holder or by recovery). Callers wake the thread
+    /// afterwards so the agent process's open command stream yields a stop.
+    pub(crate) fn end_local_work(&self, t: &mut ThreadState, reason: &str) {
+        for v in t.invocations.values_mut() {
+            if matches!(v.status.as_str(), "pending" | "running") {
                 v.status = "failed".into();
                 v.ended_at = now();
             }
         }
         for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
             command.finished_at = Some(now());
-            command.failure = "lease_changed".into();
+            command.failure = reason.into();
         }
-        drop(t);
-        self.changed(thread);
-        Ok(())
     }
     /// Unacknowledged steering for one invocation as (command id, input) pairs.
     pub(crate) async fn pending_steering(

@@ -561,13 +561,16 @@ projected in queue order with the events before it, so a run that completed befo
 thread was evicted is recorded before the lease goes. A sidecar is a per-host daemon serving several
 agents: each agent has its own runtime, cache, outbox and leases, sharing one instance
 id, one public listener and one loopback listener. On a graceful stop each runtime
-releases the leases of idle threads, keeps the leases of threads mid-invocation, and
-sends a final not-ready heartbeat; the gateway treats a not-ready instance as gone and
-recovery moves that work at once instead of after the liveness window.
+releases the leases of idle threads, ends its invocations on threads mid-invocation
+locally (the agent process's open command stream turns into a stop, as it does when a
+replica is fenced or loses a lease), and sends a final not-ready heartbeat; the gateway
+treats a not-ready instance as gone and recovery restarts that work at once instead of
+after the liveness window.
 
 Lease validity is the holder's liveness: the instance heartbeat, sent every three
 seconds independently of the event queue, implicitly renews every lease the replica
-holds, and a holder unheard from for fifteen seconds is dead. A replica whose publishes
+holds, and a holder unheard from for the liveness window (`LIVENESS`, fifteen seconds, passed
+into every query that judges liveness) is dead. A replica whose publishes
 have not been acknowledged for ten seconds stops executing on all its threads, strictly
 inside the gateway's dead-detection window, so a partitioned holder never runs beside
 its replacement. Only run, invocation and tool-call state is checked against the lease

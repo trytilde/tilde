@@ -40,8 +40,12 @@ use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-/// Owners that miss this window are treated as gone.
+/// Owners that miss this window are treated as gone. Every query that judges liveness
+/// takes this as its trailing parameter, so the window lives here alone.
 pub const LIVENESS: Duration = Duration::from_secs(15);
+pub(crate) fn liveness_secs() -> f64 {
+    LIVENESS.as_secs_f64()
+}
 #[derive(Default)]
 pub(crate) struct Channels {
     pub directives: Notifications,
@@ -620,7 +624,8 @@ impl Deployments {
         Ok(sqlx::query_file!(
             "../../queries/deployment/instance_live.sql",
             agent,
-            instance
+            instance,
+            liveness_secs()
         )
         .fetch_one(&self.pool)
         .await?
@@ -785,17 +790,20 @@ impl Deployments {
     }
     /// Who executes a thread for this agent right now, if the holder is alive.
     pub(crate) async fn holder(&self, agent: Uuid, thread: Uuid) -> Result<Option<Holder>, Error> {
-        Ok(
-            sqlx::query_file!("../../queries/deployment/lease_holder.sql", thread, agent)
-                .fetch_optional(&self.pool)
-                .await?
-                .filter(|r| r.live)
-                .map(|r| Holder {
-                    instance: r.instance_id,
-                    public_url: r.public_url.unwrap_or_default(),
-                    version: r.updated_at,
-                }),
+        Ok(sqlx::query_file!(
+            "../../queries/deployment/lease_holder.sql",
+            thread,
+            agent,
+            liveness_secs()
         )
+        .fetch_optional(&self.pool)
+        .await?
+        .filter(|r| r.live)
+        .map(|r| Holder {
+            instance: r.instance_id,
+            public_url: r.public_url.unwrap_or_default(),
+            version: r.updated_at,
+        }))
     }
     /// Take or confirm the lease for `instance` in one transaction. A live holder
     /// keeps it; a dead holder loses it, and its interrupted work is ended here. The
@@ -832,10 +840,15 @@ impl Deployments {
                 .map(|r| (r.instance_id, r.updated_at));
         if let Some((holder, version)) = current
             && holder != instance
-            && sqlx::query_file!("../../queries/deployment/instance_live.sql", agent, holder)
-                .fetch_one(&mut **tx)
-                .await?
-                .live
+            && sqlx::query_file!(
+                "../../queries/deployment/instance_live.sql",
+                agent,
+                holder,
+                liveness_secs()
+            )
+            .fetch_one(&mut **tx)
+            .await?
+            .live
         {
             let url = sqlx::query_file!("../../queries/deployment/node_url.sql", agent, holder)
                 .fetch_optional(&mut **tx)
@@ -943,7 +956,8 @@ impl Deployments {
             "../../queries/deployment/live_node.sql",
             agent,
             None::<Uuid>,
-            deployment
+            deployment,
+            liveness_secs()
         )
         .fetch_optional(&self.pool)
         .await?

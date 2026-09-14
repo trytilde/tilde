@@ -287,6 +287,9 @@ impl SidecarService for Control {
             .subscribe(&service.pool, "tilde_sidecar_leases")
             .await
             .map_err(Error::from)?;
+        // One channel for every agent: each wake re-reads this instance's pending
+        // directives (one indexed query). Scope the channel by agent if hosts grow into
+        // the hundreds.
         let mut directives = service
             .channels
             .directives
