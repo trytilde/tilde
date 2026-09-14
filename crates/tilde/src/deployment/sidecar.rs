@@ -18,6 +18,7 @@ use axum::{
     routing::get,
 };
 use secrecy::{ExposeSecret, SecretString};
+use sha2::Digest;
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -27,6 +28,10 @@ pub struct Node {
     pub gateway: gateway::Client,
     /// For handing a request to the peer replica that holds its thread.
     peers: reqwest::Client,
+    /// The deployment this node runs, and the hash of its token: the local agent
+    /// process dials in with the same token.
+    pub deployment_id: String,
+    token_hash: [u8; 32],
 }
 pub struct Options {
     pub gateway_url: String,
@@ -37,6 +42,8 @@ pub struct Options {
     pub public_url: Option<String>,
     /// Idle time after which a cached thread is dropped and its lease released.
     pub idle_after: Duration,
+    /// Approximate bytes of cached conversation state per agent before early eviction.
+    pub cache_bytes: usize,
 }
 impl Options {
     pub fn from_env() -> Result<Self> {
@@ -56,8 +63,14 @@ impl Options {
                 "At least one deployment token is required".into(),
             ));
         }
+        // Optional: agents that do not dial in are woken over HTTP at these endpoints.
         let mut endpoints = BTreeMap::new();
-        for entry in env("ENGINE_SIDECAR_AGENT_ENDPOINTS")?.split(',') {
+        for entry in std::env::var("ENGINE_SIDECAR_AGENT_ENDPOINTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
             let (agent, endpoint) = entry.split_once('=').ok_or_else(|| {
                 ChatError::Invalid("Agent endpoints must be agent_id=http(s)://host pairs".into())
             })?;
@@ -82,6 +95,15 @@ impl Options {
             public_url: std::env::var("ENGINE_SIDECAR_PUBLIC_URL")
                 .ok()
                 .filter(|s| !s.is_empty()),
+            cache_bytes: std::env::var("ENGINE_SIDECAR_CACHE_BYTES")
+                .ok()
+                .map(|v| {
+                    v.parse::<usize>().map_err(|_| {
+                        ChatError::Invalid("Invalid ENGINE_SIDECAR_CACHE_BYTES".into())
+                    })
+                })
+                .transpose()?
+                .unwrap_or(256 * 1024 * 1024),
             idle_after: Duration::from_secs(
                 std::env::var("ENGINE_SIDECAR_THREAD_IDLE_SECONDS")
                     .ok()
@@ -122,6 +144,11 @@ pub struct Sidecar {
 impl Sidecar {
     /// Stop serving, drop live executions, and let the gateway see this incarnation disappear.
     pub async fn stop(mut self) {
+        // Leave cleanly: fail live executions, release every lease and flush, so the
+        // gateway moves the work now instead of after the liveness window.
+        for node in &self.nodes {
+            node.runtime.drain().await;
+        }
         let _ = self.stop.send(true);
         self.servers.abort();
         self.workers.abort_all();
@@ -176,6 +203,7 @@ pub async fn start(options: Options) -> Result<Sidecar> {
     let mut public_router = Router::new();
     let mut nodes: Vec<Node> = vec![];
     for token in options.tokens {
+        let token_hash: [u8; 32] = sha2::Sha256::digest(token.expose_secret().as_bytes()).into();
         let gateway = gateway::Client::new(&options.gateway_url, token)?;
         let request = wire::WatchRequest {
             instance_id: instance.to_string(),
@@ -206,11 +234,7 @@ pub async fn start(options: Options) -> Result<Sidecar> {
                 "An agent appears more than once in the deployment token list".into(),
             ));
         }
-        let endpoint = options
-            .endpoints
-            .get(&agent)
-            .ok_or_else(|| ChatError::Invalid(format!("Local endpoint missing for agent {agent}")))?
-            .clone();
+        let endpoint = options.endpoints.get(&agent).cloned();
         let prefix = format!("/agents/{agent}");
         let runtime = Arc::new(Runtime::new(
             gateway.clone(),
@@ -222,6 +246,7 @@ pub async fn start(options: Options) -> Result<Sidecar> {
                 local_endpoint: endpoint,
                 callback_url: format!("http://127.0.0.1:{runtime_port}{prefix}"),
                 idle_after: options.idle_after,
+                cache_bytes: options.cache_bytes,
             },
         ));
         runtime.configure(configuration);
@@ -232,6 +257,8 @@ pub async fn start(options: Options) -> Result<Sidecar> {
             runtime: runtime.clone(),
             gateway: gateway.clone(),
             peers: peers.clone(),
+            deployment_id: std::mem::take(&mut snapshot.deployment_id),
+            token_hash,
         };
         platform_routes
             .write()
@@ -318,6 +345,9 @@ pub async fn start(options: Options) -> Result<Sidecar> {
     })
 }
 impl Node {
+    pub(crate) fn token_hash(&self) -> &[u8; 32] {
+        &self.token_hash
+    }
     pub fn runtime_router(&self) -> Router {
         crate::chat::rpc::runtime::router(Chat::from_sidecar(self.runtime.clone()))
             .route(
@@ -334,6 +364,9 @@ impl Node {
                 crate::chat::controls::router(Chat::from_sidecar(self.runtime.clone()))
                     .layer(middleware::from_fn_with_state(self.clone(), control_guard)),
             )
+            // The agent process dials in here with the deployment token, exactly as a
+            // connected host dials the gateway.
+            .merge(super::local_run::router(self.clone()))
     }
     pub fn public_router(&self) -> Router {
         crate::chat::rpc::ingress::router(Chat::from_sidecar(self.runtime.clone()))

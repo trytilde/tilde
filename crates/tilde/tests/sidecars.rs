@@ -5,7 +5,7 @@ use common::{Database, seed};
 use secrecy::{ExposeSecret, SecretString};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tilde::proto::tilde::{
-    agent_event_ingress::v1 as wire, agent_host::v1 as host, types::v1 as types,
+    agent_event_ingress::v1 as wire, agent_host::v1 as host, run::v1 as run, types::v1 as types,
 };
 use tilde::{
     agent::{Agents, CreateAgent},
@@ -116,11 +116,18 @@ struct Fixture {
     finish: Arc<tokio::sync::Notify>,
     http: reqwest::Client,
     ingress_token: SecretString,
+    deployment_token: SecretString,
+    deployment_id: String,
     tasks: Vec<tokio::task::JoinHandle<()>>,
     stop: tokio::sync::watch::Sender<bool>,
 }
 impl Fixture {
     async fn new() -> Self {
+        Self::new_with(true).await
+    }
+    /// `with_endpoint` false leaves the sidecar without an HTTP agent endpoint: the
+    /// agent process must dial in over the run protocol.
+    async fn new_with(with_endpoint: bool) -> Self {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_test_writer()
@@ -254,11 +261,16 @@ impl Fixture {
         let options = |gateway_url: &str| sidecar::Options {
             gateway_url: gateway_url.to_owned(),
             tokens: vec![token.clone()],
-            endpoints: BTreeMap::from([(agent, endpoint.clone())]),
+            endpoints: if with_endpoint {
+                BTreeMap::from([(agent, endpoint.clone())])
+            } else {
+                BTreeMap::new()
+            },
             runtime_listen: "127.0.0.1:0".parse().unwrap(),
             listen: "127.0.0.1:0".parse().unwrap(),
             public_url: None,
             idle_after: Duration::from_secs(600),
+            cache_bytes: 256 * 1024 * 1024,
         };
         let first = sidecar::start(options(&gateway_url)).await.unwrap();
         let second = sidecar::start(options(&gateway_url)).await.unwrap();
@@ -279,6 +291,8 @@ impl Fixture {
             finish,
             http: reqwest::Client::new(),
             ingress_token,
+            deployment_token: token.clone(),
+            deployment_id: deployment.id.clone(),
             tasks: vec![host_task, gateway, relay, recovery],
             stop,
         }
@@ -624,6 +638,191 @@ async fn a_replica_that_lost_its_lease_is_fenced_and_hands_off_to_the_holder() {
         }
         assert_eq!(invocation.objective, "hello");
     }
+    fx.projected(thread_id, "after").await;
+    fx.shutdown().await;
+}
+
+fn run_client(
+    base: &str,
+    bearer: &str,
+) -> tilde::services::tilde::run::v1::RunServiceClient<connectrpc::client::HttpClient> {
+    let mut headers = http::HeaderMap::new();
+    headers.insert(
+        http::header::AUTHORIZATION,
+        format!("Bearer {bearer}").parse().unwrap(),
+    );
+    tilde::services::tilde::run::v1::RunServiceClient::new(
+        connectrpc::client::HttpClient::plaintext_http2_only(),
+        connectrpc::client::ClientConfig::new(base.parse().unwrap()).with_default_headers(headers),
+    )
+}
+/// Without an HTTP endpoint the agent process dials the sidecar with the deployment
+/// token, receives the wake as a frame and reports back; stopping the sidecar releases
+/// its leases at once instead of leaving them to the liveness window.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_local_agent_dials_the_sidecar_and_a_graceful_stop_releases_leases() {
+    let mut fx = Fixture::new_with(false).await;
+    let first_base = fx.base(fx.first());
+    let runtime_base = format!("http://{}/agents/{}", fx.first().runtime_address, fx.agent);
+    let agent_process = run_client(&runtime_base, fx.deployment_token.expose_secret());
+    let instance = Uuid::new_v4();
+    let mut watch = agent_process
+        .watch(run::WatchRequest {
+            instance_id: instance.to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let first: run::WatchResponse = watch.message().await.unwrap().unwrap().to_owned_message();
+    match first.frame {
+        Some(run::watch_response::Frame::Registered(registered)) => {
+            assert_eq!(registered.deployment_id, fx.deployment_id);
+            assert_eq!(registered.agent_id, fx.agent.to_string());
+        }
+        other => panic!("expected registration, got {other:?}"),
+    }
+    agent_process
+        .heartbeat(run::HeartbeatRequest {
+            instance_id: instance.to_string(),
+            ready: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    // A wrong token never attaches.
+    assert!(
+        run_client(&runtime_base, "not-the-deployment-token")
+            .heartbeat(run::HeartbeatRequest {
+                instance_id: instance.to_string(),
+                ready: true,
+                ..Default::default()
+            })
+            .await
+            .is_err()
+    );
+    let (thread_id, alice, _) = fx.room().await;
+    let (status, posted) = fx.post(&first_base, thread_id, &alice, "hello").await;
+    assert_eq!(status, 200, "{posted}");
+    let wake = loop {
+        let frame: run::WatchResponse =
+            tokio::time::timeout(Duration::from_secs(10), watch.message())
+                .await
+                .expect("a wake frame")
+                .unwrap()
+                .unwrap()
+                .to_owned_message();
+        match frame.frame {
+            Some(run::watch_response::Frame::Wake(wake)) => break *wake,
+            Some(run::watch_response::Frame::Ping(_)) => continue,
+            other => panic!("unexpected frame {other:?}"),
+        }
+    };
+    assert_eq!(wake.objective, "hello");
+    assert_eq!(wake.thread_id, thread_id.to_string());
+    assert_eq!(wake.owner_instance_id, fx.first().instance.to_string());
+    assert!(!wake.command_id.is_empty());
+    // The agent never received an HTTP Invoke: the fixture's host saw nothing.
+    assert!(fx.calls.try_recv().is_err());
+    let execution = run_client(&runtime_base, &wake.capability);
+    let report = |event| run::ReportRequest {
+        invocation_id: wake.invocation_id.clone(),
+        event: Some(event),
+        ..Default::default()
+    };
+    execution
+        .report(report(run::report_request::Event::Accepted(
+            run::RunAccepted {
+                command_id: wake.command_id.clone(),
+                ..Default::default()
+            }
+            .into(),
+        )))
+        .await
+        .unwrap();
+    execution
+        .report(report(run::report_request::Event::ReasoningDelta(
+            "pondering".into(),
+        )))
+        .await
+        .unwrap();
+    execution
+        .report(report(run::report_request::Event::Stopped(
+            run::RunStopped::default().into(),
+        )))
+        .await
+        .unwrap();
+    let run_id = Uuid::parse_str(&wake.run_id).unwrap();
+    eventually(async || {
+        fx.chat
+            .run(run_id)
+            .await
+            .ok()
+            .filter(|r| r.invocation_status == "stopped" && r.status == "waiting")
+    })
+    .await;
+    fx.projected(thread_id, "hello").await;
+    assert_eq!(fx.holder(thread_id).await, Some(fx.first().instance));
+    // Graceful stop: the idle thread's lease is released immediately, not after
+    // fifteen seconds, and the instance reports itself gone.
+    fx.first.take().unwrap().stop().await;
+    eventually(async || (fx.holder(thread_id).await.is_none()).then_some(())).await;
+    assert!(
+        fx.deployments
+            .instances(fx.agent)
+            .await
+            .unwrap()
+            .iter()
+            .all(|i| i.instance_id != instance.to_string() || !i.ready)
+    );
+    // The survivor takes the thread on its next touch and wakes its own agent process.
+    let second_runtime = format!("http://{}/agents/{}", fx.second().runtime_address, fx.agent);
+    let second_agent = run_client(&second_runtime, fx.deployment_token.expose_secret());
+    let second_instance = Uuid::new_v4();
+    let mut second_watch = second_agent
+        .watch(run::WatchRequest {
+            instance_id: second_instance.to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let _registered = second_watch.message().await.unwrap().unwrap();
+    second_agent
+        .heartbeat(run::HeartbeatRequest {
+            instance_id: second_instance.to_string(),
+            ready: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let second_base = fx.base(fx.second());
+    let (status, after) = fx.post(&second_base, thread_id, &alice, "after").await;
+    assert_eq!(status, 200, "{after}");
+    let wake = loop {
+        let frame: run::WatchResponse =
+            tokio::time::timeout(Duration::from_secs(10), second_watch.message())
+                .await
+                .expect("a wake on the survivor")
+                .unwrap()
+                .unwrap()
+                .to_owned_message();
+        match frame.frame {
+            Some(run::watch_response::Frame::Wake(wake)) => break *wake,
+            _ => continue,
+        }
+    };
+    assert_eq!(wake.objective, "after");
+    assert_eq!(wake.owner_instance_id, fx.second().instance.to_string());
+    assert_eq!(fx.holder(thread_id).await, Some(fx.second().instance));
+    run_client(&second_runtime, &wake.capability)
+        .report(run::ReportRequest {
+            invocation_id: wake.invocation_id.clone(),
+            event: Some(run::report_request::Event::Stopped(
+                run::RunStopped::default().into(),
+            )),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
     fx.projected(thread_id, "after").await;
     fx.shutdown().await;
 }

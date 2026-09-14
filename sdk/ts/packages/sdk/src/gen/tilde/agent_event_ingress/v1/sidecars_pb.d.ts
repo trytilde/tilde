@@ -107,6 +107,11 @@ export declare type Snapshot = Message<"tilde.agent_event_ingress.v1.Snapshot"> 
    * @generated from field: string token_signing_key = 3;
    */
   tokenSigningKey: string;
+
+  /**
+   * @generated from field: string deployment_id = 4;
+   */
+  deploymentId: string;
 };
 
 /**

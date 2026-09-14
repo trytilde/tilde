@@ -130,6 +130,23 @@ impl ThreadState {
             v.agent_id == agent.to_string() && matches!(v.status.as_str(), "pending" | "running")
         })
     }
+    /// A cheap size estimate for the cache budget: text and payload lengths plus a
+    /// fixed cost per record. Exactness does not matter, order of magnitude does.
+    pub fn approx_bytes(&self) -> usize {
+        let messages: usize = self
+            .messages
+            .values()
+            .map(|m| 256 + m.text.len() + m.attachments.len() * 128)
+            .sum();
+        let events: usize = self.events.iter().map(|e| 128 + e.kind.len()).sum();
+        let converted: usize = self.converted.values().map(|c| 64 + c.len()).sum();
+        messages
+            + events
+            + converted
+            + (self.runs.len() + self.invocations.len() + self.commands.len()) * 512
+            + (self.goals.len() + self.tasks.len() + self.tool_calls.len()) * 512
+            + self.attachments.len() * 256
+    }
     pub fn retain_window(&mut self) {
         while self.events.len() > EVENT_WINDOW {
             self.events.pop_front();

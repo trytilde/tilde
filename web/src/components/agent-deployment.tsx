@@ -62,7 +62,7 @@ function message(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 function sidecarSnippet(agentId: string, token: string) {
-  return `ENGINE_SIDECAR_GATEWAY_URL=https://gateway.example\nENGINE_SIDECAR_AGENT_TOKENS=${token}\nENGINE_SIDECAR_AGENT_ENDPOINTS=${agentId}=http://127.0.0.1:3000\ntilde-sidecar`;
+  return `# Sidecar process\nENGINE_SIDECAR_GATEWAY_URL=https://gateway.example\nENGINE_SIDECAR_AGENT_TOKENS=${token}\ntilde-sidecar\n\n# Agent process beside it (SDK)\nconnectAgent({ gatewayUrl: "http://127.0.0.1:8081/agents/${agentId}", deploymentToken: process.env.TILDE_DEPLOYMENT_TOKEN!, run })`;
 }
 
 export function AgentDeployment({ agentId, paused }: { agentId: string; paused: boolean }) {

@@ -317,12 +317,22 @@ agent process:
 ```bash
 export ENGINE_SIDECAR_GATEWAY_URL=https://tilde.example.com
 export ENGINE_SIDECAR_AGENT_TOKENS='<deployment-token>'
-export ENGINE_SIDECAR_AGENT_ENDPOINTS='<agent-id>=http://127.0.0.1:3000'
 tilde-sidecar
 ```
 
-For multiple agents, separate tokens and `agent-id=endpoint` entries with commas. The
-sidecar keeps no state on disk. It dials the gateway's `sidecar` route group over one
+The agent process dials the sidecar with the same token through the run protocol:
+
+```ts
+connectAgent({
+  gatewayUrl: "http://127.0.0.1:8081/agents/<agent-id>",
+  deploymentToken: process.env.TILDE_DEPLOYMENT_TOKEN!,
+  run,
+});
+```
+
+Agents that cannot dial in are woken over HTTP instead: set
+`ENGINE_SIDECAR_AGENT_ENDPOINTS='<agent-id>=http://127.0.0.1:3000'`. For multiple agents,
+separate tokens and entries with commas. The sidecar keeps no state on disk. It dials the gateway's `sidecar` route group over one
 connection, receives configuration, credentials and thread leases from that stream, and
 publishes typed events back for projection into Postgres. The gateway never connects to
 a sidecar, so replicas may sit behind NAT.
@@ -346,7 +356,11 @@ straight to the holder, sidecar to sidecar; requests on the gateway are queued f
 holder and answered through the gateway. The gateway serves reads of sidecar
 conversations from its projection, and completed messages in rooms with several sidecar
 agents are relayed to each holder. Conversations idle for
-`ENGINE_SIDECAR_THREAD_IDLE_SECONDS` leave memory and release their lease.
+`ENGINE_SIDECAR_THREAD_IDLE_SECONDS` leave memory and release their lease, and
+`ENGINE_SIDECAR_CACHE_BYTES` (default 256 MiB per agent) evicts the least recently active
+idle conversations early. Stopping a sidecar releases idle leases immediately and reports
+the instance gone, so live work moves to another replica without waiting out the
+liveness window.
 
 Replicas heartbeat every three seconds; a holder unheard from for fifteen seconds loses
 its leases. Under **Assign to new node** the gateway hands active runs to another live

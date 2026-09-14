@@ -298,7 +298,7 @@ impl SidecarService for Control {
         directives.borrow_and_update();
         Response::stream_ok(async_stream::try_stream! {
             let mut since = chrono::Utc::now();
-            let snapshot = service.snapshot(agent, instance).await?;
+            let snapshot = service.snapshot(agent, auth.deployment, instance).await?;
             yield ingress::WatchResponse { frame: Some(snapshot.into()), ..Default::default() };
             let mut sent = std::collections::BTreeSet::new();
             for directive in service.pending_directives(agent, instance).await? {

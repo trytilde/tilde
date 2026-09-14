@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT l.thread_id,l.agent_id,l.instance_id,d.failure_mode,n.deployment_id AS \"deployment_id?\",\n EXISTS(SELECT 1 FROM chat_invocations i WHERE i.thread_id=l.thread_id AND i.agent_id=l.agent_id AND i.status IN ('pending','running')) AS \"active!\"\nFROM thread_leases l JOIN agents a ON a.id=l.agent_id JOIN agent_deployment_settings d ON d.agent_id=l.agent_id\nLEFT JOIN agent_instances n ON n.agent_id=l.agent_id AND n.instance_id=l.instance_id\nWHERE a.deployment_mode='sidecar' AND a.deleted_at IS NULL\nAND (n.instance_id IS NULL OR n.last_seen_at<NOW()-INTERVAL '15 seconds')\nORDER BY l.updated_at LIMIT 200;\n",
+  "query": "SELECT l.thread_id,l.agent_id,l.instance_id,d.failure_mode,n.deployment_id AS \"deployment_id?\",\n EXISTS(SELECT 1 FROM chat_invocations i WHERE i.thread_id=l.thread_id AND i.agent_id=l.agent_id AND i.status IN ('pending','running')) AS \"active!\"\nFROM thread_leases l JOIN agents a ON a.id=l.agent_id JOIN agent_deployment_settings d ON d.agent_id=l.agent_id\nLEFT JOIN agent_instances n ON n.agent_id=l.agent_id AND n.instance_id=l.instance_id\nWHERE a.deployment_mode='sidecar' AND a.deleted_at IS NULL\nAND (n.instance_id IS NULL OR NOT n.ready OR n.last_seen_at<NOW()-INTERVAL '15 seconds')\nORDER BY l.updated_at LIMIT 200;\n",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       null
     ]
   },
-  "hash": "b81f151d54e22198c24770557df4d7491de3eb2b573bba278012e8857eed2abc"
+  "hash": "7720b0e44ed0f6221fdb9269718a5ab0bd3b7f825a811a0c8545b525646f4cad"
 }

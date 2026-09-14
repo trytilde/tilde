@@ -871,6 +871,8 @@ pub struct SnapshotView<'a> {
     >,
     /// Field 3: `token_signing_key`
     pub token_signing_key: &'a str,
+    /// Field 4: `deployment_id`
+    pub deployment_id: &'a str,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for SnapshotView<'a> {
@@ -879,6 +881,7 @@ impl<'a> ::core::fmt::Debug for SnapshotView<'a> {
             .field("configuration", &self.configuration)
             .field("leases", &self.leases)
             .field("token_signing_key", &::core::format_args!("[REDACTED]"))
+            .field("deployment_id", &self.deployment_id)
             .finish()
     }
 }
@@ -938,6 +941,13 @@ impl<'a> ::buffa::MessageView<'a> for SnapshotView<'a> {
                 )?;
                 view.token_signing_key = ::buffa::types::borrow_str(&mut cur)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.deployment_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -995,6 +1005,7 @@ impl<'a> ::buffa::MessageView<'a> for SnapshotView<'a> {
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             token_signing_key: self.token_signing_key.to_string(),
+            deployment_id: self.deployment_id.to_string(),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1027,6 +1038,10 @@ impl<'a> ::buffa::ViewEncode<'a> for SnapshotView<'a> {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.token_signing_key) as u64;
         }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1056,6 +1071,9 @@ impl<'a> ::buffa::ViewEncode<'a> for SnapshotView<'a> {
         }
         if !self.token_signing_key.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.token_signing_key, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.deployment_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1088,6 +1106,9 @@ impl<'__a> ::serde::Serialize for SnapshotView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.token_signing_key) {
             __map.serialize_entry("tokenSigningKey", self.token_signing_key)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.deployment_id) {
+            __map.serialize_entry("deploymentId", self.deployment_id)?;
         }
         __map.end()
     }
@@ -1198,6 +1219,11 @@ impl SnapshotOwnedView {
     #[must_use]
     pub fn token_signing_key(&self) -> &'_ str {
         self.0.reborrow().token_signing_key
+    }
+    /// Field 4: `deployment_id`
+    #[must_use]
+    pub fn deployment_id(&self) -> &'_ str {
+        self.0.reborrow().deployment_id
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<SnapshotView<'static>>>

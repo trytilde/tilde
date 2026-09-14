@@ -22,19 +22,28 @@ impl Runtime {
         let mut tick = tokio::time::interval(Duration::from_secs(5));
         loop {
             tokio::select! { _=shutdown.changed()=>return, _=tick.tick()=>{} }
-            let probe = crate::proto::tilde::agent_host::v1::HealthzRequest::default();
-            let ready = match crate::chat::runtime::client(
-                &self.local_endpoint,
-                self.host_key.expose_secret(),
-                "Healthz",
-                &probe,
-            ) {
-                Ok(client) => {
-                    matches!(tokio::time::timeout(Duration::from_secs(3), client.healthz(probe)).await, Ok(Ok(value)) if value.view().ready)
+            // An agent that dialed in is ready by its heartbeats; an HTTP endpoint is probed.
+            let connected = self.local_agent_connected();
+            let probed = match &self.local_endpoint {
+                Some(endpoint) if !connected => {
+                    let probe = crate::proto::tilde::agent_host::v1::HealthzRequest::default();
+                    match crate::chat::runtime::client(
+                        endpoint,
+                        self.host_key.expose_secret(),
+                        "Healthz",
+                        &probe,
+                    ) {
+                        Ok(client) => {
+                            matches!(tokio::time::timeout(Duration::from_secs(3), client.healthz(probe)).await, Ok(Ok(value)) if value.view().ready)
+                        }
+                        Err(_) => false,
+                    }
                 }
-                Err(_) => false,
+                _ => false,
             };
-            self.state.agent_healthy.store(ready, Ordering::Release);
+            self.state
+                .agent_healthy
+                .store(connected || probed, Ordering::Release);
         }
     }
     /// Tell the gateway this replica is alive, independently of the event queue.
@@ -144,6 +153,7 @@ impl Runtime {
         loop {
             tokio::select! { _=shutdown.changed()=>return, _=tick.tick()=>{} }
             self.evict_idle().await;
+            self.evict_over_budget().await;
         }
     }
     /// Upload attachment bytes separately so a slow object store never delays events.

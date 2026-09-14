@@ -522,8 +522,10 @@ direct endpoints only; connected instances are healthy by heartbeat.
 Agents select gateway or sidecar deployment in the Deployment settings tab. Gateway
 mode uses Postgres for everything and wakes direct or Lambda deployments. Sidecar mode
 runs replicas that dial in with a sidecar deployment's token. `tilde-sidecar` accepts
-comma-separated deployment tokens, one per agent, and an agent-ID-to-local-endpoint map,
-and keeps no state on disk.
+comma-separated deployment tokens, one per agent, and keeps no state on disk. The agent
+process beside it dials the sidecar's loopback runtime listener with the same token
+through the run protocol (`connectAgent` in the SDK); an optional agent-ID-to-endpoint
+map remains for agents that must be woken over HTTP instead.
 
 The gateway serves four route groups on one listener: management, runtime, ingress and
 sidecar. A sidecar binds a loopback runtime listener for its agent process and one
@@ -544,7 +546,13 @@ transaction. After that, events on that thread cost no SQL and no gateway call o
 hot path: the holder mutates state under one per-thread lock, appends typed events with
 a per-thread sequence, and the shipper drains them asynchronously in batches. A thread
 idle past the configured window leaves memory and its lease is released, so the next
-replica to touch it takes over cleanly.
+replica to touch it takes over cleanly; a per-agent cache byte budget evicts the least
+recently active idle threads early. A sidecar is a per-host daemon serving several
+agents: each agent has its own runtime, cache, outbox and leases, sharing one instance
+id, one public listener and one loopback listener. On a graceful stop each runtime
+releases the leases of idle threads, keeps the leases of threads mid-invocation, and
+sends a final not-ready heartbeat; the gateway treats a not-ready instance as gone and
+recovery moves that work at once instead of after the liveness window.
 
 Lease validity is the holder's liveness: the instance heartbeat, sent every three
 seconds independently of the event queue, implicitly renews every lease the replica

@@ -3,6 +3,7 @@
 //! them to the shipper. Nothing is written locally; the gateway is the record.
 //! A thread costs one gateway call when this replica first touches it, none after.
 mod attachments;
+pub(crate) mod connected;
 pub(crate) mod execution;
 pub(crate) mod messages;
 pub(crate) mod outbox;
@@ -40,7 +41,8 @@ pub struct Runtime {
     pub instance_id: Uuid,
     pub signing_key: SecretString,
     pub host_key: SecretString,
-    pub local_endpoint: String,
+    /// Optional HTTP fallback for an agent process that does not dial in.
+    pub local_endpoint: Option<String>,
     pub callback_url: String,
     pub(crate) gateway: gateway::Client,
     pub(crate) state: Arc<Memory>,
@@ -71,6 +73,8 @@ pub(crate) struct Memory {
     held_elsewhere: RwLock<HashMap<Uuid, (String, i64)>>,
     lease_epochs: std::sync::atomic::AtomicU64,
     idle_after_ms: i64,
+    cache_bytes: usize,
+    pub(crate) connected: connected::Connected,
     hydrating: std::sync::Mutex<HashMap<String, Arc<Mutex<()>>>>,
     pub(crate) directives_in_flight: std::sync::Mutex<HashSet<Uuid>>,
     pub(crate) outbox: SyncMutex<VecDeque<control::Upstream>>,
@@ -88,10 +92,12 @@ pub struct RuntimeOptions {
     pub instance_id: Uuid,
     pub signing_key: SecretString,
     pub host_key: SecretString,
-    pub local_endpoint: String,
+    pub local_endpoint: Option<String>,
     pub callback_url: String,
     /// Idle time after which a cached thread is dropped and its lease released.
     pub idle_after: std::time::Duration,
+    /// Approximate bytes of cached conversation state before idle threads are evicted early.
+    pub cache_bytes: usize,
 }
 impl Runtime {
     pub fn new(gateway: gateway::Client, options: RuntimeOptions) -> Self {
@@ -116,6 +122,8 @@ impl Runtime {
                 held_elsewhere: RwLock::default(),
                 lease_epochs: std::sync::atomic::AtomicU64::new(0),
                 idle_after_ms: options.idle_after.as_millis().min(i64::MAX as u128) as i64,
+                cache_bytes: options.cache_bytes,
+                connected: connected::Connected::default(),
                 hydrating: std::sync::Mutex::default(),
                 directives_in_flight: std::sync::Mutex::default(),
                 outbox: SyncMutex::default(),
@@ -992,6 +1000,113 @@ impl Runtime {
                     );
                 }
             }
+        }
+    }
+    /// Keep cached conversation state under the per-agent byte budget by evicting the
+    /// least recently active threads that are not executing, releasing their leases.
+    pub(crate) async fn evict_over_budget(&self) {
+        let candidates: Vec<(Uuid, Shared)> = self
+            .state
+            .threads
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+        let mut sized = Vec::with_capacity(candidates.len());
+        let mut total = 0usize;
+        for (key, shared) in candidates {
+            let t = shared.lock().await;
+            let bytes = t.approx_bytes();
+            total += bytes;
+            let evictable = t.active_invocation(self.agent_id).is_none()
+                && !t.attachments.values().any(|a| !a.metadata.persisted);
+            sized.push((t.last_activity_at, key, bytes, evictable, shared.clone()));
+        }
+        if total <= self.state.cache_bytes {
+            return;
+        }
+        sized.sort_by_key(|(at, ..)| *at);
+        for (_, key, bytes, evictable, shared) in sized {
+            if total <= self.state.cache_bytes {
+                break;
+            }
+            if !evictable {
+                continue;
+            }
+            let t = shared.lock().await;
+            let held = t.lease.holder == Some(self.instance_id);
+            self.remove_thread(key, &t);
+            drop(t);
+            total = total.saturating_sub(bytes);
+            if held {
+                self.push(
+                    control::Release {
+                        thread_id: key.to_string(),
+                        ..Default::default()
+                    }
+                    .into(),
+                );
+            }
+            tracing::info!(agent_id=%self.agent_id, thread_id=%key, "Evicted a thread to stay within the cache budget");
+        }
+    }
+    /// Leave cleanly before the process exits. Idle threads release their leases so the
+    /// next replica to touch them takes over without a takeover. Threads mid-invocation
+    /// keep theirs, and the final not-ready heartbeat makes the gateway treat this
+    /// instance as gone at once, so recovery moves that work now instead of after the
+    /// liveness window. The outbox is flushed in one publish.
+    pub(crate) async fn drain(&self) {
+        let threads: Vec<(Uuid, Shared)> = self
+            .state
+            .threads
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+        for (key, shared) in threads {
+            let mut t = shared.lock().await;
+            if t.lease.holder != Some(self.instance_id)
+                || t.active_invocation(self.agent_id).is_some()
+            {
+                continue;
+            }
+            t.lease.holder = None;
+            drop(t);
+            self.push(
+                control::Release {
+                    thread_id: key.to_string(),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+        self.state.serving.store(false, Ordering::Release);
+        self.push(
+            control::Heartbeat {
+                sample_id: Uuid::new_v4().to_string(),
+                ready: false,
+                agent_ready: false,
+                ..Default::default()
+            }
+            .into(),
+        );
+        let frames: Vec<control::Upstream> = self
+            .state
+            .outbox
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .drain(..)
+            .collect();
+        if tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            self.gateway.publish(self.instance_id, frames),
+        )
+        .await
+        .is_err()
+        {
+            tracing::warn!(agent_id=%self.agent_id, "Could not flush the outbox before stopping; the gateway recovers the leases after the liveness window");
         }
     }
     /// Forget cached state before replacing it with a fresh hydration.

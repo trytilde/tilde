@@ -5,6 +5,7 @@
 pub mod attachments;
 pub mod gateway;
 mod hydrate;
+pub mod local_run;
 pub mod logs;
 pub mod project;
 pub mod provider_events;
@@ -614,7 +615,12 @@ impl Deployments {
         .await?
         .live)
     }
-    pub async fn snapshot(&self, agent: Uuid, instance: Uuid) -> Result<wire::Snapshot, Error> {
+    pub async fn snapshot(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+        instance: Uuid,
+    ) -> Result<wire::Snapshot, Error> {
         let leases = sqlx::query_file!("../../queries/deployment/leases_held.sql", agent, instance)
             .fetch_all(&self.pool)
             .await?
@@ -625,6 +631,7 @@ impl Deployments {
             configuration: self.configuration(agent).await?.into(),
             leases,
             token_signing_key: self.signing_key(agent).await?.expose_secret().into(),
+            deployment_id: deployment.to_string(),
             ..Default::default()
         })
     }
