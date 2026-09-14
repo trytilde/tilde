@@ -1,7 +1,7 @@
-//! The sidecar runs the owning-replica runtime for one or more agents beside
-//! their agent processes. Two listeners: a loopback runtime listener for the
-//! agent process, and one network listener for provider webhooks and native
-//! ingress. Everything else is an outbound connection to the gateway.
+//! The sidecar runs the cached runtime for one or more agents beside their agent
+//! processes. Two listeners: a loopback runtime listener for the agent process,
+//! and one network listener for provider webhooks, native ingress and hand-offs
+//! from peer replicas. Everything else is an outbound connection to the gateway.
 use super::{
     gateway,
     runtime::{Runtime, RuntimeOptions},
@@ -25,6 +25,8 @@ use uuid::Uuid;
 pub struct Node {
     pub runtime: Arc<Runtime>,
     pub gateway: gateway::Client,
+    /// For handing a request to the peer replica that holds its thread.
+    peers: reqwest::Client,
 }
 pub struct Options {
     pub gateway_url: String,
@@ -33,6 +35,8 @@ pub struct Options {
     pub runtime_listen: SocketAddr,
     pub listen: SocketAddr,
     pub public_url: Option<String>,
+    /// Idle time after which a cached thread is dropped and its lease released.
+    pub idle_after: Duration,
 }
 impl Options {
     pub fn from_env() -> Result<Self> {
@@ -78,6 +82,17 @@ impl Options {
             public_url: std::env::var("ENGINE_SIDECAR_PUBLIC_URL")
                 .ok()
                 .filter(|s| !s.is_empty()),
+            idle_after: Duration::from_secs(
+                std::env::var("ENGINE_SIDECAR_THREAD_IDLE_SECONDS")
+                    .ok()
+                    .map(|v| {
+                        v.parse().map_err(|_| {
+                            ChatError::Invalid("Invalid ENGINE_SIDECAR_THREAD_IDLE_SECONDS".into())
+                        })
+                    })
+                    .transpose()?
+                    .unwrap_or(24 * 60 * 60),
+            ),
         };
         if !result.runtime_listen.ip().is_loopback() {
             return Err(ChatError::Invalid("ENGINE_SIDECAR_RUNTIME_LISTEN must be a loopback address; only the agent process next door may use it".into()));
@@ -153,6 +168,10 @@ pub async fn start(options: Options) -> Result<Sidecar> {
     opentelemetry::global::set_tracer_provider(platform_provider.clone());
     let (stop, rx) = tokio::sync::watch::channel(false);
     let mut workers = tokio::task::JoinSet::new();
+    let peers = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|_| ChatError::Transport)?;
     let mut runtime_router = Router::new();
     let mut public_router = Router::new();
     let mut nodes: Vec<Node> = vec![];
@@ -202,15 +221,17 @@ pub async fn start(options: Options) -> Result<Sidecar> {
                 host_key: SecretString::from(configuration.webhook_signing_key.clone()),
                 local_endpoint: endpoint,
                 callback_url: format!("http://127.0.0.1:{runtime_port}{prefix}"),
+                idle_after: options.idle_after,
             },
         ));
         runtime.configure(configuration);
-        for assignment in std::mem::take(&mut snapshot.assignments) {
-            runtime.apply_assignment(assignment).await?;
+        for lease in std::mem::take(&mut snapshot.leases) {
+            runtime.apply_lease(lease).await?;
         }
         let node = Node {
             runtime: runtime.clone(),
             gateway: gateway.clone(),
+            peers: peers.clone(),
         };
         platform_routes
             .write()
@@ -231,6 +252,9 @@ pub async fn start(options: Options) -> Result<Sidecar> {
             .store(true, std::sync::atomic::Ordering::Release);
         workers.spawn(runtime.as_ref().clone().worker(rx.clone()));
         workers.spawn(runtime.as_ref().clone().shipper(rx.clone()));
+        workers.spawn(runtime.as_ref().clone().heartbeat_worker(rx.clone()));
+        workers.spawn(runtime.as_ref().clone().probe_worker(rx.clone()));
+        workers.spawn(runtime.as_ref().clone().housekeeping(rx.clone()));
         workers.spawn(runtime.as_ref().clone().attachment_worker(rx.clone()));
         let watcher = node.clone();
         let mut shutdown = rx.clone();
@@ -323,6 +347,120 @@ impl Node {
                     .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
                     .with_state(self.clone()),
             )
+            .merge(
+                Router::new()
+                    .route(
+                        "/peers/provider-events/{id}",
+                        axum::routing::post(peer_provider_event),
+                    )
+                    .layer(middleware::from_fn_with_state(self.clone(), peer_guard))
+                    .layer(axum::extract::DefaultBodyLimit::max(4 * 1024 * 1024))
+                    .with_state(self.clone()),
+            )
+    }
+    /// Re-send an ingress request to the replica holding its thread.
+    async fn hand_off(
+        &self,
+        url: &str,
+        path: &str,
+        parts: &http::request::Parts,
+        body: Vec<u8>,
+    ) -> Response {
+        let target = format!(
+            "{}/agents/{}/{}",
+            url.trim_end_matches('/'),
+            self.runtime.agent_id,
+            path
+        );
+        let mut request = self.peers.post(&target).body(body);
+        for name in [
+            http::header::AUTHORIZATION,
+            http::header::CONTENT_TYPE,
+            http::header::ACCEPT,
+            http::HeaderName::from_static("connect-protocol-version"),
+            http::HeaderName::from_static("connect-timeout-ms"),
+        ] {
+            if let Some(value) = parts.headers.get(&name) {
+                request = request.header(name, value);
+            }
+        }
+        match request.send().await {
+            Ok(response) => {
+                let status = response.status();
+                let content_type = response
+                    .headers()
+                    .get(http::header::CONTENT_TYPE)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_owned();
+                let body = response
+                    .bytes()
+                    .await
+                    .map(|b| b.to_vec())
+                    .unwrap_or_default();
+                super::public::relay(wire::CallResult {
+                    status: status.as_u16() as i32,
+                    content_type,
+                    body,
+                    ..Default::default()
+                })
+            }
+            Err(_) => {
+                tracing::warn!(agent_id=%self.runtime.agent_id, "Peer replica holding the thread is unreachable");
+                connectrpc::ConnectError::unavailable(
+                    "The replica holding this conversation is unreachable",
+                )
+                .into_response()
+            }
+        }
+    }
+    /// A short-lived credential peers accept for handed-off provider events.
+    fn peer_token(&self) -> Result<String> {
+        #[derive(serde::Serialize)]
+        struct Claims<'a> {
+            iss: &'a str,
+            aud: &'a str,
+            sub: Uuid,
+            iat: i64,
+            exp: i64,
+        }
+        let now = chrono::Utc::now().timestamp();
+        jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &Claims {
+                iss: "tilde:sidecar",
+                aud: "tilde:sidecar-peer",
+                sub: self.runtime.agent_id,
+                iat: now,
+                exp: now + 60,
+            },
+            &jsonwebtoken::EncodingKey::from_secret(
+                self.runtime.signing_key.expose_secret().as_bytes(),
+            ),
+        )
+        .map_err(|_| ChatError::Transport)
+    }
+    fn verify_peer_token(&self, token: &str) -> Result<()> {
+        #[derive(serde::Deserialize)]
+        struct Claims {
+            sub: Uuid,
+        }
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+        validation.set_issuer(&["tilde:sidecar"]);
+        validation.set_audience(&["tilde:sidecar-peer"]);
+        let claims = jsonwebtoken::decode::<Claims>(
+            token,
+            &jsonwebtoken::DecodingKey::from_secret(
+                self.runtime.signing_key.expose_secret().as_bytes(),
+            ),
+            &validation,
+        )
+        .map_err(|_| ChatError::Denied)?
+        .claims;
+        if claims.sub != self.runtime.agent_id {
+            return Err(ChatError::Denied);
+        }
+        Ok(())
     }
     /// Ingress calls executed here on the gateway's behalf: verified, never forwarded again.
     fn local_router(&self) -> Router {
@@ -330,30 +468,7 @@ impl Node {
             .layer(middleware::from_fn_with_state(self.clone(), local_guard))
     }
     pub(crate) async fn directive(self, directive: wire::Directive) {
-        tracing::debug!(agent_id=%self.runtime.agent_id, instance_id=%self.runtime.instance_id, directive_id=%directive.id, thread_id=%directive.thread_id, generation=directive.generation, action=?directive.action.as_ref().map(std::mem::discriminant), "Directive received");
-        // The gateway decided ownership before queueing this; apply it ahead of
-        // the assignment frame that may still be behind on the same stream.
-        if directive.generation > 0
-            && let Ok(thread) = crate::chat::id(&directive.thread_id)
-            && let Ok(shared) = self.runtime.load(thread).await
-        {
-            let assignment = {
-                let t = shared.lock().await;
-                // Only a newer generation changes anything; a directive queued
-                // before this replica lost the conversation must not regrant it.
-                (directive.generation > t.assignment.generation).then(|| {
-                    types::ParticipantAssignment {
-                        owner_instance_id: self.runtime.instance_id.to_string(),
-                        generation: directive.generation,
-                        stopped: false,
-                        ..t.assignment.clone()
-                    }
-                })
-            };
-            if let Some(assignment) = assignment {
-                let _ = self.runtime.apply_assignment(assignment).await;
-            }
-        }
+        tracing::debug!(agent_id=%self.runtime.agent_id, instance_id=%self.runtime.instance_id, directive_id=%directive.id, thread_id=%directive.thread_id, action=?directive.action.as_ref().map(std::mem::discriminant), "Directive received");
         let result = match directive.action {
             Some(wire::directive::Action::IngressCall(call)) => self.execute_call(*call).await,
             Some(wire::directive::Action::ProviderEvent(event)) => {
@@ -364,21 +479,6 @@ impl Node {
                     )
                     .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
                     self.runtime.ingest_provider(connection, message).await
-                }
-                .await;
-                status_result(outcome)
-            }
-            Some(wire::directive::Action::Recover(recover)) => {
-                let outcome = async {
-                    let thread = crate::chat::id(&directive.thread_id)?;
-                    self.runtime
-                        .recover_run(
-                            thread,
-                            crate::chat::id(&recover.run_id)?,
-                            crate::chat::id(&recover.participant_id)?,
-                            recover.objective,
-                        )
-                        .await
                 }
                 .await;
                 status_result(outcome)
@@ -447,6 +547,65 @@ impl Node {
             ..Default::default()
         }
     }
+}
+impl Node {
+    async fn hand_off_provider_event(
+        &self,
+        url: &str,
+        connection: Uuid,
+        event: types::ProviderEvent,
+    ) -> Result<()> {
+        use buffa::Message;
+        let target = format!(
+            "{}/agents/{}/peers/provider-events/{connection}",
+            url.trim_end_matches('/'),
+            self.runtime.agent_id
+        );
+        let response = self
+            .peers
+            .post(&target)
+            .bearer_auth(self.peer_token()?)
+            .header(http::header::CONTENT_TYPE, "application/proto")
+            .body(event.encode_to_vec())
+            .send()
+            .await
+            .map_err(|_| ChatError::Transport)?;
+        match response.status().as_u16() {
+            200..=299 => Ok(()),
+            409 => Err(ChatError::Denied),
+            404 => Err(ChatError::NotFound),
+            _ => Err(ChatError::Transport),
+        }
+    }
+}
+async fn peer_guard(State(node): State<Node>, request: Request, next: Next) -> Response {
+    let Some(token) = bearer(&request) else {
+        return http::StatusCode::UNAUTHORIZED.into_response();
+    };
+    if node.verify_peer_token(token).is_err() {
+        return http::StatusCode::UNAUTHORIZED.into_response();
+    }
+    next.run(request).await
+}
+/// A provider event another replica received for a thread this one holds.
+async fn peer_provider_event(
+    State(node): State<Node>,
+    axum::extract::Path(connection): axum::extract::Path<Uuid>,
+    body: axum::body::Bytes,
+) -> Response {
+    use buffa::Message;
+    let outcome = async {
+        let event = types::ProviderEvent::decode_from_slice(&body)
+            .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
+        let message = crate::chat::providers::ingress::IncomingMessage::try_from(event)
+            .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
+        node.runtime.ingest_provider(connection, message).await
+    }
+    .await;
+    let result = status_result(outcome);
+    let status =
+        http::StatusCode::from_u16(result.status as u16).unwrap_or(http::StatusCode::BAD_GATEWAY);
+    status.into_response()
 }
 fn status_result(outcome: Result<()>) -> wire::CallResult {
     match outcome {
@@ -628,12 +787,26 @@ async fn public_guard(State(node): State<Node>, request: Request, next: Next) ->
             )
             .into_response();
         }
-        let owned = match node.runtime.load(thread).await {
+        // One gateway call takes the lease for a thread first seen here; a thread
+        // another live replica holds is handed to it directly.
+        let held = match node.runtime.load(thread).await {
             Ok(shared) => node.runtime.owns(&*shared.lock().await),
+            Err(ChatError::Denied) => false,
             Err(ChatError::NotFound) => false,
             Err(e) => return connectrpc::ConnectError::from(e).into_response(),
         };
-        if !owned {
+        if !held {
+            let path = parts
+                .uri
+                .path()
+                .rsplit_once('/')
+                .map(|(_, m)| format!("tilde.ingress.v1.ChatService/{m}"))
+                .unwrap_or_default();
+            if let Some(url) = node.runtime.held_elsewhere(thread) {
+                return node.hand_off(&url, &path, &parts, body.to_vec()).await;
+            }
+            // Nobody live holds it and this replica could not take it: the gateway
+            // finds a replica that can.
             let result = node
                 .gateway
                 .forward(
@@ -709,12 +882,14 @@ async fn provider_receive(
                             .map_err(|_| ChatError::Invalid("Invalid provider event".into()))?;
                     match node.runtime.ingest_provider(connection, local).await {
                         Ok(()) => {}
-                        // Another live replica owns this conversation; the gateway hands it over.
-                        Err(ChatError::Denied) => {
-                            node.gateway
-                                .forward_provider_event(thread, connection, event)
-                                .await?
-                        }
+                        // Another live replica holds this conversation: hand the event to it.
+                        Err(ChatError::Denied) => match node.runtime.held_elsewhere(thread) {
+                            Some(url) => {
+                                node.hand_off_provider_event(&url, connection, event)
+                                    .await?
+                            }
+                            None => return Err(ChatError::Denied),
+                        },
                         Err(e) => return Err(e),
                     }
                 }

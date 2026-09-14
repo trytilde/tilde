@@ -4,7 +4,6 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { ParticipantAssignment } from "../../types/v1/deployment_pb.js";
 import type { Attachment, Message as Message$1, Run, Thread } from "../../types/v1/chat_pb.js";
 import type { ProviderEvent, RuntimeEvent } from "../../types/v1/runtime_event_pb.js";
 import type { ChannelAccessMode, IdentityType } from "../../types/v1/access_pb.js";
@@ -62,10 +61,10 @@ export declare type WatchResponse = Message<"tilde.agent_event_ingress.v1.WatchR
     case: "configuration";
   } | {
     /**
-     * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 3;
+     * @generated from field: tilde.agent_event_ingress.v1.ThreadLease lease = 3;
      */
-    value: ParticipantAssignment;
-    case: "assignment";
+    value: ThreadLease;
+    case: "lease";
   } | {
     /**
      * @generated from field: tilde.agent_event_ingress.v1.Directive directive = 4;
@@ -88,6 +87,8 @@ export declare type WatchResponse = Message<"tilde.agent_event_ingress.v1.WatchR
 export declare const WatchResponseSchema: GenMessage<WatchResponse>;
 
 /**
+ * Leases in the snapshot are the ones this instance holds.
+ *
  * @generated from message tilde.agent_event_ingress.v1.Snapshot
  */
 export declare type Snapshot = Message<"tilde.agent_event_ingress.v1.Snapshot"> & {
@@ -97,9 +98,9 @@ export declare type Snapshot = Message<"tilde.agent_event_ingress.v1.Snapshot"> 
   configuration?: GetConfigurationResponse | undefined;
 
   /**
-   * @generated from field: repeated tilde.types.v1.ParticipantAssignment assignments = 2;
+   * @generated from field: repeated tilde.agent_event_ingress.v1.ThreadLease leases = 2;
    */
-  assignments: ParticipantAssignment[];
+  leases: ThreadLease[];
 
   /**
    * @generated from field: string token_signing_key = 3;
@@ -126,7 +127,45 @@ export declare type Ping = Message<"tilde.agent_event_ingress.v1.Ping"> & {
 export declare const PingSchema: GenMessage<Ping>;
 
 /**
- * Durable gateway-originated work for the owning replica, acknowledged by DirectiveResult.
+ * Who executes a (thread, agent) pair. `held` is false when nobody does.
+ *
+ * @generated from message tilde.agent_event_ingress.v1.ThreadLease
+ */
+export declare type ThreadLease = Message<"tilde.agent_event_ingress.v1.ThreadLease"> & {
+  /**
+   * @generated from field: string thread_id = 1;
+   */
+  threadId: string;
+
+  /**
+   * @generated from field: string agent_id = 3;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: string holder_instance_id = 4;
+   */
+  holderInstanceId: string;
+
+  /**
+   * @generated from field: string holder_public_url = 5;
+   */
+  holderPublicUrl: string;
+
+  /**
+   * @generated from field: bool held = 6;
+   */
+  held: boolean;
+};
+
+/**
+ * Describes the message tilde.agent_event_ingress.v1.ThreadLease.
+ * Use `create(ThreadLeaseSchema)` to create a new message.
+ */
+export declare const ThreadLeaseSchema: GenMessage<ThreadLease>;
+
+/**
+ * Gateway-originated work for one replica, acknowledged with a DirectiveResult.
  *
  * @generated from message tilde.agent_event_ingress.v1.Directive
  */
@@ -140,11 +179,6 @@ export declare type Directive = Message<"tilde.agent_event_ingress.v1.Directive"
    * @generated from field: string thread_id = 2;
    */
   threadId: string;
-
-  /**
-   * @generated from field: uint64 generation = 3;
-   */
-  generation: bigint;
 
   /**
    * @generated from oneof tilde.agent_event_ingress.v1.Directive.action
@@ -163,12 +197,6 @@ export declare type Directive = Message<"tilde.agent_event_ingress.v1.Directive"
     case: "providerEvent";
   } | {
     /**
-     * @generated from field: tilde.agent_event_ingress.v1.RecoverRun recover = 12;
-     */
-    value: RecoverRun;
-    case: "recover";
-  } | {
-    /**
      * @generated from field: tilde.agent_event_ingress.v1.RelayMessage relay = 13;
      */
     value: RelayMessage;
@@ -183,7 +211,7 @@ export declare type Directive = Message<"tilde.agent_event_ingress.v1.Directive"
 export declare const DirectiveSchema: GenMessage<Directive>;
 
 /**
- * A completed message from another participant's replica or the gateway, for local routing.
+ * A completed message authored elsewhere in a room this agent participates in.
  *
  * @generated from message tilde.agent_event_ingress.v1.RelayMessage
  */
@@ -206,8 +234,6 @@ export declare type RelayMessage = Message<"tilde.agent_event_ingress.v1.RelayMe
 export declare const RelayMessageSchema: GenMessage<RelayMessage>;
 
 /**
- * One tilde.ingress.v1.ChatService method executed with the original caller's scope.
- *
  * @generated from message tilde.agent_event_ingress.v1.IngressCall
  */
 export declare type IngressCall = Message<"tilde.agent_event_ingress.v1.IngressCall"> & {
@@ -286,32 +312,6 @@ export declare type ProviderEventDirective = Message<"tilde.agent_event_ingress.
 export declare const ProviderEventDirectiveSchema: GenMessage<ProviderEventDirective>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.RecoverRun
- */
-export declare type RecoverRun = Message<"tilde.agent_event_ingress.v1.RecoverRun"> & {
-  /**
-   * @generated from field: string run_id = 1;
-   */
-  runId: string;
-
-  /**
-   * @generated from field: string participant_id = 2;
-   */
-  participantId: string;
-
-  /**
-   * @generated from field: string objective = 3;
-   */
-  objective: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.RecoverRun.
- * Use `create(RecoverRunSchema)` to create a new message.
- */
-export declare const RecoverRunSchema: GenMessage<RecoverRun>;
-
-/**
  * @generated from message tilde.agent_event_ingress.v1.PublishRequest
  */
 export declare type PublishRequest = Message<"tilde.agent_event_ingress.v1.PublishRequest"> & {
@@ -347,12 +347,6 @@ export declare type Upstream = Message<"tilde.agent_event_ingress.v1.Upstream"> 
     case: "heartbeat";
   } | {
     /**
-     * @generated from field: tilde.agent_event_ingress.v1.Claim claim = 2;
-     */
-    value: Claim;
-    case: "claim";
-  } | {
-    /**
      * @generated from field: tilde.agent_event_ingress.v1.Event event = 3;
      */
     value: Event;
@@ -369,6 +363,12 @@ export declare type Upstream = Message<"tilde.agent_event_ingress.v1.Upstream"> 
      */
     value: Telemetry;
     case: "telemetry";
+  } | {
+    /**
+     * @generated from field: tilde.agent_event_ingress.v1.Release release = 6;
+     */
+    value: Release;
+    case: "release";
   } | { case: undefined; value?: undefined };
 };
 
@@ -410,25 +410,22 @@ export declare type Heartbeat = Message<"tilde.agent_event_ingress.v1.Heartbeat"
 export declare const HeartbeatSchema: GenMessage<Heartbeat>;
 
 /**
- * @generated from message tilde.agent_event_ingress.v1.Claim
+ * The replica evicted an idle thread and no longer executes on it.
+ *
+ * @generated from message tilde.agent_event_ingress.v1.Release
  */
-export declare type Claim = Message<"tilde.agent_event_ingress.v1.Claim"> & {
+export declare type Release = Message<"tilde.agent_event_ingress.v1.Release"> & {
   /**
    * @generated from field: string thread_id = 1;
    */
   threadId: string;
-
-  /**
-   * @generated from field: string participant_id = 2;
-   */
-  participantId: string;
 };
 
 /**
- * Describes the message tilde.agent_event_ingress.v1.Claim.
- * Use `create(ClaimSchema)` to create a new message.
+ * Describes the message tilde.agent_event_ingress.v1.Release.
+ * Use `create(ReleaseSchema)` to create a new message.
  */
-export declare const ClaimSchema: GenMessage<Claim>;
+export declare const ReleaseSchema: GenMessage<Release>;
 
 /**
  * @generated from message tilde.agent_event_ingress.v1.Event
@@ -438,11 +435,6 @@ export declare type Event = Message<"tilde.agent_event_ingress.v1.Event"> & {
    * @generated from field: tilde.types.v1.RuntimeEvent event = 1;
    */
   event?: RuntimeEvent | undefined;
-
-  /**
-   * @generated from field: uint64 generation = 2;
-   */
-  generation: bigint;
 };
 
 /**
@@ -473,6 +465,8 @@ export declare type DirectiveResult = Message<"tilde.agent_event_ingress.v1.Dire
 export declare const DirectiveResultSchema: GenMessage<DirectiveResult>;
 
 /**
+ * Immutable telemetry batches (traces, logs) accepted once by payload receipt.
+ *
  * @generated from message tilde.agent_event_ingress.v1.Telemetry
  */
 export declare type Telemetry = Message<"tilde.agent_event_ingress.v1.Telemetry"> & {
@@ -494,25 +488,21 @@ export declare type Telemetry = Message<"tilde.agent_event_ingress.v1.Telemetry"
 export declare const TelemetrySchema: GenMessage<Telemetry>;
 
 /**
- * Every frame is either applied, fenced, or rejected; only infrastructure failures fail a batch.
+ * Frames the gateway would not accept are named so the replica drops them; run
+ * state from a replica that no longer holds the thread also reports the lease.
  *
  * @generated from message tilde.agent_event_ingress.v1.PublishResponse
  */
 export declare type PublishResponse = Message<"tilde.agent_event_ingress.v1.PublishResponse"> & {
   /**
-   * @generated from field: repeated tilde.agent_event_ingress.v1.ClaimResult claims = 1;
-   */
-  claims: ClaimResult[];
-
-  /**
-   * @generated from field: repeated tilde.agent_event_ingress.v1.Fence fences = 2;
-   */
-  fences: Fence[];
-
-  /**
    * @generated from field: repeated string rejected_event_ids = 3;
    */
   rejectedEventIds: string[];
+
+  /**
+   * @generated from field: repeated tilde.agent_event_ingress.v1.ThreadLease lost = 4;
+   */
+  lost: ThreadLease[];
 };
 
 /**
@@ -520,63 +510,6 @@ export declare type PublishResponse = Message<"tilde.agent_event_ingress.v1.Publ
  * Use `create(PublishResponseSchema)` to create a new message.
  */
 export declare const PublishResponseSchema: GenMessage<PublishResponse>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.ClaimResult
- */
-export declare type ClaimResult = Message<"tilde.agent_event_ingress.v1.ClaimResult"> & {
-  /**
-   * @generated from field: string thread_id = 1;
-   */
-  threadId: string;
-
-  /**
-   * @generated from field: string participant_id = 2;
-   */
-  participantId: string;
-
-  /**
-   * @generated from field: bool granted = 3;
-   */
-  granted: boolean;
-
-  /**
-   * @generated from field: uint64 generation = 4;
-   */
-  generation: bigint;
-
-  /**
-   * @generated from field: string owner_instance_id = 5;
-   */
-  ownerInstanceId: string;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.ClaimResult.
- * Use `create(ClaimResultSchema)` to create a new message.
- */
-export declare const ClaimResultSchema: GenMessage<ClaimResult>;
-
-/**
- * @generated from message tilde.agent_event_ingress.v1.Fence
- */
-export declare type Fence = Message<"tilde.agent_event_ingress.v1.Fence"> & {
-  /**
-   * @generated from field: string thread_id = 1;
-   */
-  threadId: string;
-
-  /**
-   * @generated from field: uint64 generation = 2;
-   */
-  generation: bigint;
-};
-
-/**
- * Describes the message tilde.agent_event_ingress.v1.Fence.
- * Use `create(FenceSchema)` to create a new message.
- */
-export declare const FenceSchema: GenMessage<Fence>;
 
 /**
  * @generated from message tilde.agent_event_ingress.v1.HydrateRequest
@@ -600,9 +533,9 @@ export declare type HydrateRequest = Message<"tilde.agent_event_ingress.v1.Hydra
   } | { case: undefined; value?: undefined };
 
   /**
-   * @generated from field: bool claim = 3;
+   * @generated from field: bool lease = 3;
    */
-  claim: boolean;
+  lease: boolean;
 
   /**
    * @generated from field: string instance_id = 4;
@@ -662,9 +595,9 @@ export declare type HydrateResponse = Message<"tilde.agent_event_ingress.v1.Hydr
   runs: Run[];
 
   /**
-   * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 5;
+   * @generated from field: tilde.agent_event_ingress.v1.ThreadLease lease = 5;
    */
-  assignment?: ParticipantAssignment | undefined;
+  lease?: ThreadLease | undefined;
 };
 
 /**
@@ -683,21 +616,9 @@ export declare type ForwardRequest = Message<"tilde.agent_event_ingress.v1.Forwa
   threadId: string;
 
   /**
-   * @generated from oneof tilde.agent_event_ingress.v1.ForwardRequest.work
+   * @generated from field: tilde.agent_event_ingress.v1.IngressCall call = 2;
    */
-  work: {
-    /**
-     * @generated from field: tilde.agent_event_ingress.v1.IngressCall call = 2;
-     */
-    value: IngressCall;
-    case: "call";
-  } | {
-    /**
-     * @generated from field: tilde.agent_event_ingress.v1.ProviderEventDirective provider_event = 3;
-     */
-    value: ProviderEventDirective;
-    case: "providerEvent";
-  } | { case: undefined; value?: undefined };
+  call?: IngressCall | undefined;
 };
 
 /**
@@ -1088,14 +1009,16 @@ export declare const TelemetryKindSchema: GenEnum<TelemetryKind>;
 
 /**
  * Sidecars dial the gateway; every call authenticates one agent deployment token.
- * The gateway never opens a connection to a sidecar.
+ * The gateway never opens a connection to a sidecar. Postgres is the record; a
+ * replica is a cache plus a write-behind queue plus the executor for the threads
+ * it holds a lease on.
  *
  * @generated from service tilde.agent_event_ingress.v1.SidecarService
  */
 export declare const SidecarService: GenService<{
   /**
    * Held open for the life of a replica: a snapshot first, then configuration,
-   * ownership and directives as they change.
+   * lease changes and directives as they change.
    *
    * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Watch
    */
@@ -1105,7 +1028,7 @@ export declare const SidecarService: GenService<{
     output: typeof WatchResponseSchema;
   },
   /**
-   * Batched replica frames. The response acknowledges events and answers claims.
+   * Heartbeats, typed events, directive results, lease releases and telemetry, in order.
    *
    * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Publish
    */
@@ -1115,7 +1038,7 @@ export declare const SidecarService: GenService<{
     output: typeof PublishResponseSchema;
   },
   /**
-   * Conversation state a replica does not hold in memory, optionally claiming ownership.
+   * Conversation state from the projection, taking the thread lease in the same call when asked.
    *
    * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Hydrate
    */
@@ -1125,7 +1048,7 @@ export declare const SidecarService: GenService<{
     output: typeof HydrateResponseSchema;
   },
   /**
-   * Execute one ingress call on the replica that owns the conversation.
+   * Run one ingress call on a live replica and relay its answer.
    *
    * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Forward
    */
@@ -1159,7 +1082,7 @@ export declare const SidecarService: GenService<{
     output: typeof ResolveParticipantResponseSchema;
   },
   /**
-   * Execute one registry call at the gateway on behalf of a verified local invocation.
+   * Registry RPCs from the agent process, re-verified at the gateway.
    *
    * @generated from rpc tilde.agent_event_ingress.v1.SidecarService.Relay
    */

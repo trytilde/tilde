@@ -36,22 +36,20 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SNAPSHOT_JSON_ANY);
         reg.register_json_any(super::__PING_JSON_ANY);
+        reg.register_json_any(super::__THREAD_LEASE_JSON_ANY);
         reg.register_json_any(super::__DIRECTIVE_JSON_ANY);
         reg.register_json_any(super::__RELAY_MESSAGE_JSON_ANY);
         reg.register_json_any(super::__INGRESS_CALL_JSON_ANY);
         reg.register_json_any(super::__CALL_RESULT_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_EVENT_DIRECTIVE_JSON_ANY);
-        reg.register_json_any(super::__RECOVER_RUN_JSON_ANY);
         reg.register_json_any(super::__PUBLISH_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPSTREAM_JSON_ANY);
         reg.register_json_any(super::__HEARTBEAT_JSON_ANY);
-        reg.register_json_any(super::__CLAIM_JSON_ANY);
+        reg.register_json_any(super::__RELEASE_JSON_ANY);
         reg.register_json_any(super::__EVENT_JSON_ANY);
         reg.register_json_any(super::__DIRECTIVE_RESULT_JSON_ANY);
         reg.register_json_any(super::__TELEMETRY_JSON_ANY);
         reg.register_json_any(super::__PUBLISH_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CLAIM_RESULT_JSON_ANY);
-        reg.register_json_any(super::__FENCE_JSON_ANY);
         reg.register_json_any(super::__HYDRATE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__EXTERNAL_KEY_JSON_ANY);
         reg.register_json_any(super::__HYDRATE_RESPONSE_JSON_ANY);
@@ -88,6 +86,10 @@ pub use self::__buffa::view::PingView;
 #[doc(inline)]
 pub use self::__buffa::view::PingOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::ThreadLeaseView;
+#[doc(inline)]
+pub use self::__buffa::view::ThreadLeaseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::DirectiveView;
 #[doc(inline)]
 pub use self::__buffa::view::DirectiveOwnedView;
@@ -108,10 +110,6 @@ pub use self::__buffa::view::ProviderEventDirectiveView;
 #[doc(inline)]
 pub use self::__buffa::view::ProviderEventDirectiveOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::RecoverRunView;
-#[doc(inline)]
-pub use self::__buffa::view::RecoverRunOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::PublishRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::PublishRequestOwnedView;
@@ -124,9 +122,9 @@ pub use self::__buffa::view::HeartbeatView;
 #[doc(inline)]
 pub use self::__buffa::view::HeartbeatOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ClaimView;
+pub use self::__buffa::view::ReleaseView;
 #[doc(inline)]
-pub use self::__buffa::view::ClaimOwnedView;
+pub use self::__buffa::view::ReleaseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::EventView;
 #[doc(inline)]
@@ -143,14 +141,6 @@ pub use self::__buffa::view::TelemetryOwnedView;
 pub use self::__buffa::view::PublishResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::PublishResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ClaimResultView;
-#[doc(inline)]
-pub use self::__buffa::view::ClaimResultOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::FenceView;
-#[doc(inline)]
-pub use self::__buffa::view::FenceOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::HydrateRequestView;
 #[doc(inline)]

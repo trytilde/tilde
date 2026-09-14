@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.agent_id,d.id AS deployment_id,d.target FROM agent_deployments d JOIN agents a ON a.id=d.agent_id WHERE d.token_hash=$1 AND d.status='registered' AND a.deleted_at IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "deployment_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9854b76251f1e403cea7c4f5eed2461da417c7e1d499336c71dee4c224b37605"
+}

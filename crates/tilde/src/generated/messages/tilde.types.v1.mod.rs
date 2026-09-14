@@ -86,8 +86,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CAPABILITY_ASSIGNMENT_JSON_ANY);
         reg.register_json_any(super::__ASSOCIATED_AGENT_JSON_ANY);
         reg.register_json_any(super::__DEPLOYMENT_JSON_ANY);
-        reg.register_json_any(super::__SIDECAR_NODE_JSON_ANY);
-        reg.register_json_any(super::__PARTICIPANT_ASSIGNMENT_JSON_ANY);
+        reg.register_json_any(super::__AGENT_DEPLOYMENT_JSON_ANY);
+        reg.register_json_any(super::__AGENT_INSTANCE_JSON_ANY);
         reg.register_json_any(super::__INVOCATION_STATE_JSON_ANY);
         reg.register_json_any(super::__RUNTIME_EVENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_COMMAND_JSON_ANY);
@@ -261,13 +261,13 @@ pub use self::__buffa::view::DeploymentView;
 #[doc(inline)]
 pub use self::__buffa::view::DeploymentOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::SidecarNodeView;
+pub use self::__buffa::view::AgentDeploymentView;
 #[doc(inline)]
-pub use self::__buffa::view::SidecarNodeOwnedView;
+pub use self::__buffa::view::AgentDeploymentOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ParticipantAssignmentView;
+pub use self::__buffa::view::AgentInstanceView;
 #[doc(inline)]
-pub use self::__buffa::view::ParticipantAssignmentOwnedView;
+pub use self::__buffa::view::AgentInstanceOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::InvocationStateView;
 #[doc(inline)]

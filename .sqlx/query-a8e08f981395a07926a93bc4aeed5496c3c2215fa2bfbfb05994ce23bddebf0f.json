@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO thread_leases(thread_id,agent_id,instance_id) VALUES($1,$2,$3) ON CONFLICT(thread_id,agent_id) DO NOTHING RETURNING instance_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a8e08f981395a07926a93bc4aeed5496c3c2215fa2bfbfb05994ce23bddebf0f"
+}

@@ -1,6 +1,6 @@
 //! Provider payload parsing stays in the existing adapters. This module moves
-//! verified, typed events into the owning replica's memory, or hands them to
-//! that replica when they arrive elsewhere.
+//! verified, typed events into the memory of the replica holding the thread, or
+//! hands them to a live replica when they arrive at the gateway.
 use super::{Deployments, runtime::Runtime, runtime::store};
 use crate::{
     chat::{
@@ -123,8 +123,8 @@ impl Deployments {
         .map_err(ChatError::from)?
         .map(|r| r.thread_id)
         .unwrap_or(thread);
-        let (instance, generation) = self
-            .owner_for(agent, Some(known))
+        let instance = self
+            .target_for(agent, Some(known))
             .await
             .map_err(|_| ChatError::Transport)?
             .ok_or_else(|| {
@@ -135,7 +135,7 @@ impl Deployments {
             event: event.into(),
             ..Default::default()
         };
-        self.direct(agent, instance, Some(known), generation, directive.into())
+        self.direct(agent, instance, Some(known), directive.into())
             .await
             .map_err(|_| ChatError::Transport)?;
         Ok(())
@@ -228,26 +228,19 @@ impl Runtime {
                     .into(),
                     ..Default::default()
                 };
-                (
-                    self.adopt(store::ThreadState::new(roster, Default::default()))
-                        .await?,
-                    true,
-                )
+                (self.adopt(store::ThreadState::new(roster)).await?, true)
             }
         };
         let mut t = shared.lock().await;
         self.require_owner(&t)?;
-        self.ensure_capacity()?;
         if !t.receipts.insert(receipt) {
             return Ok(());
         }
         if created {
             let roster = t.thread.clone();
-            let assignment = t.assignment.clone();
             self.emit(&mut t, "thread.created", roster.into(), None)?;
             self.emit(&mut t, "participant.joined", user_row.clone().into(), None)?;
             self.emit(&mut t, "participant.joined", agent_row.clone().into(), None)?;
-            self.emit(&mut t, "participant.assigned", assignment.into(), None)?;
         } else {
             for p in [&user_row, &agent_row] {
                 if !t.thread.participants.iter().any(|old| old.id == p.id) {
@@ -398,11 +391,7 @@ impl Runtime {
                     .into(),
                     ..Default::default()
                 };
-                (
-                    self.adopt(store::ThreadState::new(root, Default::default()))
-                        .await?,
-                    true,
-                )
+                (self.adopt(store::ThreadState::new(root)).await?, true)
             }
         };
         message.thread_id = thread.to_string();
@@ -414,10 +403,8 @@ impl Runtime {
         self.require_owner(&t)?;
         if created {
             let roster = t.thread.clone();
-            let assignment = t.assignment.clone();
             self.emit(&mut t, "thread.created", roster.into(), None)?;
             self.emit(&mut t, "participant.joined", p.clone().into(), None)?;
-            self.emit(&mut t, "participant.assigned", assignment.into(), None)?;
         } else if !t.thread.participants.iter().any(|old| old.id == p.id) {
             t.thread.participants.push(p.clone());
             self.emit(&mut t, "participant.joined", p.into(), None)?;

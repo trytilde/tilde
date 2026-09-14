@@ -1,6 +1,7 @@
 //! Registry calls from an agent beside a sidecar. The replica already verified
-//! the live invocation; the gateway verifies the same token against its own
-//! projected state and capability ceiling before running the registry handler.
+//! the live invocation; the gateway verifies the same token against the thread
+//! lease, its projected state and the capability ceiling before running the
+//! registry handler.
 use super::{Deployments, id};
 use crate::{chat::Scope, error::Error, proto::tilde::agent_event_ingress::v1 as wire};
 use secrecy::ExposeSecret;
@@ -13,8 +14,8 @@ struct RuntimeClaims {
     invocation_id: Uuid,
     run_id: Uuid,
     thread_id: Uuid,
+    participant_id: Uuid,
     capabilities: crate::iam::capabilities::Capabilities,
-    assignment_generation: u64,
     agent_generation: i64,
 }
 impl Deployments {
@@ -54,27 +55,27 @@ impl Deployments {
                 "Registry relay: agent generation changed".into(),
             ));
         }
-        let row = sqlx::query_file!(
-            "../../queries/deployment/current_owner.sql",
+        let holder = self
+            .holder(agent, claims.thread_id)
+            .await?
+            .ok_or_else(|| Error::Invalid("Registry relay: conversation has no holder".into()))?;
+        if holder.instance != instance {
+            return Err(Error::Invalid(
+                "Registry relay: replica does not hold the conversation".into(),
+            ));
+        }
+        // The holder verified liveness locally; projection may lag a young invocation
+        // or even the thread's roster. Only an invocation the gateway already knows
+        // to be over is refused, and the projected participant wins over the claim.
+        let participant = sqlx::query_file!(
+            "../../queries/deployment/thread_participant.sql",
             claims.thread_id,
             agent
         )
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| Error::Invalid("Registry relay: conversation has no owner".into()))?;
-        let (owner, generation, stopped, participant) = (
-            row.owner_instance_id,
-            row.generation as u64,
-            row.stopped,
-            row.participant_id,
-        );
-        if owner != instance || generation != claims.assignment_generation || stopped {
-            return Err(Error::Invalid(
-                "Registry relay: replica is not the current owner".into(),
-            ));
-        }
-        // The owner verified liveness locally; projection may lag a young invocation.
-        // Only an invocation the gateway already knows to be over is refused.
+        .map(|r| r.id)
+        .unwrap_or(claims.participant_id);
         let projected = sqlx::query_file!(
             "../../queries/deployment/relay_invocation.sql",
             claims.invocation_id,

@@ -384,7 +384,7 @@ impl ::buffa::Message for WatchResponse {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
-                __buffa::oneof::watch_response::Frame::Assignment(x) => {
+                __buffa::oneof::watch_response::Frame::Lease(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -438,7 +438,7 @@ impl ::buffa::Message for WatchResponse {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::watch_response::Frame::Assignment(x) => {
+                __buffa::oneof::watch_response::Frame::Lease(x) => {
                     ::buffa::types::put_len_delimited_header(
                         3u32,
                         u64::from(__cache.consume_next()),
@@ -525,7 +525,7 @@ impl ::buffa::Message for WatchResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 if let ::core::option::Option::Some(
-                    __buffa::oneof::watch_response::Frame::Assignment(ref mut existing),
+                    __buffa::oneof::watch_response::Frame::Lease(ref mut existing),
                 ) = self.frame
                 {
                     ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
@@ -533,7 +533,7 @@ impl ::buffa::Message for WatchResponse {
                     let mut val = ::core::default::Default::default();
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.frame = ::core::option::Option::Some(
-                        __buffa::oneof::watch_response::Frame::Assignment(
+                        __buffa::oneof::watch_response::Frame::Lease(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -668,14 +668,12 @@ impl<'de> serde::Deserialize<'de> for WatchResponse {
                                 );
                             }
                         }
-                        "assignment" => {
-                            let v: ::core::option::Option<
-                                super::super::types::v1::ParticipantAssignment,
-                            > = map
+                        "lease" => {
+                            let v: ::core::option::Option<ThreadLease> = map
                                 .next_value_seed(
                                     ::buffa::json_helpers::NullableDeserializeSeed(
                                         ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            super::super::types::v1::ParticipantAssignment,
+                                            ThreadLease,
                                         >::new(),
                                     ),
                                 )?;
@@ -688,7 +686,7 @@ impl<'de> serde::Deserialize<'de> for WatchResponse {
                                     );
                                 }
                                 __oneof_frame = Some(
-                                    __buffa::oneof::watch_response::Frame::Assignment(
+                                    __buffa::oneof::watch_response::Frame::Lease(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -781,6 +779,7 @@ pub mod watch_response {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::watch_response::Frame as FrameView;
 }
+/// Leases in the snapshot are the ones this instance holds.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -794,15 +793,13 @@ pub struct Snapshot {
         GetConfigurationResponse,
         ::buffa::Inline<GetConfigurationResponse>,
     >,
-    /// Field 2: `assignments`
+    /// Field 2: `leases`
     #[serde(
-        rename = "assignments",
+        rename = "leases",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub assignments: ::buffa::alloc::vec::Vec<
-        super::super::types::v1::ParticipantAssignment,
-    >,
+    pub leases: ::buffa::alloc::vec::Vec<ThreadLease>,
     /// Field 3: `token_signing_key`
     #[serde(
         rename = "tokenSigningKey",
@@ -819,7 +816,7 @@ impl ::core::fmt::Debug for Snapshot {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("Snapshot")
             .field("configuration", &self.configuration)
-            .field("assignments", &self.assignments)
+            .field("leases", &self.leases)
             .field("token_signing_key", &::core::format_args!("[REDACTED]"))
             .finish()
     }
@@ -859,7 +856,7 @@ impl ::buffa::Message for Snapshot {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        for v in &self.assignments {
+        for v in &self.leases {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
@@ -890,7 +887,7 @@ impl ::buffa::Message for Snapshot {
             );
             self.configuration.write_to(__cache, buf);
         }
-        for v in &self.assignments {
+        for v in &self.leases {
             ::buffa::types::put_len_delimited_header(
                 2u32,
                 u64::from(__cache.consume_next()),
@@ -935,7 +932,7 @@ impl ::buffa::Message for Snapshot {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.assignments.push(elem);
+                self.leases.push(elem);
             }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -953,7 +950,7 @@ impl ::buffa::Message for Snapshot {
     }
     fn clear(&mut self) {
         self.configuration = ::buffa::MessageField::none();
-        self.assignments.clear();
+        self.leases.clear();
         self.token_signing_key.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -1090,7 +1087,231 @@ pub const __PING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_
     from_json: ::buffa::type_registry::any_from_json::<Ping>,
     is_wkt: false,
 };
-/// Durable gateway-originated work for the owning replica, acknowledged by DirectiveResult.
+/// Who executes a (thread, agent) pair. `held` is false when nobody does.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ThreadLease {
+    /// Field 1: `thread_id`
+    #[serde(
+        rename = "threadId",
+        alias = "thread_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub thread_id: ::buffa::alloc::string::String,
+    /// Field 3: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 4: `holder_instance_id`
+    #[serde(
+        rename = "holderInstanceId",
+        alias = "holder_instance_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub holder_instance_id: ::buffa::alloc::string::String,
+    /// Field 5: `holder_public_url`
+    #[serde(
+        rename = "holderPublicUrl",
+        alias = "holder_public_url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub holder_public_url: ::buffa::alloc::string::String,
+    /// Field 6: `held`
+    #[serde(
+        rename = "held",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub held: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ThreadLease {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ThreadLease")
+            .field("thread_id", &self.thread_id)
+            .field("agent_id", &self.agent_id)
+            .field("holder_instance_id", &self.holder_instance_id)
+            .field("holder_public_url", &self.holder_public_url)
+            .field("held", &self.held)
+            .finish()
+    }
+}
+impl ThreadLease {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadLease";
+}
+::buffa::impl_default_instance!(ThreadLease);
+impl ::buffa::MessageName for ThreadLease {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "ThreadLease";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.ThreadLease";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadLease";
+}
+impl ::buffa::Message for ThreadLease {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.thread_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
+        }
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.holder_instance_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.holder_instance_id)
+                        as u64;
+        }
+        if !self.holder_public_url.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.holder_public_url) as u64;
+        }
+        if self.held {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.thread_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
+        }
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.agent_id, buf);
+        }
+        if !self.holder_instance_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.holder_instance_id, buf);
+        }
+        if !self.holder_public_url.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.holder_public_url, buf);
+        }
+        if self.held {
+            ::buffa::types::put_bool_field(6u32, self.held, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.thread_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.holder_instance_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.holder_public_url, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.held = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.thread_id.clear();
+        self.agent_id.clear();
+        self.holder_instance_id.clear();
+        self.holder_public_url.clear();
+        self.held = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ThreadLease {
+    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.ThreadLease";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ThreadLease {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __THREAD_LEASE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.ThreadLease",
+    to_json: ::buffa::type_registry::any_to_json::<ThreadLease>,
+    from_json: ::buffa::type_registry::any_from_json::<ThreadLease>,
+    is_wkt: false,
+};
+/// Gateway-originated work for one replica, acknowledged with a DirectiveResult.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -1110,13 +1331,6 @@ pub struct Directive {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub thread_id: ::buffa::alloc::string::String,
-    /// Field 3: `generation`
-    #[serde(
-        rename = "generation",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub generation: u64,
     #[serde(flatten)]
     pub action: ::core::option::Option<__buffa::oneof::directive::Action>,
     #[serde(skip)]
@@ -1128,7 +1342,6 @@ impl ::core::fmt::Debug for Directive {
         f.debug_struct("Directive")
             .field("id", &self.id)
             .field("thread_id", &self.thread_id)
-            .field("generation", &self.generation)
             .field("action", &self.action)
             .finish()
     }
@@ -1166,9 +1379,6 @@ impl ::buffa::Message for Directive {
         if !self.thread_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
         }
-        if self.generation != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.generation) as u64;
-        }
         if let ::core::option::Option::Some(ref v) = self.action {
             match v {
                 __buffa::oneof::directive::Action::IngressCall(x) => {
@@ -1180,14 +1390,6 @@ impl ::buffa::Message for Directive {
                             + inner as u64;
                 }
                 __buffa::oneof::directive::Action::ProviderEvent(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                __buffa::oneof::directive::Action::Recover(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -1221,9 +1423,6 @@ impl ::buffa::Message for Directive {
         if !self.thread_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.thread_id, buf);
         }
-        if self.generation != 0u64 {
-            ::buffa::types::put_uint64_field(3u32, self.generation, buf);
-        }
         if let ::core::option::Option::Some(ref v) = self.action {
             match v {
                 __buffa::oneof::directive::Action::IngressCall(x) => {
@@ -1237,14 +1436,6 @@ impl ::buffa::Message for Directive {
                 __buffa::oneof::directive::Action::ProviderEvent(x) => {
                     ::buffa::types::put_len_delimited_header(
                         11u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::directive::Action::Recover(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        12u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
@@ -1287,13 +1478,6 @@ impl ::buffa::Message for Directive {
                 )?;
                 ::buffa::types::merge_string(&mut self.thread_id, buf)?;
             }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.generation = ::buffa::types::decode_uint64(buf)?;
-            }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1334,26 +1518,6 @@ impl ::buffa::Message for Directive {
                     );
                 }
             }
-            12u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::directive::Action::Recover(ref mut existing),
-                ) = self.action
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.action = ::core::option::Option::Some(
-                        __buffa::oneof::directive::Action::Recover(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
             13u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1384,7 +1548,6 @@ impl ::buffa::Message for Directive {
     fn clear(&mut self) {
         self.id.clear();
         self.thread_id.clear();
-        self.generation = 0u64;
         self.action = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -1417,7 +1580,6 @@ impl<'de> serde::Deserialize<'de> for Directive {
                 let mut __f_thread_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
-                let mut __f_generation: ::core::option::Option<u64> = None;
                 let mut __oneof_action: ::core::option::Option<
                     __buffa::oneof::directive::Action,
                 > = None;
@@ -1454,21 +1616,6 @@ impl<'de> serde::Deserialize<'de> for Directive {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "generation" => {
-                            __f_generation = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = u64;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<u64, D::Error> {
-                                        ::buffa::json_helpers::uint64::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -1522,30 +1669,6 @@ impl<'de> serde::Deserialize<'de> for Directive {
                                 );
                             }
                         }
-                        "recover" => {
-                            let v: ::core::option::Option<RecoverRun> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            RecoverRun,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_action.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'action'",
-                                        ),
-                                    );
-                                }
-                                __oneof_action = Some(
-                                    __buffa::oneof::directive::Action::Recover(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
                         "relay" => {
                             let v: ::core::option::Option<RelayMessage> = map
                                 .next_value_seed(
@@ -1582,9 +1705,6 @@ impl<'de> serde::Deserialize<'de> for Directive {
                 if let ::core::option::Option::Some(v) = __f_thread_id {
                     __r.thread_id = v;
                 }
-                if let ::core::option::Option::Some(v) = __f_generation {
-                    __r.generation = v;
-                }
                 __r.action = __oneof_action;
                 Ok(__r)
             }
@@ -1620,7 +1740,7 @@ pub mod directive {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::directive::Action as ActionView;
 }
-/// A completed message from another participant's replica or the gateway, for local routing.
+/// A completed message authored elsewhere in a room this agent participates in.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1801,7 +1921,6 @@ pub const __RELAY_MESSAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<RelayMessage>,
     is_wkt: false,
 };
-/// One tilde.ingress.v1.ChatService method executed with the original caller's scope.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2336,180 +2455,6 @@ pub const __PROVIDER_EVENT_DIRECTIVE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct RecoverRun {
-    /// Field 1: `run_id`
-    #[serde(
-        rename = "runId",
-        alias = "run_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub run_id: ::buffa::alloc::string::String,
-    /// Field 2: `participant_id`
-    #[serde(
-        rename = "participantId",
-        alias = "participant_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub participant_id: ::buffa::alloc::string::String,
-    /// Field 3: `objective`
-    #[serde(
-        rename = "objective",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub objective: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for RecoverRun {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("RecoverRun")
-            .field("run_id", &self.run_id)
-            .field("participant_id", &self.participant_id)
-            .field("objective", &self.objective)
-            .finish()
-    }
-}
-impl RecoverRun {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.RecoverRun";
-}
-::buffa::impl_default_instance!(RecoverRun);
-impl ::buffa::MessageName for RecoverRun {
-    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
-    const NAME: &'static str = "RecoverRun";
-    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.RecoverRun";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.RecoverRun";
-}
-impl ::buffa::Message for RecoverRun {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.run_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.run_id) as u64;
-        }
-        if !self.participant_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.participant_id) as u64;
-        }
-        if !self.objective.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.objective) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.run_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.run_id, buf);
-        }
-        if !self.participant_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.participant_id, buf);
-        }
-        if !self.objective.is_empty() {
-            ::buffa::types::put_string_field(3u32, &self.objective, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.run_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.participant_id, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.objective, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.run_id.clear();
-        self.participant_id.clear();
-        self.objective.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for RecoverRun {
-    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.RecoverRun";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for RecoverRun {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __RECOVER_RUN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.RecoverRun",
-    to_json: ::buffa::type_registry::any_to_json::<RecoverRun>,
-    from_json: ::buffa::type_registry::any_from_json::<RecoverRun>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
 pub struct PublishRequest {
     /// Field 1: `instance_id`
     #[serde(
@@ -2723,14 +2668,6 @@ impl ::buffa::Message for Upstream {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
-                __buffa::oneof::upstream::Frame::Claim(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
                 __buffa::oneof::upstream::Frame::Event(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
@@ -2748,6 +2685,14 @@ impl ::buffa::Message for Upstream {
                             + inner as u64;
                 }
                 __buffa::oneof::upstream::Frame::Telemetry(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::upstream::Frame::Release(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
                     __cache.set(__slot, inner);
@@ -2777,14 +2722,6 @@ impl ::buffa::Message for Upstream {
                     );
                     x.write_to(__cache, buf);
                 }
-                __buffa::oneof::upstream::Frame::Claim(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
                 __buffa::oneof::upstream::Frame::Event(x) => {
                     ::buffa::types::put_len_delimited_header(
                         3u32,
@@ -2804,6 +2741,14 @@ impl ::buffa::Message for Upstream {
                 __buffa::oneof::upstream::Frame::Telemetry(x) => {
                     ::buffa::types::put_len_delimited_header(
                         5u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::upstream::Frame::Release(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
@@ -2839,26 +2784,6 @@ impl ::buffa::Message for Upstream {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.frame = ::core::option::Option::Some(
                         __buffa::oneof::upstream::Frame::Heartbeat(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::upstream::Frame::Claim(ref mut existing),
-                ) = self.frame
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.frame = ::core::option::Option::Some(
-                        __buffa::oneof::upstream::Frame::Claim(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -2924,6 +2849,26 @@ impl ::buffa::Message for Upstream {
                     );
                 }
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::upstream::Frame::Release(ref mut existing),
+                ) = self.frame
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.frame = ::core::option::Option::Some(
+                        __buffa::oneof::upstream::Frame::Release(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2984,30 +2929,6 @@ impl<'de> serde::Deserialize<'de> for Upstream {
                                 }
                                 __oneof_frame = Some(
                                     __buffa::oneof::upstream::Frame::Heartbeat(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "claim" => {
-                            let v: ::core::option::Option<Claim> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            Claim,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_frame.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'frame'",
-                                        ),
-                                    );
-                                }
-                                __oneof_frame = Some(
-                                    __buffa::oneof::upstream::Frame::Claim(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -3080,6 +3001,30 @@ impl<'de> serde::Deserialize<'de> for Upstream {
                                 }
                                 __oneof_frame = Some(
                                     __buffa::oneof::upstream::Frame::Telemetry(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "release" => {
+                            let v: ::core::option::Option<Release> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            Release,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_frame.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'frame'",
+                                        ),
+                                    );
+                                }
+                                __oneof_frame = Some(
+                                    __buffa::oneof::upstream::Frame::Release(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -3321,10 +3266,11 @@ pub const __HEARTBEAT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     from_json: ::buffa::type_registry::any_from_json::<Heartbeat>,
     is_wkt: false,
 };
+/// The replica evicted an idle thread and no longer executes on it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct Claim {
+pub struct Release {
     /// Field 1: `thread_id`
     #[serde(
         rename = "threadId",
@@ -3333,41 +3279,30 @@ pub struct Claim {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub thread_id: ::buffa::alloc::string::String,
-    /// Field 2: `participant_id`
-    #[serde(
-        rename = "participantId",
-        alias = "participant_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub participant_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for Claim {
+impl ::core::fmt::Debug for Release {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Claim")
-            .field("thread_id", &self.thread_id)
-            .field("participant_id", &self.participant_id)
-            .finish()
+        f.debug_struct("Release").field("thread_id", &self.thread_id).finish()
     }
 }
-impl Claim {
+impl Release {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Claim";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Release";
 }
-::buffa::impl_default_instance!(Claim);
-impl ::buffa::MessageName for Claim {
+::buffa::impl_default_instance!(Release);
+impl ::buffa::MessageName for Release {
     const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
-    const NAME: &'static str = "Claim";
-    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.Claim";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Claim";
+    const NAME: &'static str = "Release";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.Release";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Release";
 }
-impl ::buffa::Message for Claim {
+impl ::buffa::Message for Release {
     /// Returns the total encoded size in bytes.
     ///
     /// Accumulates in `u64` (which cannot overflow for in-memory
@@ -3383,11 +3318,6 @@ impl ::buffa::Message for Claim {
         if !self.thread_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
         }
-        if !self.participant_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.participant_id) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3400,9 +3330,6 @@ impl ::buffa::Message for Claim {
         use ::buffa::Enumeration as _;
         if !self.thread_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
-        }
-        if !self.participant_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.participant_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3424,13 +3351,6 @@ impl ::buffa::Message for Claim {
                 )?;
                 ::buffa::types::merge_string(&mut self.thread_id, buf)?;
             }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.participant_id, buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3440,12 +3360,11 @@ impl ::buffa::Message for Claim {
     }
     fn clear(&mut self) {
         self.thread_id.clear();
-        self.participant_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for Claim {
-    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.Claim";
+impl ::buffa::ExtensionSet for Release {
+    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.Release";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -3453,7 +3372,7 @@ impl ::buffa::ExtensionSet for Claim {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for Claim {
+impl ::buffa::json_helpers::ProtoElemJson for Release {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -3467,10 +3386,10 @@ impl ::buffa::json_helpers::ProtoElemJson for Claim {
     }
 }
 #[doc(hidden)]
-pub const __CLAIM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.Claim",
-    to_json: ::buffa::type_registry::any_to_json::<Claim>,
-    from_json: ::buffa::type_registry::any_from_json::<Claim>,
+pub const __RELEASE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.Release",
+    to_json: ::buffa::type_registry::any_to_json::<Release>,
+    from_json: ::buffa::type_registry::any_from_json::<Release>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -3486,23 +3405,13 @@ pub struct Event {
         super::super::types::v1::RuntimeEvent,
         ::buffa::Inline<super::super::types::v1::RuntimeEvent>,
     >,
-    /// Field 2: `generation`
-    #[serde(
-        rename = "generation",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub generation: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for Event {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Event")
-            .field("event", &self.event)
-            .field("generation", &self.generation)
-            .finish()
+        f.debug_struct("Event").field("event", &self.event).finish()
     }
 }
 impl Event {
@@ -3540,9 +3449,6 @@ impl ::buffa::Message for Event {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.generation != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.generation) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3560,9 +3466,6 @@ impl ::buffa::Message for Event {
                 buf,
             );
             self.event.write_to(__cache, buf);
-        }
-        if self.generation != 0u64 {
-            ::buffa::types::put_uint64_field(2u32, self.generation, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3588,13 +3491,6 @@ impl ::buffa::Message for Event {
                     ctx,
                 )?;
             }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.generation = ::buffa::types::decode_uint64(buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3604,7 +3500,6 @@ impl ::buffa::Message for Event {
     }
     fn clear(&mut self) {
         self.event = ::buffa::MessageField::none();
-        self.generation = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3798,6 +3693,7 @@ pub const __DIRECTIVE_RESULT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     from_json: ::buffa::type_registry::any_from_json::<DirectiveResult>,
     is_wkt: false,
 };
+/// Immutable telemetry batches (traces, logs) accepted once by payload receipt.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3952,25 +3848,12 @@ pub const __TELEMETRY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     from_json: ::buffa::type_registry::any_from_json::<Telemetry>,
     is_wkt: false,
 };
-/// Every frame is either applied, fenced, or rejected; only infrastructure failures fail a batch.
+/// Frames the gateway would not accept are named so the replica drops them; run
+/// state from a replica that no longer holds the thread also reports the lease.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PublishResponse {
-    /// Field 1: `claims`
-    #[serde(
-        rename = "claims",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub claims: ::buffa::alloc::vec::Vec<ClaimResult>,
-    /// Field 2: `fences`
-    #[serde(
-        rename = "fences",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub fences: ::buffa::alloc::vec::Vec<Fence>,
     /// Field 3: `rejected_event_ids`
     #[serde(
         rename = "rejectedEventIds",
@@ -3979,6 +3862,13 @@ pub struct PublishResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub rejected_event_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 4: `lost`
+    #[serde(
+        rename = "lost",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub lost: ::buffa::alloc::vec::Vec<ThreadLease>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3986,9 +3876,8 @@ pub struct PublishResponse {
 impl ::core::fmt::Debug for PublishResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("PublishResponse")
-            .field("claims", &self.claims)
-            .field("fences", &self.fences)
             .field("rejected_event_ids", &self.rejected_event_ids)
+            .field("lost", &self.lost)
             .finish()
     }
 }
@@ -4019,24 +3908,16 @@ impl ::buffa::Message for PublishResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
-        for v in &self.claims {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
-        for v in &self.fences {
-            let __slot = __cache.reserve();
-            let inner_size = v.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
-                    + inner_size as u64;
-        }
         for v in &self.rejected_event_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.lost {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -4048,24 +3929,16 @@ impl ::buffa::Message for PublishResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        for v in &self.claims {
-            ::buffa::types::put_len_delimited_header(
-                1u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
-        for v in &self.fences {
-            ::buffa::types::put_len_delimited_header(
-                2u32,
-                u64::from(__cache.consume_next()),
-                buf,
-            );
-            v.write_to(__cache, buf);
-        }
         for v in &self.rejected_event_ids {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        for v in &self.lost {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4080,30 +3953,6 @@ impl ::buffa::Message for PublishResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.claims.push(elem);
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let mut elem = ::core::default::Default::default();
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&elem),
-                )?;
-                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.fences.push(elem);
-            }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -4115,6 +3964,18 @@ impl ::buffa::Message for PublishResponse {
                 )?;
                 self.rejected_event_ids.push(__elem);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.lost.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4123,9 +3984,8 @@ impl ::buffa::Message for PublishResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.claims.clear();
-        self.fences.clear();
         self.rejected_event_ids.clear();
+        self.lost.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4159,386 +4019,16 @@ pub const __PUBLISH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ClaimResult {
-    /// Field 1: `thread_id`
-    #[serde(
-        rename = "threadId",
-        alias = "thread_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub thread_id: ::buffa::alloc::string::String,
-    /// Field 2: `participant_id`
-    #[serde(
-        rename = "participantId",
-        alias = "participant_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub participant_id: ::buffa::alloc::string::String,
-    /// Field 3: `granted`
-    #[serde(
-        rename = "granted",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub granted: bool,
-    /// Field 4: `generation`
-    #[serde(
-        rename = "generation",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub generation: u64,
-    /// Field 5: `owner_instance_id`
-    #[serde(
-        rename = "ownerInstanceId",
-        alias = "owner_instance_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub owner_instance_id: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ClaimResult {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ClaimResult")
-            .field("thread_id", &self.thread_id)
-            .field("participant_id", &self.participant_id)
-            .field("granted", &self.granted)
-            .field("generation", &self.generation)
-            .field("owner_instance_id", &self.owner_instance_id)
-            .finish()
-    }
-}
-impl ClaimResult {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ClaimResult";
-}
-::buffa::impl_default_instance!(ClaimResult);
-impl ::buffa::MessageName for ClaimResult {
-    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
-    const NAME: &'static str = "ClaimResult";
-    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.ClaimResult";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.ClaimResult";
-}
-impl ::buffa::Message for ClaimResult {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.thread_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
-        }
-        if !self.participant_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.participant_id) as u64;
-        }
-        if self.granted {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if self.generation != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.generation) as u64;
-        }
-        if !self.owner_instance_id.is_empty() {
-            size
-                += 1u64
-                    + ::buffa::types::string_encoded_len(&self.owner_instance_id) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.thread_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
-        }
-        if !self.participant_id.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.participant_id, buf);
-        }
-        if self.granted {
-            ::buffa::types::put_bool_field(3u32, self.granted, buf);
-        }
-        if self.generation != 0u64 {
-            ::buffa::types::put_uint64_field(4u32, self.generation, buf);
-        }
-        if !self.owner_instance_id.is_empty() {
-            ::buffa::types::put_string_field(5u32, &self.owner_instance_id, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.thread_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.participant_id, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.granted = ::buffa::types::decode_bool(buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.generation = ::buffa::types::decode_uint64(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.owner_instance_id, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.thread_id.clear();
-        self.participant_id.clear();
-        self.granted = false;
-        self.generation = 0u64;
-        self.owner_instance_id.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ClaimResult {
-    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.ClaimResult";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ClaimResult {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __CLAIM_RESULT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.ClaimResult",
-    to_json: ::buffa::type_registry::any_to_json::<ClaimResult>,
-    from_json: ::buffa::type_registry::any_from_json::<ClaimResult>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct Fence {
-    /// Field 1: `thread_id`
-    #[serde(
-        rename = "threadId",
-        alias = "thread_id",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub thread_id: ::buffa::alloc::string::String,
-    /// Field 2: `generation`
-    #[serde(
-        rename = "generation",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub generation: u64,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for Fence {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Fence")
-            .field("thread_id", &self.thread_id)
-            .field("generation", &self.generation)
-            .finish()
-    }
-}
-impl Fence {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Fence";
-}
-::buffa::impl_default_instance!(Fence);
-impl ::buffa::MessageName for Fence {
-    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
-    const NAME: &'static str = "Fence";
-    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.Fence";
-    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.Fence";
-}
-impl ::buffa::Message for Fence {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// Accumulates in `u64` (which cannot overflow for in-memory
-    /// data) and saturates to `u32` at return, so a message whose
-    /// encoded size exceeds the 2 GiB protobuf limit yields a value
-    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
-    /// points reject, never a silently wrapped size.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u64;
-        if !self.thread_id.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
-        }
-        if self.generation != 0u64 {
-            size += 1u64 + ::buffa::types::uint64_encoded_len(self.generation) as u64;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u64;
-        ::buffa::saturate_size(size)
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::EncodeSink,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.thread_id.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
-        }
-        if self.generation != 0u64 {
-            ::buffa::types::put_uint64_field(2u32, self.generation, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.thread_id, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.generation = ::buffa::types::decode_uint64(buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.thread_id.clear();
-        self.generation = 0u64;
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for Fence {
-    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.Fence";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for Fence {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __FENCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.Fence",
-    to_json: ::buffa::type_registry::any_to_json::<Fence>,
-    from_json: ::buffa::type_registry::any_from_json::<Fence>,
-    is_wkt: false,
-};
-#[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct HydrateRequest {
-    /// Field 3: `claim`
+    /// Field 3: `lease`
     #[serde(
-        rename = "claim",
+        rename = "lease",
         with = "::buffa::json_helpers::proto_bool",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
-    pub claim: bool,
+    pub lease: bool,
     /// Field 4: `instance_id`
     #[serde(
         rename = "instanceId",
@@ -4556,7 +4046,7 @@ pub struct HydrateRequest {
 impl ::core::fmt::Debug for HydrateRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("HydrateRequest")
-            .field("claim", &self.claim)
+            .field("lease", &self.lease)
             .field("instance_id", &self.instance_id)
             .field("key", &self.key)
             .finish()
@@ -4604,7 +4094,7 @@ impl ::buffa::Message for HydrateRequest {
                 }
             }
         }
-        if self.claim {
+        if self.lease {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
         if !self.instance_id.is_empty() {
@@ -4635,8 +4125,8 @@ impl ::buffa::Message for HydrateRequest {
                 }
             }
         }
-        if self.claim {
-            ::buffa::types::put_bool_field(3u32, self.claim, buf);
+        if self.lease {
+            ::buffa::types::put_bool_field(3u32, self.lease, buf);
         }
         if !self.instance_id.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.instance_id, buf);
@@ -4690,7 +4180,7 @@ impl ::buffa::Message for HydrateRequest {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.claim = ::buffa::types::decode_bool(buf)?;
+                self.lease = ::buffa::types::decode_bool(buf)?;
             }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -4708,7 +4198,7 @@ impl ::buffa::Message for HydrateRequest {
     }
     fn clear(&mut self) {
         self.key = ::core::option::Option::None;
-        self.claim = false;
+        self.lease = false;
         self.instance_id.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -4737,7 +4227,7 @@ impl<'de> serde::Deserialize<'de> for HydrateRequest {
                 self,
                 mut map: A,
             ) -> ::core::result::Result<HydrateRequest, A::Error> {
-                let mut __f_claim: ::core::option::Option<bool> = None;
+                let mut __f_lease: ::core::option::Option<bool> = None;
                 let mut __f_instance_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -4746,8 +4236,8 @@ impl<'de> serde::Deserialize<'de> for HydrateRequest {
                 > = None;
                 while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
                     match key.as_str() {
-                        "claim" => {
-                            __f_claim = Some({
+                        "lease" => {
+                            __f_lease = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = bool;
@@ -4833,8 +4323,8 @@ impl<'de> serde::Deserialize<'de> for HydrateRequest {
                     }
                 }
                 let mut __r = <HydrateRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_claim {
-                    __r.claim = v;
+                if let ::core::option::Option::Some(v) = __f_lease {
+                    __r.lease = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_instance_id {
                     __r.instance_id = v;
@@ -5059,15 +4549,12 @@ pub struct HydrateResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub runs: ::buffa::alloc::vec::Vec<super::super::types::v1::Run>,
-    /// Field 5: `assignment`
+    /// Field 5: `lease`
     #[serde(
-        rename = "assignment",
+        rename = "lease",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub assignment: ::buffa::MessageField<
-        super::super::types::v1::ParticipantAssignment,
-        ::buffa::Inline<super::super::types::v1::ParticipantAssignment>,
-    >,
+    pub lease: ::buffa::MessageField<ThreadLease, ::buffa::Inline<ThreadLease>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5079,7 +4566,7 @@ impl ::core::fmt::Debug for HydrateResponse {
             .field("thread", &self.thread)
             .field("messages", &self.messages)
             .field("runs", &self.runs)
-            .field("assignment", &self.assignment)
+            .field("lease", &self.lease)
             .finish()
     }
 }
@@ -5137,9 +4624,9 @@ impl ::buffa::Message for HydrateResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.assignment.is_set() {
+        if self.lease.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.assignment.compute_size(__cache);
+            let inner_size = self.lease.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -5182,13 +4669,13 @@ impl ::buffa::Message for HydrateResponse {
             );
             v.write_to(__cache, buf);
         }
-        if self.assignment.is_set() {
+        if self.lease.is_set() {
             ::buffa::types::put_len_delimited_header(
                 5u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.assignment.write_to(__cache, buf);
+            self.lease.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5251,7 +4738,7 @@ impl ::buffa::Message for HydrateResponse {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.assignment.get_or_insert_default(),
+                    self.lease.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -5268,7 +4755,7 @@ impl ::buffa::Message for HydrateResponse {
         self.thread = ::buffa::MessageField::none();
         self.messages.clear();
         self.runs.clear();
-        self.assignment = ::buffa::MessageField::none();
+        self.lease = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5302,7 +4789,7 @@ pub const __HYDRATE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ForwardRequest {
     /// Field 1: `thread_id`
@@ -5313,8 +4800,12 @@ pub struct ForwardRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub thread_id: ::buffa::alloc::string::String,
-    #[serde(flatten)]
-    pub work: ::core::option::Option<__buffa::oneof::forward_request::Work>,
+    /// Field 2: `call`
+    #[serde(
+        rename = "call",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub call: ::buffa::MessageField<IngressCall, ::buffa::Inline<IngressCall>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5323,7 +4814,7 @@ impl ::core::fmt::Debug for ForwardRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ForwardRequest")
             .field("thread_id", &self.thread_id)
-            .field("work", &self.work)
+            .field("call", &self.call)
             .finish()
     }
 }
@@ -5357,25 +4848,13 @@ impl ::buffa::Message for ForwardRequest {
         if !self.thread_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_id) as u64;
         }
-        if let ::core::option::Option::Some(ref v) = self.work {
-            match v {
-                __buffa::oneof::forward_request::Work::Call(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                __buffa::oneof::forward_request::Work::ProviderEvent(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-            }
+        if self.call.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.call.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -5390,25 +4869,13 @@ impl ::buffa::Message for ForwardRequest {
         if !self.thread_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.thread_id, buf);
         }
-        if let ::core::option::Option::Some(ref v) = self.work {
-            match v {
-                __buffa::oneof::forward_request::Work::Call(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::forward_request::Work::ProviderEvent(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        3u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-            }
+        if self.call.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.call.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5435,42 +4902,11 @@ impl ::buffa::Message for ForwardRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::forward_request::Work::Call(ref mut existing),
-                ) = self.work
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.work = ::core::option::Option::Some(
-                        __buffa::oneof::forward_request::Work::Call(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
+                ::buffa::Message::merge_length_delimited(
+                    self.call.get_or_insert_default(),
+                    buf,
+                    ctx,
                 )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::forward_request::Work::ProviderEvent(
-                        ref mut existing,
-                    ),
-                ) = self.work
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.work = ::core::option::Option::Some(
-                        __buffa::oneof::forward_request::Work::ProviderEvent(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -5481,7 +4917,7 @@ impl ::buffa::Message for ForwardRequest {
     }
     fn clear(&mut self) {
         self.thread_id.clear();
-        self.work = ::core::option::Option::None;
+        self.call = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5492,111 +4928,6 @@ impl ::buffa::ExtensionSet for ForwardRequest {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
-    }
-}
-impl<'de> serde::Deserialize<'de> for ForwardRequest {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = ForwardRequest;
-            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct ForwardRequest")
-            }
-            #[allow(clippy::field_reassign_with_default)]
-            fn visit_map<A: serde::de::MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> ::core::result::Result<ForwardRequest, A::Error> {
-                let mut __f_thread_id: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __oneof_work: ::core::option::Option<
-                    __buffa::oneof::forward_request::Work,
-                > = None;
-                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
-                    match key.as_str() {
-                        "threadId" | "thread_id" => {
-                            __f_thread_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "call" => {
-                            let v: ::core::option::Option<IngressCall> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            IngressCall,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_work.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'work'",
-                                        ),
-                                    );
-                                }
-                                __oneof_work = Some(
-                                    __buffa::oneof::forward_request::Work::Call(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "providerEvent" | "provider_event" => {
-                            let v: ::core::option::Option<ProviderEventDirective> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            ProviderEventDirective,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_work.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'work'",
-                                        ),
-                                    );
-                                }
-                                __oneof_work = Some(
-                                    __buffa::oneof::forward_request::Work::ProviderEvent(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        _ => {
-                            map.next_value::<serde::de::IgnoredAny>()?;
-                        }
-                    }
-                }
-                let mut __r = <ForwardRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_thread_id {
-                    __r.thread_id = v;
-                }
-                __r.work = __oneof_work;
-                Ok(__r)
-            }
-        }
-        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for ForwardRequest {
@@ -5619,14 +4950,6 @@ pub const __FORWARD_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<ForwardRequest>,
     is_wkt: false,
 };
-pub mod forward_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::forward_request::Work;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::forward_request::Work as WorkView;
-}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

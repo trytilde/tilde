@@ -2,7 +2,6 @@ syntax = "proto3";
 package tilde.types.v1;
 import "tilde/types/v1/chat.proto";
 import "tilde/types/v1/access.proto";
-import "tilde/types/v1/deployment.proto";
 message InvocationState { string traceparent = 12; string tracestate = 13; int64 ended_at = 11; string id = 1; string thread_id = 2; string run_id = 3; string agent_id = 4; string participant_id = 5; string owner_instance_id = 6; uint64 generation = 7; string status = 8; int64 lease_expires_at = 9; string objective = 10; }
 // Immutable, explicitly typed domain events. The owning replica assigns
 // origin_sequence per thread; the gateway projects them in that order.
@@ -15,8 +14,9 @@ message RuntimeEvent {
   Goal goal = 16; Task task = 17; ToolCall tool_call = 18;
   Attachment attachment = 19; Activity activity = 20; Typing typing = 21;
   ConvertedMessageState converted_message = 22;
-  ParticipantAssignment assignment = 23; ChannelDecision channel_decision = 24; AttachmentSource attachment_source = 25;
+  ChannelDecision channel_decision = 24; AttachmentSource attachment_source = 25;
  }
+ reserved 23;
 }
 message AgentCommand {
  string id = 1; string thread_id = 2; string participant_id = 3; string agent_id = 4;

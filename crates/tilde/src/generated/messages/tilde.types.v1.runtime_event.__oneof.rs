@@ -21,9 +21,6 @@ pub mod runtime_event {
         ConvertedMessage(
             ::buffa::alloc::boxed::Box<super::super::super::ConvertedMessageState>,
         ),
-        Assignment(
-            ::buffa::alloc::boxed::Box<super::super::super::ParticipantAssignment>,
-        ),
         ChannelDecision(
             ::buffa::alloc::boxed::Box<super::super::super::ChannelDecision>,
         ),
@@ -163,17 +160,6 @@ pub mod runtime_event {
             Self::Some(State::from(v))
         }
     }
-    impl From<super::super::super::ParticipantAssignment> for State {
-        fn from(v: super::super::super::ParticipantAssignment) -> Self {
-            Self::Assignment(::buffa::alloc::boxed::Box::new(v))
-        }
-    }
-    impl From<super::super::super::ParticipantAssignment>
-    for ::core::option::Option<State> {
-        fn from(v: super::super::super::ParticipantAssignment) -> Self {
-            Self::Some(State::from(v))
-        }
-    }
     impl From<super::super::super::ChannelDecision> for State {
         fn from(v: super::super::super::ChannelDecision) -> Self {
             Self::ChannelDecision(::buffa::alloc::boxed::Box::new(v))
@@ -240,9 +226,6 @@ pub mod runtime_event {
                 }
                 Self::ConvertedMessage(v) => {
                     map.serialize_entry("convertedMessage", v)?;
-                }
-                Self::Assignment(v) => {
-                    map.serialize_entry("assignment", v)?;
                 }
                 Self::ChannelDecision(v) => {
                     map.serialize_entry("channelDecision", v)?;

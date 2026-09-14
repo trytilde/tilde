@@ -1,5 +1,6 @@
-//! Runs, invocations and commands for the owning replica, plus the executor that
-//! drives the local agent process. Ownership generations fence stale work.
+//! Runs, invocations and commands for the replica holding a thread, plus the
+//! executor that drives the local agent process. The lease epoch tells the agent
+//! process a fresh invocation from a stale one after the lease changed hands.
 use super::*;
 use crate::proto::tilde::agent_host::v1 as host;
 use secrecy::ExposeSecret;
@@ -20,16 +21,11 @@ struct Claims {
     capabilities: crate::iam::capabilities::Capabilities,
     iat: i64,
     exp: i64,
-    assignment_generation: u64,
+    lease_epoch: u64,
     agent_generation: i64,
 }
 impl Runtime {
-    pub async fn assignment(&self, thread: Uuid) -> Result<types::ParticipantAssignment> {
-        let shared = self.load(thread).await?;
-        let t = shared.lock().await;
-        Ok(t.assignment.clone())
-    }
-    fn agent_participant(&self, t: &ThreadState) -> Result<Uuid> {
+    pub(crate) fn agent_participant(&self, t: &ThreadState) -> Result<Uuid> {
         t.thread
             .participants
             .iter()
@@ -47,7 +43,6 @@ impl Runtime {
         let shared = self.load(thread).await?;
         let mut t = shared.lock().await;
         self.require_owner(&t)?;
-        self.ensure_capacity()?;
         let participant = self.agent_participant(&t)?;
         let run_id = Uuid::new_v5(
             &thread,
@@ -94,15 +89,15 @@ impl Runtime {
         participant: Uuid,
     ) -> Result<()> {
         let thread = id(&run.thread_id)?;
-        tracing::debug!(agent_id=%self.agent_id, instance_id=%self.instance_id, thread_id=%thread, run_id=%run.id, generation=t.assignment.generation, "Invocation begins");
-        let assignment = t.assignment.clone();
-        if assignment.stopped {
-            return Err(ChatError::Conflict);
+        let epoch = t.lease.epoch;
+        tracing::debug!(agent_id=%self.agent_id, instance_id=%self.instance_id, thread_id=%thread, run_id=%run.id, epoch, "Invocation begins");
+        if !self.owns(t) {
+            return Err(ChatError::Denied);
         }
         let run_id = id(&run.id)?;
         let invocation_id = Uuid::new_v5(
             &run_id,
-            format!("{}:{}", assignment.generation, run.invocation_id).as_bytes(),
+            format!("{}:{}:{}", self.instance_id, epoch, run.invocation_id).as_bytes(),
         );
         run.invocation_id = invocation_id.to_string();
         run.invocation_status = "pending".into();
@@ -112,8 +107,8 @@ impl Runtime {
             run_id: run.id.clone(),
             agent_id: self.agent_id.to_string(),
             participant_id: participant.to_string(),
-            owner_instance_id: assignment.owner_instance_id.clone(),
-            generation: assignment.generation,
+            owner_instance_id: self.instance_id.to_string(),
+            generation: epoch,
             status: "pending".into(),
             traceparent: crate::telemetry::context::capture().0,
             tracestate: crate::telemetry::context::capture().1,
@@ -125,8 +120,8 @@ impl Runtime {
             thread_id: run.thread_id.clone(),
             participant_id: participant.to_string(),
             agent_id: self.agent_id.to_string(),
-            owner_instance_id: assignment.owner_instance_id.clone(),
-            generation: assignment.generation,
+            owner_instance_id: self.instance_id.to_string(),
+            generation: epoch,
             created_at: now(),
             action: Some(
                 types::InvokeCommand {
@@ -139,7 +134,7 @@ impl Runtime {
             ),
             ..Default::default()
         };
-        let attempt = Uuid::new_v5(&id(&command.id)?, &assignment.generation.to_be_bytes());
+        let attempt = Uuid::new_v5(&id(&command.id)?, &epoch.to_be_bytes());
         t.invocations.insert(invocation_id, invocation.clone());
         t.push_command(Command {
             attempt_id: attempt,
@@ -159,7 +154,6 @@ impl Runtime {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .insert(invocation_id, thread);
-        self.emit(t, "participant.assigned", assignment.into(), None)?;
         self.emit(t, "run.created", run.clone().into(), None)?;
         self.emit(t, "invocation.pending", invocation.into(), None)?;
         self.state
@@ -204,7 +198,6 @@ impl Runtime {
         let shared = self.load(thread).await?;
         let mut t = shared.lock().await;
         self.require_owner(&t)?;
-        self.ensure_capacity()?;
         let mut run = t.runs.get(&key).cloned().ok_or(ChatError::NotFound)?;
         if !["waiting", "failed"].contains(&run.status.as_str()) {
             return Err(ChatError::Conflict);
@@ -213,7 +206,7 @@ impl Runtime {
         let previous = run.invocation_id.clone();
         run.status = "active".into();
         self.begin_invocation(&mut t, &mut run, participant)?;
-        let generation = t.assignment.generation;
+        let generation = t.lease.epoch;
         let mut carried = vec![];
         for command in t
             .commands
@@ -462,7 +455,7 @@ impl Runtime {
             capabilities,
             iat: now,
             exp: now + 900,
-            assignment_generation: v.generation,
+            lease_epoch: v.generation,
             agent_generation: configuration.agent_generation,
         };
         jsonwebtoken::encode(
@@ -499,15 +492,24 @@ impl Runtime {
             .get(&claims.invocation_id)
             .ok_or(ChatError::Denied)?;
         let configuration = self.configuration()?;
-        if claims.agent_generation != configuration.agent_generation
-            || v.status != "running"
-            || v.lease_expires_at < now()
-            || v.thread_id != claims.thread_id.to_string()
-            || v.run_id != claims.run_id.to_string()
-            || t.assignment.generation != claims.assignment_generation
-            || !self.owns(&t)
-            || configuration.agent.paused
-        {
+        let refused = [
+            (
+                "agent_generation",
+                claims.agent_generation != configuration.agent_generation,
+            ),
+            ("status", v.status != "running"),
+            ("expired", v.lease_expires_at < now()),
+            ("thread", v.thread_id != claims.thread_id.to_string()),
+            ("run", v.run_id != claims.run_id.to_string()),
+            ("epoch", t.lease.epoch != claims.lease_epoch),
+            ("lease", !self.owns(&t)),
+            ("paused", configuration.agent.paused),
+        ]
+        .into_iter()
+        .find(|(_, failed)| *failed)
+        .map(|(reason, _)| reason);
+        if let Some(reason) = refused {
+            tracing::debug!(agent_id=%self.agent_id, invocation_id=%claims.invocation_id, reason, "Invocation capability refused");
             return Err(ChatError::Denied);
         }
         let meta = t.run_meta.get(&claims.run_id).cloned().unwrap_or_default();
@@ -641,7 +643,7 @@ impl Runtime {
             };
             if entry.finished_at.is_some()
                 || !self.owns(&t)
-                || t.assignment.generation != entry.command.generation
+                || t.lease.epoch != entry.command.generation
             {
                 return Ok(());
             }
@@ -766,7 +768,7 @@ impl Runtime {
                         // The lease is only renewed while the gateway still hears this replica.
                         if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
                         let mut t=shared.lock().await;
-                        if !self.owns(&t) || t.assignment.generation!=v.generation { return Err(ChatError::Denied); }
+                        if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
                         if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
                     },
                     message=stream.message()=>{
@@ -824,8 +826,8 @@ impl Runtime {
         if v.status == "canceled" || !matches!(v.status.as_str(), "pending" | "running") {
             return Ok(());
         }
-        if !self.owns(&t) || t.assignment.generation != v.generation {
-            // A newer owner exists; its state is canonical.
+        if !self.owns(&t) || t.lease.epoch != v.generation {
+            // The lease moved on; the new holder's state is canonical.
             v.status = "failed".into();
             v.ended_at = now();
             t.invocations.insert(key, v);
@@ -882,81 +884,62 @@ impl Runtime {
         self.changed(id(&v.thread_id)?);
         Ok(())
     }
-    /// Gateway-authored ownership for one thread. Losing ownership fails local work.
-    pub(crate) async fn apply_assignment(
-        &self,
-        assignment: types::ParticipantAssignment,
-    ) -> Result<()> {
-        let thread = id(&assignment.thread_id)?;
+    /// A lease change from the gateway. Losing the lease fails local work; gaining
+    /// one for a thread not cached here (recovery moved it) hydrates it, which
+    /// restarts any interrupted run.
+    pub(crate) async fn apply_lease(&self, lease: control::ThreadLease) -> Result<()> {
+        let thread = id(&lease.thread_id)?;
+        let mine = lease.held && lease.holder_instance_id == self.instance_id.to_string();
         let Some(shared) = self.local(thread) else {
+            if mine {
+                let runtime = self.clone();
+                tokio::spawn(async move {
+                    if runtime.load(thread).await.is_err() {
+                        tracing::warn!(agent_id=%runtime.agent_id, thread_id=%thread, "Could not hydrate a thread handed to this replica");
+                    }
+                });
+            }
             return Ok(());
         };
         let mut t = shared.lock().await;
-        if assignment.generation < t.assignment.generation {
+        if mine {
+            if t.lease.holder != Some(self.instance_id) {
+                t.lease = Lease {
+                    holder: Some(self.instance_id),
+                    holder_url: String::new(),
+                    epoch: self.state.lease_epochs.fetch_add(1, Ordering::AcqRel) + 1,
+                };
+                self.forget_held_elsewhere(thread);
+            }
             return Ok(());
         }
-        let lost =
-            assignment.owner_instance_id != self.instance_id.to_string() || assignment.stopped;
-        t.assignment = assignment;
-        if lost {
-            let stale: Vec<Uuid> = t
-                .invocations
-                .iter()
-                .filter(|(_, v)| matches!(v.status.as_str(), "pending" | "running"))
-                .map(|(k, _)| *k)
-                .collect();
-            for key in stale {
-                if let Some(v) = t.invocations.get_mut(&key) {
-                    v.status = "failed".into();
-                    v.ended_at = now();
-                }
-            }
-            for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
-                command.finished_at = Some(now());
-                command.failure = "ownership_changed".into();
-            }
-        }
-        drop(t);
-        self.changed(thread);
-        Ok(())
-    }
-    pub(crate) async fn fence(&self, thread: Uuid, generation: u64) -> Result<()> {
-        let assignment = {
-            let Some(shared) = self.local(thread) else {
-                return Ok(());
-            };
-            let t = shared.lock().await;
-            types::ParticipantAssignment {
-                generation: generation.max(t.assignment.generation),
-                owner_instance_id: String::new(),
-                ..t.assignment.clone()
-            }
-        };
-        self.apply_assignment(assignment).await
-    }
-    /// Take over a run after the previous owner disappeared: a fresh invocation from the objective.
-    pub(crate) async fn recover_run(
-        &self,
-        thread: Uuid,
-        run_id: Uuid,
-        participant: Uuid,
-        objective: String,
-    ) -> Result<()> {
-        let shared = self.load(thread).await?;
-        let mut t = shared.lock().await;
-        self.require_owner(&t)?;
-        if t.active_invocation(self.agent_id).is_some() {
+        if t.lease.holder != Some(self.instance_id) && !lease.held {
             return Ok(());
         }
-        let mut run = t.runs.get(&run_id).cloned().unwrap_or(types::Run {
-            id: run_id.to_string(),
-            thread_id: thread.to_string(),
-            agent_id: self.agent_id.to_string(),
-            objective,
-            ..Default::default()
-        });
-        run.status = "active".into();
-        self.begin_invocation(&mut t, &mut run, participant)?;
+        t.lease.holder = lease
+            .held
+            .then(|| id(&lease.holder_instance_id).ok())
+            .flatten();
+        t.lease.holder_url = lease.holder_public_url.clone();
+        if lease.held {
+            self.note_held_elsewhere(thread, lease.holder_public_url);
+        }
+        let stale: Vec<Uuid> = t
+            .invocations
+            .iter()
+            .filter(|(_, v)| matches!(v.status.as_str(), "pending" | "running"))
+            .map(|(k, _)| *k)
+            .collect();
+        for key in stale {
+            if let Some(v) = t.invocations.get_mut(&key) {
+                v.status = "failed".into();
+                v.ended_at = now();
+            }
+        }
+        for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
+            command.finished_at = Some(now());
+            command.failure = "lease_changed".into();
+        }
         drop(t);
         self.changed(thread);
         Ok(())

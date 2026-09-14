@@ -96,7 +96,7 @@ impl Client {
             .forward_with_options(
                 wire::ForwardRequest {
                     thread_id: thread.map(|t| t.to_string()).unwrap_or_default(),
-                    work: Some(wire::forward_request::Work::Call(Box::new(call))),
+                    call: call.into(),
                     ..Default::default()
                 },
                 CallOptions::default().with_timeout(Duration::from_secs(30)),
@@ -107,32 +107,6 @@ impl Client {
             .result
             .into_option()
             .ok_or(ChatError::Transport)
-    }
-    pub async fn forward_provider_event(
-        &self,
-        thread: Uuid,
-        connection: Uuid,
-        event: types::ProviderEvent,
-    ) -> Result<()> {
-        let directive = wire::ProviderEventDirective {
-            connection_id: connection.to_string(),
-            event: event.into(),
-            ..Default::default()
-        };
-        self.inner
-            .forward_with_options(
-                wire::ForwardRequest {
-                    thread_id: thread.to_string(),
-                    work: Some(wire::forward_request::Work::ProviderEvent(Box::new(
-                        directive,
-                    ))),
-                    ..Default::default()
-                },
-                Self::options(),
-            )
-            .await
-            .map(|_| ())
-            .map_err(|_| ChatError::Transport)
     }
     pub async fn relay(
         &self,

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_runs SET status='failed' WHERE thread_id=$1 AND agent_id=$2 AND status IN ('active','suspending') RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fccaafe3042f57ff07838757daf2161d77adef2d7531c5b9eb3b53105027f64b"
+}

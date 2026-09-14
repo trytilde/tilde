@@ -11,7 +11,6 @@ impl Runtime {
         let shared = self.load(s.thread_id).await?;
         let mut t = shared.lock().await;
         self.require_owner(&t)?;
-        self.ensure_capacity()?;
         for target in recipients {
             if !t
                 .thread
@@ -58,15 +57,15 @@ impl Runtime {
         let shared = self.local(thread).ok_or(ChatError::NotFound)?;
         let mut t = shared.lock().await;
         self.require_owner(&t)?;
-        self.ensure_capacity()?;
-        let mut message = t.message(key).cloned().ok_or(ChatError::NotFound)?;
+        // Deltas grow the message in place; a streamed message costs its length once.
+        let message = t.message_mut(key).ok_or(ChatError::NotFound)?;
         if message.status != "streaming" {
             return Err(ChatError::Conflict);
         }
-        message.text.push_str(delta);
-        if message.text.len() > 1024 * 1024 {
+        if message.text.len() + delta.len() > 1024 * 1024 {
             return Err(ChatError::Invalid("Message is too large".into()));
         }
+        message.text.push_str(delta);
         let chunk = types::Activity {
             kind: "message.delta".into(),
             entity_id: key.to_string(),
@@ -82,7 +81,6 @@ impl Runtime {
             ),
             ..Default::default()
         };
-        t.upsert_message(message);
         self.emit(&mut t, "message.delta", chunk.into(), None)?;
         drop(t);
         self.changed(thread);

@@ -9,7 +9,7 @@ import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
  * Describes the file tilde/types/v1/deployment.proto.
  */
 export const file_tilde_types_v1_deployment = /*@__PURE__*/
-  fileDesc("Ch90aWxkZS90eXBlcy92MS9kZXBsb3ltZW50LnByb3RvEg50aWxkZS50eXBlcy52MSLIAQoKRGVwbG95bWVudBIQCghhZ2VudF9pZBgBIAEoCRIsCgRtb2RlGAIgASgOMh4udGlsZGUudHlwZXMudjEuRGVwbG95bWVudE1vZGUSGQoMZW5kcG9pbnRfdXJsGAMgASgJSACIAQESOAoMZmFpbHVyZV9tb2RlGAQgASgOMiIudGlsZGUudHlwZXMudjEuU2lkZWNhckZhaWx1cmVNb2RlEhQKDHRva2VuX2lzc3VlZBgFIAEoCEIPCg1fZW5kcG9pbnRfdXJsIp4BCgtTaWRlY2FyTm9kZRITCgtpbnN0YW5jZV9pZBgBIAEoCRIQCghhZ2VudF9pZBgCIAEoCRISCgpwdWJsaWNfdXJsGAMgASgJEhMKC3J1bnRpbWVfdXJsGAQgASgJEg0KBXJlYWR5GAUgASgIEjAKDGxhc3Rfc2Vlbl9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAilAEKFVBhcnRpY2lwYW50QXNzaWdubWVudBIRCgl0aHJlYWRfaWQYASABKAkSFgoOcGFydGljaXBhbnRfaWQYAiABKAkSEAoIYWdlbnRfaWQYAyABKAkSGQoRb3duZXJfaW5zdGFuY2VfaWQYBCABKAkSEgoKZ2VuZXJhdGlvbhgFIAEoBBIPCgdzdG9wcGVkGAYgASgIKmsKDkRlcGxveW1lbnRNb2RlEh8KG0RFUExPWU1FTlRfTU9ERV9VTlNQRUNJRklFRBAAEhsKF0RFUExPWU1FTlRfTU9ERV9HQVRFV0FZEAESGwoXREVQTE9ZTUVOVF9NT0RFX1NJREVDQVIQAip8ChJTaWRlY2FyRmFpbHVyZU1vZGUSJAogU0lERUNBUl9GQUlMVVJFX01PREVfVU5TUEVDSUZJRUQQABIhCh1TSURFQ0FSX0ZBSUxVUkVfTU9ERV9SRUFTU0lHThABEh0KGVNJREVDQVJfRkFJTFVSRV9NT0RFX1NUT1AQAmIGcHJvdG8z", [file_google_protobuf_timestamp]);
+  fileDesc("Ch90aWxkZS90eXBlcy92MS9kZXBsb3ltZW50LnByb3RvEg50aWxkZS50eXBlcy52MSLlAQoKRGVwbG95bWVudBIQCghhZ2VudF9pZBgBIAEoCRIsCgRtb2RlGAIgASgOMh4udGlsZGUudHlwZXMudjEuRGVwbG95bWVudE1vZGUSOAoMZmFpbHVyZV9tb2RlGAQgASgOMiIudGlsZGUudHlwZXMudjEuU2lkZWNhckZhaWx1cmVNb2RlEjIKB3JvdXRpbmcYBiABKA4yIS50aWxkZS50eXBlcy52MS5EZXBsb3ltZW50Um91dGluZxIdChVzZXJ2aW5nX2RlcGxveW1lbnRfaWQYByABKAlKBAgDEARKBAgFEAYiyAMKD0FnZW50RGVwbG95bWVudBIKCgJpZBgBIAEoCRIQCghhZ2VudF9pZBgCIAEoCRIwCgZzb3VyY2UYAyABKA4yIC50aWxkZS50eXBlcy52MS5EZXBsb3ltZW50U291cmNlEjAKBnRhcmdldBgEIAEoDjIgLnRpbGRlLnR5cGVzLnYxLkRlcGxveW1lbnRUYXJnZXQSFAoMZW5kcG9pbnRfdXJsGAUgASgJEhgKEHRhcmdldF9yZWZlcmVuY2UYBiABKAkSEgoKcmVwb3NpdG9yeRgHIAEoCRISCgpjb21taXRfc2hhGAggASgJEhMKC2V4dGVybmFsX2lkGAkgASgJEg0KBWxhYmVsGAogASgJEjAKBnN0YXR1cxgLIAEoDjIgLnRpbGRlLnR5cGVzLnYxLkRlcGxveW1lbnRTdGF0dXMSFAoMdG9rZW5faXNzdWVkGAwgASgIEg8KB3NlcnZpbmcYDSABKAgSLgoKY3JlYXRlZF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKcmV0aXJlZF9hdBgPIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAitwEKDUFnZW50SW5zdGFuY2USEwoLaW5zdGFuY2VfaWQYASABKAkSEAoIYWdlbnRfaWQYAiABKAkSEgoKcHVibGljX3VybBgDIAEoCRITCgtydW50aW1lX3VybBgEIAEoCRINCgVyZWFkeRgFIAEoCBIwCgxsYXN0X3NlZW5fYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhUKDWRlcGxveW1lbnRfaWQYByABKAkqawoORGVwbG95bWVudE1vZGUSHwobREVQTE9ZTUVOVF9NT0RFX1VOU1BFQ0lGSUVEEAASGwoXREVQTE9ZTUVOVF9NT0RFX0dBVEVXQVkQARIbChdERVBMT1lNRU5UX01PREVfU0lERUNBUhACKnwKElNpZGVjYXJGYWlsdXJlTW9kZRIkCiBTSURFQ0FSX0ZBSUxVUkVfTU9ERV9VTlNQRUNJRklFRBAAEiEKHVNJREVDQVJfRkFJTFVSRV9NT0RFX1JFQVNTSUdOEAESHQoZU0lERUNBUl9GQUlMVVJFX01PREVfU1RPUBACKnUKEURlcGxveW1lbnRSb3V0aW5nEiIKHkRFUExPWU1FTlRfUk9VVElOR19VTlNQRUNJRklFRBAAEh0KGURFUExPWU1FTlRfUk9VVElOR19MQVRFU1QQARIdChlERVBMT1lNRU5UX1JPVVRJTkdfTUFOVUFMEAIqbQoQRGVwbG95bWVudFNvdXJjZRIhCh1ERVBMT1lNRU5UX1NPVVJDRV9VTlNQRUNJRklFRBAAEhgKFERFUExPWU1FTlRfU09VUkNFX0NJEAESHAoYREVQTE9ZTUVOVF9TT1VSQ0VfTUFOVUFMEAIqlAEKEERlcGxveW1lbnRUYXJnZXQSIQodREVQTE9ZTUVOVF9UQVJHRVRfVU5TUEVDSUZJRUQQABIcChhERVBMT1lNRU5UX1RBUkdFVF9ESVJFQ1QQARIdChlERVBMT1lNRU5UX1RBUkdFVF9TSURFQ0FSEAISIAocREVQTE9ZTUVOVF9UQVJHRVRfQVdTX0xBTUJEQRADKnYKEERlcGxveW1lbnRTdGF0dXMSIQodREVQTE9ZTUVOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxERVBMT1lNRU5UX1NUQVRVU19SRUdJU1RFUkVEEAESHQoZREVQTE9ZTUVOVF9TVEFUVVNfUkVUSVJFRBACYgZwcm90bzM", [file_google_protobuf_timestamp]);
 
 /**
  * Describes the message tilde.types.v1.Deployment.
@@ -19,17 +19,17 @@ export const DeploymentSchema = /*@__PURE__*/
   messageDesc(file_tilde_types_v1_deployment, 0);
 
 /**
- * Describes the message tilde.types.v1.SidecarNode.
- * Use `create(SidecarNodeSchema)` to create a new message.
+ * Describes the message tilde.types.v1.AgentDeployment.
+ * Use `create(AgentDeploymentSchema)` to create a new message.
  */
-export const SidecarNodeSchema = /*@__PURE__*/
+export const AgentDeploymentSchema = /*@__PURE__*/
   messageDesc(file_tilde_types_v1_deployment, 1);
 
 /**
- * Describes the message tilde.types.v1.ParticipantAssignment.
- * Use `create(ParticipantAssignmentSchema)` to create a new message.
+ * Describes the message tilde.types.v1.AgentInstance.
+ * Use `create(AgentInstanceSchema)` to create a new message.
  */
-export const ParticipantAssignmentSchema = /*@__PURE__*/
+export const AgentInstanceSchema = /*@__PURE__*/
   messageDesc(file_tilde_types_v1_deployment, 2);
 
 /**
@@ -39,6 +39,8 @@ export const DeploymentModeSchema = /*@__PURE__*/
   enumDesc(file_tilde_types_v1_deployment, 0);
 
 /**
+ * How the agent executes. Every deployment of an agent shares this for now.
+ *
  * @generated from enum tilde.types.v1.DeploymentMode
  */
 export const DeploymentMode = /*@__PURE__*/
@@ -55,4 +57,56 @@ export const SidecarFailureModeSchema = /*@__PURE__*/
  */
 export const SidecarFailureMode = /*@__PURE__*/
   tsEnum(SidecarFailureModeSchema);
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentRouting.
+ */
+export const DeploymentRoutingSchema = /*@__PURE__*/
+  enumDesc(file_tilde_types_v1_deployment, 2);
+
+/**
+ * Which deployment new threads go to: the most recently registered one automatically, or the one an operator promoted.
+ *
+ * @generated from enum tilde.types.v1.DeploymentRouting
+ */
+export const DeploymentRouting = /*@__PURE__*/
+  tsEnum(DeploymentRoutingSchema);
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentSource.
+ */
+export const DeploymentSourceSchema = /*@__PURE__*/
+  enumDesc(file_tilde_types_v1_deployment, 3);
+
+/**
+ * @generated from enum tilde.types.v1.DeploymentSource
+ */
+export const DeploymentSource = /*@__PURE__*/
+  tsEnum(DeploymentSourceSchema);
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentTarget.
+ */
+export const DeploymentTargetSchema = /*@__PURE__*/
+  enumDesc(file_tilde_types_v1_deployment, 4);
+
+/**
+ * How the gateway reaches the deployment: an HTTP endpoint it wakes, a sidecar that dials in, or a Lambda function.
+ *
+ * @generated from enum tilde.types.v1.DeploymentTarget
+ */
+export const DeploymentTarget = /*@__PURE__*/
+  tsEnum(DeploymentTargetSchema);
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentStatus.
+ */
+export const DeploymentStatusSchema = /*@__PURE__*/
+  enumDesc(file_tilde_types_v1_deployment, 5);
+
+/**
+ * @generated from enum tilde.types.v1.DeploymentStatus
+ */
+export const DeploymentStatus = /*@__PURE__*/
+  tsEnum(DeploymentStatusSchema);
 

@@ -1,7 +1,7 @@
-//! Events published by owning replicas become canonical Postgres state. Receipts
-//! deduplicate replays; ownership generations fence stale replicas; completed
-//! messages are relayed to other sidecar participants of the same room.
-use super::{Deployments, id};
+//! Events published by replicas become canonical Postgres state. A batch is one
+//! transaction; receipts deduplicate replays; run state is accepted only from the
+//! replica holding the thread's lease. Data appends carry no ownership at all.
+use super::{Deployments, Holder, id, lease_frame};
 use crate::proto::tilde::{
     agent_event_ingress::v1 as wire,
     types::v1::{self as types, runtime_event::State},
@@ -9,12 +9,13 @@ use crate::proto::tilde::{
 use crate::{chat, error::Error};
 use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 pub enum Outcome {
     Projected,
     Duplicate,
-    Fenced(u64),
+    /// Run state from a replica that does not hold the lease; carries who does.
+    NotHolder(wire::ThreadLease),
 }
 /// Errors caused by the frame itself, as opposed to the gateway's own infrastructure.
 fn rejectable(error: &Error) -> bool {
@@ -30,56 +31,37 @@ fn at(value: i64) -> Result<DateTime<Utc>, Error> {
     DateTime::from_timestamp_millis(value)
         .ok_or_else(|| Error::Invalid("Invalid event timestamp".into()))
 }
+/// Per-batch memory: leases already looked up and thread routes already locked.
+#[derive(Default)]
+struct Batch {
+    leases: HashMap<Uuid, Option<Holder>>,
+    locked: HashSet<Uuid>,
+}
 impl Deployments {
-    /// Apply one batch in order. A frame the gateway cannot accept is rejected on
-    /// its own so the replica drops it; only infrastructure failures fail the batch.
+    /// Apply one batch in order. Events share one transaction; a frame the gateway
+    /// cannot accept is rejected on its own so the replica drops it, and only
+    /// infrastructure failures fail the batch, which the replica then resends.
     pub async fn publish(
         &self,
         agent: Uuid,
+        deployment: Uuid,
         instance: Uuid,
         request: wire::PublishRequest,
     ) -> Result<wire::PublishResponse, Error> {
-        let mut claims = vec![];
-        let mut fences: BTreeMap<Uuid, u64> = BTreeMap::new();
-        let mut rejected = vec![];
+        let mut events = vec![];
         for frame in request.frames {
             match frame.frame {
                 Some(wire::upstream::Frame::Heartbeat(heartbeat)) => {
                     self.heartbeat(agent, instance, &heartbeat).await?
                 }
-                Some(wire::upstream::Frame::Claim(claim)) => {
-                    let (thread, participant) = (id(&claim.thread_id)?, id(&claim.participant_id)?);
-                    match self.claim(agent, instance, thread, participant).await {
-                        Ok(result) => claims.push(result),
-                        Err(error) if rejectable(&error) => claims.push(wire::ClaimResult {
-                            thread_id: claim.thread_id,
-                            participant_id: claim.participant_id,
-                            ..Default::default()
-                        }),
-                        Err(error) => return Err(error),
+                Some(wire::upstream::Frame::Event(event)) => {
+                    if let Some(inner) = event.event.into_option() {
+                        events.push(inner);
                     }
                 }
-                Some(wire::upstream::Frame::Event(event)) => {
-                    let inner = event
-                        .event
-                        .into_option()
-                        .ok_or_else(|| Error::Invalid("Event frame requires an event".into()))?;
-                    let event_id = inner.id.clone();
-                    let kind = inner.kind.clone();
-                    let thread = id(&inner.thread_id)?;
-                    match self
-                        .project_event(agent, instance, event.generation, inner)
-                        .await
-                    {
-                        Ok(Outcome::Fenced(current)) => {
-                            fences.insert(thread, current);
-                        }
-                        Ok(Outcome::Projected | Outcome::Duplicate) => {}
-                        Err(error) if rejectable(&error) => {
-                            tracing::warn!(agent_id=%agent, event_id=%event_id, kind=%kind, error=?error, "Rejected sidecar event");
-                            rejected.push(event_id);
-                        }
-                        Err(error) => return Err(error),
+                Some(wire::upstream::Frame::Release(release)) => {
+                    if let Ok(thread) = id(&release.thread_id) {
+                        self.release(agent, instance, thread).await?;
                     }
                 }
                 Some(wire::upstream::Frame::DirectiveResult(result)) => {
@@ -102,25 +84,109 @@ impl Deployments {
                 None => {}
             }
         }
+        let (rejected, lost) = match self
+            .project_batch(agent, deployment, instance, &events)
+            .await
+        {
+            Ok(outcome) => outcome,
+            Err(error) if rejectable(&error) => {
+                // One frame poisoned the shared transaction: isolate it by running the
+                // batch frame by frame, each in its own transaction.
+                let mut rejected = vec![];
+                let mut lost = BTreeMap::new();
+                let mut batch = Batch::default();
+                for event in events {
+                    let event_id = event.id.clone();
+                    let kind = event.kind.clone();
+                    let mut tx = self.pool.begin().await?;
+                    batch.locked.clear();
+                    match self
+                        .project_event(&mut tx, &mut batch, agent, deployment, instance, event)
+                        .await
+                    {
+                        // Not a divergence: the lost lease tells the replica what happened.
+                        Ok(Outcome::NotHolder(lease)) => {
+                            lost.insert(lease.thread_id.clone(), lease);
+                            tx.commit().await?;
+                        }
+                        Ok(_) => tx.commit().await?,
+                        Err(error) if rejectable(&error) => {
+                            tracing::warn!(agent_id=%agent, event_id=%event_id, kind=%kind, error=?error, "Rejected sidecar event");
+                            rejected.push(event_id);
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
+                (rejected, lost)
+            }
+            Err(error) => return Err(error),
+        };
         Ok(wire::PublishResponse {
-            claims,
-            fences: fences
-                .into_iter()
-                .map(|(thread, generation)| wire::Fence {
-                    thread_id: thread.to_string(),
-                    generation,
-                    ..Default::default()
-                })
-                .collect(),
             rejected_event_ids: rejected,
+            lost: lost.into_values().collect(),
             ..Default::default()
         })
     }
-    pub async fn project_event(
+    async fn project_batch(
         &self,
         agent: Uuid,
+        deployment: Uuid,
         instance: Uuid,
-        generation: u64,
+        events: &[types::RuntimeEvent],
+    ) -> Result<(Vec<String>, BTreeMap<String, wire::ThreadLease>), Error> {
+        let mut rejected = vec![];
+        let mut lost = BTreeMap::new();
+        if events.is_empty() {
+            return Ok((rejected, lost));
+        }
+        let mut batch = Batch::default();
+        let mut tx = self.pool.begin().await?;
+        for event in events {
+            let event_id = event.id.clone();
+            let kind = event.kind.clone();
+            match self
+                .project_event(
+                    &mut tx,
+                    &mut batch,
+                    agent,
+                    deployment,
+                    instance,
+                    event.clone(),
+                )
+                .await
+            {
+                // Not a divergence: the lost lease tells the replica what happened.
+                Ok(Outcome::NotHolder(lease)) => {
+                    lost.insert(lease.thread_id.clone(), lease);
+                }
+                Ok(_) => {}
+                // Our own checks leave the transaction usable; a database error does not.
+                Err(
+                    error @ (Error::Denied | Error::Invalid(_) | Error::NotFound | Error::Conflict),
+                ) => {
+                    tracing::warn!(agent_id=%agent, event_id=%event_id, kind=%kind, error=?error, "Rejected sidecar event");
+                    rejected.push(event_id);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        tx.commit().await?;
+        Ok((rejected, lost))
+    }
+    /// Kinds of state only the lease holder may write: they drive the agent process.
+    fn needs_lease(state: &Option<State>) -> bool {
+        matches!(
+            state,
+            Some(State::Run(_) | State::Invocation(_) | State::ToolCall(_))
+        )
+    }
+    async fn project_event(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        batch: &mut Batch,
+        agent: Uuid,
+        deployment: Uuid,
+        instance: Uuid,
         event: types::RuntimeEvent,
     ) -> Result<Outcome, Error> {
         let event_id = id(&event.id)?;
@@ -132,25 +198,33 @@ impl Deployments {
         }
         let thread = id(&event.thread_id)?;
         let created = at(event.created_at)?;
-        let mut tx = self.pool.begin().await?;
         if !thread.is_nil() {
-            chat::access::lock_thread_route(&mut tx, thread).await?;
-            // A claim always precedes a conversation's events; without one the
-            // replica has no authority over this thread at all. The row lock keeps
-            // the fence decision and the projection atomic against a concurrent
-            // claim or recovery, which would otherwise be able to fail this
-            // invocation between the check and the write.
-            let current =
-                sqlx::query_file!("../../queries/deployment/owner_lock.sql", thread, agent)
-                    .fetch_optional(&mut *tx)
-                    .await?
-                    .ok_or(Error::Denied)?;
-            let current_generation = current.generation as u64;
-            if generation < current_generation
-                || (generation == current_generation
-                    && (current.owner_instance_id != instance || current.stopped))
-            {
-                return Ok(Outcome::Fenced(current_generation));
+            if batch.locked.insert(thread) {
+                chat::access::lock_thread_route(tx, thread).await?;
+            }
+            if Self::needs_lease(&event.state) {
+                let holder = match batch.leases.get(&thread) {
+                    Some(holder) => holder.as_ref().map(|h| (h.instance, h.public_url.clone())),
+                    None => {
+                        let row = sqlx::query_file!(
+                            "../../queries/deployment/lease_holder.sql",
+                            thread,
+                            agent
+                        )
+                        .fetch_optional(&mut **tx)
+                        .await?;
+                        let holder = row.map(|r| Holder {
+                            instance: r.instance_id,
+                            public_url: r.public_url.unwrap_or_default(),
+                        });
+                        let value = holder.as_ref().map(|h| (h.instance, h.public_url.clone()));
+                        batch.leases.insert(thread, holder);
+                        value
+                    }
+                };
+                if holder.as_ref().map(|(i, _)| *i) != Some(instance) {
+                    return Ok(Outcome::NotHolder(lease_frame(agent, thread, holder)));
+                }
             }
         }
         if sqlx::query_file!(
@@ -162,7 +236,7 @@ impl Deployments {
             event.origin_sequence,
             created
         )
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await?
         .is_none()
         {
@@ -170,7 +244,7 @@ impl Deployments {
         }
         if !thread.is_nil()
             && !sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
-                .fetch_one(&mut *tx)
+                .fetch_one(&mut **tx)
                 .await?
                 .exists
         {
@@ -194,18 +268,16 @@ impl Deployments {
                     id(&value.id)?,
                     value.name
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::Thread(value)) => {
                 if id(&value.id)? != thread {
                     return Err(Error::Denied);
                 }
-                self.project_thread(&mut tx, value).await?;
+                self.project_thread(tx, value).await?;
             }
-            Some(State::Participant(value)) => {
-                self.project_participant(&mut tx, thread, value).await?
-            }
+            Some(State::Participant(value)) => self.project_participant(tx, thread, value).await?,
             Some(State::Message(value)) => {
                 if id(&value.thread_id)? != thread {
                     return Err(Error::Denied);
@@ -227,7 +299,7 @@ impl Deployments {
                     value.format,
                     value.subject
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
                 if let Some(delivery) = value.delivery.as_option() {
                     sqlx::query_file!(
@@ -238,7 +310,7 @@ impl Deployments {
                         delivery.external_message_id,
                         delivery.status
                     )
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
                 }
                 for target in &value.addressed_participant_ids {
@@ -248,22 +320,22 @@ impl Deployments {
                         thread,
                         id(target)?
                     )
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
                 }
                 // The publishing agent already routed this message locally.
                 sqlx::query_file!("../../queries/deployment/project/dispatch.sql", key, agent)
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
                 for attachment in &value.attachments {
-                    self.project_attachment(&mut tx, thread, attachment).await?;
+                    self.project_attachment(tx, thread, attachment).await?;
                     sqlx::query_file!(
                         "../../queries/chat/attachment_attach.sql",
                         thread,
                         key,
                         id(&attachment.id)?
                     )
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
                 }
             }
@@ -276,7 +348,7 @@ impl Deployments {
                     value.objective,
                     value.status
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::Task(value)) => {
@@ -291,7 +363,7 @@ impl Deployments {
                     value.goal_id.as_deref().map(id).transpose()?,
                     value.blocked_reason
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
                 for dep in &value.dependency_ids {
                     sqlx::query_file!(
@@ -301,7 +373,7 @@ impl Deployments {
                         key,
                         id(dep)?
                     )
-                    .execute(&mut *tx)
+                    .execute(&mut **tx)
                     .await?;
                 }
             }
@@ -319,7 +391,7 @@ impl Deployments {
                     value.goal_id.as_deref().map(id).transpose()?,
                     value.id
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::Invocation(value)) => {
@@ -338,22 +410,15 @@ impl Deployments {
                         Some(at(value.lease_expires_at)?)
                     } else {
                         None
-                    }
+                    },
+                    deployment
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
-            Some(State::Assignment(value)) => {
-                // Ownership is decided at the gateway; replicas only echo it.
-                if id(&value.thread_id)? != thread || id(&value.agent_id)? != agent {
-                    return Err(Error::Denied);
-                }
-            }
-            Some(State::Attachment(value)) => {
-                self.project_attachment(&mut tx, thread, value).await?
-            }
+            Some(State::Attachment(value)) => self.project_attachment(tx, thread, value).await?,
             Some(State::AttachmentSource(value)) => {
-                self.project_attachment(&mut tx, thread, &value.attachment)
+                self.project_attachment(tx, thread, &value.attachment)
                     .await?
             }
             Some(State::ConvertedMessage(value)) => {
@@ -364,7 +429,7 @@ impl Deployments {
                     serde_json::from_str::<serde_json::Value>(&value.message_json)
                         .map_err(|_| Error::Invalid("Invalid converted message".into()))?
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::ToolCall(value)) => {
@@ -381,7 +446,7 @@ impl Deployments {
                     value.output_json,
                     value.error
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::ChannelDecision(value)) => {
@@ -397,7 +462,7 @@ impl Deployments {
                     identity,
                     value.value
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
                 sqlx::query_file!(
                     "../../queries/channel_access/identity_upsert.sql",
@@ -408,7 +473,7 @@ impl Deployments {
                     ),
                     value.value
                 )
-                .fetch_one(&mut *tx)
+                .fetch_one(&mut **tx)
                 .await?;
                 sqlx::query_file!(
                     "../../queries/channel_access/audit.sql",
@@ -419,7 +484,7 @@ impl Deployments {
                     mode,
                     value.accepted
                 )
-                .execute(&mut *tx)
+                .execute(&mut **tx)
                 .await?;
             }
             Some(State::Activity(_) | State::Typing(_)) => {}
@@ -427,9 +492,8 @@ impl Deployments {
         }
         if !thread.is_nil() {
             let activity = super::runtime::messages::event_activity(event);
-            chat::audit::append(&mut tx, thread, activity).await?;
+            chat::audit::append(tx, thread, activity).await?;
         }
-        tx.commit().await?;
         Ok(Outcome::Projected)
     }
     async fn project_thread(
@@ -520,9 +584,7 @@ impl Deployments {
         let mut delivered = 0;
         let chat = self.chat();
         for row in rows {
-            let Some((instance, generation)) =
-                self.owner_for(row.agent_id, Some(row.thread_id)).await?
-            else {
+            let Some(instance) = self.target_for(row.agent_id, Some(row.thread_id)).await? else {
                 continue;
             };
             let relay = wire::RelayMessage {
@@ -530,14 +592,8 @@ impl Deployments {
                 message: chat.message(row.message_id).await?.into(),
                 ..Default::default()
             };
-            self.direct(
-                row.agent_id,
-                instance,
-                Some(row.thread_id),
-                generation,
-                relay.into(),
-            )
-            .await?;
+            self.direct(row.agent_id, instance, Some(row.thread_id), relay.into())
+                .await?;
             sqlx::query_file!(
                 "../../queries/deployment/project/dispatch.sql",
                 row.message_id,

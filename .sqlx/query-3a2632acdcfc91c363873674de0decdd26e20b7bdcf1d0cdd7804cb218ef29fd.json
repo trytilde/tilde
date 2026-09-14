@@ -1,0 +1,107 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.id,d.agent_id,d.source,d.target,d.endpoint_url,d.target_reference,d.repository,d.commit_sha,d.external_id,d.label,d.status,d.token_hash IS NOT NULL AS \"token_issued!\",\n d.id=s.serving_deployment_id AS \"serving!\",d.created_at,d.retired_at\nFROM agent_deployments d JOIN agent_deployment_settings s ON s.agent_id=d.agent_id WHERE d.id=$1 AND d.agent_id=$2;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "source",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "target",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "target_reference",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "repository",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "commit_sha",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "external_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "label",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "token_issued!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 12,
+        "name": "serving!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "retired_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "3a2632acdcfc91c363873674de0decdd26e20b7bdcf1d0cdd7804cb218ef29fd"
+}

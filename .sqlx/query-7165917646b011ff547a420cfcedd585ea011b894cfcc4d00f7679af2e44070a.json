@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM thread_leases WHERE thread_id=$1 AND agent_id=$2 AND instance_id=$3;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7165917646b011ff547a420cfcedd585ea011b894cfcc4d00f7679af2e44070a"
+}

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployment_settings s SET serving_deployment_id=d.id FROM agent_deployments d\nWHERE s.agent_id=$1 AND d.id=$2 AND d.agent_id=$1 AND d.status='registered' RETURNING d.target,d.endpoint_url;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "target",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "a44800de732f9099a74acfbdd0a24c143f9ebeadc3845caee3d6d493468df31f"
+}

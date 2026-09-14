@@ -1,1 +1,1 @@
-SELECT i.id,i.run_id,i.thread_id,i.agent_id,i.status,r.objective,a.endpoint_url,a.webhook_signing_key FROM chat_invocations i JOIN chat_runs r ON r.id=i.run_id JOIN agents a ON a.id=i.agent_id WHERE i.id=$1;
+SELECT i.id,i.run_id,i.thread_id,i.agent_id,i.status,r.objective,COALESCE(d.endpoint_url,a.endpoint_url) AS "endpoint_url?",a.webhook_signing_key FROM chat_invocations i JOIN chat_runs r ON r.id=i.run_id JOIN agents a ON a.id=i.agent_id LEFT JOIN agent_deployments d ON d.id=i.deployment_id AND d.target='direct' WHERE i.id=$1;

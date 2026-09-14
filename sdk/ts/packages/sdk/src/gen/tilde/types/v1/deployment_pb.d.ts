@@ -12,6 +12,8 @@ import type { Timestamp } from "@bufbuild/protobuf/wkt";
 export declare const file_tilde_types_v1_deployment: GenFile;
 
 /**
+ * Agent-level deployment settings.
+ *
  * @generated from message tilde.types.v1.Deployment
  */
 export declare type Deployment = Message<"tilde.types.v1.Deployment"> & {
@@ -26,19 +28,19 @@ export declare type Deployment = Message<"tilde.types.v1.Deployment"> & {
   mode: DeploymentMode;
 
   /**
-   * @generated from field: optional string endpoint_url = 3;
-   */
-  endpointUrl?: string | undefined;
-
-  /**
    * @generated from field: tilde.types.v1.SidecarFailureMode failure_mode = 4;
    */
   failureMode: SidecarFailureMode;
 
   /**
-   * @generated from field: bool token_issued = 5;
+   * @generated from field: tilde.types.v1.DeploymentRouting routing = 6;
    */
-  tokenIssued: boolean;
+  routing: DeploymentRouting;
+
+  /**
+   * @generated from field: string serving_deployment_id = 7;
+   */
+  servingDeploymentId: string;
 };
 
 /**
@@ -48,9 +50,99 @@ export declare type Deployment = Message<"tilde.types.v1.Deployment"> & {
 export declare const DeploymentSchema: GenMessage<Deployment>;
 
 /**
- * @generated from message tilde.types.v1.SidecarNode
+ * One registered deployment: the declared half of what is running, tied to a commit.
+ *
+ * @generated from message tilde.types.v1.AgentDeployment
  */
-export declare type SidecarNode = Message<"tilde.types.v1.SidecarNode"> & {
+export declare type AgentDeployment = Message<"tilde.types.v1.AgentDeployment"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string agent_id = 2;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentSource source = 3;
+   */
+  source: DeploymentSource;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentTarget target = 4;
+   */
+  target: DeploymentTarget;
+
+  /**
+   * @generated from field: string endpoint_url = 5;
+   */
+  endpointUrl: string;
+
+  /**
+   * @generated from field: string target_reference = 6;
+   */
+  targetReference: string;
+
+  /**
+   * @generated from field: string repository = 7;
+   */
+  repository: string;
+
+  /**
+   * @generated from field: string commit_sha = 8;
+   */
+  commitSha: string;
+
+  /**
+   * @generated from field: string external_id = 9;
+   */
+  externalId: string;
+
+  /**
+   * @generated from field: string label = 10;
+   */
+  label: string;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentStatus status = 11;
+   */
+  status: DeploymentStatus;
+
+  /**
+   * @generated from field: bool token_issued = 12;
+   */
+  tokenIssued: boolean;
+
+  /**
+   * @generated from field: bool serving = 13;
+   */
+  serving: boolean;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 14;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp retired_at = 15;
+   */
+  retiredAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message tilde.types.v1.AgentDeployment.
+ * Use `create(AgentDeploymentSchema)` to create a new message.
+ */
+export declare const AgentDeploymentSchema: GenMessage<AgentDeployment>;
+
+/**
+ * One process incarnation that dialed in with a deployment's token.
+ *
+ * @generated from message tilde.types.v1.AgentInstance
+ */
+export declare type AgentInstance = Message<"tilde.types.v1.AgentInstance"> & {
   /**
    * @generated from field: string instance_id = 1;
    */
@@ -80,58 +172,22 @@ export declare type SidecarNode = Message<"tilde.types.v1.SidecarNode"> & {
    * @generated from field: google.protobuf.Timestamp last_seen_at = 6;
    */
   lastSeenAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string deployment_id = 7;
+   */
+  deploymentId: string;
 };
 
 /**
- * Describes the message tilde.types.v1.SidecarNode.
- * Use `create(SidecarNodeSchema)` to create a new message.
+ * Describes the message tilde.types.v1.AgentInstance.
+ * Use `create(AgentInstanceSchema)` to create a new message.
  */
-export declare const SidecarNodeSchema: GenMessage<SidecarNode>;
+export declare const AgentInstanceSchema: GenMessage<AgentInstance>;
 
 /**
- * Generation identifies an assignment, independently from the agent's pause/stop generation.
+ * How the agent executes. Every deployment of an agent shares this for now.
  *
- * @generated from message tilde.types.v1.ParticipantAssignment
- */
-export declare type ParticipantAssignment = Message<"tilde.types.v1.ParticipantAssignment"> & {
-  /**
-   * @generated from field: string thread_id = 1;
-   */
-  threadId: string;
-
-  /**
-   * @generated from field: string participant_id = 2;
-   */
-  participantId: string;
-
-  /**
-   * @generated from field: string agent_id = 3;
-   */
-  agentId: string;
-
-  /**
-   * @generated from field: string owner_instance_id = 4;
-   */
-  ownerInstanceId: string;
-
-  /**
-   * @generated from field: uint64 generation = 5;
-   */
-  generation: bigint;
-
-  /**
-   * @generated from field: bool stopped = 6;
-   */
-  stopped: boolean;
-};
-
-/**
- * Describes the message tilde.types.v1.ParticipantAssignment.
- * Use `create(ParticipantAssignmentSchema)` to create a new message.
- */
-export declare const ParticipantAssignmentSchema: GenMessage<ParticipantAssignment>;
-
-/**
  * @generated from enum tilde.types.v1.DeploymentMode
  */
 export enum DeploymentMode {
@@ -180,4 +236,113 @@ export enum SidecarFailureMode {
  * Describes the enum tilde.types.v1.SidecarFailureMode.
  */
 export declare const SidecarFailureModeSchema: GenEnum<SidecarFailureMode>;
+
+/**
+ * Which deployment new threads go to: the most recently registered one automatically, or the one an operator promoted.
+ *
+ * @generated from enum tilde.types.v1.DeploymentRouting
+ */
+export enum DeploymentRouting {
+  /**
+   * @generated from enum value: DEPLOYMENT_ROUTING_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_ROUTING_LATEST = 1;
+   */
+  LATEST = 1,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_ROUTING_MANUAL = 2;
+   */
+  MANUAL = 2,
+}
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentRouting.
+ */
+export declare const DeploymentRoutingSchema: GenEnum<DeploymentRouting>;
+
+/**
+ * @generated from enum tilde.types.v1.DeploymentSource
+ */
+export enum DeploymentSource {
+  /**
+   * @generated from enum value: DEPLOYMENT_SOURCE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_SOURCE_CI = 1;
+   */
+  CI = 1,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_SOURCE_MANUAL = 2;
+   */
+  MANUAL = 2,
+}
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentSource.
+ */
+export declare const DeploymentSourceSchema: GenEnum<DeploymentSource>;
+
+/**
+ * How the gateway reaches the deployment: an HTTP endpoint it wakes, a sidecar that dials in, or a Lambda function.
+ *
+ * @generated from enum tilde.types.v1.DeploymentTarget
+ */
+export enum DeploymentTarget {
+  /**
+   * @generated from enum value: DEPLOYMENT_TARGET_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_TARGET_DIRECT = 1;
+   */
+  DIRECT = 1,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_TARGET_SIDECAR = 2;
+   */
+  SIDECAR = 2,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_TARGET_AWS_LAMBDA = 3;
+   */
+  AWS_LAMBDA = 3,
+}
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentTarget.
+ */
+export declare const DeploymentTargetSchema: GenEnum<DeploymentTarget>;
+
+/**
+ * @generated from enum tilde.types.v1.DeploymentStatus
+ */
+export enum DeploymentStatus {
+  /**
+   * @generated from enum value: DEPLOYMENT_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_STATUS_REGISTERED = 1;
+   */
+  REGISTERED = 1,
+
+  /**
+   * @generated from enum value: DEPLOYMENT_STATUS_RETIRED = 2;
+   */
+  RETIRED = 2,
+}
+
+/**
+ * Describes the enum tilde.types.v1.DeploymentStatus.
+ */
+export declare const DeploymentStatusSchema: GenEnum<DeploymentStatus>;
 

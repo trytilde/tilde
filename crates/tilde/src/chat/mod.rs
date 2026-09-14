@@ -114,6 +114,21 @@ pub fn text(value: &str) -> Result<()> {
     Ok(())
 }
 /// Append activity in commit order, locking only the affected thread.
+/// Pin a (thread, agent) pair to the deployment that will execute it: the existing
+/// pin while that deployment is registered, otherwise the agent's serving deployment.
+/// Failover stays within the deployment; moving across deployments is explicit.
+pub(crate) async fn pin_deployment(
+    tx: &mut Transaction<'_, Postgres>,
+    thread: Uuid,
+    agent: Uuid,
+) -> Result<Option<Uuid>> {
+    Ok(
+        sqlx::query_file!("../../queries/chat/deployment_pin.sql", thread, agent)
+            .fetch_optional(&mut **tx)
+            .await?
+            .and_then(|r| r.deployment_id),
+    )
+}
 pub async fn activity(
     tx: &mut Transaction<'_, Postgres>,
     thread: Uuid,

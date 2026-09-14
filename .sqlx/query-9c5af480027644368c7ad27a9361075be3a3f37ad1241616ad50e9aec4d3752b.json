@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_instances SET ready=$3,agent_ready=$4,last_seen_at=NOW() WHERE agent_id=$1 AND instance_id=$2;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9c5af480027644368c7ad27a9361075be3a3f37ad1241616ad50e9aec4d3752b"
+}

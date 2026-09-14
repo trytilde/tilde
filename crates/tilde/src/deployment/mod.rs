@@ -1,6 +1,7 @@
 //! Agent deployment settings and the gateway half of the sidecar protocol.
-//! Postgres owns every control decision. Replicas dial in over one connection;
-//! the gateway never opens a connection to a replica.
+//! Postgres is the record and the gateway its only writer. A replica caches the
+//! threads it holds a lease on, executes the agent for them, and ships typed
+//! events back asynchronously. Replicas dial in; the gateway never dials out.
 pub mod attachments;
 pub mod gateway;
 mod hydrate;
@@ -41,7 +42,7 @@ pub const LIVENESS: Duration = Duration::from_secs(15);
 #[derive(Default)]
 pub(crate) struct Channels {
     pub directives: Notifications,
-    pub assignments: Notifications,
+    pub leases: Notifications,
     pub configuration: Notifications,
     pub recovery: Notifications,
 }
@@ -93,20 +94,23 @@ impl Deployments {
             .ok_or(Error::NotFound)?;
         Ok(types::Deployment {
             agent_id: agent.to_string(),
-            mode: if row.deployment_mode == "sidecar" {
-                types::DeploymentMode::Sidecar
-            } else {
-                types::DeploymentMode::Gateway
-            }
-            .into(),
-            endpoint_url: row.endpoint_url,
+            mode: mode_wire(&row.deployment_mode).into(),
             failure_mode: if row.failure_mode == "stop" {
                 types::SidecarFailureMode::Stop
             } else {
                 types::SidecarFailureMode::Reassign
             }
             .into(),
-            token_issued: row.token_hash.is_some(),
+            routing: if row.routing == "manual" {
+                types::DeploymentRouting::Manual
+            } else {
+                types::DeploymentRouting::Latest
+            }
+            .into(),
+            serving_deployment_id: row
+                .serving_deployment_id
+                .map(|v| v.to_string())
+                .unwrap_or_default(),
             ..Default::default()
         })
     }
@@ -116,12 +120,15 @@ impl Deployments {
             .await?
             .is_some_and(|r| r.deployment_mode == "sidecar"))
     }
+    /// Agent-level execution settings. Changing the mode needs a paused, idle agent.
+    /// Deployments are not retired by a mode change; the newest one of the matching
+    /// target starts serving, or nothing serves until one is registered.
     pub async fn set(
         &self,
         agent: Uuid,
         mode: types::DeploymentMode,
-        endpoint: Option<String>,
         failure: types::SidecarFailureMode,
+        routing: types::DeploymentRouting,
     ) -> Result<types::Deployment, Error> {
         let mode = match mode {
             types::DeploymentMode::Gateway => "gateway",
@@ -136,6 +143,10 @@ impl Deployments {
             types::SidecarFailureMode::Stop => "stop",
             types::SidecarFailureMode::Reassign => "reassign",
             _ => return Err(Error::Invalid("Select a failure policy".into())),
+        };
+        let routing = match routing {
+            types::DeploymentRouting::Manual => "manual",
+            _ => "latest",
         };
         let mut tx = self.pool.begin().await?;
         let current = sqlx::query_file!("../../queries/deployment/lock.sql", agent)
@@ -155,79 +166,369 @@ impl Deployments {
                     "Wait for active work to stop before changing deployment".into(),
                 ));
             }
-            sqlx::query_file!("../../queries/deployment/migrate_assignments.sql", agent)
+            sqlx::query_file!("../../queries/deployment/leases_clear.sql", agent)
                 .execute(&mut *tx)
                 .await?;
-        }
-        let endpoint = if mode == "gateway" {
-            Some(crate::agent::validate_endpoint(endpoint.ok_or_else(
-                || Error::Invalid("Gateway deployment requires an endpoint URL".into()),
-            )?)?)
-        } else {
-            None
-        };
-        sqlx::query_file!("../../queries/deployment/set.sql", agent, mode, endpoint)
+            mirror_flag(&mut tx).await?;
+            sqlx::query_file!(
+                "../../queries/deployment/set.sql",
+                agent,
+                mode,
+                None::<String>
+            )
             .execute(&mut *tx)
             .await?;
-        sqlx::query_file!("../../queries/deployment/settings.sql", agent, failure)
-            .execute(&mut *tx)
-            .await?;
-        tx.commit().await?;
-        self.get(agent).await
-    }
-    pub async fn authenticate(&self, token: &str) -> Result<Uuid, Error> {
-        let hash = Sha256::digest(token.as_bytes()).to_vec();
-        sqlx::query_file!("../../queries/deployment/authenticate.sql", hash)
-            .fetch_optional(&self.pool)
-            .await?
-            .map(|r| r.id)
-            .ok_or(Error::Denied)
-    }
-    pub async fn issue_token(&self, agent: Uuid) -> Result<SecretString, Error> {
-        let mut tx = self.pool.begin().await?;
-        let row = sqlx::query_file!("../../queries/deployment/lock.sql", agent)
+            let latest = sqlx::query_file!(
+                "../../queries/deployment/deployment_latest.sql",
+                agent,
+                target_for_mode(mode)
+            )
             .fetch_optional(&mut *tx)
             .await?
-            .ok_or(Error::NotFound)?;
-        if row.deployment_mode != "sidecar" {
-            return Err(Error::Invalid(
-                "Select sidecar mode before issuing a deployment token".into(),
-            ));
+            .map(|r| r.id);
+            match latest {
+                Some(next) => self.promote_in(&mut tx, agent, next).await?,
+                None => {
+                    sqlx::query_file!("../../queries/deployment/serving_clear.sql", agent)
+                        .execute(&mut *tx)
+                        .await?;
+                }
+            }
         }
-        let token = secrets::random_secret();
-        let hash = Sha256::digest(token.expose_secret().as_bytes()).to_vec();
-        let sealed = if row.encrypted_secrets.is_none() {
-            Some(
-                self.encryption
-                    .seal(
-                        secret_binding(agent),
-                        &secrets::Secrets::generate().encode()?,
-                    )?
-                    .into_bytes(),
-            )
-        } else {
-            None
-        };
         sqlx::query_file!(
-            "../../queries/deployment/issue_token.sql",
+            "../../queries/deployment/settings.sql",
             agent,
-            hash,
-            sealed
+            failure,
+            routing
         )
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
+        self.get(agent).await
+    }
+    /// The deployment a token belongs to. Retired deployments no longer authenticate.
+    pub async fn authenticate(&self, token: &str) -> Result<Authenticated, Error> {
+        let hash = Sha256::digest(token.as_bytes()).to_vec();
+        sqlx::query_file!("../../queries/deployment/authenticate.sql", hash)
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|r| Authenticated {
+                agent: r.agent_id,
+                deployment: r.deployment_id,
+                target: target_wire(&r.target),
+            })
+            .ok_or(Error::Denied)
+    }
+    /// Rotate one deployment's token. Instances holding the old token lose access
+    /// at their next call; roll them with the new one.
+    pub async fn issue_token(&self, agent: Uuid, deployment: Uuid) -> Result<SecretString, Error> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query_file!("../../queries/deployment/lock.sql", agent)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let token = secrets::random_secret();
+        let hash = Sha256::digest(token.expose_secret().as_bytes()).to_vec();
+        sqlx::query_file!(
+            "../../queries/deployment/issue_token.sql",
+            deployment,
+            hash,
+            agent
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+        self.ensure_secrets(&mut tx, agent).await?;
+        tx.commit().await?;
         Ok(token)
     }
-    pub async fn nodes(&self, agent: Uuid) -> Result<Vec<types::SidecarNode>, Error> {
+    /// The agent's token signing material exists from its first deployment token on.
+    async fn ensure_secrets(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        agent: Uuid,
+    ) -> Result<(), Error> {
+        let sealed = self
+            .encryption
+            .seal(
+                secret_binding(agent),
+                &secrets::Secrets::generate().encode()?,
+            )?
+            .into_bytes();
+        sqlx::query_file!("../../queries/deployment/secrets_init.sql", agent, sealed)
+            .execute(&mut **tx)
+            .await?;
+        Ok(())
+    }
+    /// Register a deployment. Idempotent on `external_id`: a repeat returns the
+    /// existing record and no token. Under latest routing a new deployment matching
+    /// the agent's mode starts serving new threads at once.
+    pub async fn register_deployment(
+        &self,
+        agent: Uuid,
+        r: RegisterDeployment,
+    ) -> Result<(types::AgentDeployment, Option<SecretString>, bool), Error> {
+        let source = match r.source {
+            types::DeploymentSource::Ci => "ci",
+            types::DeploymentSource::Manual => "manual",
+            _ => return Err(Error::Invalid("Select a deployment source".into())),
+        };
+        let target = match r.target {
+            types::DeploymentTarget::Direct => "direct",
+            types::DeploymentTarget::Sidecar => "sidecar",
+            types::DeploymentTarget::AwsLambda => "aws_lambda",
+            _ => return Err(Error::Invalid("Select a deployment target".into())),
+        };
+        let endpoint = match (target, r.endpoint_url.filter(|v| !v.trim().is_empty())) {
+            ("direct", Some(url)) => Some(crate::agent::validate_endpoint(url)?),
+            ("direct", None) => {
+                return Err(Error::Invalid(
+                    "A direct deployment requires an endpoint URL".into(),
+                ));
+            }
+            (_, Some(_)) => {
+                return Err(Error::Invalid(
+                    "Only direct deployments take an endpoint URL".into(),
+                ));
+            }
+            _ => None,
+        };
+        let reference = match (target, r.target_reference.filter(|v| !v.trim().is_empty())) {
+            ("aws_lambda", Some(v)) if v.len() <= 2048 => Some(v),
+            ("aws_lambda", _) => {
+                return Err(Error::Invalid(
+                    "A Lambda deployment requires a function reference".into(),
+                ));
+            }
+            (_, Some(_)) => {
+                return Err(Error::Invalid(
+                    "Only Lambda deployments take a target reference".into(),
+                ));
+            }
+            _ => None,
+        };
+        let repository = short(r.repository, "Repository")?;
+        let commit = short(r.commit_sha, "Commit")?;
+        if commit
+            .as_deref()
+            .is_some_and(|c| !c.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(Error::Invalid("Commit must be a hex SHA".into()));
+        }
+        let external = short(r.external_id, "External ID")?;
+        let label = short(r.label, "Label")?.unwrap_or_default();
+        let mut tx = self.pool.begin().await?;
+        let current = sqlx::query_file!("../../queries/deployment/lock.sql", agent)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(Error::NotFound)?;
+        if let Some(external) = &external
+            && let Some(existing) = sqlx::query_file!(
+                "../../queries/deployment/deployment_external.sql",
+                agent,
+                external
+            )
+            .fetch_optional(&mut *tx)
+            .await?
+        {
+            tx.commit().await?;
+            return Ok((self.deployment(agent, existing.id).await?, None, false));
+        }
+        let id = Uuid::new_v4();
+        let token = secrets::random_secret();
+        let hash = Sha256::digest(token.expose_secret().as_bytes()).to_vec();
+        sqlx::query_file!(
+            "../../queries/deployment/deployment_create.sql",
+            id,
+            agent,
+            source,
+            target,
+            endpoint,
+            reference,
+            repository,
+            commit,
+            external,
+            label,
+            hash
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        self.ensure_secrets(&mut tx, agent).await?;
+        if current.routing == "latest" && target_for_mode(&current.deployment_mode) == target {
+            self.promote_in(&mut tx, agent, id).await?;
+        }
+        tx.commit().await?;
+        Ok((self.deployment(agent, id).await?, Some(token), true))
+    }
+    pub async fn promote(&self, agent: Uuid, deployment: Uuid) -> Result<types::Deployment, Error> {
+        let mut tx = self.pool.begin().await?;
+        let current = sqlx::query_file!("../../queries/deployment/lock.sql", agent)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let row = sqlx::query_file!(
+            "../../queries/deployment/deployment_get.sql",
+            deployment,
+            agent
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+        if target_for_mode(&current.deployment_mode) != row.target {
+            return Err(Error::Invalid(
+                "The deployment's target does not match the agent's execution mode".into(),
+            ));
+        }
+        self.promote_in(&mut tx, agent, deployment).await?;
+        tx.commit().await?;
+        self.get(agent).await
+    }
+    /// Make `deployment` the one new threads route to, mirroring a direct endpoint
+    /// onto the agent for legacy readers (health polling, listings).
+    async fn promote_in(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        agent: Uuid,
+        deployment: Uuid,
+    ) -> Result<(), Error> {
+        let row = sqlx::query_file!(
+            "../../queries/deployment/deployment_promote.sql",
+            agent,
+            deployment
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+        if row.target == "direct" {
+            mirror_flag(tx).await?;
+            sqlx::query_file!(
+                "../../queries/deployment/mirror_endpoint.sql",
+                agent,
+                row.endpoint_url
+            )
+            .execute(&mut **tx)
+            .await?;
+        }
+        Ok(())
+    }
+    /// Retire a deployment: its token stops authenticating and it leaves routing.
+    /// Retiring the serving deployment hands serving to the newest other one.
+    pub async fn retire(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+    ) -> Result<types::AgentDeployment, Error> {
+        let mut tx = self.pool.begin().await?;
+        let current = sqlx::query_file!("../../queries/deployment/lock.sql", agent)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(Error::NotFound)?;
+        if current.serving_deployment_id == Some(deployment) {
+            let next = sqlx::query_file!(
+                "../../queries/deployment/deployment_latest_except.sql",
+                agent,
+                target_for_mode(&current.deployment_mode),
+                deployment
+            )
+            .fetch_optional(&mut *tx)
+            .await?
+            .map(|r| r.id)
+            .ok_or_else(|| {
+                Error::Invalid("Register another deployment before retiring the serving one".into())
+            })?;
+            self.promote_in(&mut tx, agent, next).await?;
+        }
+        sqlx::query_file!(
+            "../../queries/deployment/deployment_retire.sql",
+            deployment,
+            agent
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+        tx.commit().await?;
+        self.deployment(agent, deployment).await
+    }
+    pub async fn deployment(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+    ) -> Result<types::AgentDeployment, Error> {
+        let r = sqlx::query_file!(
+            "../../queries/deployment/deployment_get.sql",
+            deployment,
+            agent
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or(Error::NotFound)?;
+        Ok(DeploymentRow {
+            id: r.id,
+            agent_id: r.agent_id,
+            source: r.source,
+            target: r.target,
+            endpoint_url: r.endpoint_url,
+            target_reference: r.target_reference,
+            repository: r.repository,
+            commit_sha: r.commit_sha,
+            external_id: r.external_id,
+            label: r.label,
+            status: r.status,
+            token_issued: r.token_issued,
+            serving: r.serving,
+            created_at: r.created_at,
+            retired_at: r.retired_at,
+        }
+        .into())
+    }
+    pub async fn deployments(&self, agent: Uuid) -> Result<Vec<types::AgentDeployment>, Error> {
+        Ok(
+            sqlx::query_file!("../../queries/deployment/deployments_list.sql", agent)
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .map(|r| {
+                    DeploymentRow {
+                        id: r.id,
+                        agent_id: r.agent_id,
+                        source: r.source,
+                        target: r.target,
+                        endpoint_url: r.endpoint_url,
+                        target_reference: r.target_reference,
+                        repository: r.repository,
+                        commit_sha: r.commit_sha,
+                        external_id: r.external_id,
+                        label: r.label,
+                        status: r.status,
+                        token_issued: r.token_issued,
+                        serving: r.serving,
+                        created_at: r.created_at,
+                        retired_at: r.retired_at,
+                    }
+                    .into()
+                })
+                .collect(),
+        )
+    }
+    /// The deployment a (thread, agent) pair is pinned to, if any and still registered.
+    pub(crate) async fn pinned(&self, agent: Uuid, thread: Uuid) -> Result<Option<Uuid>, Error> {
+        Ok(
+            sqlx::query_file!("../../queries/deployment/deployment_pin.sql", thread, agent)
+                .fetch_optional(&self.pool)
+                .await?
+                .and_then(|r| r.deployment_id),
+        )
+    }
+    pub async fn instances(&self, agent: Uuid) -> Result<Vec<types::AgentInstance>, Error> {
         Ok(
             sqlx::query_file!("../../queries/deployment/nodes.sql", agent)
                 .fetch_all(&self.pool)
                 .await?
                 .into_iter()
-                .map(|r| types::SidecarNode {
+                .map(|r| types::AgentInstance {
                     instance_id: r.instance_id.to_string(),
                     agent_id: agent.to_string(),
+                    deployment_id: r.deployment_id.to_string(),
                     public_url: r.public_url,
                     runtime_url: r.runtime_url,
                     ready: r.ready
@@ -240,15 +541,24 @@ impl Deployments {
                 .collect(),
         )
     }
-    pub async fn register(&self, agent: Uuid, r: &wire::WatchRequest) -> Result<Uuid, Error> {
+    pub async fn register(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+        r: &wire::WatchRequest,
+    ) -> Result<Uuid, Error> {
         let instance = id(&r.instance_id)?;
+        // Connected hosts have no address of their own; sidecars always do.
         for endpoint in [&r.public_url, &r.runtime_url] {
-            crate::agent::validate_endpoint(endpoint.clone())?;
+            if !endpoint.is_empty() {
+                crate::agent::validate_endpoint(endpoint.clone())?;
+            }
         }
         sqlx::query_file!(
             "../../queries/deployment/register.sql",
             agent,
             instance,
+            deployment,
             r.public_url,
             r.runtime_url
         )
@@ -274,7 +584,8 @@ impl Deployments {
         .rows_affected()
             == 0
         {
-            return Err(Error::NotFound);
+            tracing::warn!(agent_id=%agent, instance_id=%instance, "Heartbeat from an unregistered replica");
+            return Ok(());
         }
         if let Ok(sample) = id(&r.sample_id) {
             sqlx::query_file!(
@@ -301,48 +612,43 @@ impl Deployments {
         .await?
         .live)
     }
-    pub async fn snapshot(&self, agent: Uuid) -> Result<wire::Snapshot, Error> {
-        let since = chrono::DateTime::<Utc>::from_timestamp(0, 0).unwrap_or_default();
+    pub async fn snapshot(&self, agent: Uuid, instance: Uuid) -> Result<wire::Snapshot, Error> {
+        let leases = sqlx::query_file!("../../queries/deployment/leases_held.sql", agent, instance)
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|r| lease_frame(agent, r.thread_id, Some((instance, String::new()))))
+            .collect();
         Ok(wire::Snapshot {
             configuration: self.configuration(agent).await?.into(),
-            assignments: self
-                .assignments_since(agent, since)
-                .await?
-                .into_iter()
-                .map(|(a, _)| a)
-                .collect(),
+            leases,
             token_signing_key: self.signing_key(agent).await?.expose_secret().into(),
             ..Default::default()
         })
     }
-    pub async fn assignments_since(
+    /// Lease changes for one agent since a point in time; replicas ignore ones that do not concern them.
+    pub async fn leases_since(
         &self,
         agent: Uuid,
         since: chrono::DateTime<Utc>,
-    ) -> Result<Vec<(types::ParticipantAssignment, chrono::DateTime<Utc>)>, Error> {
-        Ok(sqlx::query_file!(
-            "../../queries/deployment/assignments_since.sql",
-            agent,
-            since
+    ) -> Result<Vec<(wire::ThreadLease, chrono::DateTime<Utc>)>, Error> {
+        Ok(
+            sqlx::query_file!("../../queries/deployment/leases_since.sql", agent, since)
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .map(|r| {
+                    (
+                        lease_frame(
+                            agent,
+                            r.thread_id,
+                            Some((r.instance_id, r.public_url.unwrap_or_default())),
+                        ),
+                        r.updated_at,
+                    )
+                })
+                .collect(),
         )
-        .fetch_all(&self.pool)
-        .await?
-        .into_iter()
-        .map(|r| {
-            (
-                types::ParticipantAssignment {
-                    thread_id: r.thread_id.to_string(),
-                    participant_id: r.participant_id.to_string(),
-                    agent_id: agent.to_string(),
-                    owner_instance_id: r.owner_instance_id.to_string(),
-                    generation: r.generation as u64,
-                    stopped: r.stopped,
-                    ..Default::default()
-                },
-                r.updated_at,
-            )
-        })
-        .collect())
     }
     pub async fn configuration(
         &self,
@@ -449,31 +755,30 @@ impl Deployments {
             .open(secret_binding(agent), SealedSecret::from_bytes(sealed)?)?;
         secrets::Secrets::decode(value)
     }
-    /// Grant or refuse ownership of one thread participant under the Postgres lock.
-    pub async fn claim(
-        &self,
-        agent: Uuid,
-        instance: Uuid,
-        thread: Uuid,
-        participant: Uuid,
-    ) -> Result<wire::ClaimResult, Error> {
-        let mut tx = self.pool.begin().await?;
-        let result = self
-            .claim_in(&mut tx, agent, instance, thread, participant)
-            .await?;
-        tx.commit().await?;
-        Ok(result)
+    /// Who executes a thread for this agent right now, if the holder is alive.
+    pub(crate) async fn holder(&self, agent: Uuid, thread: Uuid) -> Result<Option<Holder>, Error> {
+        Ok(
+            sqlx::query_file!("../../queries/deployment/lease_holder.sql", thread, agent)
+                .fetch_optional(&self.pool)
+                .await?
+                .filter(|r| r.live)
+                .map(|r| Holder {
+                    instance: r.instance_id,
+                    public_url: r.public_url.unwrap_or_default(),
+                }),
+        )
     }
-    pub(crate) async fn claim_in(
+    /// Take or confirm the lease for `instance` in one transaction. A live holder
+    /// keeps it; a dead holder loses it, and its interrupted work is ended here.
+    pub(crate) async fn lease_in(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         agent: Uuid,
         instance: Uuid,
         thread: Uuid,
-        participant: Uuid,
-    ) -> Result<wire::ClaimResult, Error> {
+    ) -> Result<wire::ThreadLease, Error> {
         crate::chat::access::lock_thread_route(tx, thread).await?;
-        // An existing conversation can only be claimed by an agent already in it.
+        // An existing conversation can only be executed by an agent already in it.
         if sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
             .fetch_one(&mut **tx)
             .await?
@@ -485,113 +790,99 @@ impl Deployments {
         {
             return Err(Error::Denied);
         }
-        let current = sqlx::query_file!(
-            "../../queries/deployment/assignment_lock.sql",
-            thread,
-            participant
-        )
-        .fetch_optional(&mut **tx)
-        .await?;
-        let result = |granted: bool, generation: i64, owner: Uuid| wire::ClaimResult {
-            thread_id: thread.to_string(),
-            participant_id: participant.to_string(),
-            granted,
-            generation: generation as u64,
-            owner_instance_id: owner.to_string(),
-            ..Default::default()
-        };
-        let generation = match current {
-            None => 1,
-            Some(c) if c.owner_instance_id == instance && !c.stopped => {
-                return Ok(result(true, c.generation, instance));
+        let mut current =
+            sqlx::query_file!("../../queries/deployment/lease_lock.sql", thread, agent)
+                .fetch_optional(&mut **tx)
+                .await?
+                .map(|r| r.instance_id);
+        if current.is_none() {
+            // Two replicas may reach here for a brand-new thread; the insert decides.
+            if sqlx::query_file!(
+                "../../queries/deployment/lease_insert.sql",
+                thread,
+                agent,
+                instance
+            )
+            .fetch_optional(&mut **tx)
+            .await?
+            .is_some()
+            {
+                return Ok(lease_frame(agent, thread, Some((instance, String::new()))));
             }
-            Some(c) => {
-                let live = !c.stopped
-                    && sqlx::query_file!(
-                        "../../queries/deployment/instance_live.sql",
-                        agent,
-                        c.owner_instance_id
-                    )
-                    .fetch_one(&mut **tx)
-                    .await?
-                    .live;
-                if live {
-                    return Ok(result(false, c.generation, c.owner_instance_id));
-                }
-                // The owner is gone: this is a recovery with the claimant as the
-                // replacement, so the interrupted run follows the same policy.
-                let generation = c.generation.checked_add(1).ok_or(Error::Conflict)?;
-                let restart_run =
-                    sqlx::query_file!("../../queries/deployment/failure_mode.sql", agent)
-                        .fetch_optional(&mut **tx)
-                        .await?
-                        .is_none_or(|d| d.failure_mode != "stop");
-                self.take_over(
-                    tx,
-                    recovery::TakeOver {
-                        thread,
-                        participant,
-                        agent,
-                        previous: c.owner_instance_id,
-                        owner: instance,
-                        generation,
-                        mark_stopped: false,
-                        restart_run,
-                    },
-                )
-                .await?;
-                tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, generation, "Claim took over a dead owner");
-                return Ok(result(true, generation, instance));
-            }
+            current = sqlx::query_file!("../../queries/deployment/lease_lock.sql", thread, agent)
+                .fetch_optional(&mut **tx)
+                .await?
+                .map(|r| r.instance_id);
+        }
+        let Some(holder) = current else {
+            return Err(Error::Conflict);
         };
-        sqlx::query_file!(
-            "../../queries/deployment/assign.sql",
-            thread,
-            participant,
-            agent,
-            instance,
-            generation,
-            false
-        )
-        .execute(&mut **tx)
-        .await?;
-        tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, generation, "Claim granted");
-        Ok(result(true, generation, instance))
+        if holder == instance {
+            return Ok(lease_frame(agent, thread, Some((instance, String::new()))));
+        }
+        let node = sqlx::query_file!("../../queries/deployment/instance_live.sql", agent, holder)
+            .fetch_one(&mut **tx)
+            .await?;
+        if node.live {
+            let url = sqlx::query_file!("../../queries/deployment/node_url.sql", agent, holder)
+                .fetch_optional(&mut **tx)
+                .await?
+                .map(|r| r.public_url)
+                .unwrap_or_default();
+            return Ok(lease_frame(agent, thread, Some((holder, url))));
+        }
+        // The holder is gone: the claimant takes over and the interrupted run follows the
+        // agent's failure policy (restarted by the new holder, or failed here).
+        let stop = sqlx::query_file!("../../queries/deployment/get.sql", agent)
+            .fetch_optional(&mut **tx)
+            .await?
+            .is_some_and(|d| d.failure_mode == "stop");
+        self.take_over(tx, agent, thread, holder, Some(instance), stop)
+            .await?;
+        tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, "Lease taken over from a dead holder");
+        Ok(lease_frame(agent, thread, Some((instance, String::new()))))
     }
-    /// Which live replica should receive work for a thread, assigning one when needed.
-    pub(crate) async fn owner_for(
+    /// Drop this instance's lease on an evicted thread.
+    pub(crate) async fn release(
+        &self,
+        agent: Uuid,
+        instance: Uuid,
+        thread: Uuid,
+    ) -> Result<(), Error> {
+        sqlx::query_file!(
+            "../../queries/deployment/lease_release.sql",
+            thread,
+            agent,
+            instance
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+    /// Which live replica should receive gateway-originated work for a thread.
+    pub(crate) async fn target_for(
         &self,
         agent: Uuid,
         thread: Option<Uuid>,
-    ) -> Result<Option<(Uuid, u64)>, Error> {
+    ) -> Result<Option<Uuid>, Error> {
         if let Some(thread) = thread
-            && let Some(current) =
-                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
-                    .fetch_optional(&self.pool)
-                    .await?
-            && !current.stopped
-            && self.instance_live(agent, current.owner_instance_id).await?
+            && let Some(holder) = self.holder(agent, thread).await?
         {
-            return Ok(Some((current.owner_instance_id, current.generation as u64)));
+            return Ok(Some(holder.instance));
         }
-        let Some(node) = sqlx::query_file!("../../queries/deployment/choose_owner.sql", agent)
-            .fetch_optional(&self.pool)
-            .await?
-        else {
-            return Ok(None);
+        let pinned = match thread {
+            Some(thread) => self.pinned(agent, thread).await?,
+            None => None,
         };
-        if let Some(thread) = thread
-            && let Some(current) =
-                sqlx::query_file!("../../queries/deployment/current_owner.sql", thread, agent)
-                    .fetch_optional(&self.pool)
-                    .await?
-        {
-            let claim = self
-                .claim(agent, node.instance_id, thread, current.participant_id)
-                .await?;
-            return Ok(Some((node.instance_id, claim.generation)));
-        }
-        Ok(Some((node.instance_id, 0)))
+        Ok(sqlx::query_file!(
+            "../../queries/deployment/live_node.sql",
+            agent,
+            None::<Uuid>,
+            pinned
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .map(|r| r.instance_id))
     }
     pub(crate) fn seal_record<M: Message>(
         &self,
@@ -645,14 +936,12 @@ impl Deployments {
         agent: Uuid,
         instance: Uuid,
         thread: Option<Uuid>,
-        generation: u64,
         action: wire::directive::Action,
     ) -> Result<Uuid, Error> {
         let key = Uuid::new_v4();
         let directive = wire::Directive {
             id: key.to_string(),
             thread_id: thread.map(|t| t.to_string()).unwrap_or_default(),
-            generation,
             action: Some(action),
             ..Default::default()
         };
@@ -663,7 +952,6 @@ impl Deployments {
             agent,
             instance,
             thread,
-            generation as i64,
             payload
         )
         .execute(&self.pool)
@@ -752,12 +1040,10 @@ impl Deployments {
         ) {
             return self.serve_read(agent, thread, call).await;
         }
-        let (instance, generation) = self.owner_for(agent, thread).await?.ok_or_else(|| {
+        let instance = self.target_for(agent, thread).await?.ok_or_else(|| {
             Error::Invalid("No sidecar replica is available for this agent".into())
         })?;
-        let key = self
-            .direct(agent, instance, thread, generation, call.into())
-            .await?;
+        let key = self.direct(agent, instance, thread, call.into()).await?;
         self.wait_directive(key, Duration::from_secs(30)).await
     }
     /// Reads are agent-wide, so the projection answers them for every replica.
@@ -845,6 +1131,136 @@ impl Deployments {
             }
             None => Err(Error::Invalid("Resolve requires an agent or user".into())),
         }
+    }
+}
+/// A live replica executing a thread.
+pub(crate) struct Holder {
+    pub instance: Uuid,
+    pub public_url: String,
+}
+/// What a deployment token proves.
+#[derive(Clone, Copy, Debug)]
+pub struct Authenticated {
+    pub agent: Uuid,
+    pub deployment: Uuid,
+    pub target: types::DeploymentTarget,
+}
+pub struct RegisterDeployment {
+    pub source: types::DeploymentSource,
+    pub target: types::DeploymentTarget,
+    pub endpoint_url: Option<String>,
+    pub target_reference: Option<String>,
+    pub repository: Option<String>,
+    pub commit_sha: Option<String>,
+    pub external_id: Option<String>,
+    pub label: Option<String>,
+}
+struct DeploymentRow {
+    id: Uuid,
+    agent_id: Uuid,
+    source: String,
+    target: String,
+    endpoint_url: Option<String>,
+    target_reference: Option<String>,
+    repository: Option<String>,
+    commit_sha: Option<String>,
+    external_id: Option<String>,
+    label: String,
+    status: String,
+    token_issued: bool,
+    serving: bool,
+    created_at: chrono::DateTime<Utc>,
+    retired_at: Option<chrono::DateTime<Utc>>,
+}
+impl From<DeploymentRow> for types::AgentDeployment {
+    fn from(r: DeploymentRow) -> Self {
+        types::AgentDeployment {
+            id: r.id.to_string(),
+            agent_id: r.agent_id.to_string(),
+            source: if r.source == "ci" {
+                types::DeploymentSource::Ci
+            } else {
+                types::DeploymentSource::Manual
+            }
+            .into(),
+            target: target_wire(&r.target).into(),
+            endpoint_url: r.endpoint_url.unwrap_or_default(),
+            target_reference: r.target_reference.unwrap_or_default(),
+            repository: r.repository.unwrap_or_default(),
+            commit_sha: r.commit_sha.unwrap_or_default(),
+            external_id: r.external_id.unwrap_or_default(),
+            label: r.label,
+            status: if r.status == "retired" {
+                types::DeploymentStatus::Retired
+            } else {
+                types::DeploymentStatus::Registered
+            }
+            .into(),
+            token_issued: r.token_issued,
+            serving: r.serving,
+            created_at: crate::chat::audit::timestamp(r.created_at).into(),
+            retired_at: r
+                .retired_at
+                .map(|t| crate::chat::audit::timestamp(t).into())
+                .unwrap_or_default(),
+            ..Default::default()
+        }
+    }
+}
+fn mode_wire(mode: &str) -> types::DeploymentMode {
+    if mode == "sidecar" {
+        types::DeploymentMode::Sidecar
+    } else {
+        types::DeploymentMode::Gateway
+    }
+}
+fn target_wire(target: &str) -> types::DeploymentTarget {
+    match target {
+        "sidecar" => types::DeploymentTarget::Sidecar,
+        "aws_lambda" => types::DeploymentTarget::AwsLambda,
+        _ => types::DeploymentTarget::Direct,
+    }
+}
+/// The deployment target new threads of an agent in `mode` route to.
+fn target_for_mode(mode: &str) -> &'static str {
+    if mode == "sidecar" {
+        "sidecar"
+    } else {
+        "direct"
+    }
+}
+fn short(value: Option<String>, name: &str) -> Result<Option<String>, Error> {
+    match value {
+        Some(v) if v.chars().count() > 512 => Err(Error::Invalid(format!("{name} is too long"))),
+        Some(v) if v.trim().is_empty() => Ok(None),
+        other => Ok(other),
+    }
+}
+/// Writes to `agents.endpoint_url` inside this transaction mirror a promotion; the
+/// endpoint trigger must not mint another deployment for them.
+async fn mirror_flag(tx: &mut Transaction<'_, Postgres>) -> Result<(), Error> {
+    sqlx::query("SELECT set_config('tilde.deployment_mirror','on',true)")
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+pub(crate) fn lease_frame(
+    agent: Uuid,
+    thread: Uuid,
+    holder: Option<(Uuid, String)>,
+) -> wire::ThreadLease {
+    let (instance, url) = holder.clone().unwrap_or_default();
+    wire::ThreadLease {
+        thread_id: thread.to_string(),
+        agent_id: agent.to_string(),
+        holder_instance_id: if holder.is_some() {
+            instance.to_string()
+        } else {
+            String::new()
+        },
+        holder_public_url: url,
+        held: holder.is_some(),
+        ..Default::default()
     }
 }
 pub(crate) fn id(value: &str) -> Result<Uuid, Error> {

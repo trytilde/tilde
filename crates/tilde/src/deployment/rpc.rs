@@ -32,7 +32,8 @@ impl DeploymentService for Rpc {
         let agent = id(r.agent_id)?;
         Response::ok(management::GetDeploymentResponse {
             deployment: self.0.get(agent).await?.into(),
-            nodes: self.0.nodes(agent).await?,
+            instances: self.0.instances(agent).await?,
+            deployments: self.0.deployments(agent).await?,
             ..Default::default()
         })
     }
@@ -50,10 +51,10 @@ impl DeploymentService for Rpc {
                     r.mode.as_known().ok_or_else(|| {
                         connectrpc::ConnectError::invalid_argument("Invalid deployment mode")
                     })?,
-                    r.endpoint_url.map(str::to_owned),
                     r.failure_mode.as_known().ok_or_else(|| {
                         connectrpc::ConnectError::invalid_argument("Invalid failure policy")
                     })?,
+                    r.routing.as_known().unwrap_or_default(),
                 )
                 .await?
                 .into(),
@@ -67,9 +68,78 @@ impl DeploymentService for Rpc {
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::IssueDeploymentTokenResponse> + Send + use<'a>,
     > {
-        let token = self.0.issue_token(id(r.agent_id)?).await?;
+        let token = self
+            .0
+            .issue_token(id(r.agent_id)?, id(r.deployment_id)?)
+            .await?;
         Response::ok(management::IssueDeploymentTokenResponse {
             token: token.expose_secret().into(),
+            ..Default::default()
+        })
+    }
+    async fn register_deployment<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::RegisterDeploymentRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::RegisterDeploymentResponse> + Send + use<'a>,
+    > {
+        let agent = id(r.agent_id)?;
+        let request = r.to_owned_message();
+        let (deployment, token, created) = self
+            .0
+            .register_deployment(
+                agent,
+                super::RegisterDeployment {
+                    source: request.source.as_known().unwrap_or_default(),
+                    target: request.target.as_known().unwrap_or_default(),
+                    endpoint_url: request.endpoint_url,
+                    target_reference: request.target_reference,
+                    repository: request.repository,
+                    commit_sha: request.commit_sha,
+                    external_id: request.external_id,
+                    label: request.label,
+                },
+            )
+            .await?;
+        Response::ok(management::RegisterDeploymentResponse {
+            deployment: deployment.into(),
+            token: token
+                .map(|t| t.expose_secret().to_owned())
+                .unwrap_or_default(),
+            created,
+            ..Default::default()
+        })
+    }
+    async fn promote_deployment<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::PromoteDeploymentRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::PromoteDeploymentResponse> + Send + use<'a>,
+    > {
+        Response::ok(management::PromoteDeploymentResponse {
+            deployment: self
+                .0
+                .promote(id(r.agent_id)?, id(r.deployment_id)?)
+                .await?
+                .into(),
+            ..Default::default()
+        })
+    }
+    async fn retire_deployment<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::RetireDeploymentRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::RetireDeploymentResponse> + Send + use<'a>,
+    > {
+        Response::ok(management::RetireDeploymentResponse {
+            deployment: self
+                .0
+                .retire(id(r.agent_id)?, id(r.deployment_id)?)
+                .await?
+                .into(),
             ..Default::default()
         })
     }
@@ -159,20 +229,34 @@ impl DeploymentService for Rpc {
     }
 }
 struct Control(Deployments);
+fn bearer(ctx: &RequestContext) -> Option<&str> {
+    ctx.headers()
+        .get(http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+}
 impl Control {
-    async fn agent(&self, ctx: &RequestContext) -> Result<Uuid, connectrpc::ConnectError> {
-        let token = ctx
-            .headers()
-            .get(http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.strip_prefix("Bearer "))
-            .ok_or_else(|| {
-                connectrpc::ConnectError::unauthenticated("Deployment token required")
+    /// The sidecar protocol accepts sidecar deployment tokens only.
+    async fn authenticated(
+        &self,
+        ctx: &RequestContext,
+    ) -> Result<super::Authenticated, connectrpc::ConnectError> {
+        let token = bearer(ctx).ok_or_else(|| {
+            connectrpc::ConnectError::unauthenticated("Deployment token required")
+        })?;
+        let auth =
+            self.0.authenticate(token).await.map_err(|_| {
+                connectrpc::ConnectError::unauthenticated("Invalid deployment token")
             })?;
-        self.0
-            .authenticate(token)
-            .await
-            .map_err(|_| connectrpc::ConnectError::unauthenticated("Invalid deployment token"))
+        if auth.target != crate::proto::tilde::types::v1::DeploymentTarget::Sidecar {
+            return Err(connectrpc::ConnectError::permission_denied(
+                "This deployment token is not for a sidecar",
+            ));
+        }
+        Ok(auth)
+    }
+    async fn agent(&self, ctx: &RequestContext) -> Result<Uuid, connectrpc::ConnectError> {
+        Ok(self.authenticated(ctx).await?.agent)
     }
 }
 impl SidecarService for Control {
@@ -185,9 +269,11 @@ impl SidecarService for Control {
             impl connectrpc::Encodable<ingress::WatchResponse> + Send + use<>,
         >,
     > {
-        let agent = self.agent(&ctx).await?;
+        let auth = self.authenticated(&ctx).await?;
+        let agent = auth.agent;
+        let token = bearer(&ctx).unwrap_or_default().to_owned();
         let request = r.to_owned_message();
-        let instance = self.0.register(agent, &request).await?;
+        let instance = self.0.register(agent, auth.deployment, &request).await?;
         let service = self.0.clone();
         let mut configuration = service
             .channels
@@ -195,10 +281,10 @@ impl SidecarService for Control {
             .subscribe(&service.pool, "tilde_sidecar_configuration")
             .await
             .map_err(Error::from)?;
-        let mut assignments = service
+        let mut leases = service
             .channels
-            .assignments
-            .subscribe(&service.pool, "tilde_sidecar_assignments")
+            .leases
+            .subscribe(&service.pool, "tilde_sidecar_leases")
             .await
             .map_err(Error::from)?;
         let mut directives = service
@@ -208,38 +294,42 @@ impl SidecarService for Control {
             .await
             .map_err(Error::from)?;
         configuration.borrow_and_update();
-        assignments.borrow_and_update();
+        leases.borrow_and_update();
         directives.borrow_and_update();
         Response::stream_ok(async_stream::try_stream! {
             let mut since = chrono::Utc::now();
-            let snapshot = service.snapshot(agent).await?;
+            let snapshot = service.snapshot(agent, instance).await?;
             yield ingress::WatchResponse { frame: Some(snapshot.into()), ..Default::default() };
             let mut sent = std::collections::BTreeSet::new();
             for directive in service.pending_directives(agent, instance).await? {
                 sent.insert(directive.id.clone());
                 yield ingress::WatchResponse { frame: Some(directive.into()), ..Default::default() };
             }
-            enum Wake { Configuration, Assignments, Directives, Ping, Closed }
+            enum Wake { Configuration, Leases, Directives, Ping, Closed }
             loop {
                 let wake = tokio::select! {
                     changed = configuration.changed() => if changed.is_ok() { Wake::Configuration } else { Wake::Closed },
-                    changed = assignments.changed() => if changed.is_ok() { Wake::Assignments } else { Wake::Closed },
+                    changed = leases.changed() => if changed.is_ok() { Wake::Leases } else { Wake::Closed },
                     changed = directives.changed() => if changed.is_ok() { Wake::Directives } else { Wake::Closed },
                     _ = tokio::time::sleep(Duration::from_secs(10)) => Wake::Ping,
                 };
                 match wake {
                     Wake::Closed => break,
-                    Wake::Ping => yield ingress::WatchResponse { frame: Some(ingress::Ping::default().into()), ..Default::default() },
+                    Wake::Ping => {
+                        // A rotated or revoked token ends the stream instead of living on until TCP notices.
+                        if service.authenticate(&token).await.ok().map(|a| a.deployment) != Some(auth.deployment) { break; }
+                        yield ingress::WatchResponse { frame: Some(ingress::Ping::default().into()), ..Default::default() }
+                    }
                     Wake::Configuration => {
                         configuration.borrow_and_update();
                         yield ingress::WatchResponse { frame: Some(service.configuration(agent).await?.into()), ..Default::default() };
                     }
-                    Wake::Assignments => {
-                        assignments.borrow_and_update();
+                    Wake::Leases => {
+                        leases.borrow_and_update();
                         // Look back past any transaction that started before the last send but committed after it; replicas ignore repeats.
-                        for (assignment, updated_at) in service.assignments_since(agent, since - chrono::Duration::seconds(30)).await? {
+                        for (lease, updated_at) in service.leases_since(agent, since - chrono::Duration::seconds(30)).await? {
                             since = since.max(updated_at);
-                            yield ingress::WatchResponse { frame: Some(assignment.into()), ..Default::default() };
+                            yield ingress::WatchResponse { frame: Some(lease.into()), ..Default::default() };
                         }
                     }
                     Wake::Directives => {
@@ -262,10 +352,14 @@ impl SidecarService for Control {
         ctx: RequestContext,
         r: ServiceRequest<'_, ingress::PublishRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ingress::PublishResponse> + Send + use<'a>> {
-        let agent = self.agent(&ctx).await?;
+        let auth = self.authenticated(&ctx).await?;
         let request = r.to_owned_message();
         let instance = id(&request.instance_id)?;
-        Response::ok(self.0.publish(agent, instance, request).await?)
+        Response::ok(
+            self.0
+                .publish(auth.agent, auth.deployment, instance, request)
+                .await?,
+        )
     }
     async fn hydrate<'a>(
         &'a self,
@@ -293,32 +387,11 @@ impl SidecarService for Control {
         } else {
             Some(id(&request.thread_id)?)
         };
-        let result = match request.work {
-            Some(ingress::forward_request::Work::Call(call)) => {
-                self.0.forward(agent, thread, *call).await?
-            }
-            Some(ingress::forward_request::Work::ProviderEvent(event)) => {
-                let event = *event;
-                self.0
-                    .forward_provider_event(
-                        agent,
-                        id(&event.connection_id)?,
-                        event.event.into_option().ok_or_else(|| {
-                            connectrpc::ConnectError::invalid_argument("Provider event required")
-                        })?,
-                    )
-                    .await?;
-                ingress::CallResult {
-                    status: 204,
-                    ..Default::default()
-                }
-            }
-            None => {
-                return Err(connectrpc::ConnectError::invalid_argument(
-                    "Forward requires work",
-                ));
-            }
-        };
+        let call = request
+            .call
+            .into_option()
+            .ok_or_else(|| connectrpc::ConnectError::invalid_argument("Forward requires a call"))?;
+        let result = self.0.forward(agent, thread, call).await?;
         Response::ok(ingress::ForwardResponse {
             result: result.into(),
             ..Default::default()

@@ -71,18 +71,17 @@ it("autosaves typed capabilities and keeps header saves independent", async () =
   expect(onSaved).not.toHaveBeenCalled();
 
   getDeployment.mockResolvedValue({
-    deployment: { mode: 1, endpointUrl: agent.endpointUrl, failureMode: 1 },
-    nodes: [],
+    deployment: { agentId: agent.id, mode: 1, failureMode: 1, routing: 1, servingDeploymentId: "" },
+    deployments: [],
+    instances: [],
   });
   setDeployment.mockImplementation(async (values) => ({ deployment: values }));
   fireEvent.click(screen.getByRole("tab", { name: "Deployment" }));
-  fireEvent.change(await screen.findByRole("textbox", { name: "Agent endpoint URL" }), {
-    target: { value: "https://new.example.com" },
-  });
+  fireEvent.click(await screen.findByRole("tab", { name: "Manual" }));
   fireEvent.click(screen.getByRole("button", { name: "Save deployment" }));
   await screen.findByText("Deployment saved.");
   expect(setDeployment).toHaveBeenLastCalledWith(
-    expect.objectContaining({ agentId: agent.id, endpointUrl: "https://new.example.com" }),
+    expect.objectContaining({ agentId: agent.id, routing: 2 }),
   );
 
   fireEvent.click(screen.getByRole("tab", { name: "Chat providers" }));

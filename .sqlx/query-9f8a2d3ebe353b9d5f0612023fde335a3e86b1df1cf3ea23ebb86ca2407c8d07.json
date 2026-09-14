@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployment_settings SET encrypted_secrets=$2 WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9f8a2d3ebe353b9d5f0612023fde335a3e86b1df1cf3ea23ebb86ca2407c8d07"
+}

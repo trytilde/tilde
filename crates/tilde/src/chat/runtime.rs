@@ -161,6 +161,7 @@ impl Chat {
             {
                 return Err(ChatError::Conflict);
             }
+            let deployment = super::pin_deployment(&mut tx, thread, agent).await?;
             sqlx::query_file!(
                 "../../queries/chat/invocation_create.sql",
                 invocation,
@@ -168,7 +169,8 @@ impl Chat {
                 thread,
                 agent,
                 crate::telemetry::context::capture().0,
-                crate::telemetry::context::capture().1
+                crate::telemetry::context::capture().1,
+                deployment
             )
             .execute(&mut *tx)
             .await?;
@@ -227,6 +229,7 @@ impl Chat {
             .await?
             .ok_or(ChatError::Conflict)?;
         let invocation = Uuid::new_v4();
+        let deployment = super::pin_deployment(&mut tx, row.thread_id, row.agent_id).await?;
         sqlx::query_file!(
             "../../queries/chat/invocation_create.sql",
             invocation,
@@ -234,7 +237,8 @@ impl Chat {
             row.thread_id,
             row.agent_id,
             crate::telemetry::context::capture().0,
-            crate::telemetry::context::capture().1
+            crate::telemetry::context::capture().1,
+            deployment
         )
         .execute(&mut *tx)
         .await?;
@@ -330,6 +334,8 @@ impl Chat {
                 )
                 .execute(&mut *tx)
                 .await?;
+                let deployment =
+                    super::pin_deployment(&mut tx, message.thread_id, message.agent_id).await?;
                 sqlx::query_file!(
                     "../../queries/chat/invocation_create.sql",
                     invocation,
@@ -337,7 +343,8 @@ impl Chat {
                     message.thread_id,
                     message.agent_id,
                     message.traceparent,
-                    message.tracestate
+                    message.tracestate,
+                    deployment
                 )
                 .execute(&mut *tx)
                 .await?;

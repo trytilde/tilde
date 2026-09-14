@@ -860,14 +860,6 @@ impl ::buffa::Message for RuntimeEvent {
                         += 2u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
-                __buffa::oneof::runtime_event::State::Assignment(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 2u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
                 __buffa::oneof::runtime_event::State::ChannelDecision(x) => {
                     let __slot = __cache.reserve();
                     let inner = x.compute_size(__cache);
@@ -1029,14 +1021,6 @@ impl ::buffa::Message for RuntimeEvent {
                 __buffa::oneof::runtime_event::State::ConvertedMessage(x) => {
                     ::buffa::types::put_len_delimited_header(
                         22u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::runtime_event::State::Assignment(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        23u32,
                         u64::from(__cache.consume_next()),
                         buf,
                     );
@@ -1396,26 +1380,6 @@ impl ::buffa::Message for RuntimeEvent {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.state = ::core::option::Option::Some(
                         __buffa::oneof::runtime_event::State::ConvertedMessage(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::runtime_event::State::Assignment(ref mut existing),
-                ) = self.state
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.state = ::core::option::Option::Some(
-                        __buffa::oneof::runtime_event::State::Assignment(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -2020,30 +1984,6 @@ impl<'de> serde::Deserialize<'de> for RuntimeEvent {
                                 }
                                 __oneof_state = Some(
                                     __buffa::oneof::runtime_event::State::ConvertedMessage(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "assignment" => {
-                            let v: ::core::option::Option<ParticipantAssignment> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            ParticipantAssignment,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_state.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'state'",
-                                        ),
-                                    );
-                                }
-                                __oneof_state = Some(
-                                    __buffa::oneof::runtime_event::State::Assignment(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );

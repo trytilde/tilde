@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.deployment_id AS \"deployment_id?\" FROM chat_participants p JOIN agent_deployments d ON d.id=p.deployment_id AND d.status='registered' WHERE p.thread_id=$1 AND p.agent_id=$2 AND p.active;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deployment_id?",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "fc5b3fb40e9ba39e731e90a46055c6f162beb3c5ea9d08c4a114f2f5517d66f9"
+}

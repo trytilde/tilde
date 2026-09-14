@@ -469,7 +469,9 @@ pub const SIDECAR_SERVICE_RELAY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::s
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Sidecars dial the gateway; every call authenticates one agent deployment token.
-/// The gateway never opens a connection to a sidecar.
+/// The gateway never opens a connection to a sidecar. Postgres is the record; a
+/// replica is a cache plus a write-behind queue plus the executor for the threads
+/// it holds a lease on.
 ///
 /// # Implementing handlers
 ///
@@ -521,7 +523,7 @@ pub const SIDECAR_SERVICE_RELAY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::s
 #[allow(clippy::type_complexity)]
 pub trait SidecarService: Send + Sync + 'static {
     /// Held open for the life of a replica: a snapshot first, then configuration,
-    /// ownership and directives as they change.
+    /// lease changes and directives as they change.
     ///
     /// `request` is borrowed from the request body and is valid for the
     /// duration of the call (until the response stream is returned);
@@ -544,7 +546,7 @@ pub trait SidecarService: Send + Sync + 'static {
             >,
         >,
     > + Send;
-    /// Batched replica frames. The response acknowledges events and answers claims.
+    /// Heartbeats, typed events, directive results, lease releases and telemetry, in order.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -567,7 +569,7 @@ pub trait SidecarService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Conversation state a replica does not hold in memory, optionally claiming ownership.
+    /// Conversation state from the projection, taking the thread lease in the same call when asked.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -590,7 +592,7 @@ pub trait SidecarService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Execute one ingress call on the replica that owns the conversation.
+    /// Run one ingress call on a live replica and relay its answer.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -682,7 +684,7 @@ pub trait SidecarService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Execute one registry call at the gateway on behalf of a verified local invocation.
+    /// Registry RPCs from the agent process, re-verified at the gateway.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

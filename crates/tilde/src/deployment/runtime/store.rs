@@ -1,14 +1,24 @@
-//! Owner-side conversation state. Everything here is plain memory: the replica
-//! that owns a thread mutates it under one per-thread lock and ships typed events
-//! to the gateway afterwards. Nothing is persisted locally.
+//! Cached conversation state. Everything here is plain memory: the replica
+//! holding a thread's lease mutates it under one per-thread lock and ships typed
+//! events to the gateway afterwards. Nothing is persisted locally.
 use crate::proto::tilde::types::v1 as types;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
 /// Bound on retained history per thread; older events stay durable at the gateway.
 pub(crate) const EVENT_WINDOW: usize = 5000;
-/// Bound on unacknowledged upstream frames before mutations start failing.
+/// Unshipped frames beyond this shed typing and streaming deltas first.
+pub(crate) const OUTBOX_SOFT_LIMIT: usize = 20_000;
+/// Unshipped frames beyond this refuse new mutations until the gateway catches up.
 pub(crate) const OUTBOX_LIMIT: usize = 200_000;
+/// Who executes this thread. `epoch` rises each time this replica takes the lease,
+/// so an agent process can tell a fresh invocation from a stale one.
+#[derive(Clone, Default)]
+pub(crate) struct Lease {
+    pub holder: Option<Uuid>,
+    pub holder_url: String,
+    pub epoch: u64,
+}
 
 #[derive(Clone)]
 pub(crate) struct Command {
@@ -45,13 +55,13 @@ pub(crate) struct ThreadState {
     pub receipts: HashSet<Uuid>,
     pub dispatched: HashSet<Uuid>,
     pub control_receipts: HashSet<Uuid>,
-    pub assignment: types::ParticipantAssignment,
+    pub lease: Lease,
     pub events: VecDeque<types::RuntimeEvent>,
     pub sequence: i64,
     pub last_activity_at: i64,
 }
 impl ThreadState {
-    pub fn new(thread: types::Thread, assignment: types::ParticipantAssignment) -> Self {
+    pub fn new(thread: types::Thread) -> Self {
         Self {
             thread,
             messages: BTreeMap::new(),
@@ -69,7 +79,7 @@ impl ThreadState {
             receipts: HashSet::new(),
             dispatched: HashSet::new(),
             control_receipts: HashSet::new(),
-            assignment,
+            lease: Lease::default(),
             events: VecDeque::new(),
             sequence: 0,
             last_activity_at: super::now(),
@@ -79,6 +89,10 @@ impl ThreadState {
         self.message_keys
             .get(&key)
             .and_then(|position| self.messages.get(position))
+    }
+    pub fn message_mut(&mut self, key: Uuid) -> Option<&mut types::Message> {
+        let position = *self.message_keys.get(&key)?;
+        self.messages.get_mut(&position)
     }
     pub fn upsert_message(&mut self, message: types::Message) -> Option<types::Message> {
         let key = match Uuid::parse_str(&message.id) {

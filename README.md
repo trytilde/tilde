@@ -286,6 +286,20 @@ subscription before user code executes. Suspension uses a framework checkpoint h
 and ends execution; resume starts a new invocation. See the
 [SDK serverless setup](sdk/ts/README.md#serverless-invocation-controls).
 
+## Deployments
+
+Every agent has deployments: the declared record of what is running, tied to a commit,
+created by CI with `DeploymentService.RegisterDeployment` (idempotent on your deployment
+id) or by hand in the agent's **Deployments** tab. Registering returns a token once; the
+process that runs the deployment dials in with it. New threads route to the serving
+deployment (`Latest` promotes each new one automatically, `Manual` waits for you) and
+existing threads stay pinned to theirs. Targets:
+
+- **Direct**: the gateway invokes an HTTP endpoint (serverless handlers included).
+- **AWS Lambda**: registered now for routing and history; the gateway-side Lambda invoke
+  arrives with the run protocol.
+- **Sidecar**: replicas of `tilde-sidecar` dial in with the token; see below.
+
 ## Sidecar deployments
 
 Gateway-only deployments need nothing beyond the gateway. To run an agent beside a
@@ -293,8 +307,10 @@ sidecar, choose **Sidecar** in its **Deployment** tab, select the failure policy
 issue a deployment token. Use the same token for every replica of that agent. Pause an
 existing agent before changing its mode.
 
-The release archive and container include `tilde` and `tilde-sidecar`. Run the sidecar
-next to your SDK-hosted agent process:
+Register a sidecar deployment in the **Deployments** tab (or from CI with
+`RegisterDeployment`) and use its token for every replica. The release archive and
+container include `tilde` and `tilde-sidecar`. Run the sidecar next to your SDK-hosted
+agent process:
 
 ```bash
 export ENGINE_SIDECAR_GATEWAY_URL=https://tilde.example.com
@@ -305,7 +321,7 @@ tilde-sidecar
 
 For multiple agents, separate tokens and `agent-id=endpoint` entries with commas. The
 sidecar keeps no state on disk. It dials the gateway's `sidecar` route group over one
-connection, receives configuration, credentials and ownership from that stream, and
+connection, receives configuration, credentials and thread leases from that stream, and
 publishes typed events back for projection into Postgres. The gateway never connects to
 a sidecar, so replicas may sit behind NAT.
 
@@ -317,28 +333,33 @@ prefixed with `/agents/<agent-id>`; provider webhooks use
 to the externally reachable origin of that listener and put a load balancer in front of
 the replicas.
 
-The replica that first receives work for a conversation owns it: turn state lives in its
-memory, the agent process is invoked over loopback, and channel replies use the
-replicated credentials. Registry calls the agent makes with its invocation token are
-verified locally and relayed to the gateway, which checks the same token against its
-own ownership record and capability ceiling before answering. Requests that land on another replica, or on the gateway, are
-executed by the owner and answered through the gateway. The gateway serves reads of
-sidecar conversations from its projection, and completed messages in rooms with several
-sidecar agents are relayed to each owner.
+The replica that first receives work for a conversation takes its lease in the same
+gateway call that hydrates it, and holds it while the conversation stays warm: turn state
+lives in its memory, the agent process is invoked over loopback, channel replies use the
+replicated credentials, and events on that conversation cost no further gateway calls on
+the hot path. Registry calls the agent makes with its invocation token are verified
+locally and relayed to the gateway, which checks the same token against the thread lease
+and capability ceiling before answering. Requests that land on another replica are handed
+straight to the holder, sidecar to sidecar; requests on the gateway are queued for the
+holder and answered through the gateway. The gateway serves reads of sidecar
+conversations from its projection, and completed messages in rooms with several sidecar
+agents are relayed to each holder. Conversations idle for
+`ENGINE_SIDECAR_THREAD_IDLE_SECONDS` leave memory and release their lease.
 
-Heartbeats travel with every publish; an owner unheard from for fifteen seconds loses its
-conversations. Under **Assign to new node** the gateway hands active runs to another live
+Replicas heartbeat every three seconds; a holder unheard from for fifteen seconds loses
+its leases. Under **Assign to new node** the gateway hands active runs to another live
 replica, which restarts them from their objective. Under **Stop** the runs fail. A
-replica that cannot reach the gateway stops executing after thirty seconds, so a
-partitioned owner never keeps running beside its replacement. Writes are acknowledged
-from replica memory and reach Postgres when the replica publishes them, so a replica
-that dies loses the events it had not yet published. External effects should therefore
-use idempotency keys.
+replica whose publishes go unacknowledged for ten seconds stops executing, so a
+partitioned holder never keeps running beside its replacement. Writes are acknowledged
+from replica memory and reach Postgres when the replica publishes them in batches, so a
+replica that dies loses the events it had not yet published, and a replica whose
+outbox fills sheds streaming deltas first and then its oldest frames rather than failing
+callers. External effects should therefore use idempotency keys.
 
 Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until
 uploaded to gateway S3 storage; configure the existing `ENGINE_S3_*` settings on the
 gateway. Use `task dev:sidecar` for local development; `task test:sidecar` runs two
-in-process replicas against Postgres and exercises ownership, projection, forwarding and
+in-process replicas against Postgres and exercises leases, projection, hand-off and
 failover.
 
 ## Route groups and authentication

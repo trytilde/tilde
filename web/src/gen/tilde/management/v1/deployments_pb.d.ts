@@ -4,7 +4,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
-import type { Deployment, DeploymentMode, SidecarFailureMode, SidecarNode } from "../../types/v1/deployment_pb.js";
+import type { AgentDeployment, AgentInstance, Deployment, DeploymentMode, DeploymentRouting, DeploymentSource, DeploymentTarget, SidecarFailureMode } from "../../types/v1/deployment_pb.js";
 import type { Agent, Capabilities } from "../../types/v1/agent_pb.js";
 
 /**
@@ -38,9 +38,14 @@ export declare type GetDeploymentResponse = Message<"tilde.management.v1.GetDepl
   deployment?: Deployment | undefined;
 
   /**
-   * @generated from field: repeated tilde.types.v1.SidecarNode nodes = 2;
+   * @generated from field: repeated tilde.types.v1.AgentInstance instances = 2;
    */
-  nodes: SidecarNode[];
+  instances: AgentInstance[];
+
+  /**
+   * @generated from field: repeated tilde.types.v1.AgentDeployment deployments = 3;
+   */
+  deployments: AgentDeployment[];
 };
 
 /**
@@ -64,14 +69,14 @@ export declare type SetDeploymentRequest = Message<"tilde.management.v1.SetDeplo
   mode: DeploymentMode;
 
   /**
-   * @generated from field: optional string endpoint_url = 3;
-   */
-  endpointUrl?: string | undefined;
-
-  /**
    * @generated from field: tilde.types.v1.SidecarFailureMode failure_mode = 4;
    */
   failureMode: SidecarFailureMode;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentRouting routing = 5;
+   */
+  routing: DeploymentRouting;
 };
 
 /**
@@ -97,6 +102,162 @@ export declare type SetDeploymentResponse = Message<"tilde.management.v1.SetDepl
 export declare const SetDeploymentResponseSchema: GenMessage<SetDeploymentResponse>;
 
 /**
+ * @generated from message tilde.management.v1.RegisterDeploymentRequest
+ */
+export declare type RegisterDeploymentRequest = Message<"tilde.management.v1.RegisterDeploymentRequest"> & {
+  /**
+   * @generated from field: string agent_id = 1;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentSource source = 2;
+   */
+  source: DeploymentSource;
+
+  /**
+   * @generated from field: tilde.types.v1.DeploymentTarget target = 3;
+   */
+  target: DeploymentTarget;
+
+  /**
+   * @generated from field: optional string endpoint_url = 4;
+   */
+  endpointUrl?: string | undefined;
+
+  /**
+   * @generated from field: optional string target_reference = 5;
+   */
+  targetReference?: string | undefined;
+
+  /**
+   * @generated from field: optional string repository = 6;
+   */
+  repository?: string | undefined;
+
+  /**
+   * @generated from field: optional string commit_sha = 7;
+   */
+  commitSha?: string | undefined;
+
+  /**
+   * @generated from field: optional string external_id = 8;
+   */
+  externalId?: string | undefined;
+
+  /**
+   * @generated from field: optional string label = 9;
+   */
+  label?: string | undefined;
+};
+
+/**
+ * Describes the message tilde.management.v1.RegisterDeploymentRequest.
+ * Use `create(RegisterDeploymentRequestSchema)` to create a new message.
+ */
+export declare const RegisterDeploymentRequestSchema: GenMessage<RegisterDeploymentRequest>;
+
+/**
+ * @generated from message tilde.management.v1.RegisterDeploymentResponse
+ */
+export declare type RegisterDeploymentResponse = Message<"tilde.management.v1.RegisterDeploymentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.AgentDeployment deployment = 1;
+   */
+  deployment?: AgentDeployment | undefined;
+
+  /**
+   * @generated from field: string token = 2;
+   */
+  token: string;
+
+  /**
+   * @generated from field: bool created = 3;
+   */
+  created: boolean;
+};
+
+/**
+ * Describes the message tilde.management.v1.RegisterDeploymentResponse.
+ * Use `create(RegisterDeploymentResponseSchema)` to create a new message.
+ */
+export declare const RegisterDeploymentResponseSchema: GenMessage<RegisterDeploymentResponse>;
+
+/**
+ * @generated from message tilde.management.v1.PromoteDeploymentRequest
+ */
+export declare type PromoteDeploymentRequest = Message<"tilde.management.v1.PromoteDeploymentRequest"> & {
+  /**
+   * @generated from field: string agent_id = 1;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: string deployment_id = 2;
+   */
+  deploymentId: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.PromoteDeploymentRequest.
+ * Use `create(PromoteDeploymentRequestSchema)` to create a new message.
+ */
+export declare const PromoteDeploymentRequestSchema: GenMessage<PromoteDeploymentRequest>;
+
+/**
+ * @generated from message tilde.management.v1.PromoteDeploymentResponse
+ */
+export declare type PromoteDeploymentResponse = Message<"tilde.management.v1.PromoteDeploymentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.Deployment deployment = 1;
+   */
+  deployment?: Deployment | undefined;
+};
+
+/**
+ * Describes the message tilde.management.v1.PromoteDeploymentResponse.
+ * Use `create(PromoteDeploymentResponseSchema)` to create a new message.
+ */
+export declare const PromoteDeploymentResponseSchema: GenMessage<PromoteDeploymentResponse>;
+
+/**
+ * @generated from message tilde.management.v1.RetireDeploymentRequest
+ */
+export declare type RetireDeploymentRequest = Message<"tilde.management.v1.RetireDeploymentRequest"> & {
+  /**
+   * @generated from field: string agent_id = 1;
+   */
+  agentId: string;
+
+  /**
+   * @generated from field: string deployment_id = 2;
+   */
+  deploymentId: string;
+};
+
+/**
+ * Describes the message tilde.management.v1.RetireDeploymentRequest.
+ * Use `create(RetireDeploymentRequestSchema)` to create a new message.
+ */
+export declare const RetireDeploymentRequestSchema: GenMessage<RetireDeploymentRequest>;
+
+/**
+ * @generated from message tilde.management.v1.RetireDeploymentResponse
+ */
+export declare type RetireDeploymentResponse = Message<"tilde.management.v1.RetireDeploymentResponse"> & {
+  /**
+   * @generated from field: tilde.types.v1.AgentDeployment deployment = 1;
+   */
+  deployment?: AgentDeployment | undefined;
+};
+
+/**
+ * Describes the message tilde.management.v1.RetireDeploymentResponse.
+ * Use `create(RetireDeploymentResponseSchema)` to create a new message.
+ */
+export declare const RetireDeploymentResponseSchema: GenMessage<RetireDeploymentResponse>;
+
+/**
  * @generated from message tilde.management.v1.IssueDeploymentTokenRequest
  */
 export declare type IssueDeploymentTokenRequest = Message<"tilde.management.v1.IssueDeploymentTokenRequest"> & {
@@ -104,6 +265,11 @@ export declare type IssueDeploymentTokenRequest = Message<"tilde.management.v1.I
    * @generated from field: string agent_id = 1;
    */
   agentId: string;
+
+  /**
+   * @generated from field: string deployment_id = 2;
+   */
+  deploymentId: string;
 };
 
 /**
@@ -236,6 +402,35 @@ export declare const DeploymentService: GenService<{
     methodKind: "unary";
     input: typeof SetDeploymentRequestSchema;
     output: typeof SetDeploymentResponseSchema;
+  },
+  /**
+   * Register a deployment from CI or by hand. Idempotent on (agent, external_id): a repeat
+   * returns the existing record without a token. The token is returned once, on creation.
+   *
+   * @generated from rpc tilde.management.v1.DeploymentService.RegisterDeployment
+   */
+  registerDeployment: {
+    methodKind: "unary";
+    input: typeof RegisterDeploymentRequestSchema;
+    output: typeof RegisterDeploymentResponseSchema;
+  },
+  /**
+   * @generated from rpc tilde.management.v1.DeploymentService.PromoteDeployment
+   */
+  promoteDeployment: {
+    methodKind: "unary";
+    input: typeof PromoteDeploymentRequestSchema;
+    output: typeof PromoteDeploymentResponseSchema;
+  },
+  /**
+   * Retiring invalidates the deployment's token; its instances can no longer register.
+   *
+   * @generated from rpc tilde.management.v1.DeploymentService.RetireDeployment
+   */
+  retireDeployment: {
+    methodKind: "unary";
+    input: typeof RetireDeploymentRequestSchema;
+    output: typeof RetireDeploymentResponseSchema;
   },
   /**
    * @generated from rpc tilde.management.v1.DeploymentService.IssueDeploymentToken

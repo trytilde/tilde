@@ -5,7 +5,6 @@
 import type { GenEnum, GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 import type { Activity, Attachment, Goal, Message as Message$1, Participant, Run, Task, Thread, ToolCall, Typing, User } from "./chat_pb.js";
-import type { ParticipantAssignment } from "./deployment_pb.js";
 import type { ChannelAccessMode, IdentityType } from "./access_pb.js";
 
 /**
@@ -227,12 +226,6 @@ export declare type RuntimeEvent = Message<"tilde.types.v1.RuntimeEvent"> & {
      */
     value: ConvertedMessageState;
     case: "convertedMessage";
-  } | {
-    /**
-     * @generated from field: tilde.types.v1.ParticipantAssignment assignment = 23;
-     */
-    value: ParticipantAssignment;
-    case: "assignment";
   } | {
     /**
      * @generated from field: tilde.types.v1.ChannelDecision channel_decision = 24;

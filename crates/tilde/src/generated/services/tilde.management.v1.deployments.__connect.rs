@@ -18,6 +18,42 @@ pub type OwnedSetDeploymentResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<RegisterDeploymentRequestView<'static>>`.
+pub type OwnedRegisterDeploymentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RegisterDeploymentResponseView<'static>>`.
+pub type OwnedRegisterDeploymentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PromoteDeploymentRequestView<'static>>`.
+pub type OwnedPromoteDeploymentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PromoteDeploymentResponseView<'static>>`.
+pub type OwnedPromoteDeploymentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetireDeploymentRequestView<'static>>`.
+pub type OwnedRetireDeploymentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RetireDeploymentResponseView<'static>>`.
+pub type OwnedRetireDeploymentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<IssueDeploymentTokenRequestView<'static>>`.
 pub type OwnedIssueDeploymentTokenRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::IssueDeploymentTokenRequestView<
@@ -102,6 +138,132 @@ for crate::proto::tilde::management::v1::__buffa::view::SetDeploymentResponseVie
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::SetDeploymentResponse>
 for ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::SetDeploymentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RegisterDeploymentResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RegisterDeploymentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::PromoteDeploymentResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::PromoteDeploymentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RetireDeploymentResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RetireDeploymentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentResponseView<
         'static,
     >,
 > {
@@ -266,6 +428,24 @@ pub const DEPLOYMENT_SERVICE_SET_DEPLOYMENT_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RegisterDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_REGISTER_DEPLOYMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/RegisterDeployment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `PromoteDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_PROMOTE_DEPLOYMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/PromoteDeployment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RetireDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_RETIRE_DEPLOYMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/RetireDeployment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `IssueDeploymentToken` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const DEPLOYMENT_SERVICE_ISSUE_DEPLOYMENT_TOKEN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.DeploymentService/IssueDeploymentToken",
@@ -378,6 +558,76 @@ pub trait DeploymentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::SetDeploymentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Register a deployment from CI or by hand. Idempotent on (agent, external_id): a repeat
+    /// returns the existing record without a token. The token is returned once, on creation.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn register_deployment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::RegisterDeploymentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the PromoteDeployment RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn promote_deployment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::PromoteDeploymentResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Retiring invalidates the deployment's token; its instances can no longer register.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn retire_deployment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::RetireDeploymentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::RetireDeploymentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -542,6 +792,93 @@ impl<S: DeploymentService> DeploymentServiceExt for S {
             .with_spec(DEPLOYMENT_SERVICE_SET_DEPLOYMENT_SPEC)
             .route_view(
                 DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "RegisterDeployment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.register_deployment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::RegisterDeploymentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_REGISTER_DEPLOYMENT_SPEC)
+            .route_view(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "PromoteDeployment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.promote_deployment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::PromoteDeploymentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_PROMOTE_DEPLOYMENT_SPEC)
+            .route_view(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "RetireDeployment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::RetireDeploymentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.retire_deployment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::RetireDeploymentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_RETIRE_DEPLOYMENT_SPEC)
+            .route_view(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
                 "IssueDeploymentToken",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -693,6 +1030,24 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                         .with_spec(DEPLOYMENT_SERVICE_SET_DEPLOYMENT_SPEC),
                 )
             }
+            "RegisterDeployment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DEPLOYMENT_SERVICE_REGISTER_DEPLOYMENT_SPEC),
+                )
+            }
+            "PromoteDeployment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DEPLOYMENT_SERVICE_PROMOTE_DEPLOYMENT_SPEC),
+                )
+            }
+            "RetireDeployment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DEPLOYMENT_SERVICE_RETIRE_DEPLOYMENT_SPEC),
+                )
+            }
             "IssueDeploymentToken" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -768,6 +1123,72 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::SetDeploymentResponse,
+                        >(format)
+                })
+            }
+            "RegisterDeployment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+                    >::from_parts(&req, &body);
+                    svc.register_deployment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::RegisterDeploymentResponse,
+                        >(format)
+                })
+            }
+            "PromoteDeployment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+                    >::from_parts(&req, &body);
+                    svc.promote_deployment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::PromoteDeploymentResponse,
+                        >(format)
+                })
+            }
+            "RetireDeployment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::RetireDeploymentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::RetireDeploymentRequest,
+                    >::from_parts(&req, &body);
+                    svc.retire_deployment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::RetireDeploymentResponse,
                         >(format)
                 })
             }
@@ -1052,6 +1473,141 @@ where
                 &self.transport,
                 &self.config,
                 DEPLOYMENT_SERVICE_SET_DEPLOYMENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RegisterDeployment RPC. Sends a request to /tilde.management.v1.DeploymentService/RegisterDeployment.
+    pub async fn register_deployment(
+        &self,
+        request: crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.register_deployment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegisterDeployment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn register_deployment_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::RegisterDeploymentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RegisterDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_REGISTER_DEPLOYMENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PromoteDeployment RPC. Sends a request to /tilde.management.v1.DeploymentService/PromoteDeployment.
+    pub async fn promote_deployment(
+        &self,
+        request: crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.promote_deployment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PromoteDeployment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn promote_deployment_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::PromoteDeploymentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PromoteDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_PROMOTE_DEPLOYMENT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RetireDeployment RPC. Sends a request to /tilde.management.v1.DeploymentService/RetireDeployment.
+    pub async fn retire_deployment(
+        &self,
+        request: crate::proto::tilde::management::v1::RetireDeploymentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.retire_deployment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RetireDeployment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn retire_deployment_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::RetireDeploymentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RetireDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_RETIRE_DEPLOYMENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

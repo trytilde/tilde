@@ -139,13 +139,20 @@ pub struct GetDeploymentResponse {
         super::super::types::v1::Deployment,
         ::buffa::Inline<super::super::types::v1::Deployment>,
     >,
-    /// Field 2: `nodes`
+    /// Field 2: `instances`
     #[serde(
-        rename = "nodes",
+        rename = "instances",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
-    pub nodes: ::buffa::alloc::vec::Vec<super::super::types::v1::SidecarNode>,
+    pub instances: ::buffa::alloc::vec::Vec<super::super::types::v1::AgentInstance>,
+    /// Field 3: `deployments`
+    #[serde(
+        rename = "deployments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub deployments: ::buffa::alloc::vec::Vec<super::super::types::v1::AgentDeployment>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -154,7 +161,8 @@ impl ::core::fmt::Debug for GetDeploymentResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetDeploymentResponse")
             .field("deployment", &self.deployment)
-            .field("nodes", &self.nodes)
+            .field("instances", &self.instances)
+            .field("deployments", &self.deployments)
             .finish()
     }
 }
@@ -193,7 +201,15 @@ impl ::buffa::Message for GetDeploymentResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        for v in &self.nodes {
+        for v in &self.instances {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.deployments {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
@@ -219,9 +235,17 @@ impl ::buffa::Message for GetDeploymentResponse {
             );
             self.deployment.write_to(__cache, buf);
         }
-        for v in &self.nodes {
+        for v in &self.instances {
             ::buffa::types::put_len_delimited_header(
                 2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.deployments {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -261,7 +285,19 @@ impl ::buffa::Message for GetDeploymentResponse {
                     ::buffa::__private::element_footprint(&elem),
                 )?;
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
-                self.nodes.push(elem);
+                self.instances.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.deployments.push(elem);
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -272,7 +308,8 @@ impl ::buffa::Message for GetDeploymentResponse {
     }
     fn clear(&mut self) {
         self.deployment = ::buffa::MessageField::none();
-        self.nodes.clear();
+        self.instances.clear();
+        self.deployments.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -324,13 +361,6 @@ pub struct SetDeploymentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub mode: ::buffa::EnumValue<super::super::types::v1::DeploymentMode>,
-    /// Field 3: `endpoint_url`
-    #[serde(
-        rename = "endpointUrl",
-        alias = "endpoint_url",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub endpoint_url: ::core::option::Option<::buffa::alloc::string::String>,
     /// Field 4: `failure_mode`
     #[serde(
         rename = "failureMode",
@@ -339,6 +369,13 @@ pub struct SetDeploymentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub failure_mode: ::buffa::EnumValue<super::super::types::v1::SidecarFailureMode>,
+    /// Field 5: `routing`
+    #[serde(
+        rename = "routing",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub routing: ::buffa::EnumValue<super::super::types::v1::DeploymentRouting>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -348,8 +385,8 @@ impl ::core::fmt::Debug for SetDeploymentRequest {
         f.debug_struct("SetDeploymentRequest")
             .field("agent_id", &self.agent_id)
             .field("mode", &self.mode)
-            .field("endpoint_url", &self.endpoint_url)
             .field("failure_mode", &self.failure_mode)
+            .field("routing", &self.routing)
             .finish()
     }
 }
@@ -359,18 +396,6 @@ impl SetDeploymentRequest {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetDeploymentRequest";
-}
-impl SetDeploymentRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::endpoint_url`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_endpoint_url(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.endpoint_url = Some(value.into());
-        self
-    }
 }
 ::buffa::impl_default_instance!(SetDeploymentRequest);
 impl ::buffa::MessageName for SetDeploymentRequest {
@@ -401,11 +426,14 @@ impl ::buffa::Message for SetDeploymentRequest {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
-        if let Some(ref v) = self.endpoint_url {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
         {
             let val = self.failure_mode.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.routing.to_i32();
             if val != 0 {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
@@ -429,13 +457,16 @@ impl ::buffa::Message for SetDeploymentRequest {
                 ::buffa::types::put_int32_field(2u32, val, buf);
             }
         }
-        if let Some(ref v) = self.endpoint_url {
-            ::buffa::types::put_string_field(3u32, v, buf);
-        }
         {
             let val = self.failure_mode.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        {
+            let val = self.routing.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -465,24 +496,21 @@ impl ::buffa::Message for SetDeploymentRequest {
                 )?;
                 self.mode = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .endpoint_url
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 self.failure_mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.routing = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
@@ -496,8 +524,8 @@ impl ::buffa::Message for SetDeploymentRequest {
     fn clear(&mut self) {
         self.agent_id.clear();
         self.mode = ::buffa::EnumValue::from(0);
-        self.endpoint_url = ::core::option::Option::None;
         self.failure_mode = ::buffa::EnumValue::from(0);
+        self.routing = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -675,6 +703,1182 @@ pub const __SET_DEPLOYMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
+pub struct RegisterDeploymentRequest {
+    /// Field 1: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 2: `source`
+    #[serde(
+        rename = "source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub source: ::buffa::EnumValue<super::super::types::v1::DeploymentSource>,
+    /// Field 3: `target`
+    #[serde(
+        rename = "target",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub target: ::buffa::EnumValue<super::super::types::v1::DeploymentTarget>,
+    /// Field 4: `endpoint_url`
+    #[serde(
+        rename = "endpointUrl",
+        alias = "endpoint_url",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub endpoint_url: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `target_reference`
+    #[serde(
+        rename = "targetReference",
+        alias = "target_reference",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub target_reference: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `repository`
+    #[serde(
+        rename = "repository",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub repository: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `commit_sha`
+    #[serde(
+        rename = "commitSha",
+        alias = "commit_sha",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub commit_sha: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 8: `external_id`
+    #[serde(
+        rename = "externalId",
+        alias = "external_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub external_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 9: `label`
+    #[serde(rename = "label", skip_serializing_if = "::core::option::Option::is_none")]
+    pub label: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RegisterDeploymentRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RegisterDeploymentRequest")
+            .field("agent_id", &self.agent_id)
+            .field("source", &self.source)
+            .field("target", &self.target)
+            .field("endpoint_url", &self.endpoint_url)
+            .field("target_reference", &self.target_reference)
+            .field("repository", &self.repository)
+            .field("commit_sha", &self.commit_sha)
+            .field("external_id", &self.external_id)
+            .field("label", &self.label)
+            .finish()
+    }
+}
+impl RegisterDeploymentRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RegisterDeploymentRequest";
+}
+impl RegisterDeploymentRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::endpoint_url`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_endpoint_url(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.endpoint_url = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::target_reference`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_target_reference(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.target_reference = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::repository`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_repository(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.repository = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::commit_sha`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_commit_sha(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.commit_sha = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::external_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_external_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::label`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_label(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.label = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(RegisterDeploymentRequest);
+impl ::buffa::MessageName for RegisterDeploymentRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RegisterDeploymentRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.RegisterDeploymentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RegisterDeploymentRequest";
+}
+impl ::buffa::Message for RegisterDeploymentRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        {
+            let val = self.source.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        {
+            let val = self.target.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if let Some(ref v) = self.endpoint_url {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.target_reference {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.repository {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.commit_sha {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.external_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.label {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.agent_id, buf);
+        }
+        {
+            let val = self.source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        {
+            let val = self.target.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.endpoint_url {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.target_reference {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.repository {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.commit_sha {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        if let Some(ref v) = self.external_id {
+            ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if let Some(ref v) = self.label {
+            ::buffa::types::put_string_field(9u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .endpoint_url
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .target_reference
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .repository
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .commit_sha
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .external_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.label.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_id.clear();
+        self.source = ::buffa::EnumValue::from(0);
+        self.target = ::buffa::EnumValue::from(0);
+        self.endpoint_url = ::core::option::Option::None;
+        self.target_reference = ::core::option::Option::None;
+        self.repository = ::core::option::Option::None;
+        self.commit_sha = ::core::option::Option::None;
+        self.external_id = ::core::option::Option::None;
+        self.label = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RegisterDeploymentRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RegisterDeploymentRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RegisterDeploymentRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REGISTER_DEPLOYMENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RegisterDeploymentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RegisterDeploymentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RegisterDeploymentRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RegisterDeploymentResponse {
+    /// Field 1: `deployment`
+    #[serde(
+        rename = "deployment",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub deployment: ::buffa::MessageField<
+        super::super::types::v1::AgentDeployment,
+        ::buffa::Inline<super::super::types::v1::AgentDeployment>,
+    >,
+    /// Field 2: `token`
+    #[serde(
+        rename = "token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub token: ::buffa::alloc::string::String,
+    /// Field 3: `created`
+    #[serde(
+        rename = "created",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub created: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RegisterDeploymentResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RegisterDeploymentResponse")
+            .field("deployment", &self.deployment)
+            .field("token", &::core::format_args!("[REDACTED]"))
+            .field("created", &self.created)
+            .finish()
+    }
+}
+impl RegisterDeploymentResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RegisterDeploymentResponse";
+}
+::buffa::impl_default_instance!(RegisterDeploymentResponse);
+impl ::buffa::MessageName for RegisterDeploymentResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RegisterDeploymentResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.RegisterDeploymentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RegisterDeploymentResponse";
+}
+impl ::buffa::Message for RegisterDeploymentResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.deployment.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.deployment.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.token.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.token) as u64;
+        }
+        if self.created {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.deployment.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.deployment.write_to(__cache, buf);
+        }
+        if !self.token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.token, buf);
+        }
+        if self.created {
+            ::buffa::types::put_bool_field(3u32, self.created, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.deployment.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.token, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.created = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.deployment = ::buffa::MessageField::none();
+        self.token.clear();
+        self.created = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RegisterDeploymentResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RegisterDeploymentResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RegisterDeploymentResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REGISTER_DEPLOYMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RegisterDeploymentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RegisterDeploymentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RegisterDeploymentResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PromoteDeploymentRequest {
+    /// Field 1: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 2: `deployment_id`
+    #[serde(
+        rename = "deploymentId",
+        alias = "deployment_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub deployment_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PromoteDeploymentRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PromoteDeploymentRequest")
+            .field("agent_id", &self.agent_id)
+            .field("deployment_id", &self.deployment_id)
+            .finish()
+    }
+}
+impl PromoteDeploymentRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PromoteDeploymentRequest";
+}
+::buffa::impl_default_instance!(PromoteDeploymentRequest);
+impl ::buffa::MessageName for PromoteDeploymentRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "PromoteDeploymentRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.PromoteDeploymentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PromoteDeploymentRequest";
+}
+impl ::buffa::Message for PromoteDeploymentRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.agent_id, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.deployment_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_id.clear();
+        self.deployment_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PromoteDeploymentRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.PromoteDeploymentRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PromoteDeploymentRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROMOTE_DEPLOYMENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.PromoteDeploymentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<PromoteDeploymentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<PromoteDeploymentRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PromoteDeploymentResponse {
+    /// Field 1: `deployment`
+    #[serde(
+        rename = "deployment",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub deployment: ::buffa::MessageField<
+        super::super::types::v1::Deployment,
+        ::buffa::Inline<super::super::types::v1::Deployment>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PromoteDeploymentResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PromoteDeploymentResponse")
+            .field("deployment", &self.deployment)
+            .finish()
+    }
+}
+impl PromoteDeploymentResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PromoteDeploymentResponse";
+}
+::buffa::impl_default_instance!(PromoteDeploymentResponse);
+impl ::buffa::MessageName for PromoteDeploymentResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "PromoteDeploymentResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.PromoteDeploymentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PromoteDeploymentResponse";
+}
+impl ::buffa::Message for PromoteDeploymentResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.deployment.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.deployment.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.deployment.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.deployment.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.deployment.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.deployment = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PromoteDeploymentResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.PromoteDeploymentResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PromoteDeploymentResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROMOTE_DEPLOYMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.PromoteDeploymentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<PromoteDeploymentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<PromoteDeploymentResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RetireDeploymentRequest {
+    /// Field 1: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 2: `deployment_id`
+    #[serde(
+        rename = "deploymentId",
+        alias = "deployment_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub deployment_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RetireDeploymentRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RetireDeploymentRequest")
+            .field("agent_id", &self.agent_id)
+            .field("deployment_id", &self.deployment_id)
+            .finish()
+    }
+}
+impl RetireDeploymentRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RetireDeploymentRequest";
+}
+::buffa::impl_default_instance!(RetireDeploymentRequest);
+impl ::buffa::MessageName for RetireDeploymentRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RetireDeploymentRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.RetireDeploymentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RetireDeploymentRequest";
+}
+impl ::buffa::Message for RetireDeploymentRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.agent_id, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.deployment_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_id.clear();
+        self.deployment_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RetireDeploymentRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RetireDeploymentRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RetireDeploymentRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETIRE_DEPLOYMENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RetireDeploymentRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RetireDeploymentRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RetireDeploymentRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RetireDeploymentResponse {
+    /// Field 1: `deployment`
+    #[serde(
+        rename = "deployment",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub deployment: ::buffa::MessageField<
+        super::super::types::v1::AgentDeployment,
+        ::buffa::Inline<super::super::types::v1::AgentDeployment>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RetireDeploymentResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RetireDeploymentResponse")
+            .field("deployment", &self.deployment)
+            .finish()
+    }
+}
+impl RetireDeploymentResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RetireDeploymentResponse";
+}
+::buffa::impl_default_instance!(RetireDeploymentResponse);
+impl ::buffa::MessageName for RetireDeploymentResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RetireDeploymentResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.RetireDeploymentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RetireDeploymentResponse";
+}
+impl ::buffa::Message for RetireDeploymentResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.deployment.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.deployment.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.deployment.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.deployment.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.deployment.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.deployment = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RetireDeploymentResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RetireDeploymentResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RetireDeploymentResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RETIRE_DEPLOYMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RetireDeploymentResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RetireDeploymentResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RetireDeploymentResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct IssueDeploymentTokenRequest {
     /// Field 1: `agent_id`
     #[serde(
@@ -684,6 +1888,14 @@ pub struct IssueDeploymentTokenRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub agent_id: ::buffa::alloc::string::String,
+    /// Field 2: `deployment_id`
+    #[serde(
+        rename = "deploymentId",
+        alias = "deployment_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub deployment_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -692,6 +1904,7 @@ impl ::core::fmt::Debug for IssueDeploymentTokenRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("IssueDeploymentTokenRequest")
             .field("agent_id", &self.agent_id)
+            .field("deployment_id", &self.deployment_id)
             .finish()
     }
 }
@@ -725,6 +1938,10 @@ impl ::buffa::Message for IssueDeploymentTokenRequest {
         if !self.agent_id.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
         }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -737,6 +1954,9 @@ impl ::buffa::Message for IssueDeploymentTokenRequest {
         use ::buffa::Enumeration as _;
         if !self.agent_id.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.agent_id, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.deployment_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -758,6 +1978,13 @@ impl ::buffa::Message for IssueDeploymentTokenRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.agent_id, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -767,6 +1994,7 @@ impl ::buffa::Message for IssueDeploymentTokenRequest {
     }
     fn clear(&mut self) {
         self.agent_id.clear();
+        self.deployment_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

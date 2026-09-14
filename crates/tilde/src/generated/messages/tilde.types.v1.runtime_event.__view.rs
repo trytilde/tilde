@@ -1082,37 +1082,6 @@ impl<'a> ::buffa::MessageView<'a> for RuntimeEventView<'a> {
                     );
                 }
             }
-            23u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let __sub_ctx = ctx.descend()?;
-                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                if let Some(
-                    super::super::__buffa::view::oneof::runtime_event::State::Assignment(
-                        ref mut existing,
-                    ),
-                ) = view.state
-                {
-                    ::buffa::MessageView::merge_into_view(
-                        &mut **existing,
-                        sub,
-                        __sub_ctx,
-                    )?;
-                } else {
-                    view.state = Some(
-                        super::super::__buffa::view::oneof::runtime_event::State::Assignment(
-                            ::buffa::alloc::boxed::Box::new(
-                                <super::super::__buffa::view::ParticipantAssignmentView as ::buffa::MessageView>::decode_view_ctx(
-                                    sub,
-                                    __sub_ctx,
-                                )?,
-                            ),
-                        ),
-                    );
-                }
-            }
             24u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1328,15 +1297,6 @@ impl<'a> ::buffa::MessageView<'a> for RuntimeEventView<'a> {
                                     ),
                                 )
                             }
-                            super::super::__buffa::view::oneof::runtime_event::State::Assignment(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::runtime_event::State::Assignment(
-                                    ::buffa::alloc::boxed::Box::new(
-                                        v.to_owned_from_source(__buffa_src)?,
-                                    ),
-                                )
-                            }
                             super::super::__buffa::view::oneof::runtime_event::State::ChannelDecision(
                                 v,
                             ) => {
@@ -1514,16 +1474,6 @@ impl<'a> ::buffa::ViewEncode<'a> for RuntimeEventView<'a> {
                             + inner as u64;
                 }
                 super::super::__buffa::view::oneof::runtime_event::State::ConvertedMessage(
-                    x,
-                ) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 2u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                super::super::__buffa::view::oneof::runtime_event::State::Assignment(
                     x,
                 ) => {
                     let __slot = __cache.reserve();
@@ -1716,16 +1666,6 @@ impl<'a> ::buffa::ViewEncode<'a> for RuntimeEventView<'a> {
                     );
                     x.write_to(__cache, buf);
                 }
-                super::super::__buffa::view::oneof::runtime_event::State::Assignment(
-                    x,
-                ) => {
-                    ::buffa::types::put_len_delimited_header(
-                        23u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
                 super::super::__buffa::view::oneof::runtime_event::State::ChannelDecision(
                     x,
                 ) => {
@@ -1862,11 +1802,6 @@ impl<'__a> ::serde::Serialize for RuntimeEventView<'__a> {
                     v,
                 ) => {
                     __map.serialize_entry("convertedMessage", v)?;
-                }
-                super::super::__buffa::view::oneof::runtime_event::State::Assignment(
-                    v,
-                ) => {
-                    __map.serialize_entry("assignment", v)?;
                 }
                 super::super::__buffa::view::oneof::runtime_event::State::ChannelDecision(
                     v,

@@ -4,7 +4,9 @@ use buffa::Message;
 use common::{Database, seed};
 use secrecy::{ExposeSecret, SecretString};
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use tilde::proto::tilde::{agent_host::v1 as host, types::v1 as types};
+use tilde::proto::tilde::{
+    agent_event_ingress::v1 as wire, agent_host::v1 as host, types::v1 as types,
+};
 use tilde::{
     agent::{Agents, CreateAgent},
     chat::Chat,
@@ -168,20 +170,62 @@ impl Fixture {
             .set(
                 agent,
                 types::DeploymentMode::Sidecar,
-                None,
                 types::SidecarFailureMode::Reassign,
+                types::DeploymentRouting::Latest,
             )
             .await
             .unwrap();
         agents.resume(agent).await.unwrap();
-        let token = deployments.issue_token(agent).await.unwrap();
-        assert_eq!(
-            deployments
-                .authenticate(token.expose_secret())
-                .await
-                .unwrap(),
-            agent
+        // A manual sidecar deployment, as an operator would register from the UI. Its
+        // token is what every replica of that deployment dials in with.
+        let (deployment, token, created) = deployments
+            .register_deployment(
+                agent,
+                tilde::deployment::RegisterDeployment {
+                    source: types::DeploymentSource::Manual,
+                    target: types::DeploymentTarget::Sidecar,
+                    endpoint_url: None,
+                    target_reference: None,
+                    repository: Some("acme/support".into()),
+                    commit_sha: Some("abc123".into()),
+                    external_id: Some("deploy-1".into()),
+                    label: None,
+                },
+            )
+            .await
+            .unwrap();
+        assert!(created);
+        assert!(
+            deployment.serving,
+            "latest routing serves the new deployment"
         );
+        let token = token.expect("a new deployment returns its token once");
+        let auth = deployments
+            .authenticate(token.expose_secret())
+            .await
+            .unwrap();
+        assert_eq!(
+            (auth.agent, auth.deployment.to_string()),
+            (agent, deployment.id.clone())
+        );
+        // Registering the same external id again is a no-op without a token.
+        let (again, none, created) = deployments
+            .register_deployment(
+                agent,
+                tilde::deployment::RegisterDeployment {
+                    source: types::DeploymentSource::Ci,
+                    target: types::DeploymentTarget::Sidecar,
+                    endpoint_url: None,
+                    target_reference: None,
+                    repository: None,
+                    commit_sha: None,
+                    external_id: Some("deploy-1".into()),
+                    label: None,
+                },
+            )
+            .await
+            .unwrap();
+        assert!(!created && none.is_none() && again.id == deployment.id);
         assert!(
             deployments
                 .authenticate("unrelated-deployment-token")
@@ -214,10 +258,11 @@ impl Fixture {
             runtime_listen: "127.0.0.1:0".parse().unwrap(),
             listen: "127.0.0.1:0".parse().unwrap(),
             public_url: None,
+            idle_after: Duration::from_secs(600),
         };
         let first = sidecar::start(options(&gateway_url)).await.unwrap();
         let second = sidecar::start(options(&gateway_url)).await.unwrap();
-        assert_eq!(deployments.nodes(agent).await.unwrap().len(), 2);
+        assert_eq!(deployments.instances(agent).await.unwrap().len(), 2);
         let ingress_token = deployments
             .issue_ingress_token(agent, None, Uuid::nil())
             .await
@@ -304,15 +349,16 @@ impl Fixture {
             .unwrap_or_else(|_| panic!("agent invocation for {expected}"))
             .unwrap()
     }
-    async fn owner(&self, thread: Uuid) -> (Uuid, i64) {
+    /// The replica holding the thread's lease in the projection, if any.
+    async fn holder(&self, thread: Uuid) -> Option<Uuid> {
         use sqlx::Row;
-        let row = sqlx::query("SELECT owner_instance_id,generation FROM participant_assignments WHERE thread_id=$1 AND agent_id=$2")
+        sqlx::query("SELECT instance_id FROM thread_leases WHERE thread_id=$1 AND agent_id=$2")
             .bind(thread)
             .bind(self.agent)
-            .fetch_one(&self.db.pool)
+            .fetch_optional(&self.db.pool)
             .await
-            .unwrap();
-        (row.get("owner_instance_id"), row.get("generation"))
+            .unwrap()
+            .map(|row| row.get("instance_id"))
     }
     async fn projected(&self, thread: Uuid, text: &str) {
         eventually(async || {
@@ -324,20 +370,20 @@ impl Fixture {
         })
         .await;
     }
-    /// Age a node until the gateway treats it as dead and hands its conversation to `owner`.
-    async fn fail_over(&self, instance: Uuid, thread: Uuid, owner: Uuid, generation: i64) {
+    /// Age a node until the gateway treats it as dead and moves its lease to `next`.
+    async fn fail_over(&self, instance: Uuid, thread: Uuid, next: Uuid) {
         // A heartbeat already in flight may still land after a stop; keep aging the
         // node until recovery (the worker or this direct call) reassigns.
         eventually(async || {
             sqlx::query(
-                "UPDATE sidecar_nodes SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
+                "UPDATE agent_instances SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
             )
             .bind(instance)
             .execute(&self.db.pool)
             .await
             .unwrap();
             self.deployments.recover().await.unwrap();
-            (self.owner(thread).await == (owner, generation)).then_some(())
+            (self.holder(thread).await == Some(next)).then_some(())
         })
         .await;
     }
@@ -356,7 +402,7 @@ impl Fixture {
 async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway() {
     let mut fx = Fixture::new().await;
     let (first_base, second_base) = (fx.base(fx.first()), fx.base(fx.second()));
-    // The replica that receives the first request owns the conversation and runs the agent.
+    // The replica that receives the first request takes the thread lease and runs the agent.
     let (thread_id, alice, agent_participant) = fx.room().await;
     let (status, posted) = fx.post(&first_base, thread_id, &alice, "hello").await;
     assert_eq!(status, 200, "{posted}");
@@ -365,7 +411,6 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         invocation.owner_instance_id,
         fx.first().instance.to_string()
     );
-    assert_eq!(invocation.assignment_generation, 1);
     assert_eq!(invocation.objective, "hello");
     assert_eq!(invocation.thread_id, thread_id.to_string());
     // Registry calls from the agent process are relayed to the gateway under the same token.
@@ -397,7 +442,7 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         401
     );
     fx.finish.notify_one();
-    // The owner's events reach Postgres without the gateway ever calling the replica.
+    // The holder's events reach Postgres without the gateway ever calling the replica.
     let projected = eventually(async || {
         let messages = fx.chat.messages(thread_id, 10).await.ok()?;
         let run = fx
@@ -412,8 +457,9 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     })
     .await;
     assert_eq!(projected.status, "waiting");
-    assert_eq!(fx.owner(thread_id).await, (fx.first().instance, 1));
-    // A request landing on the other replica is executed by the owner through the gateway.
+    assert_eq!(fx.holder(thread_id).await, Some(fx.first().instance));
+    // A request landing on the other replica is handed to the holder: the gateway
+    // refuses the second replica's lease and names the first, which executes it.
     let (status, forwarded) = fx.post(&second_base, thread_id, &alice, "second").await;
     assert_eq!(status, 200, "{forwarded}");
     let invocation = fx.invocation("second").await;
@@ -449,7 +495,7 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         .await;
     assert_eq!(status, 200, "{listed}");
     assert_eq!(listed["threads"].as_array().unwrap().len(), 1);
-    // The owner dies mid-invocation: the gateway reassigns and the survivor restarts the run.
+    // The holder dies mid-invocation: recovery moves the lease and the survivor restarts the run.
     let pending_run = Uuid::parse_str(&invocation.run_id).unwrap();
     eventually(async || {
         fx.chat
@@ -461,7 +507,7 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     .await;
     eventually(async || {
         fx.deployments
-            .nodes(fx.agent)
+            .instances(fx.agent)
             .await
             .ok()
             .filter(|nodes| nodes.len() == 2 && nodes.iter().all(|n| n.ready))
@@ -469,8 +515,8 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     .await;
     let first_instance = fx.first().instance;
     fx.first.take().unwrap().stop().await;
-    // Work queued for the dead owner while the gateway still believed it alive follows
-    // the conversation to the survivor instead of timing out.
+    // Work queued for the dead holder while the gateway still believed it alive follows
+    // the lease to the survivor instead of timing out.
     let queued = {
         let (http, base, agent, token) = (
             fx.http.clone(),
@@ -483,21 +529,20 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
             ingress(&http, &base, agent, &token, "PostMessage", serde_json::json!({"id":Uuid::new_v4(),"threadId":thread_id,"participantId":participant,"text":"queued"})).await
         })
     };
-    fx.fail_over(first_instance, thread_id, fx.second().instance, 2)
+    fx.fail_over(first_instance, thread_id, fx.second().instance)
         .await;
     let recovered = fx.invocation("recovered second").await;
     assert_eq!(
         recovered.owner_instance_id,
         fx.second().instance.to_string()
     );
-    assert_eq!(recovered.assignment_generation, 2);
     assert_eq!(recovered.objective, "second");
     fx.finish.notify_one();
     fx.finish.notify_one();
     let (status, queued) = queued.await.unwrap();
     assert_eq!(status, 200, "{queued}");
     fx.projected(thread_id, "queued").await;
-    assert_eq!(fx.owner(thread_id).await, (fx.second().instance, 2));
+    assert_eq!(fx.holder(thread_id).await, Some(fx.second().instance));
     // Afterwards the survivor serves the conversation directly.
     let (status, after) = fx.post(&second_base, thread_id, &alice, "third").await;
     assert_eq!(status, 200, "{after}");
@@ -506,16 +551,15 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         invocation.owner_instance_id,
         fx.second().instance.to_string()
     );
-    assert_eq!(invocation.assignment_generation, 2);
     fx.finish.notify_one();
     fx.projected(thread_id, "third").await;
     fx.shutdown().await;
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_reassigned_owner_is_fenced_and_forwards_to_the_new_owner() {
+async fn a_replica_that_lost_its_lease_is_fenced_and_hands_off_to_the_holder() {
     let mut fx = Fixture::new().await;
     let first_base = fx.base(fx.first());
-    let (thread_id, alice, agent_participant) = fx.room().await;
+    let (thread_id, alice, _agent_participant) = fx.room().await;
     let (status, posted) = fx.post(&first_base, thread_id, &alice, "hello").await;
     assert_eq!(status, 200, "{posted}");
     let invocation = fx.invocation("hello").await;
@@ -524,42 +568,48 @@ async fn a_reassigned_owner_is_fenced_and_forwards_to_the_new_owner() {
         fx.first().instance.to_string()
     );
     fx.projected(thread_id, "hello").await;
-    // The gateway moves the conversation while the first replica is still mid-invocation
-    // and has not heard about it: its heartbeats stopped arriving, so another replica's
-    // claim is granted. The first replica is alive and will keep heartbeating, so the
-    // claim must land inside one heartbeat interval.
+    // The lease moves while the first replica is still mid-invocation and has not
+    // heard about it: its heartbeats stopped arriving, so the second replica's
+    // hydrate takes the lease from a holder the gateway considers dead. The first
+    // replica is alive and will keep heartbeating, so the take-over must land
+    // inside one heartbeat interval.
     let (first_instance, second_instance) = (fx.first().instance, fx.second().instance);
     eventually(async || {
         sqlx::query(
-            "UPDATE sidecar_nodes SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
+            "UPDATE agent_instances SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1",
         )
         .bind(first_instance)
         .execute(&fx.db.pool)
         .await
         .unwrap();
-        let claim = fx
+        let hydrated = fx
             .deployments
-            .claim(
+            .hydrate(
                 fx.agent,
-                second_instance,
-                thread_id,
-                Uuid::parse_str(&agent_participant).unwrap(),
+                Some(second_instance),
+                wire::HydrateRequest {
+                    key: Some(wire::hydrate_request::Key::ThreadId(thread_id.to_string())),
+                    lease: true,
+                    instance_id: second_instance.to_string(),
+                    ..Default::default()
+                },
             )
             .await
             .unwrap();
-        (claim.granted && claim.generation == 2).then_some(())
+        let lease = hydrated.lease.into_option().unwrap();
+        (lease.held && lease.holder_instance_id == second_instance.to_string()).then_some(())
     })
     .await;
     fx.finish.notify_one();
-    // Whatever the stale owner publishes at generation 1 is fenced, and it gives the
-    // conversation up; the projection keeps the second replica as the owner.
+    // Run state the stale replica publishes is refused as not the holder's; it learns
+    // who holds the lease and gives the conversation up. The projection keeps the
+    // second replica as the holder.
     eventually(async || (!fx.first().nodes[0].runtime.owns_thread(thread_id).await).then_some(()))
         .await;
-    assert_eq!(fx.owner(thread_id).await, (fx.second().instance, 2));
-    // New work landing on the stale replica is executed by the new owner. The recovery
-    // worker may also have restarted the interrupted run on the new owner in the
-    // meantime; every invocation from here on belongs to the second replica at
-    // generation 2, whichever order they arrive in.
+    assert_eq!(fx.holder(thread_id).await, Some(fx.second().instance));
+    // New work landing on the stale replica is handed to the holder. The second
+    // replica may also have restarted the interrupted run when it hydrated; every
+    // invocation from here on belongs to it, whichever order they arrive in.
     let (status, after) = fx.post(&first_base, thread_id, &alice, "after").await;
     assert_eq!(status, 200, "{after}");
     loop {
@@ -568,7 +618,6 @@ async fn a_reassigned_owner_is_fenced_and_forwards_to_the_new_owner() {
             invocation.owner_instance_id,
             fx.second().instance.to_string()
         );
-        assert_eq!(invocation.assignment_generation, 2);
         fx.finish.notify_one();
         if invocation.objective == "after" {
             break;

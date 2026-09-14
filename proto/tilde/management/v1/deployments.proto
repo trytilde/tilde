@@ -5,15 +5,31 @@ import "tilde/types/v1/deployment.proto";
 service DeploymentService {
   rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse);
   rpc SetDeployment(SetDeploymentRequest) returns (SetDeploymentResponse);
+  // Register a deployment from CI or by hand. Idempotent on (agent, external_id): a repeat
+  // returns the existing record without a token. The token is returned once, on creation.
+  rpc RegisterDeployment(RegisterDeploymentRequest) returns (RegisterDeploymentResponse);
+  rpc PromoteDeployment(PromoteDeploymentRequest) returns (PromoteDeploymentResponse);
+  // Retiring invalidates the deployment's token; its instances can no longer register.
+  rpc RetireDeployment(RetireDeploymentRequest) returns (RetireDeploymentResponse);
   rpc IssueDeploymentToken(IssueDeploymentTokenRequest) returns (IssueDeploymentTokenResponse);
   rpc CreateSidecarAgent(CreateSidecarAgentRequest) returns (CreateSidecarAgentResponse);
   rpc IssueIngressToken(IssueIngressTokenRequest) returns (IssueIngressTokenResponse);
 }
 message GetDeploymentRequest { string agent_id = 1; }
-message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.SidecarNode nodes = 2; }
-message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.DeploymentMode mode = 2; optional string endpoint_url = 3; tilde.types.v1.SidecarFailureMode failure_mode = 4; }
+message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.AgentInstance instances = 2; repeated tilde.types.v1.AgentDeployment deployments = 3; }
+message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.DeploymentMode mode = 2; tilde.types.v1.SidecarFailureMode failure_mode = 4; tilde.types.v1.DeploymentRouting routing = 5; reserved 3; }
 message SetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
-message IssueDeploymentTokenRequest { string agent_id = 1; }
+message RegisterDeploymentRequest {
+  string agent_id = 1; tilde.types.v1.DeploymentSource source = 2; tilde.types.v1.DeploymentTarget target = 3;
+  optional string endpoint_url = 4; optional string target_reference = 5; optional string repository = 6;
+  optional string commit_sha = 7; optional string external_id = 8; optional string label = 9;
+}
+message RegisterDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; string token = 2 [debug_redact = true]; bool created = 3; }
+message PromoteDeploymentRequest { string agent_id = 1; string deployment_id = 2; }
+message PromoteDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
+message RetireDeploymentRequest { string agent_id = 1; string deployment_id = 2; }
+message RetireDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; }
+message IssueDeploymentTokenRequest { string agent_id = 1; string deployment_id = 2; }
 message IssueDeploymentTokenResponse { string token = 1 [debug_redact = true]; }
 message CreateSidecarAgentRequest { string id = 1; string name = 2; string webhook_signing_key = 3 [debug_redact = true]; tilde.types.v1.Capabilities capabilities = 4; }
 message CreateSidecarAgentResponse { tilde.types.v1.Agent agent = 1; }

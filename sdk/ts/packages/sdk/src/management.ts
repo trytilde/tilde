@@ -11,3 +11,5 @@ export * from "./gen/tilde/types/v1/access_pb.js";
 export * from "./gen/tilde/management/v1/tracing_pb.js";
 
 export * from "./gen/tilde/management/v1/logs_pb.js";
+export * from "./gen/tilde/management/v1/deployments_pb.js";
+export * from "./gen/tilde/types/v1/deployment_pb.js";

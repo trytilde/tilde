@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployments SET status='retired',retired_at=NOW(),token_hash=NULL WHERE id=$1 AND agent_id=$2 AND status='registered' RETURNING id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1a3d006ad08914cca49707f8d82131af5a804275cd7a235bc0395f24f17d62ad"
+}

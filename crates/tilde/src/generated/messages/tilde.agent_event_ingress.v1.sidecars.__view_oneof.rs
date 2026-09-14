@@ -18,11 +18,9 @@ pub mod watch_response {
                 >,
             >,
         ),
-        Assignment(
+        Lease(
             ::buffa::alloc::boxed::Box<
-                super::super::super::super::super::super::types::v1::__buffa::view::ParticipantAssignmentView<
-                    'a,
-                >,
+                super::super::super::super::__buffa::view::ThreadLeaseView<'a>,
             >,
         ),
         Directive(
@@ -52,11 +50,6 @@ pub mod directive {
                 super::super::super::super::__buffa::view::ProviderEventDirectiveView<'a>,
             >,
         ),
-        Recover(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::__buffa::view::RecoverRunView<'a>,
-            >,
-        ),
         Relay(
             ::buffa::alloc::boxed::Box<
                 super::super::super::super::__buffa::view::RelayMessageView<'a>,
@@ -74,11 +67,6 @@ pub mod upstream {
                 super::super::super::super::__buffa::view::HeartbeatView<'a>,
             >,
         ),
-        Claim(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::__buffa::view::ClaimView<'a>,
-            >,
-        ),
         Event(
             ::buffa::alloc::boxed::Box<
                 super::super::super::super::__buffa::view::EventView<'a>,
@@ -94,6 +82,11 @@ pub mod upstream {
                 super::super::super::super::__buffa::view::TelemetryView<'a>,
             >,
         ),
+        Release(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::__buffa::view::ReleaseView<'a>,
+            >,
+        ),
     }
 }
 pub mod hydrate_request {
@@ -105,23 +98,6 @@ pub mod hydrate_request {
         External(
             ::buffa::alloc::boxed::Box<
                 super::super::super::super::__buffa::view::ExternalKeyView<'a>,
-            >,
-        ),
-    }
-}
-pub mod forward_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[derive(Clone, Debug)]
-    pub enum Work<'a> {
-        Call(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::__buffa::view::IngressCallView<'a>,
-            >,
-        ),
-        ProviderEvent(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::__buffa::view::ProviderEventDirectiveView<'a>,
             >,
         ),
     }

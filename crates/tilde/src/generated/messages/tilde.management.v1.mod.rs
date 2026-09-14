@@ -122,6 +122,12 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_DEPLOYMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SET_DEPLOYMENT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_DEPLOYMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_DEPLOYMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__PROMOTE_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__PROMOTE_DEPLOYMENT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RETIRE_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RETIRE_DEPLOYMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ISSUE_DEPLOYMENT_TOKEN_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ISSUE_DEPLOYMENT_TOKEN_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_SIDECAR_AGENT_REQUEST_JSON_ANY);
@@ -500,6 +506,30 @@ pub use self::__buffa::view::SetDeploymentRequestOwnedView;
 pub use self::__buffa::view::SetDeploymentResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetDeploymentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterDeploymentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromoteDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PromoteDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromoteDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PromoteDeploymentResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RetireDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RetireDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RetireDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RetireDeploymentResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::IssueDeploymentTokenRequestView;
 #[doc(inline)]

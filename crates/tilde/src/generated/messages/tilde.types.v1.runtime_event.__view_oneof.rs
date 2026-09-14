@@ -71,11 +71,6 @@ pub mod runtime_event {
                 super::super::super::super::__buffa::view::ConvertedMessageStateView<'a>,
             >,
         ),
-        Assignment(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::__buffa::view::ParticipantAssignmentView<'a>,
-            >,
-        ),
         ChannelDecision(
             ::buffa::alloc::boxed::Box<
                 super::super::super::super::__buffa::view::ChannelDecisionView<'a>,

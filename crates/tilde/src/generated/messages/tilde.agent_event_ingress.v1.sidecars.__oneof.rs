@@ -10,11 +10,7 @@ pub mod watch_response {
         Configuration(
             ::buffa::alloc::boxed::Box<super::super::super::GetConfigurationResponse>,
         ),
-        Assignment(
-            ::buffa::alloc::boxed::Box<
-                super::super::super::super::super::types::v1::ParticipantAssignment,
-            >,
-        ),
+        Lease(::buffa::alloc::boxed::Box<super::super::super::ThreadLease>),
         Directive(::buffa::alloc::boxed::Box<super::super::super::Directive>),
         Ping(::buffa::alloc::boxed::Box<super::super::super::Ping>),
     }
@@ -40,19 +36,13 @@ pub mod watch_response {
             Self::Some(Frame::from(v))
         }
     }
-    impl From<super::super::super::super::super::types::v1::ParticipantAssignment>
-    for Frame {
-        fn from(
-            v: super::super::super::super::super::types::v1::ParticipantAssignment,
-        ) -> Self {
-            Self::Assignment(::buffa::alloc::boxed::Box::new(v))
+    impl From<super::super::super::ThreadLease> for Frame {
+        fn from(v: super::super::super::ThreadLease) -> Self {
+            Self::Lease(::buffa::alloc::boxed::Box::new(v))
         }
     }
-    impl From<super::super::super::super::super::types::v1::ParticipantAssignment>
-    for ::core::option::Option<Frame> {
-        fn from(
-            v: super::super::super::super::super::types::v1::ParticipantAssignment,
-        ) -> Self {
+    impl From<super::super::super::ThreadLease> for ::core::option::Option<Frame> {
+        fn from(v: super::super::super::ThreadLease) -> Self {
             Self::Some(Frame::from(v))
         }
     }
@@ -90,8 +80,8 @@ pub mod watch_response {
                 Self::Configuration(v) => {
                     map.serialize_entry("configuration", v)?;
                 }
-                Self::Assignment(v) => {
-                    map.serialize_entry("assignment", v)?;
+                Self::Lease(v) => {
+                    map.serialize_entry("lease", v)?;
                 }
                 Self::Directive(v) => {
                     map.serialize_entry("directive", v)?;
@@ -113,7 +103,6 @@ pub mod directive {
         ProviderEvent(
             ::buffa::alloc::boxed::Box<super::super::super::ProviderEventDirective>,
         ),
-        Recover(::buffa::alloc::boxed::Box<super::super::super::RecoverRun>),
         Relay(::buffa::alloc::boxed::Box<super::super::super::RelayMessage>),
     }
     impl ::buffa::Oneof for Action {}
@@ -135,16 +124,6 @@ pub mod directive {
     impl From<super::super::super::ProviderEventDirective>
     for ::core::option::Option<Action> {
         fn from(v: super::super::super::ProviderEventDirective) -> Self {
-            Self::Some(Action::from(v))
-        }
-    }
-    impl From<super::super::super::RecoverRun> for Action {
-        fn from(v: super::super::super::RecoverRun) -> Self {
-            Self::Recover(::buffa::alloc::boxed::Box::new(v))
-        }
-    }
-    impl From<super::super::super::RecoverRun> for ::core::option::Option<Action> {
-        fn from(v: super::super::super::RecoverRun) -> Self {
             Self::Some(Action::from(v))
         }
     }
@@ -172,9 +151,6 @@ pub mod directive {
                 Self::ProviderEvent(v) => {
                     map.serialize_entry("providerEvent", v)?;
                 }
-                Self::Recover(v) => {
-                    map.serialize_entry("recover", v)?;
-                }
                 Self::Relay(v) => {
                     map.serialize_entry("relay", v)?;
                 }
@@ -189,12 +165,12 @@ pub mod upstream {
     #[derive(Clone, PartialEq, Debug)]
     pub enum Frame {
         Heartbeat(::buffa::alloc::boxed::Box<super::super::super::Heartbeat>),
-        Claim(::buffa::alloc::boxed::Box<super::super::super::Claim>),
         Event(::buffa::alloc::boxed::Box<super::super::super::Event>),
         DirectiveResult(
             ::buffa::alloc::boxed::Box<super::super::super::DirectiveResult>,
         ),
         Telemetry(::buffa::alloc::boxed::Box<super::super::super::Telemetry>),
+        Release(::buffa::alloc::boxed::Box<super::super::super::Release>),
     }
     impl ::buffa::Oneof for Frame {}
     impl From<super::super::super::Heartbeat> for Frame {
@@ -204,16 +180,6 @@ pub mod upstream {
     }
     impl From<super::super::super::Heartbeat> for ::core::option::Option<Frame> {
         fn from(v: super::super::super::Heartbeat) -> Self {
-            Self::Some(Frame::from(v))
-        }
-    }
-    impl From<super::super::super::Claim> for Frame {
-        fn from(v: super::super::super::Claim) -> Self {
-            Self::Claim(::buffa::alloc::boxed::Box::new(v))
-        }
-    }
-    impl From<super::super::super::Claim> for ::core::option::Option<Frame> {
-        fn from(v: super::super::super::Claim) -> Self {
             Self::Some(Frame::from(v))
         }
     }
@@ -247,6 +213,16 @@ pub mod upstream {
             Self::Some(Frame::from(v))
         }
     }
+    impl From<super::super::super::Release> for Frame {
+        fn from(v: super::super::super::Release) -> Self {
+            Self::Release(::buffa::alloc::boxed::Box::new(v))
+        }
+    }
+    impl From<super::super::super::Release> for ::core::option::Option<Frame> {
+        fn from(v: super::super::super::Release) -> Self {
+            Self::Some(Frame::from(v))
+        }
+    }
     impl serde::Serialize for Frame {
         fn serialize<S: serde::Serializer>(
             &self,
@@ -258,9 +234,6 @@ pub mod upstream {
                 Self::Heartbeat(v) => {
                     map.serialize_entry("heartbeat", v)?;
                 }
-                Self::Claim(v) => {
-                    map.serialize_entry("claim", v)?;
-                }
                 Self::Event(v) => {
                     map.serialize_entry("event", v)?;
                 }
@@ -269,6 +242,9 @@ pub mod upstream {
                 }
                 Self::Telemetry(v) => {
                     map.serialize_entry("telemetry", v)?;
+                }
+                Self::Release(v) => {
+                    map.serialize_entry("release", v)?;
                 }
             }
             map.end()
@@ -307,57 +283,6 @@ pub mod hydrate_request {
                 }
                 Self::External(v) => {
                     map.serialize_entry("external", v)?;
-                }
-            }
-            map.end()
-        }
-    }
-}
-pub mod forward_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[derive(Clone, PartialEq, Debug)]
-    pub enum Work {
-        Call(::buffa::alloc::boxed::Box<super::super::super::IngressCall>),
-        ProviderEvent(
-            ::buffa::alloc::boxed::Box<super::super::super::ProviderEventDirective>,
-        ),
-    }
-    impl ::buffa::Oneof for Work {}
-    impl From<super::super::super::IngressCall> for Work {
-        fn from(v: super::super::super::IngressCall) -> Self {
-            Self::Call(::buffa::alloc::boxed::Box::new(v))
-        }
-    }
-    impl From<super::super::super::IngressCall> for ::core::option::Option<Work> {
-        fn from(v: super::super::super::IngressCall) -> Self {
-            Self::Some(Work::from(v))
-        }
-    }
-    impl From<super::super::super::ProviderEventDirective> for Work {
-        fn from(v: super::super::super::ProviderEventDirective) -> Self {
-            Self::ProviderEvent(::buffa::alloc::boxed::Box::new(v))
-        }
-    }
-    impl From<super::super::super::ProviderEventDirective>
-    for ::core::option::Option<Work> {
-        fn from(v: super::super::super::ProviderEventDirective) -> Self {
-            Self::Some(Work::from(v))
-        }
-    }
-    impl serde::Serialize for Work {
-        fn serialize<S: serde::Serializer>(
-            &self,
-            s: S,
-        ) -> ::core::result::Result<S::Ok, S::Error> {
-            use serde::ser::SerializeMap;
-            let mut map = s.serialize_map(Some(1))?;
-            match self {
-                Self::Call(v) => {
-                    map.serialize_entry("call", v)?;
-                }
-                Self::ProviderEvent(v) => {
-                    map.serialize_entry("providerEvent", v)?;
                 }
             }
             map.end()

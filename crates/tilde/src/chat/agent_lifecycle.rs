@@ -119,6 +119,7 @@ pub(crate) async fn requeue_inputs(
             run
         };
         let next = Uuid::new_v4();
+        let deployment = super::pin_deployment(tx, state.thread_id, state.agent_id).await?;
         sqlx::query_file!(
             "../../queries/chat/invocation_create.sql",
             next,
@@ -126,7 +127,8 @@ pub(crate) async fn requeue_inputs(
             state.thread_id,
             state.agent_id,
             crate::telemetry::context::capture().0,
-            crate::telemetry::context::capture().1
+            crate::telemetry::context::capture().1,
+            deployment
         )
         .execute(&mut **tx)
         .await?;

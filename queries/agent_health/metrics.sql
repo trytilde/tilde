@@ -29,4 +29,4 @@ LEFT JOIN LATERAL (
     WHERE agent_id = a.id AND endpoint_url = a.endpoint_url AND checked_at <= $2
     ORDER BY checked_at DESC, id DESC LIMIT 1
 ) h ON TRUE
-LEFT JOIN LATERAL (SELECT BOOL_OR(ready AND agent_ready AND last_seen_at>$2-INTERVAL '15 seconds') AS healthy,MAX(last_seen_at) AS checked_at FROM sidecar_nodes WHERE agent_id=a.id) sh ON TRUE;
+LEFT JOIN LATERAL (SELECT BOOL_OR(ready AND agent_ready AND last_seen_at>$2-INTERVAL '15 seconds') AS healthy,MAX(last_seen_at) AS checked_at FROM agent_instances WHERE agent_id=a.id) sh ON TRUE;

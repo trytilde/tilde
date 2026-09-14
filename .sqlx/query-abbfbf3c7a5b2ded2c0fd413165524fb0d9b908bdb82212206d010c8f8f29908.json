@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.instance_id,n.public_url AS \"public_url?\",COALESCE(n.last_seen_at>NOW()-INTERVAL '15 seconds',FALSE) AS \"live!\"\nFROM thread_leases l LEFT JOIN agent_instances n ON n.agent_id=l.agent_id AND n.instance_id=l.instance_id\nWHERE l.thread_id=$1 AND l.agent_id=$2;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "public_url?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "live!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "abbfbf3c7a5b2ded2c0fd413165524fb0d9b908bdb82212206d010c8f8f29908"
+}

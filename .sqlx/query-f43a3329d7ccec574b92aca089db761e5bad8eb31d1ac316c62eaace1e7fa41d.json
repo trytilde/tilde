@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO sidecar_directives(id,agent_id,instance_id,thread_id,payload) VALUES($1,$2,$3,$4,$5);\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f43a3329d7ccec574b92aca089db761e5bad8eb31d1ac316c62eaace1e7fa41d"
+}

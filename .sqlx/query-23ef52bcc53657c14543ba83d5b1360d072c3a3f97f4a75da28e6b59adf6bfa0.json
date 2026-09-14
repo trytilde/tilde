@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agent_deployment_settings SET failure_mode=$2,routing=$3 WHERE agent_id=$1;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "23ef52bcc53657c14543ba83d5b1360d072c3a3f97f4a75da28e6b59adf6bfa0"
+}

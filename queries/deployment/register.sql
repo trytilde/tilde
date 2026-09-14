@@ -1,1 +1,1 @@
-INSERT INTO sidecar_nodes(agent_id,instance_id,public_url,runtime_url) VALUES($1,$2,$3,$4) ON CONFLICT(agent_id,instance_id) DO UPDATE SET public_url=EXCLUDED.public_url,runtime_url=EXCLUDED.runtime_url,last_seen_at=NOW();
+INSERT INTO agent_instances(agent_id,instance_id,deployment_id,public_url,runtime_url) VALUES($1,$2,$3,$4,$5) ON CONFLICT(agent_id,instance_id) DO UPDATE SET deployment_id=EXCLUDED.deployment_id,public_url=EXCLUDED.public_url,runtime_url=EXCLUDED.runtime_url,last_seen_at=NOW();

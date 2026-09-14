@@ -4,56 +4,57 @@ import "tilde/types/v1/agent.proto";
 import "tilde/types/v1/access.proto";
 import "tilde/types/v1/chat.proto";
 import "tilde/types/v1/runtime_event.proto";
-import "tilde/types/v1/deployment.proto";
 // Sidecars dial the gateway; every call authenticates one agent deployment token.
-// The gateway never opens a connection to a sidecar.
+// The gateway never opens a connection to a sidecar. Postgres is the record; a
+// replica is a cache plus a write-behind queue plus the executor for the threads
+// it holds a lease on.
 service SidecarService {
   // Held open for the life of a replica: a snapshot first, then configuration,
-  // ownership and directives as they change.
+  // lease changes and directives as they change.
   rpc Watch(WatchRequest) returns (stream WatchResponse);
-  // Batched replica frames. The response acknowledges events and answers claims.
+  // Heartbeats, typed events, directive results, lease releases and telemetry, in order.
   rpc Publish(PublishRequest) returns (PublishResponse);
-  // Conversation state a replica does not hold in memory, optionally claiming ownership.
+  // Conversation state from the projection, taking the thread lease in the same call when asked.
   rpc Hydrate(HydrateRequest) returns (HydrateResponse);
-  // Execute one ingress call on the replica that owns the conversation.
+  // Run one ingress call on a live replica and relay its answer.
   rpc Forward(ForwardRequest) returns (ForwardResponse);
   rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
   rpc ResolveParticipant(ResolveParticipantRequest) returns (ResolveParticipantResponse);
-  // Execute one registry call at the gateway on behalf of a verified local invocation.
+  // Registry RPCs from the agent process, re-verified at the gateway.
   rpc Relay(RelayRequest) returns (RelayResponse);
 }
 message WatchRequest { string instance_id = 1; string public_url = 2; string runtime_url = 3; }
-message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; tilde.types.v1.ParticipantAssignment assignment = 3; Directive directive = 4; Ping ping = 5; } }
-message Snapshot { GetConfigurationResponse configuration = 1; repeated tilde.types.v1.ParticipantAssignment assignments = 2; string token_signing_key = 3 [debug_redact = true]; }
+message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; ThreadLease lease = 3; Directive directive = 4; Ping ping = 5; } }
+// Leases in the snapshot are the ones this instance holds.
+message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; }
 message Ping {}
-// Durable gateway-originated work for the owning replica, acknowledged by DirectiveResult.
-message Directive { string id = 1; string thread_id = 2; uint64 generation = 3; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RecoverRun recover = 12; RelayMessage relay = 13; } }
-// A completed message from another participant's replica or the gateway, for local routing.
+// Who executes a (thread, agent) pair. `held` is false when nobody does.
+message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; reserved 2; }
+// Gateway-originated work for one replica, acknowledged with a DirectiveResult.
+message Directive { string id = 1; string thread_id = 2; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RelayMessage relay = 13; } }
+// A completed message authored elsewhere in a room this agent participates in.
 message RelayMessage { tilde.types.v1.Thread thread = 1; tilde.types.v1.Message message = 2; }
-// One tilde.ingress.v1.ChatService method executed with the original caller's scope.
 message IngressCall { string method = 1; string content_type = 2; bytes body = 3; string caller_token = 4 [debug_redact = true]; }
 message CallResult { int32 status = 1; string content_type = 2; bytes body = 3; }
 message ProviderEventDirective { string connection_id = 1; tilde.types.v1.ProviderEvent event = 2; }
-message RecoverRun { string run_id = 1; string participant_id = 2; string objective = 3; }
-
 message PublishRequest { string instance_id = 1; repeated Upstream frames = 2; }
-message Upstream { oneof frame { Heartbeat heartbeat = 1; Claim claim = 2; Event event = 3; DirectiveResult directive_result = 4; Telemetry telemetry = 5; } }
+message Upstream { oneof frame { Heartbeat heartbeat = 1; Event event = 3; DirectiveResult directive_result = 4; Telemetry telemetry = 5; Release release = 6; } }
 message Heartbeat { string sample_id = 1; bool ready = 2; bool agent_ready = 3; int32 latency_ms = 4; }
-message Claim { string thread_id = 1; string participant_id = 2; }
-message Event { tilde.types.v1.RuntimeEvent event = 1; uint64 generation = 2; }
+// The replica evicted an idle thread and no longer executes on it.
+message Release { string thread_id = 1; }
+message Event { tilde.types.v1.RuntimeEvent event = 1; }
 message DirectiveResult { string id = 1; CallResult result = 2; }
-enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; TELEMETRY_KIND_LOGS = 2; }
+// Immutable telemetry batches (traces, logs) accepted once by payload receipt.
 message Telemetry { TelemetryKind kind = 1; bytes payload = 2; }
-// Every frame is either applied, fenced, or rejected; only infrastructure failures fail a batch.
-message PublishResponse { repeated ClaimResult claims = 1; repeated Fence fences = 2; repeated string rejected_event_ids = 3; }
-message ClaimResult { string thread_id = 1; string participant_id = 2; bool granted = 3; uint64 generation = 4; string owner_instance_id = 5; }
-message Fence { string thread_id = 1; uint64 generation = 2; }
-
-message HydrateRequest { oneof key { string thread_id = 1; ExternalKey external = 2; } bool claim = 3; string instance_id = 4; }
+enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; TELEMETRY_KIND_LOGS = 2; }
+// Frames the gateway would not accept are named so the replica drops them; run
+// state from a replica that no longer holds the thread also reports the lease.
+message PublishResponse { repeated string rejected_event_ids = 3; repeated ThreadLease lost = 4; }
+message HydrateRequest { oneof key { string thread_id = 1; ExternalKey external = 2; } bool lease = 3; string instance_id = 4; }
 message ExternalKey { string connection_id = 1; string external_id = 2; }
-message HydrateResponse { bool found = 1; tilde.types.v1.Thread thread = 2; repeated tilde.types.v1.Message messages = 3; repeated tilde.types.v1.Run runs = 4; tilde.types.v1.ParticipantAssignment assignment = 5; }
-message ForwardRequest { string thread_id = 1; oneof work { IngressCall call = 2; ProviderEventDirective provider_event = 3; } }
+message HydrateResponse { bool found = 1; tilde.types.v1.Thread thread = 2; repeated tilde.types.v1.Message messages = 3; repeated tilde.types.v1.Run runs = 4; ThreadLease lease = 5; }
+message ForwardRequest { string thread_id = 1; IngressCall call = 2; }
 message ForwardResponse { CallResult result = 1; }
 message UploadAttachmentRequest { tilde.types.v1.Attachment attachment = 1; bytes content = 2; }
 message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }

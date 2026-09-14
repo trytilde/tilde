@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE thread_leases SET instance_id=$3,updated_at=clock_timestamp() WHERE thread_id=$1 AND agent_id=$2;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9b398885bae6e797f7328b089b1efe8fa66084012ef497237a312fab7bcf6f77"
+}

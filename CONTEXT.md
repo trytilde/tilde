@@ -481,64 +481,101 @@ notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
 refreshes every 30 seconds; it does not yet have a registry subscription API.
 
+## Deployments and instances
+
+An agent has many deployments. `agent_deployments` is the declared half of "what is
+running": created by CI (`RegisterDeployment`, idempotent on a caller-supplied external
+id) or by hand in the Deployments tab, with a source, a target (`direct`, `sidecar` or
+`aws_lambda`), the wake address or function ARN, repository and commit. Registering a
+deployment issues its token once; the token is the join between the record and whatever
+runs. `agent_instances` is the observed half: every process that dials in with a
+deployment token, heartbeating on a short cadence. Every instance belongs to exactly one
+deployment, the gateway rejects registration otherwise, and local agents never federate
+into a deployed registry. Retiring a deployment invalidates its token. Policy
+(capabilities, connections, IAM) stays on the agent; execution mode (gateway or sidecar)
+also stays on the agent for now, so every deployment of an agent shares it and a
+deployment's target must match. Creating an agent with an endpoint mints its initial
+manual direct deployment, and changing the endpoint mints another; promotion mirrors a
+direct deployment's endpoint back onto the agent for legacy readers.
+
+Routing is per agent: `latest` serves each newly registered deployment of the matching
+target at once, `manual` waits for `PromoteDeployment`. A (thread, agent) pair is pinned
+to the serving deployment on its first invocation and stays pinned while that
+deployment is registered; invocations record their deployment. Failover stays within a
+deployment. Moving a thread across deployments is an explicit act, not yet exposed.
+
 ## Agent deployments and sidecars
 
 Agents select gateway or sidecar deployment in the Deployment settings tab. Gateway
-mode has an agent endpoint and uses Postgres for everything. Sidecar mode registers
-replicas with one shared token per agent. `tilde-sidecar` accepts comma-separated agent
-tokens and an agent-ID-to-local-endpoint map and keeps no state on disk.
+mode uses Postgres for everything and invokes the serving direct deployment's endpoint. Sidecar mode
+runs replicas that dial in with a sidecar deployment's token. `tilde-sidecar` accepts
+comma-separated deployment tokens, one per agent, and an agent-ID-to-local-endpoint map,
+and keeps no state on disk.
 
 The gateway serves four route groups on one listener: management, runtime, ingress and
 sidecar. A sidecar binds a loopback runtime listener for its agent process and one
 network listener for provider webhooks and native ingress. Every other interaction is an
 outbound connection from the sidecar to the gateway's sidecar group: a held `Watch`
-stream that delivers a snapshot, configuration changes, ownership changes and
-directives, and `Publish` calls that carry heartbeats, ownership claims, typed events,
-directive results and telemetry. Central IAM, registry changes and credential setup stay
-at the gateway. Sidecars enforce replicated permissions and serve assigned connection
+stream that delivers a snapshot, configuration changes, lease changes and directives,
+and `Publish` calls that carry heartbeats, typed events, directive results, lease
+releases and telemetry. Central IAM, registry changes and credential setup stay at the
+gateway. Sidecars enforce replicated permissions and serve assigned connection
 credentials from memory.
 
-Ownership is `(thread, agent participant)` and points to a sidecar process incarnation.
-A replica creating a conversation claims it synchronously, so no local state exists
-until the gateway has granted a generation; a request for a conversation it does not
-hold is answered by hydration from the gateway's projection, which settles ownership in
-the same call. Claims and projection lock the assignment row, so a fence decision and
-the write it guards are atomic against recovery. The owner mutates thread state under
-one per-thread lock, appends typed events with a per-thread sequence, and the shipper
-delivers them in order. The gateway records event receipts for deduplication, fences
-events from an older generation or a non-owner, and projects the rest into the chat
-tables and activity history. A frame the gateway cannot accept (a permission failure or
-a constraint violation) is rejected on its own and the replica drops it with an error
-log; only infrastructure failures fail a batch, which is then resent in order.
-Acknowledged writes live in replica memory until the shipper publishes them: a replica
-that dies with a non-empty outbox loses those events, and its conversations are
-recovered from the projection, which is why external effects need idempotency keys.
+Postgres is the record. A replica is a cache of the threads it touched, a write-behind
+queue, and the executor for the threads it holds a lease on. Execution exclusivity is
+one lease per `(thread, agent)` in `thread_leases`, pointing at a replica incarnation;
+data carries no ownership. A thread costs one gateway call when a replica first touches
+it: `Hydrate` returns the projection's state and takes the lease in the same
+transaction. After that, events on that thread cost no SQL and no gateway call on the
+hot path: the holder mutates state under one per-thread lock, appends typed events with
+a per-thread sequence, and the shipper drains them asynchronously in batches. A thread
+idle past the configured window leaves memory and its lease is released, so the next
+replica to touch it takes over cleanly.
 
-Heartbeats travel with every publish; an owner unheard from for fifteen seconds is dead.
-Recovery locks the assignment in Postgres, bumps the generation, fails the old
-invocations, re-routes the dead owner's unacknowledged directives, and either directs a
-live replica to restart the run from its objective or fails the run under the stop
-policy. A claim that finds the current owner dead performs the same takeover with the
-claimant as the replacement, so a forwarded request never orphans an interrupted run.
-Ownership changes reach replicas on the Watch stream with a thirty-second lookback, and
-a directive only raises a replica's generation, never regrants a conversation it lost. A replica renews an invocation's lease only while
-its own publishes succeed, so a replica cut off from the gateway stops within thirty
-seconds. External effects still need application idempotency.
+Lease validity is the holder's liveness: the instance heartbeat, sent every three
+seconds independently of the event queue, implicitly renews every lease the replica
+holds, and a holder unheard from for fifteen seconds is dead. A replica whose publishes
+have not been acknowledged for ten seconds stops executing on all its threads, strictly
+inside the gateway's dead-detection window, so a partitioned holder never runs beside
+its replacement. Only run, invocation and tool-call state is checked against the lease
+at projection time; messages, users, thread changes, traces and logs from any replica
+are accepted. Run state from a replica that no longer holds the thread is answered
+with the current lease rather than an error, and the replica fails its local work for
+that thread. The gateway projects a batch in one transaction with an idempotency
+receipt per event; only a frame the gateway cannot accept (a permission failure or a
+constraint violation) is rejected on its own, and only infrastructure failures fail a
+batch, which is then resent in order. Acknowledged writes live in replica memory until
+the shipper publishes them: a replica that dies with a non-empty outbox loses those
+events, and the gateway decides the order of near-simultaneous appends from different
+replicas, both accepted risks in exchange for a hot path without round trips. External
+effects still need application idempotency keys.
 
-Requests for a conversation that land on a non-owner replica, or on the gateway's
-ingress for a sidecar agent, are executed by the owner: the gateway queues a durable
-directive for the owning replica, waits for its answer through notifications, and relays
-the HTTP result unchanged. Provider webhooks are handed over the same way without
-waiting. Completed messages in rooms with several sidecar agents are relayed to each
-owner; gateway-deployed agents in the same room are routed from the projection.
-Management writes to sidecar conversations forward the same way. Reads (thread, run,
-message, activity and thread listings) are answered from the projection wherever they
-land, since only the projection sees every replica's conversations; a replica forwards
-listings and cursor pages, and serves the current window of a conversation it holds.
+Recovery scans leases whose holder is dead. A lease with no active invocation is simply
+dropped. One with interrupted work locks the thread route, fails the old invocations,
+re-routes the dead holder's unacknowledged directives, and either moves the lease to a
+live replica, which hydrates the thread and restarts the run from its objective, or
+fails the run under the stop policy. A hydrate that finds the current holder dead
+performs the same takeover with the claimant as the replacement, so a forwarded request
+never orphans an interrupted run. Lease changes reach replicas on the Watch stream.
+
+Requests for a thread that land on a replica which does not hold it are handed to the
+holder directly, sidecar to sidecar, when the gateway's lease answer named a live one;
+when nobody holds it the receiving replica takes the lease and runs the turn itself.
+Requests on the gateway's ingress for a sidecar agent are queued as durable directives
+for the holder, or for any live replica when the thread is unheld, and the HTTP result
+is relayed unchanged. Provider webhooks are handed over the same way without waiting.
+Completed messages in rooms with several sidecar agents are relayed to each holder;
+gateway-deployed agents in the same room are routed from the projection. Management
+writes to sidecar conversations forward the same way. Reads (thread, run, message,
+activity and thread listings) are answered from the projection wherever they land,
+since only the projection sees every replica's conversations; a replica forwards
+listings and cursor pages, and serves the current window of a thread it holds.
 Registry RPCs from an agent beside a sidecar are verified by the replica, relayed over
-`Relay`, and re-verified at the gateway: token signature, agent generation, current
-owner and generation, and the capability ceiling, before the existing registry
-handlers run.
+`Relay`, and re-verified at the gateway: token signature, agent generation, the
+thread lease, and the capability ceiling, before the existing registry handlers run.
+The projection may lag a young invocation or roster, so only an invocation the gateway
+already knows to be over is refused there.
 
 Attachment bytes live in bounded sidecar memory until a separate worker uploads them
 to the gateway, which encrypts them into S3; a slow object store never delays

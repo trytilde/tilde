@@ -3,7 +3,7 @@ use clap::Parser;
 #[command(
     name = "tilde-sidecar",
     version,
-    about = "Tilde sidecar: in-memory conversation owner beside an agent process"
+    about = "Tilde sidecar: in-memory conversation cache and executor beside an agent process"
 )]
 struct Args {
     #[arg(long)]
