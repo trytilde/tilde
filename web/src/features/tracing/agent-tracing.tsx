@@ -8,7 +8,7 @@ import {
   TracingState,
   type Observation,
   type GetTracingStatusResponse,
-} from "@/gen/tilde/management/v1/tracing_pb.js";
+} from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

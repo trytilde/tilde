@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { Code, ConnectError } from "@connectrpc/connect";
-import { AgentSchema } from "@/gen/tilde/types/v1/agent_pb.js";
+import { AgentSchema } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { createAppRouter } from "./router";
 
 const rpc = vi.hoisted(() => ({ listAgents: vi.fn(), getAgent: vi.fn(), updateAgent: vi.fn() }));

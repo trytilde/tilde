@@ -1,10 +1,10 @@
-import { LogsService } from "./gen/tilde/management/v1/logs_pb.js";
+import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import {
   InvocationControlService,
   InvocationCommandKind,
-} from "./gen/tilde/runtime/v1/controls_pb.js";
-import { TracingService } from "./gen/tilde/management/v1/tracing_pb.js";
-import { AgentAccessService } from "./gen/tilde/management/v1/access_pb.js";
+} from "@trytilde/contracts/tilde/runtime/v1/controls_pb.js";
+import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
 import { initializeTracing, invocationTracing, tracingInterceptor } from "./tracing.js";
 export { agentSpanProcessor } from "./tracing.js";
 import {
@@ -26,29 +26,29 @@ import {
 import { createServer } from "node:http2";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { ConnectionsService } from "./gen/tilde/management/v1/connections_pb.js";
-import { AgentService as ManagementAgentService } from "./gen/tilde/management/v1/agents_pb.js";
-import { AgentService as RuntimeAgentService } from "./gen/tilde/runtime/v1/agents_pb.js";
-import { ChatService as ManagementChatService } from "./gen/tilde/management/v1/chat_pb.js";
-import { ChatService as RuntimeChatService } from "./gen/tilde/runtime/v1/chat_pb.js";
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
+import { AgentService as ManagementAgentService } from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
+import { AgentService as RuntimeAgentService } from "@trytilde/contracts/tilde/runtime/v1/agents_pb.js";
+import { ChatService as ManagementChatService } from "@trytilde/contracts/tilde/management/v1/chat_pb.js";
+import { ChatService as RuntimeChatService } from "@trytilde/contracts/tilde/runtime/v1/chat_pb.js";
 import {
   AgentService as AgentHostService,
   InvokeRequestSchema,
   type InvokeRequest,
-} from "./gen/tilde/agent_host/v1/agent_pb.js";
+} from "@trytilde/contracts/tilde/agent_host/v1/agent_pb.js";
 import {
   RunService,
   type ReportRequestSchema,
   type RunRegistered,
-} from "./gen/tilde/run/v1/run_pb.js";
+} from "@trytilde/contracts/tilde/run/v1/run_pb.js";
 import {
   MessageSchema,
   type Participant,
   type Message as ChatMessage,
-} from "./gen/tilde/types/v1/chat_pb.js";
-export * from "./gen/tilde/types/v1/chat_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
+export * from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 export { RuntimeChatService, AgentHostService, RunService };
-export { BinaryPermission, TargetSelection } from "./gen/tilde/types/v1/agent_pb.js";
+export { BinaryPermission, TargetSelection } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
@@ -527,9 +527,7 @@ export class AgentContext {
    * (the final `stopped` outlives it), and failures are logged rather than thrown.
    * `stopped` is sent at most once.
    */
-  report(
-    event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>,
-  ): Promise<void> {
+  report(event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>): Promise<void> {
     if (event.case === "stopped") {
       if (this.stoppedReported) return this.reports;
       this.stoppedReported = true;
@@ -959,7 +957,10 @@ export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
       );
     } catch (error) {
       if (!closed.signal.aborted)
-        console.warn(`[tilde] heartbeat for instance ${instanceId} failed:`, ConnectError.from(error).message);
+        console.warn(
+          `[tilde] heartbeat for instance ${instanceId} failed:`,
+          ConnectError.from(error).message,
+        );
     }
   }, 3_000);
   const watching = (async () => {
@@ -993,7 +994,10 @@ export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
         }
       } catch (error) {
         if (closed.signal.aborted) break;
-        console.warn(`[tilde] watch for instance ${instanceId} failed:`, ConnectError.from(error).message);
+        console.warn(
+          `[tilde] watch for instance ${instanceId} failed:`,
+          ConnectError.from(error).message,
+        );
       }
       if (closed.signal.aborted) break;
       await sleep(1_000, undefined, { signal: closed.signal }).catch(() => {});

@@ -7,7 +7,7 @@ import {
   LogsState,
   type GetLogsStatusResponse,
   type LogRecord,
-} from "@/gen/tilde/management/v1/logs_pb.js";
+} from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

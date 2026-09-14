@@ -2,7 +2,11 @@ vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }
 import { create } from "@bufbuild/protobuf";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { AgentSchema, BinaryPermission, TargetSelection } from "@/gen/tilde/types/v1/agent_pb.js";
+import {
+  AgentSchema,
+  BinaryPermission,
+  TargetSelection,
+} from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { AgentEditor } from "./agent-editor";
 
 const updateAgent = vi.hoisted(() => vi.fn());

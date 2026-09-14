@@ -1,6 +1,6 @@
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }));
 import { useState } from "react";
-import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
+import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { AgentEditor } from "./agent-editor";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import {
   AgentHealthStatus,
   BinaryPermission,
   TargetSelection,
-} from "@/gen/tilde/types/v1/agent_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { AgentRegistry } from "./agent-registry";
 
 const rpc = vi.hoisted(() => ({

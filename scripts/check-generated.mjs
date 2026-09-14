@@ -24,11 +24,8 @@ try {
   if (result.status !== 0) process.exitCode = 1;
   else {
     const changed = [];
-    for (const folder of [
-      "crates/tilde/src/generated",
-      "web/src/gen",
-      "sdk/ts/packages/sdk/src/gen",
-    ]) {
+    // TypeScript contracts are not committed; @trytilde/contracts regenerates them on build.
+    for (const folder of ["crates/tilde/src/generated"]) {
       const names = new Set([...(await files(folder)), ...(await files(join(temp, folder)))]);
       for (const name of names) {
         const [a, b] = await Promise.all([
@@ -41,7 +38,7 @@ try {
     if (changed.length) {
       console.error("Run pnpm generate; stale generated files:\n" + changed.join("\n"));
       process.exitCode = 1;
-    } else console.log("Generated Rust and TypeScript match the Protobuf contracts.");
+    } else console.log("Generated Rust matches the Protobuf contracts.");
   }
 } finally {
   await rm(temp, { recursive: true, force: true });

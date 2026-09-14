@@ -1,4 +1,4 @@
-import type { Brokering } from "./gen/tilde/setup/v1/connections_pb.js";
+import type { Brokering } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 export type SetupValues = Record<string, string>;
 type Reply = { id: number; state?: Brokering; error?: string };
 /** Browser-only client for an isolated provider iframe. The host owns all credentials and scope.
@@ -88,4 +88,4 @@ export function createConnectionSetupClient() {
   };
 }
 
-export { AuthDriver, type Brokering } from "./gen/tilde/setup/v1/connections_pb.js";
+export { AuthDriver, type Brokering } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";

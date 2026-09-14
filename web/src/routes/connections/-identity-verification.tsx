@@ -2,8 +2,8 @@ import { LoadingReveal } from "@trytilde/connection-ui";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { IdentityVerificationService } from "@/gen/tilde/setup/v1/identity_verification_pb.js";
-import type { IdentityVerification } from "@/gen/tilde/types/v1/access_pb.js";
+import { IdentityVerificationService } from "@trytilde/contracts/tilde/setup/v1/identity_verification_pb.js";
+import type { IdentityVerification } from "@trytilde/contracts/tilde/types/v1/access_pb.js";
 import { Button } from "@/components/ui/button";
 import { ProviderIcon } from "@/components/provider-icon";
 

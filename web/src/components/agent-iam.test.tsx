@@ -6,7 +6,7 @@ import {
   ChannelIdentitySchema,
   ChannelAccessMode,
   IdentityType,
-} from "@/gen/tilde/types/v1/access_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/access_pb.js";
 import { AgentIam } from "./agent-iam";
 const rpc = vi.hoisted(() => ({
   listChannelAccess: vi.fn(),

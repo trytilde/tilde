@@ -1,7 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { AuthDriver, BrokeringSchema } from "@/gen/tilde/setup/v1/connections_pb.js";
+import { AuthDriver, BrokeringSchema } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 import { Page, StandardSetup, useSetup } from "@trytilde/connection-ui";
 
 const getSetup = vi.hoisted(() => vi.fn());

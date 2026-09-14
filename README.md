@@ -119,8 +119,12 @@ pnpm generate
 `pnpm tools` downloads pinned official code-generator binaries and checks their
 SHA-256 digests. `pnpm generate` runs Buf and the generators directly. It needs
 **no Rust compiler, application build, running server, database or cloud keys**.
-JavaScript and TypeScript declaration output works in both React and Node.
-Generated code is checked in; ordinary Cargo builds need neither Node nor Buf.
+The generated Rust is checked in, so ordinary Cargo builds need neither Node nor
+Buf. The TypeScript contracts are not: `@trytilde/contracts`
+(`sdk/ts/packages/contracts`) generates them into its ignored `gen/` directory on
+build, and the web app and `@trytilde/sdk` import from that package instead of
+carrying copies. `pnpm generate`, the SDK workspace build and every web script build
+it first, so a fresh clone only needs `task setup`.
 SQLx uses checked-in offline metadata, so Rust compilation also needs no database.
 
 The repository commits `.env` and `.env.test` as development and test defaults.

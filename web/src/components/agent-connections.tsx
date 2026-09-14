@@ -1,7 +1,11 @@
 import { LoadingReveal } from "@trytilde/connection-ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CableIcon, PlusIcon } from "lucide-react";
-import { Capability, type Connection, type Provider } from "@/gen/tilde/types/v1/connections_pb.js";
+import {
+  Capability,
+  type Connection,
+  type Provider,
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { connections } from "@/client";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";

@@ -1,4 +1,4 @@
-import type { Observation } from "@/gen/tilde/management/v1/tracing_pb.js";
+import type { Observation } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 export const observationKey = (row: Observation) => `${row.traceId}:${row.id}`;
 /** OTLP retries may be visible as multiple versions while Langfuse converges. */
 export function mergeObservations(previous: Observation[], incoming: Observation[]) {

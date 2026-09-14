@@ -1,5 +1,5 @@
 import { agentAccess } from "@/client";
-import { ChannelAccessMode, IdentityType } from "@/gen/tilde/types/v1/access_pb.js";
+import { ChannelAccessMode, IdentityType } from "@trytilde/contracts/tilde/types/v1/access_pb.js";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon, ShieldCheckIcon } from "lucide-react";
 import { useForm, NativeSelect } from "@trytilde/connection-ui";

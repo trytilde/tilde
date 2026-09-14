@@ -11,9 +11,11 @@ pnpm generate
 pnpm --dir sdk/ts build
 ```
 
-Protobuf contracts live in the repository root. Buf generates the Rust server,
-web client and SDK types without compiling Rust. The SDK build emits JavaScript
-and declarations into each package's `dist` directory.
+Protobuf contracts live in the repository root. Buf generates the Rust server and,
+through the `@trytilde/contracts` package in this workspace, the TypeScript messages
+and service descriptors that the SDK and the web app share. That package builds its
+`gen/` directory from the protos and does not commit it. The SDK build emits
+JavaScript and declarations into each package's `dist` directory.
 
 ## Run the example
 

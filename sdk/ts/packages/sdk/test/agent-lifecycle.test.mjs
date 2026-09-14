@@ -14,11 +14,11 @@ import {
   RuntimeChatService,
   RunService,
 } from "../dist/index.js";
-import { InvokeRequestSchema } from "../dist/gen/tilde/agent_host/v1/agent_pb.js";
+import { InvokeRequestSchema } from "@trytilde/contracts/tilde/agent_host/v1/agent_pb.js";
 import {
   InvocationControlService,
   InvocationCommandKind as Kind,
-} from "../dist/gen/tilde/runtime/v1/controls_pb.js";
+} from "@trytilde/contracts/tilde/runtime/v1/controls_pb.js";
 
 void test(
   "separate stateless hosts consume invocation controls, replay steering, and checkpoint suspension",

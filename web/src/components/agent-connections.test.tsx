@@ -5,7 +5,7 @@ import {
   Capability,
   ConnectionSchema,
   ProviderSchema,
-} from "@/gen/tilde/types/v1/connections_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { AgentConnections } from "./agent-connections";
 
 const rpc = vi.hoisted(() => ({
