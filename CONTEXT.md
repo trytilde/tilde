@@ -481,7 +481,7 @@ notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
 refreshes every 30 seconds; it does not yet have a registry subscription API.
 
-## Deployments and instances
+## Deployments, instances and the run protocol
 
 An agent has many deployments. `agent_deployments` is the declared half of "what is
 running": created by CI (`RegisterDeployment`, idempotent on a caller-supplied external
@@ -504,10 +504,23 @@ to the serving deployment on its first invocation and stays pinned while that
 deployment is registered; invocations record their deployment. Failover stays within a
 deployment. Moving a thread across deployments is an explicit act, not yet exposed.
 
+Execution is wake-and-dial. A wake carries the invocation (`InvokeRequest`, now with
+the deployment id and trace context); how it is delivered is the only per-target
+difference: an instance that dialed in through `tilde.run.v1.RunService.Watch`
+receives it as a frame (a durable directive acknowledged by `Report`), a direct
+endpoint is woken over HTTP, and a Lambda function is invoked asynchronously through
+the AWS invoke API with the gateway's own credentials. Every host then reports through
+`RunService.Report` with its invocation capability: acceptance, reasoning deltas and
+the end of the invocation with any unconsumed inputs. The gateway no longer depends on
+the wake call's response; a legacy host that answers on the Invoke stream still works.
+The invocation lease is renewed by the host's open command stream and by reports, so a
+host that dies stops renewing and expiry reclaims the run. Health polling remains for
+direct endpoints only; connected instances are healthy by heartbeat.
+
 ## Agent deployments and sidecars
 
 Agents select gateway or sidecar deployment in the Deployment settings tab. Gateway
-mode uses Postgres for everything and invokes the serving direct deployment's endpoint. Sidecar mode
+mode uses Postgres for everything and wakes direct or Lambda deployments. Sidecar mode
 runs replicas that dial in with a sidecar deployment's token. `tilde-sidecar` accepts
 comma-separated deployment tokens, one per agent, and an agent-ID-to-local-endpoint map,
 and keeps no state on disk.

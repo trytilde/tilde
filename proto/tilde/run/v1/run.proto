@@ -1,0 +1,25 @@
+syntax = "proto3";
+package tilde.run.v1;
+import "tilde/agent_host/v1/agent.proto";
+// The run protocol for hosts that dial in. A long-running host opens Watch with its
+// deployment token, registers an instance and receives wakes as frames instead of
+// inbound Invoke calls; it heartbeats on a short cadence. Serverless hosts are woken
+// over HTTP or a cloud invoke API and skip Watch. Every host reports acceptance,
+// reasoning and the end of an invocation through Report with its invocation capability,
+// so the gateway never depends on the wake call's response.
+service RunService {
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc Report(ReportRequest) returns (ReportResponse);
+}
+message WatchRequest { string instance_id = 1; string public_url = 2; }
+message WatchResponse { oneof frame { RunRegistered registered = 1; tilde.agent_host.v1.InvokeRequest wake = 2; RunPing ping = 3; } }
+message RunRegistered { string agent_id = 1; string deployment_id = 2; string instance_id = 3; }
+message RunPing {}
+message HeartbeatRequest { string instance_id = 1; bool ready = 2; }
+message HeartbeatResponse {}
+// One event in an invocation's life, authenticated with the invocation capability.
+message ReportRequest { string invocation_id = 1; oneof event { RunAccepted accepted = 2; string reasoning_delta = 3; RunStopped stopped = 4; } }
+message RunAccepted { string command_id = 1; }
+message RunStopped { repeated string pending_input_ids = 1; }
+message ReportResponse {}

@@ -5,6 +5,28 @@
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct InvokeRequest {
+    /// Field 15: `deployment_id`
+    #[serde(
+        rename = "deploymentId",
+        alias = "deployment_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub deployment_id: ::buffa::alloc::string::String,
+    /// Field 16: `traceparent`
+    #[serde(
+        rename = "traceparent",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub traceparent: ::buffa::alloc::string::String,
+    /// Field 17: `tracestate`
+    #[serde(
+        rename = "tracestate",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tracestate: ::buffa::alloc::string::String,
     /// Field 12: `command_id`
     #[serde(
         rename = "commandId",
@@ -124,6 +146,9 @@ pub struct InvokeRequest {
 impl ::core::fmt::Debug for InvokeRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvokeRequest")
+            .field("deployment_id", &self.deployment_id)
+            .field("traceparent", &self.traceparent)
+            .field("tracestate", &self.tracestate)
             .field("command_id", &self.command_id)
             .field("assignment_generation", &self.assignment_generation)
             .field("owner_instance_id", &self.owner_instance_id)
@@ -233,6 +258,16 @@ impl ::buffa::Message for InvokeRequest {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.owner_instance_id) as u64;
         }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
+        if !self.traceparent.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.traceparent) as u64;
+        }
+        if !self.tracestate.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.tracestate) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -299,6 +334,15 @@ impl ::buffa::Message for InvokeRequest {
         }
         if !self.owner_instance_id.is_empty() {
             ::buffa::types::put_string_field(14u32, &self.owner_instance_id, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(15u32, &self.deployment_id, buf);
+        }
+        if !self.traceparent.is_empty() {
+            ::buffa::types::put_string_field(16u32, &self.traceparent, buf);
+        }
+        if !self.tracestate.is_empty() {
+            ::buffa::types::put_string_field(17u32, &self.tracestate, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -425,6 +469,27 @@ impl ::buffa::Message for InvokeRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.owner_instance_id, buf)?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.traceparent, buf)?;
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tracestate, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -447,6 +512,9 @@ impl ::buffa::Message for InvokeRequest {
         self.command_id.clear();
         self.assignment_generation = 0u64;
         self.owner_instance_id.clear();
+        self.deployment_id.clear();
+        self.traceparent.clear();
+        self.tracestate.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

@@ -19,11 +19,16 @@ pub fn agent_runtime_router(
 
 /// Invocation RPCs require live invocation state on every request.
 pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
-    Router::new()
+    let mut router = Router::new()
         .merge(crate::agent::rpc::runtime::router(agents, chat.clone()))
         .merge(crate::chat::rpc::runtime::router(chat.clone()))
         .layer(middleware::from_fn_with_state(chat.clone(), agent_guard))
-        .merge(crate::chat::controls::router(chat))
+        .merge(crate::chat::controls::router(chat.clone()));
+    // Hosts that dial in: deployment-token Watch/Heartbeat and capability-scoped Report.
+    if let Some(deployments) = chat.deployments.clone() {
+        router = router.merge(crate::deployment::run::router(deployments, chat));
+    }
+    router
 }
 
 /// User-facing APIs and provider setup/callbacks. Agent trace ingestion is deliberately absent.

@@ -55,6 +55,13 @@ pub mod directive {
                 super::super::super::super::__buffa::view::RelayMessageView<'a>,
             >,
         ),
+        Wake(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::super::super::agent_host::v1::__buffa::view::InvokeRequestView<
+                    'a,
+                >,
+            >,
+        ),
     }
 }
 pub mod upstream {

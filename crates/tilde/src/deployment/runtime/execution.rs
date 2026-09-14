@@ -746,6 +746,8 @@ impl Runtime {
                 objective: invoke.objective,
                 callback_url: self.callback_url.clone(),
                 capability: capability.expose_secret().into(),
+                traceparent: v.traceparent.clone(),
+                tracestate: v.tracestate.clone(),
                 messages: self.messages(thread, 100).await?,
                 thread: self.thread(thread).await?.into(),
                 cached_messages: self

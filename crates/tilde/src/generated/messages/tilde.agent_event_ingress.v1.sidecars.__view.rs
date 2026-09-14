@@ -1934,6 +1934,37 @@ impl<'a> ::buffa::MessageView<'a> for DirectiveView<'a> {
                     );
                 }
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                if let Some(
+                    super::super::__buffa::view::oneof::directive::Action::Wake(
+                        ref mut existing,
+                    ),
+                ) = view.action
+                {
+                    ::buffa::MessageView::merge_into_view(
+                        &mut **existing,
+                        sub,
+                        __sub_ctx,
+                    )?;
+                } else {
+                    view.action = Some(
+                        super::super::__buffa::view::oneof::directive::Action::Wake(
+                            ::buffa::alloc::boxed::Box::new(
+                                <super::super::super::super::agent_host::v1::__buffa::view::InvokeRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            ),
+                        ),
+                    );
+                }
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1984,6 +2015,15 @@ impl<'a> ::buffa::MessageView<'a> for DirectiveView<'a> {
                                 v,
                             ) => {
                                 super::super::__buffa::oneof::directive::Action::Relay(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        v.to_owned_from_source(__buffa_src)?,
+                                    ),
+                                )
+                            }
+                            super::super::__buffa::view::oneof::directive::Action::Wake(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::directive::Action::Wake(
                                     ::buffa::alloc::boxed::Box::new(
                                         v.to_owned_from_source(__buffa_src)?,
                                     ),
@@ -2041,6 +2081,14 @@ impl<'a> ::buffa::ViewEncode<'a> for DirectiveView<'a> {
                         += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
                             + inner as u64;
                 }
+                super::super::__buffa::view::oneof::directive::Action::Wake(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -2090,6 +2138,14 @@ impl<'a> ::buffa::ViewEncode<'a> for DirectiveView<'a> {
                     );
                     x.write_to(__cache, buf);
                 }
+                super::super::__buffa::view::oneof::directive::Action::Wake(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -2133,6 +2189,9 @@ impl<'__a> ::serde::Serialize for DirectiveView<'__a> {
                 }
                 super::super::__buffa::view::oneof::directive::Action::Relay(v) => {
                     __map.serialize_entry("relay", v)?;
+                }
+                super::super::__buffa::view::oneof::directive::Action::Wake(v) => {
+                    __map.serialize_entry("wake", v)?;
                 }
             }
         }

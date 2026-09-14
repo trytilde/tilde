@@ -4,6 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
+import type { InvokeRequest } from "../../agent_host/v1/agent_pb.js";
 import type { Attachment, Message as Message$1, Run, Thread } from "../../types/v1/chat_pb.js";
 import type { ProviderEvent, RuntimeEvent } from "../../types/v1/runtime_event_pb.js";
 import type { ChannelAccessMode, IdentityType } from "../../types/v1/access_pb.js";
@@ -201,6 +202,12 @@ export declare type Directive = Message<"tilde.agent_event_ingress.v1.Directive"
      */
     value: RelayMessage;
     case: "relay";
+  } | {
+    /**
+     * @generated from field: tilde.agent_host.v1.InvokeRequest wake = 14;
+     */
+    value: InvokeRequest;
+    case: "wake";
   } | { case: undefined; value?: undefined };
 };
 

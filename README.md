@@ -295,9 +295,11 @@ process that runs the deployment dials in with it. New threads route to the serv
 deployment (`Latest` promotes each new one automatically, `Manual` waits for you) and
 existing threads stay pinned to theirs. Targets:
 
-- **Direct**: the gateway invokes an HTTP endpoint (serverless handlers included).
-- **AWS Lambda**: registered now for routing and history; the gateway-side Lambda invoke
-  arrives with the run protocol.
+- **Direct**: the gateway wakes an HTTP endpoint (serverless handlers included). A
+  long-running process can instead call `connectAgent` with the token and receive wakes
+  over its own connection, with no inbound endpoint.
+- **AWS Lambda**: the gateway invokes the function ARN asynchronously using its own AWS
+  credentials; deploy `createLambdaHandler` from the SDK.
 - **Sidecar**: replicas of `tilde-sidecar` dial in with the token; see below.
 
 ## Sidecar deployments
