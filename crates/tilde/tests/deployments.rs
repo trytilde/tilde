@@ -154,8 +154,18 @@ async fn latest_routing_serves_new_deployments_and_manual_routing_waits_for_prom
     );
     // Mirroring never mints a deployment of its own.
     assert_eq!(fx.deployments.deployments(fx.agent).await.unwrap().len(), 3);
-    // Retiring the serving deployment hands serving to the newest other one and
-    // invalidates its token; an already retired one cannot be promoted.
+    // Under manual routing the serving deployment stays until another is promoted;
+    // retiring then invalidates its token, and a retired one cannot be promoted.
+    assert!(
+        fx.deployments
+            .retire(fx.agent, Uuid::parse_str(&third.id).unwrap())
+            .await
+            .is_err()
+    );
+    fx.deployments
+        .promote(fx.agent, Uuid::parse_str(&second.id).unwrap())
+        .await
+        .unwrap();
     let retired = fx
         .deployments
         .retire(fx.agent, Uuid::parse_str(&third.id).unwrap())
@@ -265,5 +275,59 @@ async fn threads_pin_to_the_serving_deployment_on_first_invocation_and_stay_pinn
     };
     assert_eq!(by_thread(&thread.id), Some(initial));
     assert_eq!(by_thread(&other.id), Some(second.id));
+    fx.db.close().await;
+}
+
+#[tokio::test]
+async fn lambda_deployments_serve_gateway_agents_and_manual_routing_guards_retirement() {
+    let fx = Fx::new().await;
+    let initial = Uuid::parse_str(&fx.serving().await.unwrap()).unwrap();
+    // Under latest routing a Lambda deployment serves a gateway-mode agent at once.
+    let (lambda, token, created) = fx
+        .deployments
+        .register_deployment(
+            fx.agent,
+            RegisterDeployment {
+                source: types::DeploymentSource::Ci,
+                target: types::DeploymentTarget::AwsLambda,
+                endpoint_url: None,
+                target_reference: Some(
+                    "arn:aws:lambda:eu-central-1:123456789012:function:support".into(),
+                ),
+                repository: None,
+                commit_sha: None,
+                external_id: Some("lambda-1".into()),
+                label: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert!(created && token.is_some() && lambda.serving);
+    assert_eq!(fx.serving().await, Some(lambda.id.clone()));
+    // A Lambda deployment is not mirrored onto the agent's endpoint.
+    assert_eq!(
+        fx.mirrored_endpoint().await.as_deref(),
+        Some("http://127.0.0.1:3001/")
+    );
+    // Under manual routing it can be promoted explicitly, and the serving deployment
+    // cannot be retired until another one is promoted.
+    fx.deployments
+        .set(
+            fx.agent,
+            types::DeploymentMode::Gateway,
+            types::SidecarFailureMode::Reassign,
+            types::DeploymentRouting::Manual,
+        )
+        .await
+        .unwrap();
+    fx.deployments.promote(fx.agent, initial).await.unwrap();
+    assert_eq!(fx.serving().await, Some(initial.to_string()));
+    let lambda_id = Uuid::parse_str(&lambda.id).unwrap();
+    fx.deployments.promote(fx.agent, lambda_id).await.unwrap();
+    assert_eq!(fx.serving().await, Some(lambda.id.clone()));
+    assert!(fx.deployments.retire(fx.agent, lambda_id).await.is_err());
+    fx.deployments.promote(fx.agent, initial).await.unwrap();
+    fx.deployments.retire(fx.agent, lambda_id).await.unwrap();
+    assert_eq!(fx.serving().await, Some(initial.to_string()));
     fx.db.close().await;
 }

@@ -1,4 +1,7 @@
-import { AgentHealthStatus, type AgentMetrics } from "@/gen/tilde/types/v1/agent_pb.js";
+import {
+  AgentHealthStatus,
+  type AgentMetrics,
+} from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { Badge } from "@/components/ui/badge";
 
 export function HealthBadge({ metrics }: { metrics?: AgentMetrics }) {

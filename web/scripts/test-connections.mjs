@@ -1,11 +1,14 @@
-import { ConnectionSetupService } from "../src/gen/tilde/setup/v1/connections_pb.js";
+import { ConnectionSetupService } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 // Run from the Rust integration test against its isolated Postgres-backed Connect server.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { ConnectionsService } from "../src/gen/tilde/management/v1/connections_pb.js";
-import { Capability, ClientAuthentication } from "../src/gen/tilde/types/v1/connections_pb.js";
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
+import {
+  Capability,
+  ClientAuthentication,
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 const origin = process.env.CONNECTION_TEST_URL;
 assert(origin, "CONNECTION_TEST_URL is required");
 const transport = createConnectTransport({ baseUrl: origin });

@@ -1,10 +1,10 @@
 import { expect, it } from "vitest";
 import type { DescMessage } from "@bufbuild/protobuf";
-import { AgentService } from "./gen/tilde/management/v1/agents_pb.js";
-import { ChatService } from "./gen/tilde/management/v1/chat_pb.js";
-import { ConnectionsService } from "./gen/tilde/management/v1/connections_pb.js";
-import { ChatService as RuntimeChatService } from "./gen/tilde/runtime/v1/chat_pb.js";
-import { MessageSchema } from "./gen/tilde/types/v1/chat_pb.js";
+import { AgentService } from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
+import { ChatService } from "@trytilde/contracts/tilde/management/v1/chat_pb.js";
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
+import { ChatService as RuntimeChatService } from "@trytilde/contracts/tilde/runtime/v1/chat_pb.js";
+import { MessageSchema } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 
 it("management contracts cannot reach runtime cache types through shared entities", () => {
   const seen = new Set<DescMessage>();

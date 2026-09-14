@@ -11,7 +11,7 @@ import {
   type AgentDeployment as RegisteredDeployment,
   type AgentInstance,
   type Deployment,
-} from "@/gen/tilde/types/v1/deployment_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/deployment_pb.js";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,7 +361,10 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
                 <>
                   Serving <span className="font-medium">{describe(serving)}</span>
                   {serving.commitSha && serving.label && (
-                    <span className="text-muted-foreground"> ({shortCommit(serving.commitSha)})</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({shortCommit(serving.commitSha)})
+                    </span>
                   )}
                   .
                 </>
@@ -434,12 +437,13 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
                       <p className="text-xs text-muted-foreground">
                         Created {formatDate(deployment.createdAt)}
                         {deployment.retiredAt && ` · Retired ${formatDate(deployment.retiredAt)}`}
-                        {deployment.target === DeploymentTarget.DIRECT && deployment.endpointUrl && (
-                          <>
-                            {" · "}
-                            <span className="font-mono">{deployment.endpointUrl}</span>
-                          </>
-                        )}
+                        {deployment.target === DeploymentTarget.DIRECT &&
+                          deployment.endpointUrl && (
+                            <>
+                              {" · "}
+                              <span className="font-mono">{deployment.endpointUrl}</span>
+                            </>
+                          )}
                         {deployment.target === DeploymentTarget.AWS_LAMBDA &&
                           deployment.targetReference && (
                             <>
@@ -523,16 +527,17 @@ export function AgentDeployment({ agentId, paused }: { agentId: string; paused: 
                 )}
               </NativeSelect>
             </div>
-            {loadedMode !== DeploymentMode.SIDECAR && registerTarget === DeploymentTarget.DIRECT && (
-              <div className="space-y-2">
-                <Label htmlFor="register-endpoint">Agent endpoint URL</Label>
-                <Input
-                  id="register-endpoint"
-                  type="url"
-                  {...register.register("endpointUrl", { required: true })}
-                />
-              </div>
-            )}
+            {loadedMode !== DeploymentMode.SIDECAR &&
+              registerTarget === DeploymentTarget.DIRECT && (
+                <div className="space-y-2">
+                  <Label htmlFor="register-endpoint">Agent endpoint URL</Label>
+                  <Input
+                    id="register-endpoint"
+                    type="url"
+                    {...register.register("endpointUrl", { required: true })}
+                  />
+                </div>
+              )}
             {loadedMode !== DeploymentMode.SIDECAR &&
               registerTarget === DeploymentTarget.AWS_LAMBDA && (
                 <div className="space-y-2">

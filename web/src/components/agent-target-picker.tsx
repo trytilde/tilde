@@ -2,7 +2,7 @@
 // Keep registry requests here; the ported avatar package has no API dependency.
 import { useEffect, useRef, useState } from "react";
 import { PlusIcon, XIcon, CheckIcon } from "lucide-react";
-import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
+import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { agents } from "@/client";
 import { AgentAvatar } from "./agent-avatar";
 import { Button } from "./ui/button";

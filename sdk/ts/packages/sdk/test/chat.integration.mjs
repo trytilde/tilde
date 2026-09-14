@@ -1,4 +1,4 @@
-import { BinaryPermission, TargetSelection } from "../dist/gen/tilde/types/v1/agent_pb.js";
+import { BinaryPermission, TargetSelection } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";

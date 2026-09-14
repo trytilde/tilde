@@ -3,6 +3,8 @@ WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/package.json
+# The web app links @trytilde/contracts by path; the target must exist before install.
+COPY sdk/ts/packages/contracts/package.json sdk/ts/packages/contracts/package.json
 RUN pnpm install --frozen-lockfile
 COPY sdk/ts sdk/ts
 RUN pnpm --dir sdk/ts install --frozen-lockfile
@@ -15,7 +17,7 @@ RUN pnpm tools && pnpm generate && pnpm --dir sdk/ts build && pnpm --dir web bui
 
 FROM rust:1.98.1-bookworm AS rust
 WORKDIR /src
-RUN apt-get update && apt-get install -y --no-install-recommends cmake git pkg-config libssl-dev libsystemd-dev && apt-get clean
+RUN apt-get update && apt-get install -y --no-install-recommends cmake git pkg-config libssl-dev libsystemd-dev protobuf-compiler && apt-get clean
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates crates
 COPY vendor vendor

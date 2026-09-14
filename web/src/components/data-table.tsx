@@ -2,7 +2,7 @@ import { AgentAvatar } from "./agent-avatar";
 import { useMemo } from "react";
 import { createColumnHelper, FlexRender, tableFeatures, useTable } from "@tanstack/react-table";
 import { PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
-import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
+import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { HealthBadge, HealthHistory, responseTime } from "@/components/agent-health";
 import { Button } from "@/components/ui/button";
 import {

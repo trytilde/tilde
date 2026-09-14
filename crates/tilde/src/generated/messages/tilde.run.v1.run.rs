@@ -1509,6 +1509,7 @@ pub const __RUN_ACCEPTED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<RunAccepted>,
     is_wkt: false,
 };
+/// `error` is empty when the run ended normally; otherwise the host failed and the gateway records a failed invocation.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1521,6 +1522,13 @@ pub struct RunStopped {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub pending_input_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 2: `error`
+    #[serde(
+        rename = "error",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub error: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1529,6 +1537,7 @@ impl ::core::fmt::Debug for RunStopped {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("RunStopped")
             .field("pending_input_ids", &self.pending_input_ids)
+            .field("error", &self.error)
             .finish()
     }
 }
@@ -1562,6 +1571,9 @@ impl ::buffa::Message for RunStopped {
         for v in &self.pending_input_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if !self.error.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1574,6 +1586,9 @@ impl ::buffa::Message for RunStopped {
         use ::buffa::Enumeration as _;
         for v in &self.pending_input_ids {
             ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.error.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.error, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1599,6 +1614,13 @@ impl ::buffa::Message for RunStopped {
                 )?;
                 self.pending_input_ids.push(__elem);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.error, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1608,6 +1630,7 @@ impl ::buffa::Message for RunStopped {
     }
     fn clear(&mut self) {
         self.pending_input_ids.clear();
+        self.error.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

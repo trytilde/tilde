@@ -9,7 +9,7 @@ import { connectAgent, RuntimeChatService, RunService } from "../dist/index.js";
 import {
   InvocationControlService,
   InvocationCommandKind as Kind,
-} from "../dist/gen/tilde/runtime/v1/controls_pb.js";
+} from "@trytilde/contracts/tilde/runtime/v1/controls_pb.js";
 
 void test(
   "a connected host registers over Watch, runs wake frames and reports through RunService",
@@ -65,7 +65,10 @@ void test(
               );
             },
             async heartbeat(request, ctx) {
-              heartbeats.push({ ...request, authorization: ctx.requestHeader.get("authorization") });
+              heartbeats.push({
+                ...request,
+                authorization: ctx.requestHeader.get("authorization"),
+              });
               return {};
             },
             async report(request, ctx) {

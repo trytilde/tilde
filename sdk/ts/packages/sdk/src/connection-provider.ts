@@ -7,8 +7,8 @@ import {
   ConnectionProviderService,
   type HandleSetupRequest,
   HandleSetupResponseSchema,
-} from "./gen/tilde/provider/v1/connections_pb.js";
-export { ConnectionProviderService } from "./gen/tilde/provider/v1/connections_pb.js";
+} from "@trytilde/contracts/tilde/provider/v1/connections_pb.js";
+export { ConnectionProviderService } from "@trytilde/contracts/tilde/provider/v1/connections_pb.js";
 /** Optional hook for exceptional provisioning. Static keys and standard OAuth need no hook. */
 export function createConnectionProviderServer(options: {
   backendToken: string;

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "tools": "node scripts/install-codegen.mjs",
-    "generate": "buf lint && buf generate",
+    "generate": "buf lint && buf generate && pnpm --dir sdk/ts/packages/contracts build",
     "generate:check": "node scripts/check-generated.mjs",
     "dev": "task dev",
     "build": "task build",
@@ -12,7 +12,6 @@
   },
   "devDependencies": {
     "@bufbuild/buf": "1.72.0",
-    "@bufbuild/protoc-gen-es": "2.14.1",
     "@types/node": "26.5.0",
     "vite-plus": "0.3.1"
   },

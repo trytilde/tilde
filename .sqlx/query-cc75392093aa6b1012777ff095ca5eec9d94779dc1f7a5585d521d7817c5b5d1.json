@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(SELECT 1 FROM agent_instances WHERE agent_id=$1 AND instance_id=$2 AND ready AND last_seen_at>NOW()-make_interval(secs=>$3::float8)) AS \"live!\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "live!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cc75392093aa6b1012777ff095ca5eec9d94779dc1f7a5585d521d7817c5b5d1"
+}

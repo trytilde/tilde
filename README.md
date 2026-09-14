@@ -119,8 +119,12 @@ pnpm generate
 `pnpm tools` downloads pinned official code-generator binaries and checks their
 SHA-256 digests. `pnpm generate` runs Buf and the generators directly. It needs
 **no Rust compiler, application build, running server, database or cloud keys**.
-JavaScript and TypeScript declaration output works in both React and Node.
-Generated code is checked in; ordinary Cargo builds need neither Node nor Buf.
+The generated Rust is checked in, so ordinary Cargo builds need neither Node nor
+Buf. The TypeScript contracts are not: `@trytilde/contracts`
+(`sdk/ts/packages/contracts`) generates them into its ignored `gen/` directory on
+build, and the web app and `@trytilde/sdk` import from that package instead of
+carrying copies. `pnpm generate`, the SDK workspace build and every web script build
+it first, so a fresh clone only needs `task setup`.
 SQLx uses checked-in offline metadata, so Rust compilation also needs no database.
 
 The repository commits `.env` and `.env.test` as development and test defaults.
@@ -369,7 +373,7 @@ replica whose publishes go unacknowledged for ten seconds stops executing, so a
 partitioned holder never keeps running beside its replacement. Writes are acknowledged
 from replica memory and reach Postgres when the replica publishes them in batches, so a
 replica that dies loses the events it had not yet published, and a replica whose
-outbox fills sheds streaming deltas first and then its oldest frames rather than failing
+outbox fills sheds streaming deltas first and then its oldest events (never heartbeats, lease releases or directive results) rather than failing
 callers. External effects should therefore use idempotency keys.
 
 Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until

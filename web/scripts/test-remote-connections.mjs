@@ -1,11 +1,11 @@
-import { ConnectionSetupService } from "../src/gen/tilde/setup/v1/connections_pb.js";
+import { ConnectionSetupService } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createServer as createHttpServer } from "node:http";
 import { once } from "node:events";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { ConnectionsService } from "../src/gen/tilde/management/v1/connections_pb.js";
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
 import { createConnectionProviderServer } from "../../sdk/ts/packages/sdk/dist/connection-provider.js";
 const origin = process.env.CONNECTION_TEST_URL;
 assert(origin);

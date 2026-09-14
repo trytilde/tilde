@@ -12,12 +12,14 @@ pub(crate) const OUTBOX_SOFT_LIMIT: usize = 20_000;
 /// Unshipped frames beyond this refuse new mutations until the gateway catches up.
 pub(crate) const OUTBOX_LIMIT: usize = 200_000;
 /// Who executes this thread. `epoch` rises each time this replica takes the lease,
-/// so an agent process can tell a fresh invocation from a stale one.
+/// so an agent process can tell a fresh invocation from a stale one. `version` is the
+/// gateway's timestamp for the lease row; frames older than it are stale and ignored.
 #[derive(Clone, Default)]
 pub(crate) struct Lease {
     pub holder: Option<Uuid>,
     pub holder_url: String,
     pub epoch: u64,
+    pub version: i64,
 }
 
 #[derive(Clone)]

@@ -52,7 +52,8 @@ it("registers provider inputs with React Hook Form and clears submitted secrets"
 
 it("renders JSON Schema secret, boolean, enum and numeric fields without provider UI code", async () => {
   const { create } = await import("@bufbuild/protobuf");
-  const { BrokeringSchema, AuthDriver } = await import("./gen/tilde/setup/v1/connections_pb.js");
+  const { BrokeringSchema, AuthDriver } =
+    await import("@trytilde/contracts/tilde/setup/v1/connections_pb.js");
   const { CredentialForm } = await import("@trytilde/connection-ui");
   const submit = vi.fn().mockResolvedValue(undefined);
   const accountNameForm = renderHook(() => useForm<{ name: string }>()).result.current;

@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "contracts": "pnpm --dir ../sdk/ts/packages/contracts build",
+    "dev": "pnpm run contracts && vite --host 127.0.0.1",
+    "build": "pnpm run contracts && tsc --noEmit && vite build",
+    "typecheck": "pnpm run contracts && tsc --noEmit",
+    "test": "pnpm run contracts && vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -18,6 +19,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.35",
     "@tanstack/react-table": "^9.2.4",
+    "@trytilde/contracts": "link:../sdk/ts/packages/contracts",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "lucide-react": "^1.43.0",

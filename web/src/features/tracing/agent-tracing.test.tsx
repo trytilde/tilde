@@ -10,7 +10,10 @@ import {
 import { create } from "@bufbuild/protobuf";
 import { AgentTracing } from "./agent-tracing";
 import { parseSearch } from "./search";
-import { ObservationSchema, TracingState } from "@/gen/tilde/management/v1/tracing_pb.js";
+import {
+  ObservationSchema,
+  TracingState,
+} from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 const rpc = vi.hoisted(() => ({
   getTracingStatus: vi.fn(),
   listObservations: vi.fn(),

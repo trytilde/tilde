@@ -33,7 +33,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-contracts.mjs",
+    "build": "tsc -p tsconfig.json",
     "test": "node test/chat.integration.mjs"
   },
   "dependencies": {
@@ -45,6 +45,7 @@
     "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
     "@opentelemetry/resources": "^2.11.0",
     "@opentelemetry/sdk-trace-base": "^2.11.0",
-    "@opentelemetry/sdk-trace-node": "^2.11.0"
+    "@opentelemetry/sdk-trace-node": "^2.11.0",
+    "@trytilde/contracts": "workspace:*"
   }
 }

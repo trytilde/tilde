@@ -11,7 +11,7 @@ import {
   DeploymentStatus,
   DeploymentTarget,
   SidecarFailureMode,
-} from "@/gen/tilde/types/v1/deployment_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/deployment_pb.js";
 import { AgentDeployment } from "./agent-deployment";
 
 const rpc = vi.hoisted(() => ({
@@ -73,9 +73,7 @@ it("renders the serving summary and deployment rows with their instances", async
     instances: [instance],
   });
   render(<AgentDeployment agentId="agent-1" paused={false} />);
-  expect((await screen.findByTestId("serving-summary")).textContent).toContain(
-    "Serving Release 1",
-  );
+  expect((await screen.findByTestId("serving-summary")).textContent).toContain("Serving Release 1");
   const rows = screen.getAllByRole("listitem", { name: /^Deployment / });
   expect(rows[0].getAttribute("aria-label")).toBe("Deployment 1234567");
   const row = screen.getByRole("listitem", { name: "Deployment Release 1" });
@@ -88,9 +86,7 @@ it("renders the serving summary and deployment rows with their instances", async
   expect(within(row).getByText("inst-1")).toBeTruthy();
   expect(within(row).getByText("Ready")).toBeTruthy();
   expect(within(row).queryByRole("button", { name: "Promote Release 1" })).toBeNull();
-  expect(
-    screen.getByRole("tab", { name: "Sidecar" }).getAttribute("aria-disabled"),
-  ).toBe("true");
+  expect(screen.getByRole("tab", { name: "Sidecar" }).getAttribute("aria-disabled")).toBe("true");
   expect(screen.getByRole("tab", { name: "Manual" }).getAttribute("aria-selected")).toBe("true");
 });
 
@@ -185,7 +181,9 @@ it("saves settings and shows the sidecar snippet for sidecar tokens", async () =
     deploymentId: "dep-2",
   });
   expect(screen.getByText(/ENGINE_SIDECAR_AGENT_TOKENS=tok_rotated/)).toBeTruthy();
-  expect(screen.getByText(/connectAgent\(\{ gatewayUrl: "http:\/\/127\.0\.0\.1:8081\/agents\/agent-1"/)).toBeTruthy();
+  expect(
+    screen.getByText(/connectAgent\(\{ gatewayUrl: "http:\/\/127\.0\.0\.1:8081\/agents\/agent-1"/),
+  ).toBeTruthy();
   expect(screen.queryByLabelText("Agent endpoint URL")).toBeNull();
   expect(
     within(screen.getByLabelText("Target") as HTMLSelectElement)

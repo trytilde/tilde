@@ -10,7 +10,10 @@ import { once } from "node:events";
 import { createClient, Code, ConnectError } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { toJsonString } from "@bufbuild/protobuf";
-import { AgentService, GetAgentResponseSchema } from "../src/gen/tilde/management/v1/agents_pb.js";
+import {
+  AgentService,
+  GetAgentResponseSchema,
+} from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
 
 const database = process.env.TEST_DATABASE_URL;
 assert(database, "TEST_DATABASE_URL is required; use task test");

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT instance_id FROM agent_instances WHERE agent_id=$1 AND deployment_id=$2 AND ready AND agent_ready AND last_seen_at>NOW()-make_interval(secs=>$3::float8) ORDER BY last_seen_at DESC LIMIT 1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8e053b4036c4ad9030714966208101bb1d3151a1f867c83fa557f7ca5940e9d3"
+}

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT instance_id,public_url FROM agent_instances WHERE agent_id=$1 AND instance_id<>COALESCE($2,'00000000-0000-0000-0000-000000000000'::uuid) AND ($3::uuid IS NULL OR deployment_id=$3) AND ready AND agent_ready AND last_seen_at>NOW()-make_interval(secs=>$4::float8) ORDER BY instance_id LIMIT 1;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instance_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "public_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "91d3ad76ed05545f7a3607b177c1daa087b011dfeeecfdc83d66d14e8e3df646"
+}

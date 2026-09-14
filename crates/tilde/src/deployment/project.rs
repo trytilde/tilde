@@ -1,7 +1,7 @@
 //! Events published by replicas become canonical Postgres state. A batch is one
 //! transaction; receipts deduplicate replays; run state is accepted only from the
 //! replica holding the thread's lease. Data appends carry no ownership at all.
-use super::{Deployments, Holder, id, lease_frame};
+use super::{Deployments, Holder, id, lease_frame, liveness_secs};
 use crate::proto::tilde::{
     agent_event_ingress::v1 as wire,
     types::v1::{self as types, runtime_event::State},
@@ -31,16 +31,26 @@ fn at(value: i64) -> Result<DateTime<Utc>, Error> {
     DateTime::from_timestamp_millis(value)
         .ok_or_else(|| Error::Invalid("Invalid event timestamp".into()))
 }
-/// Per-batch memory: leases already looked up and thread routes already locked.
+/// Per-batch memory: leases already looked up, membership already verified and thread
+/// routes already locked.
 #[derive(Default)]
 struct Batch {
     leases: HashMap<Uuid, Option<Holder>>,
+    members: HashSet<Uuid>,
     locked: HashSet<Uuid>,
 }
+/// One frame of a batch that the projection applies in the order the replica queued it.
+enum Item {
+    Event(Box<types::RuntimeEvent>),
+    /// The replica evicted the thread; its lease goes only after the events before it.
+    Release(Uuid),
+}
 impl Deployments {
-    /// Apply one batch in order. Events share one transaction; a frame the gateway
-    /// cannot accept is rejected on its own so the replica drops it, and only
-    /// infrastructure failures fail the batch, which the replica then resends.
+    /// Apply one batch in order. Events and lease releases share one transaction and
+    /// keep their queue order, so a run that completed before its thread was evicted is
+    /// recorded before the lease goes. A frame the gateway cannot accept is rejected on
+    /// its own so the replica drops it, and only infrastructure failures fail the
+    /// batch, which the replica then resends.
     pub async fn publish(
         &self,
         agent: Uuid,
@@ -48,7 +58,7 @@ impl Deployments {
         instance: Uuid,
         request: wire::PublishRequest,
     ) -> Result<wire::PublishResponse, Error> {
-        let mut events = vec![];
+        let mut items = vec![];
         for frame in request.frames {
             match frame.frame {
                 Some(wire::upstream::Frame::Heartbeat(heartbeat)) => {
@@ -56,12 +66,12 @@ impl Deployments {
                 }
                 Some(wire::upstream::Frame::Event(event)) => {
                     if let Some(inner) = event.event.into_option() {
-                        events.push(inner);
+                        items.push(Item::Event(Box::new(inner)));
                     }
                 }
                 Some(wire::upstream::Frame::Release(release)) => {
                     if let Ok(thread) = id(&release.thread_id) {
-                        self.release(agent, instance, thread).await?;
+                        items.push(Item::Release(thread));
                     }
                 }
                 Some(wire::upstream::Frame::DirectiveResult(result)) => {
@@ -85,7 +95,7 @@ impl Deployments {
             }
         }
         let (rejected, lost) = match self
-            .project_batch(agent, deployment, instance, &events)
+            .project_batch(agent, deployment, instance, &items)
             .await
         {
             Ok(outcome) => outcome,
@@ -95,11 +105,19 @@ impl Deployments {
                 let mut rejected = vec![];
                 let mut lost = BTreeMap::new();
                 let mut batch = Batch::default();
-                for event in events {
-                    let event_id = event.id.clone();
-                    let kind = event.kind.clone();
+                for item in items {
                     let mut tx = self.pool.begin().await?;
                     batch.locked.clear();
+                    let event = match item {
+                        Item::Event(event) => *event,
+                        Item::Release(thread) => {
+                            self.release_in(&mut tx, agent, instance, thread).await?;
+                            tx.commit().await?;
+                            continue;
+                        }
+                    };
+                    let event_id = event.id.clone();
+                    let kind = event.kind.clone();
                     match self
                         .project_event(&mut tx, &mut batch, agent, deployment, instance, event)
                         .await
@@ -132,16 +150,25 @@ impl Deployments {
         agent: Uuid,
         deployment: Uuid,
         instance: Uuid,
-        events: &[types::RuntimeEvent],
+        items: &[Item],
     ) -> Result<(Vec<String>, BTreeMap<String, wire::ThreadLease>), Error> {
         let mut rejected = vec![];
         let mut lost = BTreeMap::new();
-        if events.is_empty() {
+        if items.is_empty() {
             return Ok((rejected, lost));
         }
         let mut batch = Batch::default();
         let mut tx = self.pool.begin().await?;
-        for event in events {
+        for item in items {
+            let event = match item {
+                Item::Event(event) => event,
+                Item::Release(thread) => {
+                    self.release_in(&mut tx, agent, instance, *thread).await?;
+                    // Later events on this thread must see the lease gone.
+                    batch.leases.remove(thread);
+                    continue;
+                }
+            };
             let event_id = event.id.clone();
             let kind = event.kind.clone();
             match self
@@ -151,7 +178,7 @@ impl Deployments {
                     agent,
                     deployment,
                     instance,
-                    event.clone(),
+                    (**event).clone(),
                 )
                 .await
             {
@@ -209,13 +236,15 @@ impl Deployments {
                         let row = sqlx::query_file!(
                             "../../queries/deployment/lease_holder.sql",
                             thread,
-                            agent
+                            agent,
+                            liveness_secs()
                         )
                         .fetch_optional(&mut **tx)
                         .await?;
                         let holder = row.map(|r| Holder {
                             instance: r.instance_id,
                             public_url: r.public_url.unwrap_or_default(),
+                            version: r.updated_at,
                         });
                         let value = holder.as_ref().map(|h| (h.instance, h.public_url.clone()));
                         batch.leases.insert(thread, holder);
@@ -223,7 +252,14 @@ impl Deployments {
                     }
                 };
                 if holder.as_ref().map(|(i, _)| *i) != Some(instance) {
-                    return Ok(Outcome::NotHolder(lease_frame(agent, thread, holder)));
+                    let version = batch
+                        .leases
+                        .get(&thread)
+                        .and_then(|h| h.as_ref().map(|h| h.version))
+                        .unwrap_or_else(Utc::now);
+                    return Ok(Outcome::NotHolder(lease_frame(
+                        agent, thread, holder, version,
+                    )));
                 }
             }
         }
@@ -242,24 +278,33 @@ impl Deployments {
         {
             return Ok(Outcome::Duplicate);
         }
-        if !thread.is_nil()
-            && !sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
-                .fetch_one(&mut **tx)
-                .await?
-                .exists
-        {
-            // Only the creating event may introduce a thread, and the agent must be in it.
-            let Some(State::Thread(value)) = &event.state else {
-                return Err(Error::Denied);
+        if !thread.is_nil() && !batch.members.contains(&thread) {
+            let exists =
+                sqlx::query_file!("../../queries/deployment/project/has_thread.sql", thread)
+                    .fetch_one(&mut **tx)
+                    .await?
+                    .exists;
+            let member = if exists {
+                // An existing conversation accepts events only from agents in it.
+                sqlx::query_file!("../../queries/deployment/thread_agent.sql", thread, agent)
+                    .fetch_one(&mut **tx)
+                    .await?
+                    .allowed
+            } else {
+                // Only the creating event may introduce a thread, and the agent must be in it.
+                let Some(State::Thread(value)) = &event.state else {
+                    return Err(Error::Denied);
+                };
+                value.primary_agent_id == agent.to_string()
+                    || value
+                        .participants
+                        .iter()
+                        .any(|p| p.agent_id.as_deref() == Some(&agent.to_string()))
             };
-            let member = value.primary_agent_id == agent.to_string()
-                || value
-                    .participants
-                    .iter()
-                    .any(|p| p.agent_id.as_deref() == Some(&agent.to_string()));
             if !member {
                 return Err(Error::Denied);
             }
+            batch.members.insert(thread);
         }
         match &event.state {
             Some(State::User(value)) => {
@@ -577,9 +622,12 @@ impl Deployments {
     }
     /// Hand completed messages to the other sidecar agents in a room.
     pub async fn relay_pending(&self) -> Result<(bool, usize), Error> {
-        let rows = sqlx::query_file!("../../queries/deployment/relay_pending.sql")
-            .fetch_all(&self.pool)
-            .await?;
+        let rows = sqlx::query_file!(
+            "../../queries/deployment/relay_pending.sql",
+            liveness_secs()
+        )
+        .fetch_all(&self.pool)
+        .await?;
         let more = rows.len() == 50;
         let mut delivered = 0;
         let chat = self.chat();

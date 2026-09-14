@@ -5,7 +5,7 @@ import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { AgentEditor, type AgentTab } from "@/components/agent-editor";
 import { Button } from "@/components/ui/button";
 import { agents } from "@/client";
-import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
+import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 
 export const Route = createFileRoute("/_app/agent/$agentId")({ component: AgentPage });
 

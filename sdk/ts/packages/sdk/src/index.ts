@@ -1,10 +1,10 @@
-import { LogsService } from "./gen/tilde/management/v1/logs_pb.js";
+import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import {
   InvocationControlService,
   InvocationCommandKind,
-} from "./gen/tilde/runtime/v1/controls_pb.js";
-import { TracingService } from "./gen/tilde/management/v1/tracing_pb.js";
-import { AgentAccessService } from "./gen/tilde/management/v1/access_pb.js";
+} from "@trytilde/contracts/tilde/runtime/v1/controls_pb.js";
+import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
 import { initializeTracing, invocationTracing, tracingInterceptor } from "./tracing.js";
 export { agentSpanProcessor } from "./tracing.js";
 import {
@@ -26,29 +26,29 @@ import {
 import { createServer } from "node:http2";
 import { setTimeout as sleep } from "node:timers/promises";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { ConnectionsService } from "./gen/tilde/management/v1/connections_pb.js";
-import { AgentService as ManagementAgentService } from "./gen/tilde/management/v1/agents_pb.js";
-import { AgentService as RuntimeAgentService } from "./gen/tilde/runtime/v1/agents_pb.js";
-import { ChatService as ManagementChatService } from "./gen/tilde/management/v1/chat_pb.js";
-import { ChatService as RuntimeChatService } from "./gen/tilde/runtime/v1/chat_pb.js";
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
+import { AgentService as ManagementAgentService } from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
+import { AgentService as RuntimeAgentService } from "@trytilde/contracts/tilde/runtime/v1/agents_pb.js";
+import { ChatService as ManagementChatService } from "@trytilde/contracts/tilde/management/v1/chat_pb.js";
+import { ChatService as RuntimeChatService } from "@trytilde/contracts/tilde/runtime/v1/chat_pb.js";
 import {
   AgentService as AgentHostService,
   InvokeRequestSchema,
   type InvokeRequest,
-} from "./gen/tilde/agent_host/v1/agent_pb.js";
+} from "@trytilde/contracts/tilde/agent_host/v1/agent_pb.js";
 import {
   RunService,
   type ReportRequestSchema,
   type RunRegistered,
-} from "./gen/tilde/run/v1/run_pb.js";
+} from "@trytilde/contracts/tilde/run/v1/run_pb.js";
 import {
   MessageSchema,
   type Participant,
   type Message as ChatMessage,
-} from "./gen/tilde/types/v1/chat_pb.js";
-export * from "./gen/tilde/types/v1/chat_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
+export * from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 export { RuntimeChatService, AgentHostService, RunService };
-export { BinaryPermission, TargetSelection } from "./gen/tilde/types/v1/agent_pb.js";
+export { BinaryPermission, TargetSelection } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
@@ -523,29 +523,44 @@ export class AgentContext {
   }
   /**
    * Internal host hook: report one run event through tilde.run.v1.RunService with the
-   * invocation capability. Reports are ordered, never cancelled by the invocation signal
-   * (the final `stopped` outlives it), and failures are logged rather than thrown.
-   * `stopped` is sent at most once.
+   * invocation capability. Reports are ordered and never cancelled by the invocation
+   * signal (the final `stopped` outlives it). Acceptance and the end of the run decide
+   * what the gateway records, so they retry a few times; a lost reasoning delta only
+   * costs a UI update. `stopped` is sent at most once.
    */
-  report(
-    event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>,
-  ): Promise<void> {
+  report(event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>): Promise<void> {
     if (event.case === "stopped") {
       if (this.stoppedReported) return this.reports;
       this.stoppedReported = true;
     }
     const invocationId = this.invocationId;
+    const attempts = event.case === "reasoningDelta" ? 1 : 4;
     this.reports = this.reports.then(async () => {
-      try {
-        await this.runService.report(
-          { invocationId, event },
-          { headers: this.#headers, timeoutMs: 10_000 },
-        );
-      } catch (error) {
-        console.warn(
-          `[tilde] run report (${event.case}) for invocation ${invocationId} failed:`,
-          ConnectError.from(error).message,
-        );
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await this.runService.report(
+            { invocationId, event },
+            { headers: this.#headers, timeoutMs: 10_000 },
+          );
+          return;
+        } catch (error) {
+          const connectError = ConnectError.from(error);
+          // The gateway answered and refused: retrying cannot change that.
+          const permanent = ![
+            Code.Unavailable,
+            Code.DeadlineExceeded,
+            Code.Unknown,
+            Code.Internal,
+          ].includes(connectError.code);
+          if (permanent || attempt >= attempts) {
+            console.warn(
+              `[tilde] run report (${event.case}) for invocation ${invocationId} failed:`,
+              connectError.message,
+            );
+            return;
+          }
+          await sleep(250 * attempt).catch(() => {});
+        }
       }
     });
     return this.reports;
@@ -810,6 +825,7 @@ async function runInvocation(
   }
   const telemetry = invocationTracing(request, traceHeaders, () => context.traceAuthorization());
   let traceFailed = false;
+  let failure: string | undefined;
   const execution = telemetry.run(async () => {
     try {
       await ready;
@@ -820,6 +836,7 @@ async function runInvocation(
       settle();
     } catch (error) {
       traceFailed = !(error instanceof StopLoop || controller.signal.aborted);
+      if (traceFailed) failure = error instanceof Error ? error.message : String(error);
       settle(
         error instanceof StopLoop || controller.signal.aborted
           ? undefined
@@ -850,9 +867,10 @@ async function runInvocation(
     wake.signal?.removeEventListener("abort", abort);
     controller.signal.removeEventListener("abort", rejectAborted);
     void controls;
+    // A failed run says so, so the gateway records a failed invocation instead of a stop.
     await context.report({
       case: "stopped",
-      value: { pendingInputIds: context.pendingInputIds() },
+      value: { pendingInputIds: context.pendingInputIds(), error: failure ?? "" },
     });
     void telemetry.end(traceFailed);
   }
@@ -959,7 +977,10 @@ export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
       );
     } catch (error) {
       if (!closed.signal.aborted)
-        console.warn(`[tilde] heartbeat for instance ${instanceId} failed:`, ConnectError.from(error).message);
+        console.warn(
+          `[tilde] heartbeat for instance ${instanceId} failed:`,
+          ConnectError.from(error).message,
+        );
     }
   }, 3_000);
   const watching = (async () => {
@@ -993,7 +1014,10 @@ export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
         }
       } catch (error) {
         if (closed.signal.aborted) break;
-        console.warn(`[tilde] watch for instance ${instanceId} failed:`, ConnectError.from(error).message);
+        console.warn(
+          `[tilde] watch for instance ${instanceId} failed:`,
+          ConnectError.from(error).message,
+        );
       }
       if (closed.signal.aborted) break;
       await sleep(1_000, undefined, { signal: closed.signal }).catch(() => {});

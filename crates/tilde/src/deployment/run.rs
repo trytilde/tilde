@@ -3,7 +3,7 @@
 //! an instance of that deployment; wakes for it arrive as frames. `Report` carries an
 //! invocation capability and is how every host, woken by stream, HTTP or a cloud invoke
 //! API, tells the gateway about acceptance, reasoning and the end of an invocation.
-use super::{Deployments, id};
+use super::{Deployments, id, liveness_secs};
 use crate::chat::Chat;
 use crate::proto::tilde::{agent_event_ingress::v1 as wire, run::v1 as run, types::v1 as types};
 use crate::services::tilde::run::v1::RunService;
@@ -165,7 +165,8 @@ impl Deployments {
         Ok(sqlx::query_file!(
             "../../queries/deployment/connected_instance.sql",
             agent,
-            deployment
+            deployment,
+            liveness_secs()
         )
         .fetch_optional(&self.pool)
         .await?

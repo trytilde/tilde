@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Gateway-executed invocations only: a sidecar invocation's liveness is its lease holder's heartbeat, reclaimed by recovery.\nUPDATE chat_invocations i SET status='failed',ended_at=NOW() FROM agents a WHERE a.id=i.agent_id AND a.deployment_mode='gateway' AND i.status='running' AND i.lease_expires_at<NOW() RETURNING i.id,i.run_id,i.thread_id;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "run_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "thread_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a974001d7bbf5698886c04fb59961fc50539030fe0f0fa08f97c24d30c37c10d"
+}

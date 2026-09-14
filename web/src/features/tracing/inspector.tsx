@@ -1,7 +1,10 @@
 import { mergeObservations, observationKey } from "./records";
 import { useEffect, useMemo, useState } from "react";
 import { traces } from "@/client";
-import type { Observation, ObservationFilter } from "@/gen/tilde/management/v1/tracing_pb.js";
+import type {
+  Observation,
+  ObservationFilter,
+} from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { IOPreview, ViewModeToggle, type ViewMode } from "./io-preview";

@@ -10,7 +10,7 @@ import {
 import { create } from "@bufbuild/protobuf";
 import { AgentLogs } from "./agent-logs";
 import { parseLogSearch } from "./search";
-import { LogRecordSchema, LogsState } from "@/gen/tilde/management/v1/logs_pb.js";
+import { LogRecordSchema, LogsState } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 const rpc = vi.hoisted(() => ({ getLogsStatus: vi.fn(), listLogs: vi.fn() }));
 vi.mock("@/client", () => ({ logs: rpc }));
 afterEach(() => {

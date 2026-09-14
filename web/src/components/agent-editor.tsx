@@ -17,7 +17,7 @@ import {
   TargetPermissionSchema,
   BinaryPermission,
   TargetSelection,
-} from "@/gen/tilde/types/v1/agent_pb.js";
+} from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { agents, deployments } from "@/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

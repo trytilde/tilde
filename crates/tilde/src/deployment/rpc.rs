@@ -287,6 +287,9 @@ impl SidecarService for Control {
             .subscribe(&service.pool, "tilde_sidecar_leases")
             .await
             .map_err(Error::from)?;
+        // One channel for every agent: each wake re-reads this instance's pending
+        // directives (one indexed query). Scope the channel by agent if hosts grow into
+        // the hundreds.
         let mut directives = service
             .channels
             .directives
@@ -366,14 +369,18 @@ impl SidecarService for Control {
         ctx: RequestContext,
         r: ServiceRequest<'_, ingress::HydrateRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ingress::HydrateResponse> + Send + use<'a>> {
-        let agent = self.agent(&ctx).await?;
+        let auth = self.authenticated(&ctx).await?;
         let request = r.to_owned_message();
         let instance = if request.instance_id.is_empty() {
             None
         } else {
             Some(id(&request.instance_id)?)
         };
-        Response::ok(self.0.hydrate(agent, instance, request).await?)
+        Response::ok(
+            self.0
+                .hydrate(auth.agent, auth.deployment, instance, request)
+                .await?,
+        )
     }
     async fn forward<'a>(
         &'a self,

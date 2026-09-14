@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
-import type { Agent } from "@/gen/tilde/types/v1/agent_pb.js";
+import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { agents } from "@/client";
 import { useCursorPage, type FetchPage } from "@/hooks/use-cursor-page";
 import { DataTable } from "@/components/data-table";

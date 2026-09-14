@@ -2,7 +2,10 @@ import { LoadingReveal } from "@trytilde/connection-ui";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
-import { ConnectionSetupService, type Brokering } from "@/gen/tilde/setup/v1/connections_pb.js";
+import {
+  ConnectionSetupService,
+  type Brokering,
+} from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 
 const client = createClient(
   ConnectionSetupService,
