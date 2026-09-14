@@ -808,6 +808,14 @@ pub struct Snapshot {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub token_signing_key: ::buffa::alloc::string::String,
+    /// Field 4: `deployment_id`
+    #[serde(
+        rename = "deploymentId",
+        alias = "deployment_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub deployment_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -818,6 +826,7 @@ impl ::core::fmt::Debug for Snapshot {
             .field("configuration", &self.configuration)
             .field("leases", &self.leases)
             .field("token_signing_key", &::core::format_args!("[REDACTED]"))
+            .field("deployment_id", &self.deployment_id)
             .finish()
     }
 }
@@ -869,6 +878,10 @@ impl ::buffa::Message for Snapshot {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.token_signing_key) as u64;
         }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -897,6 +910,9 @@ impl ::buffa::Message for Snapshot {
         }
         if !self.token_signing_key.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.token_signing_key, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.deployment_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -941,6 +957,13 @@ impl ::buffa::Message for Snapshot {
                 )?;
                 ::buffa::types::merge_string(&mut self.token_signing_key, buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -952,6 +975,7 @@ impl ::buffa::Message for Snapshot {
         self.configuration = ::buffa::MessageField::none();
         self.leases.clear();
         self.token_signing_key.clear();
+        self.deployment_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

@@ -185,7 +185,7 @@ it("saves settings and shows the sidecar snippet for sidecar tokens", async () =
     deploymentId: "dep-2",
   });
   expect(screen.getByText(/ENGINE_SIDECAR_AGENT_TOKENS=tok_rotated/)).toBeTruthy();
-  expect(screen.getByText(/ENGINE_SIDECAR_AGENT_ENDPOINTS=agent-1=http:\/\/127\.0\.0\.1:3000/)).toBeTruthy();
+  expect(screen.getByText(/connectAgent\(\{ gatewayUrl: "http:\/\/127\.0\.0\.1:8081\/agents\/agent-1"/)).toBeTruthy();
   expect(screen.queryByLabelText("Agent endpoint URL")).toBeNull();
   expect(
     within(screen.getByLabelText("Target") as HTMLSelectElement)

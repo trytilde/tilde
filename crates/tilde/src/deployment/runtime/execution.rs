@@ -758,36 +758,86 @@ impl Runtime {
                     .collect(),
                 ..Default::default()
             };
-            let mut stream = tokio::time::timeout(Duration::from_secs(5), crate::chat::runtime::client(&self.local_endpoint, self.host_key.expose_secret(), "Invoke", &request)?.invoke(request))
-                .await
-                .map_err(|_| ChatError::Transport)?
-                .map_err(|_| ChatError::Transport)?;
+            // A connected agent process takes the wake as a frame and reports back; an
+            // HTTP endpoint, when configured, is the fallback for agents that do not dial in.
+            let local = self.wake_local(request.clone());
             let mut acknowledged = false;
             let mut tick = tokio::time::interval(Duration::from_secs(5));
-            loop {
-                tokio::select! {
-                    _=tick.tick()=>{
-                        // The lease is only renewed while the gateway still hears this replica.
-                        if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
-                        let mut t=shared.lock().await;
-                        if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
-                        if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
-                    },
-                    message=stream.message()=>{
-                        let Some(message)=message.map_err(|_|ChatError::Transport)? else { break; };
-                        let message=message.view();
-                        pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
-                        if message.accepted_command_id==command.id && !acknowledged {
-                            acknowledged=true;
-                            let mut t=shared.lock().await;
-                            if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
+            if let Some(mut local) = local {
+                let outcome: Result<()> = async {
+                    loop {
+                        tokio::select! {
+                            _=tick.tick()=>{
+                                if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
+                                let mut t=shared.lock().await;
+                                if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
+                                if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
+                                if !acknowledged && !self.local_agent_connected() { return Err(ChatError::Transport); }
+                            },
+                            event=local.events.recv()=>{
+                                let Some(event)=event else { break; };
+                                use crate::proto::tilde::run::v1::report_request::Event;
+                                match event {
+                                    Event::Accepted(_) => {
+                                        if !acknowledged {
+                                            acknowledged=true;
+                                            let mut t=shared.lock().await;
+                                            if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
+                                        }
+                                    }
+                                    Event::ReasoningDelta(delta) => {
+                                        if !delta.is_empty() {
+                                            let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:delta,..Default::default()};
+                                            let mut t=shared.lock().await;
+                                            self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
+                                            drop(t);
+                                            self.changed(thread);
+                                        }
+                                    }
+                                    Event::Stopped(stopped) => {
+                                        pending.extend(stopped.pending_input_ids);
+                                        break;
+                                    }
+                                }
+                            }
                         }
-                        if !message.reasoning_delta.is_empty() {
-                            let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:message.reasoning_delta.into(),..Default::default()};
+                    }
+                    Ok(())
+                }
+                .await;
+                self.forget_waiter(key);
+                outcome?;
+            } else {
+                let endpoint = self.local_endpoint.clone().ok_or(ChatError::Transport)?;
+                let mut stream = tokio::time::timeout(Duration::from_secs(5), crate::chat::runtime::client(&endpoint, self.host_key.expose_secret(), "Invoke", &request)?.invoke(request))
+                    .await
+                    .map_err(|_| ChatError::Transport)?
+                    .map_err(|_| ChatError::Transport)?;
+                loop {
+                    tokio::select! {
+                        _=tick.tick()=>{
+                            // The lease is only renewed while the gateway still hears this replica.
+                            if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
                             let mut t=shared.lock().await;
-                            self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
-                            drop(t);
-                            self.changed(thread);
+                            if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
+                            if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
+                        },
+                        message=stream.message()=>{
+                            let Some(message)=message.map_err(|_|ChatError::Transport)? else { break; };
+                            let message=message.view();
+                            pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
+                            if message.accepted_command_id==command.id && !acknowledged {
+                                acknowledged=true;
+                                let mut t=shared.lock().await;
+                                if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
+                            }
+                            if !message.reasoning_delta.is_empty() {
+                                let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:message.reasoning_delta.into(),..Default::default()};
+                                let mut t=shared.lock().await;
+                                self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
+                                drop(t);
+                                self.changed(thread);
+                            }
                         }
                     }
                 }

@@ -28,7 +28,7 @@ service SidecarService {
 message WatchRequest { string instance_id = 1; string public_url = 2; string runtime_url = 3; }
 message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; ThreadLease lease = 3; Directive directive = 4; Ping ping = 5; } }
 // Leases in the snapshot are the ones this instance holds.
-message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; }
+message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; string deployment_id = 4; }
 message Ping {}
 // Who executes a (thread, agent) pair. `held` is false when nobody does.
 message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; reserved 2; }
