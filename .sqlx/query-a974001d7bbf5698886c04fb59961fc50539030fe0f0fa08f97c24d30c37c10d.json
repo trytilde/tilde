@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE chat_invocations SET status='failed',ended_at=NOW() WHERE status='running' AND lease_expires_at<NOW() RETURNING id,run_id,thread_id;\n",
+  "query": "-- Gateway-executed invocations only: a sidecar invocation's liveness is its lease holder's heartbeat, reclaimed by recovery.\nUPDATE chat_invocations i SET status='failed',ended_at=NOW() FROM agents a WHERE a.id=i.agent_id AND a.deployment_mode='gateway' AND i.status='running' AND i.lease_expires_at<NOW() RETURNING i.id,i.run_id,i.thread_id;\n",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "f5d181d4eb77b9e9f071dabcfc42ac73f86f3a7173044ae8313f7433006987ff"
+  "hash": "a974001d7bbf5698886c04fb59961fc50539030fe0f0fa08f97c24d30c37c10d"
 }

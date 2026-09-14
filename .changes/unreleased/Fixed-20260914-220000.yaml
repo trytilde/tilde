@@ -1,0 +1,3 @@
+kind: Fixed
+body: Sidecar publishes project lease releases in queue order, the projection checks thread membership on every event, Lambda deployments can serve gateway agents, routing enforces the pinned deployment, hosts report failed runs, and hydration restores goals, tasks, conversions and run origins.
+time: 2026-09-14T22:00:00.000000+02:00

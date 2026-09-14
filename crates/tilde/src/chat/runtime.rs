@@ -755,6 +755,10 @@ impl Chat {
                 return Ok(Woken::Detached);
             }
             tracing::warn!(agent_id=%agent, instance_id=%instance, invocation_id=%invocation, "Connected instance did not accept the wake; falling back to its endpoint");
+            // The endpoint runs it now; the queued frame must not run it again on reconnect.
+            if queued {
+                let _ = deployments.acknowledge_wake(agent, command).await;
+            }
             request.command_id.clear();
         }
         let endpoint = endpoint.ok_or(ChatError::Transport)?;
@@ -810,7 +814,14 @@ impl Chat {
                     .execute(self.pg()?)
                     .await?;
                 }
-                self.finish(invocation, "stopped").await?;
+                // A host that failed says so; the run does not wait on a stop that never came.
+                let status = if stopped.error.is_empty() {
+                    "stopped"
+                } else {
+                    tracing::warn!(invocation_id=%invocation, error=%stopped.error, "Host reported a failed invocation");
+                    "failed"
+                };
+                self.finish(invocation, status).await?;
             }
             None => return Err(ChatError::Invalid("Report requires an event".into())),
         }

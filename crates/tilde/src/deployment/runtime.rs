@@ -218,7 +218,9 @@ impl Runtime {
     /// Queue a frame for the gateway. The hot path never fails the caller because
     /// the gateway is slow: past the soft limit, typing and streaming deltas are not
     /// queued; at the hard limit, queued ephemeral frames are shed first, then the
-    /// oldest frame. Lost frames are an accepted cost of a hot path with no round trips.
+    /// oldest event. Heartbeats, releases and directive results are never shed: the
+    /// gateway acts on each one exactly once, so losing one replays or stalls work.
+    /// Lost events are an accepted cost of a hot path with no round trips.
     pub(crate) fn push(&self, frame: control::upstream::Frame) {
         self.push_frame(frame, false);
     }
@@ -231,8 +233,12 @@ impl Runtime {
             let before = outbox.len();
             outbox.retain(|f| !Self::ephemeral_frame(f));
             let shed = before - outbox.len();
-            if outbox.len() >= store::OUTBOX_LIMIT {
-                outbox.pop_front();
+            if outbox.len() >= store::OUTBOX_LIMIT
+                && let Some(oldest) = outbox
+                    .iter()
+                    .position(|f| matches!(f.frame, Some(control::upstream::Frame::Event(_))))
+            {
+                outbox.remove(oldest);
             }
             tracing::warn!(agent_id=%self.agent_id, shed, "Outbox full; frames dropped for the gateway to catch up");
         }
@@ -525,6 +531,25 @@ impl Runtime {
         for run in response.runs {
             t.runs.insert(id(&run.id)?, run);
         }
+        for origin in response.run_origins {
+            t.run_meta.insert(
+                id(&origin.run_id)?,
+                store::RunMeta {
+                    source_identity_id: origin.source_identity_id,
+                    channel_origin: origin.channel_origin,
+                },
+            );
+        }
+        for goal in response.goals {
+            t.goals.insert(id(&goal.id)?, goal);
+        }
+        for task in response.tasks {
+            t.tasks.insert(id(&task.id)?, task);
+        }
+        for converted in response.converted {
+            t.converted
+                .insert(id(&converted.message_id)?, converted.message_json);
+        }
         t.lease = lease;
         Ok(t)
     }
@@ -543,6 +568,7 @@ impl Runtime {
             holder: Some(self.instance_id),
             holder_url: String::new(),
             epoch: self.state.lease_epochs.fetch_add(1, Ordering::AcqRel) + 1,
+            version: lease.version,
         })
     }
     /// Create a thread held here. The gateway grants the lease before any local

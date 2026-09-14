@@ -523,9 +523,10 @@ export class AgentContext {
   }
   /**
    * Internal host hook: report one run event through tilde.run.v1.RunService with the
-   * invocation capability. Reports are ordered, never cancelled by the invocation signal
-   * (the final `stopped` outlives it), and failures are logged rather than thrown.
-   * `stopped` is sent at most once.
+   * invocation capability. Reports are ordered and never cancelled by the invocation
+   * signal (the final `stopped` outlives it). Acceptance and the end of the run decide
+   * what the gateway records, so they retry a few times; a lost reasoning delta only
+   * costs a UI update. `stopped` is sent at most once.
    */
   report(event: NonNullable<MessageInitShape<typeof ReportRequestSchema>["event"]>): Promise<void> {
     if (event.case === "stopped") {
@@ -533,17 +534,33 @@ export class AgentContext {
       this.stoppedReported = true;
     }
     const invocationId = this.invocationId;
+    const attempts = event.case === "reasoningDelta" ? 1 : 4;
     this.reports = this.reports.then(async () => {
-      try {
-        await this.runService.report(
-          { invocationId, event },
-          { headers: this.#headers, timeoutMs: 10_000 },
-        );
-      } catch (error) {
-        console.warn(
-          `[tilde] run report (${event.case}) for invocation ${invocationId} failed:`,
-          ConnectError.from(error).message,
-        );
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await this.runService.report(
+            { invocationId, event },
+            { headers: this.#headers, timeoutMs: 10_000 },
+          );
+          return;
+        } catch (error) {
+          const connectError = ConnectError.from(error);
+          // The gateway answered and refused: retrying cannot change that.
+          const permanent = ![
+            Code.Unavailable,
+            Code.DeadlineExceeded,
+            Code.Unknown,
+            Code.Internal,
+          ].includes(connectError.code);
+          if (permanent || attempt >= attempts) {
+            console.warn(
+              `[tilde] run report (${event.case}) for invocation ${invocationId} failed:`,
+              connectError.message,
+            );
+            return;
+          }
+          await sleep(250 * attempt).catch(() => {});
+        }
       }
     });
     return this.reports;
@@ -808,6 +825,7 @@ async function runInvocation(
   }
   const telemetry = invocationTracing(request, traceHeaders, () => context.traceAuthorization());
   let traceFailed = false;
+  let failure: string | undefined;
   const execution = telemetry.run(async () => {
     try {
       await ready;
@@ -818,6 +836,7 @@ async function runInvocation(
       settle();
     } catch (error) {
       traceFailed = !(error instanceof StopLoop || controller.signal.aborted);
+      if (traceFailed) failure = error instanceof Error ? error.message : String(error);
       settle(
         error instanceof StopLoop || controller.signal.aborted
           ? undefined
@@ -848,9 +867,10 @@ async function runInvocation(
     wake.signal?.removeEventListener("abort", abort);
     controller.signal.removeEventListener("abort", rejectAborted);
     void controls;
+    // A failed run says so, so the gateway records a failed invocation instead of a stop.
     await context.report({
       case: "stopped",
-      value: { pendingInputIds: context.pendingInputIds() },
+      value: { pendingInputIds: context.pendingInputIds(), error: failure ?? "" },
     });
     void telemetry.end(traceFailed);
   }

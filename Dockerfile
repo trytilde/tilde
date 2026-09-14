@@ -3,6 +3,8 @@ WORKDIR /src
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/package.json
+# The web app links @trytilde/contracts by path; the target must exist before install.
+COPY sdk/ts/packages/contracts/package.json sdk/ts/packages/contracts/package.json
 RUN pnpm install --frozen-lockfile
 COPY sdk/ts sdk/ts
 RUN pnpm --dir sdk/ts install --frozen-lockfile

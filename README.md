@@ -373,7 +373,7 @@ replica whose publishes go unacknowledged for ten seconds stops executing, so a
 partitioned holder never keeps running beside its replacement. Writes are acknowledged
 from replica memory and reach Postgres when the replica publishes them in batches, so a
 replica that dies loses the events it had not yet published, and a replica whose
-outbox fills sheds streaming deltas first and then its oldest frames rather than failing
+outbox fills sheds streaming deltas first and then its oldest events (never heartbeats, lease releases or directive results) rather than failing
 callers. External effects should therefore use idempotency keys.
 
 Attachments use bounded sidecar memory (128 MiB per upload, 256 MiB total) until

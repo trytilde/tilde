@@ -30,8 +30,9 @@ message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationRes
 // Leases in the snapshot are the ones this instance holds.
 message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; string deployment_id = 4; }
 message Ping {}
-// Who executes a (thread, agent) pair. `held` is false when nobody does.
-message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; reserved 2; }
+// Who executes a (thread, agent) pair. `held` is false when nobody does. `version` is the
+// lease row's last change in Unix milliseconds; a replica ignores frames older than the lease it holds.
+message ThreadLease { string thread_id = 1; string agent_id = 3; string holder_instance_id = 4; string holder_public_url = 5; bool held = 6; int64 version = 7; reserved 2; }
 // Gateway-originated work for one replica, acknowledged with a DirectiveResult.
 message Directive { string id = 1; string thread_id = 2; oneof action { IngressCall ingress_call = 10; ProviderEventDirective provider_event = 11; RelayMessage relay = 13; tilde.agent_host.v1.InvokeRequest wake = 14; } }
 // A completed message authored elsewhere in a room this agent participates in.
@@ -54,7 +55,11 @@ enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; 
 message PublishResponse { repeated string rejected_event_ids = 3; repeated ThreadLease lost = 4; }
 message HydrateRequest { oneof key { string thread_id = 1; ExternalKey external = 2; } bool lease = 3; string instance_id = 4; }
 message ExternalKey { string connection_id = 1; string external_id = 2; }
-message HydrateResponse { bool found = 1; tilde.types.v1.Thread thread = 2; repeated tilde.types.v1.Message messages = 3; repeated tilde.types.v1.Run runs = 4; ThreadLease lease = 5; }
+// Everything a replica needs to resume execution: goals, tasks, cached conversions and
+// each run's origin travel with the roster, so a failover restores the same authorization context.
+message HydrateResponse { bool found = 1; tilde.types.v1.Thread thread = 2; repeated tilde.types.v1.Message messages = 3; repeated tilde.types.v1.Run runs = 4; ThreadLease lease = 5; repeated tilde.types.v1.Goal goals = 6; repeated tilde.types.v1.Task tasks = 7; repeated RunOrigin run_origins = 8; repeated tilde.types.v1.ConvertedMessageState converted = 9; }
+// Where a run came from, for channel access checks on the executing replica.
+message RunOrigin { string run_id = 1; string source_identity_id = 2; bool channel_origin = 3; }
 message ForwardRequest { string thread_id = 1; IngressCall call = 2; }
 message ForwardResponse { CallResult result = 1; }
 message UploadAttachmentRequest { tilde.types.v1.Attachment attachment = 1; bytes content = 2; }

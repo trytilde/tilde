@@ -1,1 +1,1 @@
-SELECT instance_id,public_url FROM agent_instances WHERE agent_id=$1 AND instance_id<>COALESCE($2,'00000000-0000-0000-0000-000000000000'::uuid) AND ready AND agent_ready AND last_seen_at>NOW()-INTERVAL '15 seconds' ORDER BY (deployment_id=$3) DESC,instance_id LIMIT 1;
+SELECT instance_id,public_url FROM agent_instances WHERE agent_id=$1 AND instance_id<>COALESCE($2,'00000000-0000-0000-0000-000000000000'::uuid) AND ($3::uuid IS NULL OR deployment_id=$3) AND ready AND agent_ready AND last_seen_at>NOW()-INTERVAL '15 seconds' ORDER BY instance_id LIMIT 1;

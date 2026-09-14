@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT instance_id,public_url FROM agent_instances WHERE agent_id=$1 AND instance_id<>COALESCE($2,'00000000-0000-0000-0000-000000000000'::uuid) AND ready AND agent_ready AND last_seen_at>NOW()-INTERVAL '15 seconds' ORDER BY (deployment_id=$3) DESC,instance_id LIMIT 1;\n",
+  "query": "SELECT instance_id,public_url FROM agent_instances WHERE agent_id=$1 AND instance_id<>COALESCE($2,'00000000-0000-0000-0000-000000000000'::uuid) AND ($3::uuid IS NULL OR deployment_id=$3) AND ready AND agent_ready AND last_seen_at>NOW()-INTERVAL '15 seconds' ORDER BY instance_id LIMIT 1;\n",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "9e2673e1418bab910a41e74d28c3ce64211a44058cdac5e3a7eeccb110153e9c"
+  "hash": "841f576cfe1d2e93881d4aaff1437de00b48551ddf987efbde2e494aeb398589"
 }

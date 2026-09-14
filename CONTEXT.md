@@ -498,11 +498,16 @@ deployment's target must match. Creating an agent with an endpoint mints its ini
 manual direct deployment, and changing the endpoint mints another; promotion mirrors a
 direct deployment's endpoint back onto the agent for legacy readers.
 
-Routing is per agent: `latest` serves each newly registered deployment of the matching
-target at once, `manual` waits for `PromoteDeployment`. A (thread, agent) pair is pinned
-to the serving deployment on its first invocation and stays pinned while that
-deployment is registered; invocations record their deployment. Failover stays within a
-deployment. Moving a thread across deployments is an explicit act, not yet exposed.
+Routing is per agent: `latest` serves each newly registered deployment the agent's
+mode can run (direct and Lambda for gateway mode, sidecar for sidecar mode) at once,
+`manual` waits for `PromoteDeployment`, and under `manual` the serving deployment
+cannot be retired until another is promoted. A (thread, agent) pair is pinned to the
+serving deployment on its first invocation (gateway mode) or first lease (sidecar
+mode) and stays pinned while that deployment is registered; invocations record their
+deployment. The pin is a constraint, not a preference: gateway-originated work goes
+only to instances of the pinned deployment, failover stays within it, and a replica of
+another deployment is refused the lease. Moving a thread across deployments is an
+explicit act, not yet exposed.
 
 Execution is wake-and-dial. A wake carries the invocation (`InvokeRequest`, now with
 the deployment id and trace context); how it is delivered is the only per-target
@@ -511,8 +516,10 @@ receives it as a frame (a durable directive acknowledged by `Report`), a direct
 endpoint is woken over HTTP, and a Lambda function is invoked asynchronously through
 the AWS invoke API with the gateway's own credentials. Every host then reports through
 `RunService.Report` with its invocation capability: acceptance, reasoning deltas and
-the end of the invocation with any unconsumed inputs. The gateway no longer depends on
-the wake call's response; a legacy host that answers on the Invoke stream still works.
+the end of the invocation with any unconsumed inputs and, when the host's run threw,
+the error, which the gateway records as a failed invocation rather than a stop. The
+gateway no longer depends on the wake call's response; a legacy host that answers on
+the Invoke stream still works.
 The invocation lease is renewed by the host's open command stream and by reports, so a
 host that dies stops renewing and expiry reclaims the run. Health polling remains for
 direct endpoints only; connected instances are healthy by heartbeat.
@@ -541,13 +548,17 @@ Postgres is the record. A replica is a cache of the threads it touched, a write-
 queue, and the executor for the threads it holds a lease on. Execution exclusivity is
 one lease per `(thread, agent)` in `thread_leases`, pointing at a replica incarnation;
 data carries no ownership. A thread costs one gateway call when a replica first touches
-it: `Hydrate` returns the projection's state and takes the lease in the same
-transaction. After that, events on that thread cost no SQL and no gateway call on the
-hot path: the holder mutates state under one per-thread lock, appends typed events with
-a per-thread sequence, and the shipper drains them asynchronously in batches. A thread
-idle past the configured window leaves memory and its lease is released, so the next
-replica to touch it takes over cleanly; a per-agent cache byte budget evicts the least
-recently active idle threads early. A sidecar is a per-host daemon serving several
+it: `Hydrate` takes the lease, then returns everything the executor needs to resume
+(roster, recent messages, runs and their origins, goals, tasks, cached conversions).
+Lease frames carry the row's version so a replica can order a Watch frame against the
+lease its own Hydrate returned. After that, events on that thread cost no SQL and no
+gateway call on the hot path: the holder mutates state under one per-thread lock,
+appends typed events with a per-thread sequence, and the shipper drains them
+asynchronously in batches. A thread idle past the configured window leaves memory and
+its lease is released, so the next replica to touch it takes over cleanly; a per-agent
+cache byte budget evicts the least recently active idle threads early. A release is
+projected in queue order with the events before it, so a run that completed before its
+thread was evicted is recorded before the lease goes. A sidecar is a per-host daemon serving several
 agents: each agent has its own runtime, cache, outbox and leases, sharing one instance
 id, one public listener and one loopback listener. On a graceful stop each runtime
 releases the leases of idle threads, keeps the leases of threads mid-invocation, and
@@ -561,7 +572,7 @@ have not been acknowledged for ten seconds stops executing on all its threads, s
 inside the gateway's dead-detection window, so a partitioned holder never runs beside
 its replacement. Only run, invocation and tool-call state is checked against the lease
 at projection time; messages, users, thread changes, traces and logs from any replica
-are accepted. Run state from a replica that no longer holds the thread is answered
+of an agent in the thread are accepted. Run state from a replica that no longer holds the thread is answered
 with the current lease rather than an error, and the replica fails its local work for
 that thread. The gateway projects a batch in one transaction with an idempotency
 receipt per event; only a frame the gateway cannot accept (a permission failure or a

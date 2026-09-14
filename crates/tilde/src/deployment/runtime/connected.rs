@@ -24,6 +24,8 @@ pub(crate) struct Connected {
     waiters: StdMutex<HashMap<Uuid, Waiter>>,
 }
 pub(crate) struct LocalWake {
+    /// The agent process that took the wake; the execution ends when it stops heartbeating.
+    pub instance: Uuid,
     pub events: mpsc::Receiver<run::report_request::Event>,
 }
 impl Runtime {
@@ -68,6 +70,16 @@ impl Runtime {
             None => false,
         }
     }
+    /// Whether one agent process is still heartbeating.
+    pub(crate) fn local_instance_connected(&self, instance: Uuid) -> bool {
+        self.state
+            .connected
+            .instances
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&instance)
+            .is_some_and(|local| now() - local.last_seen < LOCAL_LIVENESS_MS)
+    }
     /// Whether an agent process has heartbeated recently.
     pub(crate) fn local_agent_connected(&self) -> bool {
         self.state
@@ -78,22 +90,11 @@ impl Runtime {
             .values()
             .any(|local| now() - local.last_seen < LOCAL_LIVENESS_MS)
     }
-    /// Hand a wake to the most recently seen live agent process, if any.
-    pub(crate) fn wake_local(&self, request: host::InvokeRequest) -> Option<LocalWake> {
-        let invocation = id(&request.invocation_id).ok()?;
-        let sender = {
-            let instances = self
-                .state
-                .connected
-                .instances
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            instances
-                .values()
-                .filter(|local| now() - local.last_seen < LOCAL_LIVENESS_MS)
-                .max_by_key(|local| local.last_seen)
-                .map(|local| local.wakes.clone())?
-        };
+    /// Where reports for one invocation land, whichever way its host was woken.
+    pub(crate) fn expect_reports(
+        &self,
+        invocation: Uuid,
+    ) -> mpsc::Receiver<run::report_request::Event> {
         let (events_tx, events) = mpsc::channel(256);
         self.state
             .connected
@@ -101,11 +102,30 @@ impl Runtime {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(invocation, Waiter { events: events_tx });
+        events
+    }
+    /// Hand a wake to the most recently seen live agent process, if any.
+    pub(crate) fn wake_local(&self, request: host::InvokeRequest) -> Option<LocalWake> {
+        let invocation = id(&request.invocation_id).ok()?;
+        let (instance, sender) = {
+            let instances = self
+                .state
+                .connected
+                .instances
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            instances
+                .iter()
+                .filter(|(_, local)| now() - local.last_seen < LOCAL_LIVENESS_MS)
+                .max_by_key(|(_, local)| local.last_seen)
+                .map(|(instance, local)| (*instance, local.wakes.clone()))?
+        };
+        let events = self.expect_reports(invocation);
         if sender.try_send(request).is_err() {
             self.forget_waiter(invocation);
             return None;
         }
-        Some(LocalWake { events })
+        Some(LocalWake { instance, events })
     }
     pub(crate) fn forget_waiter(&self, invocation: Uuid) {
         self.state

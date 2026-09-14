@@ -366,14 +366,18 @@ impl SidecarService for Control {
         ctx: RequestContext,
         r: ServiceRequest<'_, ingress::HydrateRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<ingress::HydrateResponse> + Send + use<'a>> {
-        let agent = self.agent(&ctx).await?;
+        let auth = self.authenticated(&ctx).await?;
         let request = r.to_owned_message();
         let instance = if request.instance_id.is_empty() {
             None
         } else {
             Some(id(&request.instance_id)?)
         };
-        Response::ok(self.0.hydrate(agent, instance, request).await?)
+        Response::ok(
+            self.0
+                .hydrate(auth.agent, auth.deployment, instance, request)
+                .await?,
+        )
     }
     async fn forward<'a>(
         &'a self,

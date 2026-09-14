@@ -21,5 +21,6 @@ message HeartbeatResponse {}
 // One event in an invocation's life, authenticated with the invocation capability.
 message ReportRequest { string invocation_id = 1; oneof event { RunAccepted accepted = 2; string reasoning_delta = 3; RunStopped stopped = 4; } }
 message RunAccepted { string command_id = 1; }
-message RunStopped { repeated string pending_input_ids = 1; }
+// `error` is empty when the run ended normally; otherwise the host failed and the gateway records a failed invocation.
+message RunStopped { repeated string pending_input_ids = 1; string error = 2; }
 message ReportResponse {}

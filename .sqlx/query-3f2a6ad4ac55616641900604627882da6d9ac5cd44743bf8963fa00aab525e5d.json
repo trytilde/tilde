@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "-- Pin the (thread, agent) pair to a deployment on first lease; a pin to a retired deployment is replaced.\nWITH current AS (\n SELECT p.deployment_id FROM chat_participants p JOIN agent_deployments d ON d.id=p.deployment_id AND d.status='registered'\n WHERE p.thread_id=$1 AND p.agent_id=$2 AND p.active\n), chosen AS (SELECT COALESCE((SELECT deployment_id FROM current),$3::uuid) AS id)\nUPDATE chat_participants p SET deployment_id=chosen.id FROM chosen WHERE p.thread_id=$1 AND p.agent_id=$2 AND p.active RETURNING p.deployment_id AS \"deployment_id?\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "deployment_id?",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "3f2a6ad4ac55616641900604627882da6d9ac5cd44743bf8963fa00aab525e5d"
+}

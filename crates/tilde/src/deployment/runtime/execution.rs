@@ -24,6 +24,13 @@ struct Claims {
     lease_epoch: u64,
     agent_generation: i64,
 }
+/// What the host has told us about one wake so far.
+#[derive(Default)]
+struct Progress {
+    acknowledged: bool,
+    pending: Vec<String>,
+    error: Option<String>,
+}
 impl Runtime {
     pub(crate) fn agent_participant(&self, t: &ThreadState) -> Result<Uuid> {
         t.thread
@@ -730,7 +737,7 @@ impl Runtime {
             self.emit(&mut t, "invocation.running", v.clone().into(), None)?;
         }
         self.changed(thread);
-        let mut pending = Vec::new();
+        let mut pending: Vec<String> = Vec::new();
         let result = async {
             let capability = self.issue_token(&v).await?;
             let configuration = self.configuration()?;
@@ -758,93 +765,69 @@ impl Runtime {
                     .collect(),
                 ..Default::default()
             };
-            // A connected agent process takes the wake as a frame and reports back; an
-            // HTTP endpoint, when configured, is the fallback for agents that do not dial in.
-            let local = self.wake_local(request.clone());
-            let mut acknowledged = false;
+            // A connected agent process takes the wake as a frame; an HTTP endpoint, when
+            // configured, is the fallback for agents that do not dial in. Either way the
+            // host reports through the run protocol, so reports are collected the same way.
+            let mut progress = Progress::default();
             let mut tick = tokio::time::interval(Duration::from_secs(5));
-            if let Some(mut local) = local {
-                let outcome: Result<()> = async {
-                    loop {
-                        tokio::select! {
-                            _=tick.tick()=>{
-                                if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
-                                let mut t=shared.lock().await;
-                                if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
-                                if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
-                                if !acknowledged && !self.local_agent_connected() { return Err(ChatError::Transport); }
-                            },
-                            event=local.events.recv()=>{
-                                let Some(event)=event else { break; };
-                                use crate::proto::tilde::run::v1::report_request::Event;
-                                match event {
-                                    Event::Accepted(_) => {
-                                        if !acknowledged {
-                                            acknowledged=true;
-                                            let mut t=shared.lock().await;
-                                            if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
-                                        }
-                                    }
-                                    Event::ReasoningDelta(delta) => {
-                                        if !delta.is_empty() {
-                                            let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:delta,..Default::default()};
-                                            let mut t=shared.lock().await;
-                                            self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
-                                            drop(t);
-                                            self.changed(thread);
-                                        }
-                                    }
-                                    Event::Stopped(stopped) => {
-                                        pending.extend(stopped.pending_input_ids);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+            let local = self.wake_local(request.clone());
+            let (instance, mut reports) = match local {
+                Some(local) => (Some(local.instance), local.events),
+                None => (None, self.expect_reports(key)),
+            };
+            let outcome: Result<()> = async {
+                let mut stream = match instance {
+                    Some(_) => None,
+                    None => {
+                        let endpoint = self.local_endpoint.clone().ok_or(ChatError::Transport)?;
+                        Some(tokio::time::timeout(Duration::from_secs(5), crate::chat::runtime::client(&endpoint, self.host_key.expose_secret(), "Invoke", &request)?.invoke(request))
+                            .await
+                            .map_err(|_| ChatError::Transport)?
+                            .map_err(|_| ChatError::Transport)?)
                     }
-                    Ok(())
-                }
-                .await;
-                self.forget_waiter(key);
-                outcome?;
-            } else {
-                let endpoint = self.local_endpoint.clone().ok_or(ChatError::Transport)?;
-                let mut stream = tokio::time::timeout(Duration::from_secs(5), crate::chat::runtime::client(&endpoint, self.host_key.expose_secret(), "Invoke", &request)?.invoke(request))
-                    .await
-                    .map_err(|_| ChatError::Transport)?
-                    .map_err(|_| ChatError::Transport)?;
+                };
                 loop {
                     tokio::select! {
                         _=tick.tick()=>{
-                            // The lease is only renewed while the gateway still hears this replica.
+                            // The lease is only renewed while the gateway still hears this replica
+                            // and the process running the wake is still alive.
                             if !self.gateway_healthy() || self.paused() { return Err(ChatError::Denied); }
                             let mut t=shared.lock().await;
                             if !self.owns(&t) || t.lease.epoch!=v.generation { return Err(ChatError::Denied); }
                             if let Some(current)=t.invocations.get_mut(&key) { if current.status!="running" { return Err(ChatError::Denied); } current.lease_expires_at=now()+30_000; }
+                            if instance.is_some_and(|i| !self.local_instance_connected(i)) { return Err(ChatError::Transport); }
                         },
-                        message=stream.message()=>{
+                        event=reports.recv()=>{
+                            let Some(event)=event else { break; };
+                            if self.apply_report(shared, attempt, &v, event, &mut progress).await? { break; }
+                        },
+                        message=async { match stream.as_mut() { Some(stream)=>stream.message().await, None=>std::future::pending().await } }=>{
+                            // Legacy hosts answer on the wake's response stream; current ones only keep it open.
                             let Some(message)=message.map_err(|_|ChatError::Transport)? else { break; };
                             let message=message.view();
-                            pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
-                            if message.accepted_command_id==command.id && !acknowledged {
-                                acknowledged=true;
-                                let mut t=shared.lock().await;
-                                if let Some(entry)=t.commands.iter_mut().find(|c| c.attempt_id==attempt) { entry.acked_at=Some(now()); }
+                            progress.pending.extend(message.pending_input_ids.iter().map(|id| (*id).to_owned()));
+                            if message.accepted_command_id==command.id && !progress.acknowledged {
+                                self.acknowledge_wake(shared, attempt, &mut progress).await;
                             }
                             if !message.reasoning_delta.is_empty() {
-                                let activity=types::Activity{kind:"reasoning.delta".into(),entity_id:v.id.clone(),participant_id:v.participant_id.clone(),invocation_id:v.id.clone(),text_delta:message.reasoning_delta.into(),..Default::default()};
-                                let mut t=shared.lock().await;
-                                self.emit(&mut t,"reasoning.delta",activity.into(),None)?;
-                                drop(t);
-                                self.changed(thread);
+                                self.reasoning(shared, &v, message.reasoning_delta.into()).await?;
                             }
                         }
                     }
                 }
+                Ok(())
             }
-            if !acknowledged {
+            .await;
+            self.forget_waiter(key);
+            outcome?;
+            if !progress.acknowledged {
                 return Err(ChatError::Transport);
             }
+            if let Some(error) = progress.error {
+                tracing::warn!(agent_id=%self.agent_id, invocation_id=%v.id, error=%error, "Agent process reported a failed invocation");
+                return Err(ChatError::Transport);
+            }
+            pending = progress.pending;
             Ok(())
         }
         .with_context(cx.clone())
@@ -861,6 +844,66 @@ impl Runtime {
         )
         .await?;
         result
+    }
+    /// One report from the host, from whichever transport carried it. Returns whether
+    /// the invocation ended.
+    async fn apply_report(
+        &self,
+        shared: &Shared,
+        attempt: Uuid,
+        v: &types::InvocationState,
+        event: crate::proto::tilde::run::v1::report_request::Event,
+        progress: &mut Progress,
+    ) -> Result<bool> {
+        use crate::proto::tilde::run::v1::report_request::Event;
+        match event {
+            Event::Accepted(_) => {
+                if !progress.acknowledged {
+                    self.acknowledge_wake(shared, attempt, progress).await;
+                }
+                Ok(false)
+            }
+            Event::ReasoningDelta(delta) => {
+                if !delta.is_empty() {
+                    self.reasoning(shared, v, delta).await?;
+                }
+                Ok(false)
+            }
+            Event::Stopped(stopped) => {
+                progress.pending.extend(stopped.pending_input_ids);
+                if !stopped.error.is_empty() {
+                    progress.error = Some(stopped.error);
+                }
+                Ok(true)
+            }
+        }
+    }
+    async fn acknowledge_wake(&self, shared: &Shared, attempt: Uuid, progress: &mut Progress) {
+        progress.acknowledged = true;
+        let mut t = shared.lock().await;
+        if let Some(entry) = t.commands.iter_mut().find(|c| c.attempt_id == attempt) {
+            entry.acked_at = Some(now());
+        }
+    }
+    async fn reasoning(
+        &self,
+        shared: &Shared,
+        v: &types::InvocationState,
+        delta: String,
+    ) -> Result<()> {
+        let activity = types::Activity {
+            kind: "reasoning.delta".into(),
+            entity_id: v.id.clone(),
+            participant_id: v.participant_id.clone(),
+            invocation_id: v.id.clone(),
+            text_delta: delta,
+            ..Default::default()
+        };
+        let mut t = shared.lock().await;
+        self.emit(&mut t, "reasoning.delta", activity.into(), None)?;
+        drop(t);
+        self.changed(id(&v.thread_id)?);
+        Ok(())
     }
     pub(crate) async fn finish_invocation(
         &self,
@@ -954,18 +997,25 @@ impl Runtime {
             return Ok(());
         };
         let mut t = shared.lock().await;
+        // Watch frames and Hydrate answers race; the gateway's version orders them.
+        if lease.version < t.lease.version {
+            return Ok(());
+        }
         if mine {
             if t.lease.holder != Some(self.instance_id) {
                 t.lease = Lease {
                     holder: Some(self.instance_id),
                     holder_url: String::new(),
                     epoch: self.state.lease_epochs.fetch_add(1, Ordering::AcqRel) + 1,
+                    version: lease.version,
                 };
                 self.forget_held_elsewhere(thread);
             }
+            t.lease.version = lease.version;
             return Ok(());
         }
         if t.lease.holder != Some(self.instance_id) && !lease.held {
+            t.lease.version = lease.version;
             return Ok(());
         }
         t.lease.holder = lease
@@ -973,6 +1023,7 @@ impl Runtime {
             .then(|| id(&lease.holder_instance_id).ok())
             .flatten();
         t.lease.holder_url = lease.holder_public_url.clone();
+        t.lease.version = lease.version;
         if lease.held {
             self.note_held_elsewhere(thread, lease.holder_public_url);
         }

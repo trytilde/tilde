@@ -2388,10 +2388,13 @@ impl ::serde::Serialize for RunAcceptedOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// `error` is empty when the run ended normally; otherwise the host failed and the gateway records a failed invocation.
 #[derive(Clone, Debug, Default)]
 pub struct RunStoppedView<'a> {
     /// Field 1: `pending_input_ids`
     pub pending_input_ids: ::buffa::RepeatedView<'a, &'a str>,
+    /// Field 2: `error`
+    pub error: &'a str,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for RunStoppedView<'a> {
@@ -2422,6 +2425,13 @@ impl<'a> ::buffa::MessageView<'a> for RunStoppedView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.error = ::buffa::types::borrow_str(&mut cur)?;
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -2460,6 +2470,7 @@ impl<'a> ::buffa::MessageView<'a> for RunStoppedView<'a> {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
+            error: self.error.to_string(),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -2474,6 +2485,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RunStoppedView<'a> {
         for v in &self.pending_input_ids {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if !self.error.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.error) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2487,6 +2501,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RunStoppedView<'a> {
         use ::buffa::Enumeration as _;
         for v in &self.pending_input_ids {
             ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.error.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.error, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2511,6 +2528,9 @@ impl<'__a> ::serde::Serialize for RunStoppedView<'__a> {
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
         if !self.pending_input_ids.is_empty() {
             __map.serialize_entry("pendingInputIds", &*self.pending_input_ids)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.error) {
+            __map.serialize_entry("error", self.error)?;
         }
         __map.end()
     }
@@ -2607,6 +2627,11 @@ impl RunStoppedOwnedView {
     #[must_use]
     pub fn pending_input_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().pending_input_ids
+    }
+    /// Field 2: `error`
+    #[must_use]
+    pub fn error(&self) -> &'_ str {
+        self.0.reborrow().error
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<RunStoppedView<'static>>>

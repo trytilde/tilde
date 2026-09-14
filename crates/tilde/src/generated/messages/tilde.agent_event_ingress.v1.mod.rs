@@ -53,6 +53,7 @@ pub mod __buffa {
         reg.register_json_any(super::__HYDRATE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__EXTERNAL_KEY_JSON_ANY);
         reg.register_json_any(super::__HYDRATE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RUN_ORIGIN_JSON_ANY);
         reg.register_json_any(super::__FORWARD_REQUEST_JSON_ANY);
         reg.register_json_any(super::__FORWARD_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPLOAD_ATTACHMENT_REQUEST_JSON_ANY);
@@ -153,6 +154,10 @@ pub use self::__buffa::view::ExternalKeyOwnedView;
 pub use self::__buffa::view::HydrateResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::HydrateResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RunOriginView;
+#[doc(inline)]
+pub use self::__buffa::view::RunOriginOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ForwardRequestView;
 #[doc(inline)]

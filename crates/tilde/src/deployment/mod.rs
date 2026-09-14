@@ -32,7 +32,7 @@ use crate::{
     error::Error,
 };
 use buffa::Message;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
@@ -184,7 +184,7 @@ impl Deployments {
             let latest = sqlx::query_file!(
                 "../../queries/deployment/deployment_latest.sql",
                 agent,
-                target_for_mode(mode)
+                &targets_for_mode(mode)
             )
             .fetch_optional(&mut *tx)
             .await?
@@ -357,7 +357,11 @@ impl Deployments {
         .fetch_one(&mut *tx)
         .await?;
         self.ensure_secrets(&mut tx, agent).await?;
-        if current.routing == "latest" && target_for_mode(&current.deployment_mode) == target {
+        if current.routing == "latest"
+            && targets_for_mode(&current.deployment_mode)
+                .iter()
+                .any(|t| t == target)
+        {
             self.promote_in(&mut tx, agent, id).await?;
         }
         tx.commit().await?;
@@ -377,7 +381,7 @@ impl Deployments {
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(Error::NotFound)?;
-        if target_for_mode(&current.deployment_mode) != row.target {
+        if !targets_for_mode(&current.deployment_mode).contains(&row.target) {
             return Err(Error::Invalid(
                 "The deployment's target does not match the agent's execution mode".into(),
             ));
@@ -415,7 +419,8 @@ impl Deployments {
         Ok(())
     }
     /// Retire a deployment: its token stops authenticating and it leaves routing.
-    /// Retiring the serving deployment hands serving to the newest other one.
+    /// Under latest routing, retiring the serving deployment hands serving to the newest
+    /// other one; under manual routing the operator promotes a replacement first.
     pub async fn retire(
         &self,
         agent: Uuid,
@@ -427,10 +432,15 @@ impl Deployments {
             .await?
             .ok_or(Error::NotFound)?;
         if current.serving_deployment_id == Some(deployment) {
+            if current.routing == "manual" {
+                return Err(Error::Invalid(
+                    "Promote another deployment before retiring the serving one".into(),
+                ));
+            }
             let next = sqlx::query_file!(
                 "../../queries/deployment/deployment_latest_except.sql",
                 agent,
-                target_for_mode(&current.deployment_mode),
+                &targets_for_mode(&current.deployment_mode),
                 deployment
             )
             .fetch_optional(&mut *tx)
@@ -514,7 +524,8 @@ impl Deployments {
         )
     }
     /// The deployment a (thread, agent) pair is pinned to, if any and still registered.
-    pub(crate) async fn pinned(&self, agent: Uuid, thread: Uuid) -> Result<Option<Uuid>, Error> {
+    /// The deployment a (thread, agent) pair is pinned to, if it is still registered.
+    pub async fn pinned(&self, agent: Uuid, thread: Uuid) -> Result<Option<Uuid>, Error> {
         Ok(
             sqlx::query_file!("../../queries/deployment/deployment_pin.sql", thread, agent)
                 .fetch_optional(&self.pool)
@@ -625,7 +636,14 @@ impl Deployments {
             .fetch_all(&self.pool)
             .await?
             .into_iter()
-            .map(|r| lease_frame(agent, r.thread_id, Some((instance, String::new()))))
+            .map(|r| {
+                lease_frame(
+                    agent,
+                    r.thread_id,
+                    Some((instance, String::new())),
+                    r.updated_at,
+                )
+            })
             .collect();
         Ok(wire::Snapshot {
             configuration: self.configuration(agent).await?.into(),
@@ -652,6 +670,7 @@ impl Deployments {
                             agent,
                             r.thread_id,
                             Some((r.instance_id, r.public_url.unwrap_or_default())),
+                            r.updated_at,
                         ),
                         r.updated_at,
                     )
@@ -774,15 +793,19 @@ impl Deployments {
                 .map(|r| Holder {
                     instance: r.instance_id,
                     public_url: r.public_url.unwrap_or_default(),
+                    version: r.updated_at,
                 }),
         )
     }
     /// Take or confirm the lease for `instance` in one transaction. A live holder
-    /// keeps it; a dead holder loses it, and its interrupted work is ended here.
+    /// keeps it; a dead holder loses it, and its interrupted work is ended here. The
+    /// pair pins to the claimant's deployment on first lease; a pair pinned to another
+    /// deployment is refused when nobody holds it, so routing decides where it runs.
     pub(crate) async fn lease_in(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         agent: Uuid,
+        deployment: Uuid,
         instance: Uuid,
         thread: Uuid,
     ) -> Result<wire::ThreadLease, Error> {
@@ -799,14 +822,44 @@ impl Deployments {
         {
             return Err(Error::Denied);
         }
+        let mine = |version: DateTime<Utc>| {
+            lease_frame(agent, thread, Some((instance, String::new())), version)
+        };
         let mut current =
             sqlx::query_file!("../../queries/deployment/lease_lock.sql", thread, agent)
                 .fetch_optional(&mut **tx)
                 .await?
-                .map(|r| r.instance_id);
+                .map(|r| (r.instance_id, r.updated_at));
+        if let Some((holder, version)) = current
+            && holder != instance
+            && sqlx::query_file!("../../queries/deployment/instance_live.sql", agent, holder)
+                .fetch_one(&mut **tx)
+                .await?
+                .live
+        {
+            let url = sqlx::query_file!("../../queries/deployment/node_url.sql", agent, holder)
+                .fetch_optional(&mut **tx)
+                .await?
+                .map(|r| r.public_url)
+                .unwrap_or_default();
+            return Ok(lease_frame(agent, thread, Some((holder, url)), version));
+        }
+        // Nobody live holds it: the pair pins to this deployment unless already pinned.
+        let pinned = sqlx::query_file!(
+            "../../queries/deployment/lease_pin.sql",
+            thread,
+            agent,
+            deployment
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .and_then(|r| r.deployment_id);
+        if pinned.is_some_and(|p| p != deployment) {
+            return Err(Error::Denied);
+        }
         if current.is_none() {
             // Two replicas may reach here for a brand-new thread; the insert decides.
-            if sqlx::query_file!(
+            if let Some(row) = sqlx::query_file!(
                 "../../queries/deployment/lease_insert.sql",
                 thread,
                 agent,
@@ -814,31 +867,19 @@ impl Deployments {
             )
             .fetch_optional(&mut **tx)
             .await?
-            .is_some()
             {
-                return Ok(lease_frame(agent, thread, Some((instance, String::new()))));
+                return Ok(mine(row.updated_at));
             }
             current = sqlx::query_file!("../../queries/deployment/lease_lock.sql", thread, agent)
                 .fetch_optional(&mut **tx)
                 .await?
-                .map(|r| r.instance_id);
+                .map(|r| (r.instance_id, r.updated_at));
         }
-        let Some(holder) = current else {
+        let Some((holder, version)) = current else {
             return Err(Error::Conflict);
         };
         if holder == instance {
-            return Ok(lease_frame(agent, thread, Some((instance, String::new()))));
-        }
-        let node = sqlx::query_file!("../../queries/deployment/instance_live.sql", agent, holder)
-            .fetch_one(&mut **tx)
-            .await?;
-        if node.live {
-            let url = sqlx::query_file!("../../queries/deployment/node_url.sql", agent, holder)
-                .fetch_optional(&mut **tx)
-                .await?
-                .map(|r| r.public_url)
-                .unwrap_or_default();
-            return Ok(lease_frame(agent, thread, Some((holder, url))));
+            return Ok(mine(version));
         }
         // The holder is gone: the claimant takes over and the interrupted run follows the
         // agent's failure policy (restarted by the new holder, or failed here).
@@ -848,12 +889,18 @@ impl Deployments {
             .is_some_and(|d| d.failure_mode == "stop");
         self.take_over(tx, agent, thread, holder, Some(instance), stop)
             .await?;
+        let version = sqlx::query_file!("../../queries/deployment/lease_lock.sql", thread, agent)
+            .fetch_optional(&mut **tx)
+            .await?
+            .map(|r| r.updated_at)
+            .unwrap_or_else(Utc::now);
         tracing::debug!(agent_id=%agent, instance_id=%instance, thread_id=%thread, "Lease taken over from a dead holder");
-        Ok(lease_frame(agent, thread, Some((instance, String::new()))))
+        Ok(mine(version))
     }
-    /// Drop this instance's lease on an evicted thread.
-    pub(crate) async fn release(
+    /// Drop this instance's lease on an evicted thread, in the batch's transaction.
+    pub(crate) async fn release_in(
         &self,
+        tx: &mut Transaction<'_, Postgres>,
         agent: Uuid,
         instance: Uuid,
         thread: Uuid,
@@ -864,11 +911,13 @@ impl Deployments {
             agent,
             instance
         )
-        .execute(&self.pool)
+        .execute(&mut **tx)
         .await?;
         Ok(())
     }
-    /// Which live replica should receive gateway-originated work for a thread.
+    /// Which live replica should receive gateway-originated work for a thread: the live
+    /// holder, else a live instance of the thread's pinned deployment, else one of the
+    /// serving deployment. Never a replica of another deployment.
     pub(crate) async fn target_for(
         &self,
         agent: Uuid,
@@ -883,11 +932,18 @@ impl Deployments {
             Some(thread) => self.pinned(agent, thread).await?,
             None => None,
         };
+        let deployment = match pinned {
+            Some(pinned) => Some(pinned),
+            None => sqlx::query_file!("../../queries/deployment/get.sql", agent)
+                .fetch_optional(&self.pool)
+                .await?
+                .and_then(|r| r.serving_deployment_id),
+        };
         Ok(sqlx::query_file!(
             "../../queries/deployment/live_node.sql",
             agent,
             None::<Uuid>,
-            pinned
+            deployment
         )
         .fetch_optional(&self.pool)
         .await?
@@ -1160,6 +1216,7 @@ impl Deployments {
 pub(crate) struct Holder {
     pub instance: Uuid,
     pub public_url: String,
+    pub version: DateTime<Utc>,
 }
 /// What a deployment token proves.
 #[derive(Clone, Copy, Debug)]
@@ -1244,12 +1301,13 @@ fn target_wire(target: &str) -> types::DeploymentTarget {
         _ => types::DeploymentTarget::Direct,
     }
 }
-/// The deployment target new threads of an agent in `mode` route to.
-fn target_for_mode(mode: &str) -> &'static str {
+/// The deployment targets an agent in `mode` can serve from. Gateway mode wakes direct
+/// endpoints and Lambda functions alike; sidecar mode is served by sidecars only.
+fn targets_for_mode(mode: &str) -> Vec<String> {
     if mode == "sidecar" {
-        "sidecar"
+        vec!["sidecar".into()]
     } else {
-        "direct"
+        vec!["direct".into(), "aws_lambda".into()]
     }
 }
 fn short(value: Option<String>, name: &str) -> Result<Option<String>, Error> {
@@ -1267,10 +1325,13 @@ async fn mirror_flag(tx: &mut Transaction<'_, Postgres>) -> Result<(), Error> {
         .await?;
     Ok(())
 }
+/// A lease as replicas see it. `version` is the row's `updated_at` in milliseconds, so a
+/// replica can order a Watch frame against the lease its own Hydrate returned.
 pub(crate) fn lease_frame(
     agent: Uuid,
     thread: Uuid,
     holder: Option<(Uuid, String)>,
+    version: DateTime<Utc>,
 ) -> wire::ThreadLease {
     let (instance, url) = holder.clone().unwrap_or_default();
     wire::ThreadLease {
@@ -1283,6 +1344,7 @@ pub(crate) fn lease_frame(
         },
         holder_public_url: url,
         held: holder.is_some(),
+        version: version.timestamp_millis(),
         ..Default::default()
     }
 }

@@ -600,6 +600,7 @@ async fn a_replica_that_lost_its_lease_is_fenced_and_hands_off_to_the_holder() {
             .deployments
             .hydrate(
                 fx.agent,
+                Uuid::parse_str(&fx.deployment_id).unwrap(),
                 Some(second_instance),
                 wire::HydrateRequest {
                     key: Some(wire::hydrate_request::Key::ThreadId(thread_id.to_string())),
@@ -824,5 +825,237 @@ async fn a_local_agent_dials_the_sidecar_and_a_graceful_stop_releases_leases() {
         .await
         .unwrap();
     fx.projected(thread_id, "after").await;
+    fx.shutdown().await;
+}
+
+/// The projected status of a run, with or without an invocation.
+async fn run_status(fx: &Fixture, run: Uuid) -> String {
+    use sqlx::Row;
+    sqlx::query("SELECT status FROM chat_runs WHERE id=$1")
+        .bind(run)
+        .fetch_one(&fx.db.pool)
+        .await
+        .unwrap()
+        .get("status")
+}
+/// Publish frames as a replica would, straight into the gateway's projection.
+fn event(
+    agent: Uuid,
+    instance: Uuid,
+    thread: Uuid,
+    sequence: i64,
+    kind: &str,
+    state: types::runtime_event::State,
+) -> wire::Upstream {
+    wire::Upstream {
+        frame: Some(
+            wire::Event {
+                event: types::RuntimeEvent {
+                    id: Uuid::new_v4().to_string(),
+                    thread_id: thread.to_string(),
+                    agent_id: agent.to_string(),
+                    origin_instance_id: instance.to_string(),
+                    origin_agent_id: agent.to_string(),
+                    origin_sequence: sequence,
+                    created_at: chrono::Utc::now().timestamp_millis(),
+                    kind: kind.into(),
+                    state: Some(state),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+        ),
+        ..Default::default()
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_projection_keeps_publish_order_and_checks_thread_membership() {
+    let fx = Fixture::new().await;
+    let deployment = Uuid::parse_str(&fx.deployment_id).unwrap();
+    let (thread_id, _, _) = fx.room().await;
+    // The room is created on a replica and projected behind it; wait for the roster.
+    eventually(async || {
+        fx.chat.thread(thread_id).await.ok().filter(|t| {
+            t.participants
+                .iter()
+                .any(|p| p.agent_id.as_deref() == Some(&fx.agent.to_string()))
+        })
+    })
+    .await;
+    // A third replica, registered and live, takes the lease on the room.
+    let instance = Uuid::new_v4();
+    fx.deployments
+        .register(
+            fx.agent,
+            deployment,
+            &wire::WatchRequest {
+                instance_id: instance.to_string(),
+                public_url: "http://127.0.0.1:9".into(),
+                runtime_url: "http://127.0.0.1:9".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    fx.deployments
+        .heartbeat(
+            fx.agent,
+            instance,
+            &wire::Heartbeat {
+                ready: true,
+                agent_ready: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    // Take it back from whichever replica created the room: age that holder first.
+    if let Some(holder) = fx.holder(thread_id).await {
+        sqlx::query("UPDATE agent_instances SET last_seen_at=NOW()-INTERVAL '1 minute' WHERE instance_id=$1")
+            .bind(holder)
+            .execute(&fx.db.pool)
+            .await
+            .unwrap();
+    }
+    let hydrated = fx
+        .deployments
+        .hydrate(
+            fx.agent,
+            deployment,
+            Some(instance),
+            wire::HydrateRequest {
+                key: Some(wire::hydrate_request::Key::ThreadId(thread_id.to_string())),
+                lease: true,
+                instance_id: instance.to_string(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let lease = hydrated.lease.into_option().unwrap();
+    assert!(lease.held && lease.holder_instance_id == instance.to_string());
+    assert!(lease.version > 0, "lease frames carry the row version");
+    // The pair is now pinned to this deployment.
+    let pinned = fx.deployments.pinned(fx.agent, thread_id).await.unwrap();
+    assert_eq!(pinned, Some(deployment));
+    // A run completes and the thread is released in the same publish: the completion
+    // is recorded first, so the lease going does not discard it.
+    let run_id = Uuid::new_v4();
+    let run = types::Run {
+        id: run_id.to_string(),
+        thread_id: thread_id.to_string(),
+        agent_id: fx.agent.to_string(),
+        objective: "ordered".into(),
+        status: "waiting".into(),
+        ..Default::default()
+    };
+    let response = fx
+        .deployments
+        .publish(
+            fx.agent,
+            deployment,
+            instance,
+            wire::PublishRequest {
+                instance_id: instance.to_string(),
+                frames: vec![
+                    event(fx.agent, instance, thread_id, 1, "run.updated", run.into()),
+                    wire::Upstream {
+                        frame: Some(
+                            wire::Release {
+                                thread_id: thread_id.to_string(),
+                                ..Default::default()
+                            }
+                            .into(),
+                        ),
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(response.rejected_event_ids.is_empty(), "{response:?}");
+    assert!(response.lost.is_empty(), "{response:?}");
+    assert_eq!(run_status(&fx, run_id).await, "waiting");
+    assert_eq!(
+        fx.holder(thread_id).await,
+        None,
+        "the release still applied"
+    );
+    // Run state published after the release is refused with the (empty) lease.
+    let late = fx
+        .deployments
+        .publish(
+            fx.agent,
+            deployment,
+            instance,
+            wire::PublishRequest {
+                instance_id: instance.to_string(),
+                frames: vec![event(
+                    fx.agent,
+                    instance,
+                    thread_id,
+                    2,
+                    "run.updated",
+                    types::Run {
+                        id: run_id.to_string(),
+                        thread_id: thread_id.to_string(),
+                        agent_id: fx.agent.to_string(),
+                        status: "failed".into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(late.lost.len(), 1);
+    assert_eq!(run_status(&fx, run_id).await, "waiting");
+    // An agent that is not in a thread cannot append to it, even without run state.
+    // The thread belongs to this agent on paper but has no participant row for it.
+    let other_thread = Uuid::new_v4();
+    sqlx::query("INSERT INTO chat_threads(id,title,primary_agent_id) VALUES($1,'Private',$2)")
+        .bind(other_thread)
+        .bind(fx.agent)
+        .execute(&fx.db.pool)
+        .await
+        .unwrap();
+    let intruding = fx
+        .deployments
+        .publish(
+            fx.agent,
+            deployment,
+            instance,
+            wire::PublishRequest {
+                instance_id: instance.to_string(),
+                frames: vec![event(
+                    fx.agent,
+                    instance,
+                    other_thread,
+                    3,
+                    "message.created",
+                    types::Message {
+                        id: Uuid::new_v4().to_string(),
+                        thread_id: other_thread.to_string(),
+                        participant_id: Uuid::new_v4().to_string(),
+                        text: "intrusion".into(),
+                        status: "complete".into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(intruding.rejected_event_ids.len(), 1, "{intruding:?}");
+    assert!(fx.chat.messages(other_thread, 10).await.unwrap().is_empty());
     fx.shutdown().await;
 }
