@@ -17,7 +17,7 @@ RUN pnpm tools && pnpm generate && pnpm --dir sdk/ts build && pnpm --dir web bui
 
 FROM rust:1.98.1-bookworm AS rust
 WORKDIR /src
-RUN apt-get update && apt-get install -y --no-install-recommends cmake git pkg-config libssl-dev libsystemd-dev && apt-get clean
+RUN apt-get update && apt-get install -y --no-install-recommends cmake git pkg-config libssl-dev libsystemd-dev protobuf-compiler && apt-get clean
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates crates
 COPY vendor vendor
