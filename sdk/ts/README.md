@@ -114,8 +114,11 @@ terminate arbitrary synchronous JavaScript. Returning a value from `run` never
 publishes a message. Both normal return and `context.stop()` end the invocation;
 unfinished runs become waiting unless the agent explicitly changed their status.
 
-`context.takeInputs()` drains accepted steering at a safe checkpoint. Unconsumed
-inputs are reported on stream completion and carried into a subsequent invocation.
+Message concurrency is configured on the agent: `queue` (default), `interrupt`,
+or `queue_and_batch`. The API schedules fresh invocations and cancels interrupted
+ones; handlers do not poll for steering or drain input queues. Pass `context.signal`
+to model/tool calls. Each invocation's history is bounded by its triggering event,
+plus messages produced by that invocation.
 Use `chat.resumeRun` to explicitly resume a waiting/failed run. Do not guess which
 of several waiting objectives a new human message should resume.
 
@@ -241,14 +244,14 @@ handler supports HTTP/1 requests, including those behind a serverless ingress.
 No session affinity is required for control requests.
 
 Each running invocation opens `InvocationControlService.WatchCommands` to its
-callback URL before user code starts. Steering is accepted into that execution's
-input queue and acknowledged. Stop aborts its signal. Suspend runs the optional
+callback URL before user code starts. Incoming messages and explicit steering are
+scheduled by the agent's queue, interrupt or batch policy. Stop aborts its signal. Suspend runs the optional
 checkpoint hook, acknowledges it, and ends the request; resume is a fresh invocation
 that restores framework state. Already-persisted conversation state remains in Tilde;
 the hook owns any additional framework checkpoint. It must not merely copy mutable
 state while the framework continues executing.
 
-Unacknowledged input replays after reconnect and is deduplicated by input ID.
+Queued inputs remain at the runtime and are deduplicated by input ID.
 Control connections use the current renewed invocation token. A sustained connection
 failure aborts the local execution. Cancellation is cooperative: custom code must
 honor the signal. The host has only Invoke and Healthz; inbound Stop/Steer/Cancel
@@ -316,3 +319,25 @@ export const handler = createLambdaHandler({
   },
 });
 ```
+
+## Message history and Vercel AI SDK
+
+Use `ctx.message.history()` for invocation-scoped, paginated context and
+`ctx.channel` for provider-owned delivery tools. Core SDK history contains
+typed conversation, objective, goal and task items; work state is opt-in with
+`includeWork` and uses the existing work.read permission.
+
+`@trytilde/sdk-vercel-ai-node` owns `convertToAiSdkMessages`, default attachment
+hydration, and callbacks for custom message/attachment rendering. Convert its UI
+messages with Vercel's `convertToModelMessages` before inference. The core SDK has
+no Vercel dependency. See the adapter's README and `dev/example-agent-1`.
+
+
+`ctx.channel.current` contains only the inbound connection's available tools.
+Built-ins have typed namespaces (`slack`, `github`, `agentmail`, `linq`, `whatsapp`,
+`telnyxWhatsapp`, `native`), with explicit connection selection when ambiguous.
+Call a tool directly, e.g. `ctx.channel.slack.sendMessage({ channelId, text })`,
+after checking it is available. Custom tools use `call_channel_tool(name, json)`
+or `channel.provider(providerId)`. `convertToAiSdkTools` in the Vercel adapter
+turns these provider descriptors into model tools and permits instruction overrides.
+There is no generic `message.reply` projection of returned model text.

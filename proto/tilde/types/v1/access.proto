@@ -4,10 +4,14 @@ import "google/protobuf/timestamp.proto";
 
 enum ChannelAccessMode { CHANNEL_ACCESS_MODE_UNSPECIFIED = 0; CHANNEL_ACCESS_MODE_PRIVATE = 1; CHANNEL_ACCESS_MODE_PUBLIC = 2; CHANNEL_ACCESS_MODE_DISABLED = 3; }
 enum IdentityType { IDENTITY_TYPE_UNSPECIFIED = 0; IDENTITY_TYPE_EMAIL = 1; IDENTITY_TYPE_PHONE_NUMBER = 2; IDENTITY_TYPE_USERNAME = 3; }
+// The provider address/bot account used by an agent on its assigned channel.
+message AgentChannelIdentity {
+ string connection_id = 1; string agent_id = 2; string value = 3; IdentityType identity_type = 4;
+}
 message ChannelAccess {
  string connection_id = 1; string agent_id = 2; string account_name = 3; string provider_id = 4; string provider_name = 5;
  optional string icon_url = 6; string connection_status = 7; ChannelAccessMode mode = 8;
- repeated IdentityType identity_types = 9; bool verification_supported = 10; bool supports_template = 11; string verification_instructions = 12;
+ repeated IdentityType identity_types = 9; bool verification_supported = 10; bool supports_template = 11; string verification_instructions = 12; AgentChannelIdentity agent_identity = 13;
 }
 message ChannelIdentity {
  string id = 1; string connection_id = 2; string value = 3; IdentityType identity_type = 8; google.protobuf.Timestamp verified_at = 4;
@@ -15,5 +19,5 @@ message ChannelIdentity {
 }
 message IdentityVerification {
  string id = 1; string agent_name = 2; string account_name = 3; string provider_name = 4; string value = 5; IdentityType identity_type = 9;
- optional string icon_url = 6; string status = 7; google.protobuf.Timestamp expires_at = 8;
+ optional string icon_url = 6; string status = 7; google.protobuf.Timestamp expires_at = 8; AgentChannelIdentity agent_identity = 10;
 }

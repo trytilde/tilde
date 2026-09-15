@@ -1,3 +1,17 @@
+import { createChannels } from "./channels.js";
+import type { Channels } from "./channel-types.js";
+export type * from "./channel-types.js";
+import { createMessageClient, type MessageClient } from "./messages.js";
+export type {
+  ContextMessage,
+  ConversationMessage,
+  ObjectiveMessage,
+  GoalMessage,
+  TaskMessage,
+  MessageHistory,
+  MessageHistoryOptions,
+  MessageClient,
+} from "./messages.js";
 import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import {
   InvocationControlService,
@@ -48,7 +62,11 @@ import {
 } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 export * from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 export { RuntimeChatService, AgentHostService, RunService };
-export { BinaryPermission, TargetSelection } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
+export {
+  BinaryPermission,
+  TargetSelection,
+  AgentConcurrencyPolicy,
+} from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 /** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
@@ -145,6 +163,8 @@ export class AgentContext {
     return this.messageHistory;
   }
   readonly getMessages;
+  readonly message: MessageClient;
+  readonly channel: Channels;
   readonly cachedMessages: InvokeRequest["cachedMessages"];
   readonly participants: readonly Participant[];
   readonly signal: AbortSignal;
@@ -352,6 +372,17 @@ export class AgentContext {
           ),
       ),
     };
+    this.message = createMessageClient(this);
+    const incoming = request.messages
+      .filter(
+        (message) =>
+          message.delivery?.connectionId === request.thread?.channel?.connectionId &&
+          !this.participants.some(
+            (p) => p.id === message.participantId && p.agentId === this.agentId,
+          ),
+      )
+      .at(-1);
+    this.channel = createChannels(this.tools, request.thread?.channel, incoming);
   }
   /** Persist opaque converted messages in this agent's cache; canonical messages stay unchanged. */
   async cacheConvertedMessages(input: {

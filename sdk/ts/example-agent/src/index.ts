@@ -21,8 +21,6 @@ const server = createAgentServer({
         for (const word of `Hello from the example agent. Your objective was: ${ctx.objective}`.split(
           " ",
         )) {
-          for (const input of ctx.takeInputs())
-            await ctx.reason(`Received steering: ${input.text}`);
           await delay(30, undefined, { signal: ctx.signal });
           yield `${word} `;
         }

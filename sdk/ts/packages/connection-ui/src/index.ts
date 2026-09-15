@@ -11,3 +11,5 @@ export { StandardSetup, CredentialForm } from "./standard.js";
 export { TildeWordmark } from "./wordmark.js";
 
 export { LoadingReveal } from "./loading-reveal.js";
+
+export { ProviderPage } from "./provider-page.js";

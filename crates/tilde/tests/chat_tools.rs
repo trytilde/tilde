@@ -101,6 +101,7 @@ async fn scoped_catalog_dispatches_provider_formats_and_publishes_messages() {
     let agents = Agents::new(db.pool.clone(), crypto.clone());
     let agent = agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             capabilities: tilde::iam::capabilities::Capabilities(std::collections::BTreeMap::from(
                 [(
                     tilde::iam::capabilities::Capability::ToolsInvoke,

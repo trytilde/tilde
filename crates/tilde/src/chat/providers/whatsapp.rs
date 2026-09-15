@@ -32,10 +32,11 @@ impl Adapter for Whatsapp {
         m: crate::chat::access::identity::VerificationMessage<'a>,
     ) -> BoxFuture<'a, ToolResult<()>> {
         Box::pin(async move {
+            let text = m.invitation("this WhatsApp number");
             let mut body = if let Some(name) = m.template_name {
                 json!({"type":"template","template":{"name":name,"language":{"code":m.template_language.unwrap_or("en")},"components":[{"type":"body","parameters":[{"type":"text","text":m.url}]}]}})
             } else {
-                json!({"type":"text","text":{"body":m.text,"preview_url":false}})
+                json!({"type":"text","text":{"body":text.as_str(),"preview_url":false}})
             };
             if self.telnyx {
                 a.json(a.post(a.url("telnyx_api","https://api.telnyx.com/v2",&["messages","whatsapp"])?,"api_key")?.json(&json!({"from":a.secret("phone_number")?,"to":m.value,"type":"WHATSAPP","messaging_profile_id":a.secret("messaging_profile_id")?,"whatsapp_message":body}))).await?;

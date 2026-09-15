@@ -1,11 +1,10 @@
-import { LoadingReveal } from "@trytilde/connection-ui";
+import { LoadingReveal, ProviderPage } from "@trytilde/connection-ui";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { IdentityVerificationService } from "@trytilde/contracts/tilde/setup/v1/identity_verification_pb.js";
 import type { IdentityVerification } from "@trytilde/contracts/tilde/types/v1/access_pb.js";
 import { Button } from "@/components/ui/button";
-import { ProviderIcon } from "@/components/provider-icon";
 
 const client = createClient(
   IdentityVerificationService,
@@ -131,34 +130,43 @@ export function IdentityVerificationForm() {
   }, [verification]);
   return (
     <LoadingReveal loading={!verification && !error} label="Loading identity verification">
-      <main className="mx-auto max-w-lg space-y-5 p-6">
-        <header className="flex items-center gap-3">
-          <ProviderIcon iconUrl={verification?.iconUrl} />
-          <h1 className="text-xl font-semibold">Approve identity access</h1>
-        </header>
+      <ProviderPage
+        providerName={verification?.providerName}
+        iconUrl={verification?.iconUrl}
+        title={
+          verification
+            ? `Link ${verification.value} to ${verification.agentName}`
+            : "Link your identity"
+        }
+      >
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
         {verification &&
-          (verification.status === "approved" ? (
+          (!verification.agentIdentity ? (
+            <p role="alert">
+              This channel needs to be reconnected before its sending identity can be confirmed. Ask
+              the person who invited you for a new link.
+            </p>
+          ) : verification.status === "approved" ? (
             <p role="status">
               Approved. You can now contact {verification.agentName} through{" "}
-              {verification.accountName}.
+              {verification.agentIdentity?.value}.
             </p>
           ) : (
             <>
-              <p>
-                Allow <strong>{verification.value}</strong> to contact{" "}
-                <strong>{verification.agentName}</strong> through {verification.accountName}?
-              </p>
               <p className="text-sm text-muted-foreground">
-                {verification.providerName} · No Tilde login required. Only approve if you requested
-                this access.
+                Clicking approve will allow you to contact <strong>{verification.agentName}</strong>{" "}
+                via <strong>{verification.agentIdentity?.value}</strong> on{" "}
+                {verification.providerName}. <strong>{verification.agentName}</strong> will also be
+                allowed to send messages to you via <strong>{verification.value}</strong>.
               </p>
               <Button
-                disabled={busy || verification.status !== "delivered"}
+                disabled={
+                  busy || verification.status !== "delivered" || !verification.agentIdentity
+                }
                 onClick={() => run("approve")}
               >
                 {busy ? "Approving…" : "Approve"}
@@ -170,7 +178,7 @@ export function IdentityVerificationForm() {
             Retry
           </Button>
         )}
-      </main>
+      </ProviderPage>
     </LoadingReveal>
   );
 }

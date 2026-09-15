@@ -83,8 +83,9 @@ async fn setup(
     let agent = Uuid::new_v4();
     Agents::new(db.pool.clone(), crypto.clone())
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: agent,
-            name: "Assistant".into(),
+            name: "Assistant <&>".into(),
             endpoint_url: origin.clone(),
             webhook_signing_key: SecretString::from("shared-signing-key-0123456789abcdef"),
             capabilities: Default::default(),
@@ -146,7 +147,9 @@ async fn connection(
         ("phone_number", "+12025550111"),
         ("phone_number_id", "phone"),
         ("messaging_profile_id", "profile"),
-        ("inbox_id", "inbox"),
+        ("inbox_id", "assistant@agentmail.to"),
+        ("slack_bot_user_id", "U_BOT"),
+        ("slug", "assistant"),
     ] {
         let sealed = crypto
             .seal(
@@ -161,9 +164,19 @@ async fn connection(
             .into_bytes();
         sqlx::query("INSERT INTO connection_values(connection_id,field_key,encrypted_value) VALUES($1,$2,$3)").bind(id).bind(key).bind(sealed).execute(&db.pool).await.unwrap();
     }
-    sqlx::query("UPDATE connections SET status='ready' WHERE id=$1")
+    sqlx::query("UPDATE connections SET status='ready', account_label='+12025550111' WHERE id=$1")
         .bind(id)
         .execute(&db.pool)
+        .await
+        .unwrap();
+    connections
+        .assign(
+            id,
+            &Assignment {
+                capability: Capability::Channel,
+                agent_id: agent,
+            },
+        )
         .await
         .unwrap();
     id
@@ -207,14 +220,19 @@ fn verification_link(sink: &Sink) -> url::Url {
     for value in sink.0.lock().unwrap().iter() {
         strings(value, &mut values)
     }
-    url::Url::parse(
-        values
-            .iter()
-            .flat_map(|v| v.split_whitespace())
-            .find(|v| v.contains("/identity/verify/"))
-            .expect("verification URL delivered to provider"),
-    )
-    .unwrap()
+    values
+        .iter()
+        .find_map(|value| {
+            let start = value.find("http")?;
+            let url = value[start..]
+                .split(|c: char| c.is_whitespace() || matches!(c, '\"' | '<' | '>' | '|'))
+                .next()?;
+            if !url.contains("/identity/verify/") {
+                return None;
+            }
+            url::Url::parse(url).ok()
+        })
+        .expect("verification URL delivered to provider")
 }
 #[tokio::test]
 async fn private_verification_public_identity_capture_and_revocation_are_enforced() {
@@ -424,7 +442,14 @@ async fn providers_deliver_supported_identity_types_and_github_rejects_private()
             "alice@example.com",
         ),
         ("linq", "account", IdentityType::Email, "alice@example.com"),
+        ("linq", "account", IdentityType::PhoneNumber, "+12025550102"),
         ("slack", "slack_app", IdentityType::Username, "U12345"),
+        (
+            "whatsapp",
+            "meta",
+            IdentityType::PhoneNumber,
+            "+12025550103",
+        ),
         (
             "telnyx",
             "whatsapp",
@@ -449,13 +474,62 @@ async fn providers_deliver_supported_identity_types_and_github_rejects_private()
             .unwrap();
         assert_eq!(status, "delivered", "{provider}");
         let link = verification_link(&sink);
+        let delivered = sink.0.lock().unwrap().last().unwrap().clone();
+        let text = match provider {
+            "agentmail" => {
+                assert_eq!(delivered["subject"], "Invitation to access Assistant <&>");
+                let html = delivered["html"].as_str().unwrap();
+                assert!(html.contains("access Assistant &lt;&amp;&gt; from this email address"));
+                assert!(html.contains(&format!("<a href=\"{}\">this link</a>", link)));
+                assert!(html.contains("This link expires in 10 minutes."));
+                delivered["text"].as_str().unwrap()
+            }
+            "slack" => {
+                let text = delivered["text"].as_str().unwrap();
+                assert!(text.contains("access Assistant &lt;&amp;&gt; from this Slack account"));
+                assert!(text.contains(&format!("<{}|this link>", link)));
+                text
+            }
+            "linq" => {
+                let text = delivered["message"]["parts"][0]["value"].as_str().unwrap();
+                assert!(text.contains(if kind == IdentityType::Email {
+                    "from this email address"
+                } else {
+                    "from this phone number"
+                }));
+                text
+            }
+            "whatsapp" => delivered["text"]["body"].as_str().unwrap(),
+            "telnyx" => delivered["whatsapp_message"]["text"]["body"]
+                .as_str()
+                .unwrap(),
+            _ => unreachable!(),
+        };
+        assert!(text.starts_with("You've received an invitation to access Assistant"));
+        assert!(text.contains("This link expires in 10 minutes. If you did not request access, please ignore this message."));
+        if matches!(provider, "whatsapp" | "telnyx") {
+            assert!(text.contains("from this WhatsApp number"));
+        }
+        assert!(!text.contains("No Tilde login"));
         let token = link
             .query_pairs()
             .find(|(key, _)| key == "identity_verification_token")
             .unwrap()
             .1
             .to_string();
-        assert_eq!(access.verification(id, &token).await.unwrap().value, value);
+        let verification = access.verification(id, &token).await.unwrap();
+        assert_eq!(verification.value, value);
+        let sender = verification.agent_identity.as_option().unwrap();
+        assert_eq!(sender.agent_id, agent.to_string());
+        assert_eq!(sender.connection_id, connection.to_string());
+        assert_eq!(
+            sender.value,
+            match provider {
+                "agentmail" => "assistant@agentmail.to",
+                "slack" => "U_BOT",
+                _ => "+12025550111",
+            }
+        );
         sqlx::query("UPDATE chat_identity_verifications SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1").bind(id).execute(&db.pool).await.unwrap();
         assert!(access.approve(id, &token).await.is_err());
     }

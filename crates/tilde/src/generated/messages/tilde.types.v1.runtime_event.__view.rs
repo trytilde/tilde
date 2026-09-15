@@ -3,6 +3,8 @@
 
 #[derive(Clone, Debug, Default)]
 pub struct InvocationStateView<'a> {
+    /// Field 14: `history_through_message_id`
+    pub history_through_message_id: &'a str,
     /// Field 12: `traceparent`
     pub traceparent: &'a str,
     /// Field 13: `tracestate`
@@ -59,6 +61,13 @@ impl<'a> ::buffa::MessageView<'a> for InvocationStateView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.history_through_message_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
             12u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -172,6 +181,7 @@ impl<'a> ::buffa::MessageView<'a> for InvocationStateView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::InvocationState {
+            history_through_message_id: self.history_through_message_id.to_string(),
             traceparent: self.traceparent.to_string(),
             tracestate: self.tracestate.to_string(),
             ended_at: self.ended_at,
@@ -241,6 +251,13 @@ impl<'a> ::buffa::ViewEncode<'a> for InvocationStateView<'a> {
         if !self.tracestate.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.tracestate) as u64;
         }
+        if !self.history_through_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(
+                        &self.history_through_message_id,
+                    ) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -291,6 +308,13 @@ impl<'a> ::buffa::ViewEncode<'a> for InvocationStateView<'a> {
         if !self.tracestate.is_empty() {
             ::buffa::types::put_string_field(13u32, &self.tracestate, buf);
         }
+        if !self.history_through_message_id.is_empty() {
+            ::buffa::types::put_string_field(
+                14u32,
+                &self.history_through_message_id,
+                buf,
+            );
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -312,6 +336,15 @@ impl<'__a> ::serde::Serialize for InvocationStateView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(
+            self.history_through_message_id,
+        ) {
+            __map
+                .serialize_entry(
+                    "historyThroughMessageId",
+                    self.history_through_message_id,
+                )?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.traceparent) {
             __map.serialize_entry("traceparent", self.traceparent)?;
         }
@@ -455,6 +488,11 @@ impl InvocationStateOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 14: `history_through_message_id`
+    #[must_use]
+    pub fn history_through_message_id(&self) -> &'_ str {
+        self.0.reborrow().history_through_message_id
     }
     /// Field 12: `traceparent`
     #[must_use]
@@ -2840,6 +2878,8 @@ impl ::serde::Serialize for InvokeCommandOwnedView {
 }
 #[derive(Clone, Debug, Default)]
 pub struct SteerCommandView<'a> {
+    /// Field 5: `history_through_message_id`
+    pub history_through_message_id: &'a str,
     /// Field 1: `invocation_id`
     pub invocation_id: &'a str,
     /// Field 2: `input_id`
@@ -2878,6 +2918,13 @@ impl<'a> ::buffa::MessageView<'a> for SteerCommandView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.history_through_message_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -2942,6 +2989,7 @@ impl<'a> ::buffa::MessageView<'a> for SteerCommandView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::SteerCommand {
+            history_through_message_id: self.history_through_message_id.to_string(),
             invocation_id: self.invocation_id.to_string(),
             input_id: self.input_id.to_string(),
             text: self.text.to_string(),
@@ -2983,6 +3031,13 @@ impl<'a> ::buffa::ViewEncode<'a> for SteerCommandView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if !self.history_through_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(
+                        &self.history_through_message_id,
+                    ) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3011,6 +3066,13 @@ impl<'a> ::buffa::ViewEncode<'a> for SteerCommandView<'a> {
             );
             self.message.write_to(__cache, buf);
         }
+        if !self.history_through_message_id.is_empty() {
+            ::buffa::types::put_string_field(
+                5u32,
+                &self.history_through_message_id,
+                buf,
+            );
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -3032,6 +3094,15 @@ impl<'__a> ::serde::Serialize for SteerCommandView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(
+            self.history_through_message_id,
+        ) {
+            __map
+                .serialize_entry(
+                    "historyThroughMessageId",
+                    self.history_through_message_id,
+                )?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.invocation_id) {
             __map.serialize_entry("invocationId", self.invocation_id)?;
         }
@@ -3136,6 +3207,11 @@ impl SteerCommandOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 5: `history_through_message_id`
+    #[must_use]
+    pub fn history_through_message_id(&self) -> &'_ str {
+        self.0.reborrow().history_through_message_id
     }
     /// Field 1: `invocation_id`
     #[must_use]

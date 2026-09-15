@@ -43,6 +43,7 @@ async fn avatars_round_trip_through_private_s3_and_keep_the_generated_identity()
     let id = Uuid::new_v4();
     let created = agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id,
             name: "Avatar fixture".into(),
             endpoint_url: "https://avatar.example.com".into(),

@@ -28,6 +28,17 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Linq;
 #[async_trait::async_trait]
 impl Runtime for Linq {
+    fn channel_identity(
+        &self,
+        values: &Values,
+        _account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        Some(crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::PhoneNumber,
+            value: optional(values, "phone_number")?.to_owned(),
+        })
+    }
+
     fn account_name_field(&self, _typ: &ConnectionType) -> Option<&'static str> {
         Some("phone_number")
     }

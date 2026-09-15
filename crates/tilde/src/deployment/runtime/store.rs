@@ -44,6 +44,8 @@ pub(crate) struct ThreadState {
     pub thread: types::Thread,
     pub messages: BTreeMap<(i64, Uuid), types::Message>,
     pub message_keys: HashMap<Uuid, (i64, Uuid)>,
+    /// Retain producing scope independently of the bounded activity window.
+    pub message_invocations: HashMap<Uuid, Uuid>,
     pub runs: HashMap<Uuid, types::Run>,
     pub run_meta: HashMap<Uuid, RunMeta>,
     pub invocations: HashMap<Uuid, types::InvocationState>,
@@ -68,6 +70,7 @@ impl ThreadState {
             thread,
             messages: BTreeMap::new(),
             message_keys: HashMap::new(),
+            message_invocations: HashMap::new(),
             runs: HashMap::new(),
             run_meta: HashMap::new(),
             invocations: HashMap::new(),
@@ -148,6 +151,7 @@ impl ThreadState {
             + (self.runs.len() + self.invocations.len() + self.commands.len()) * 512
             + (self.goals.len() + self.tasks.len() + self.tool_calls.len()) * 512
             + self.attachments.len() * 256
+            + self.message_invocations.len() * 64
     }
     pub fn retain_window(&mut self) {
         while self.events.len() > EVENT_WINDOW {

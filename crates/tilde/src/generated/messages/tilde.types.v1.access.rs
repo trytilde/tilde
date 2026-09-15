@@ -323,6 +323,211 @@ impl ::buffa::Enumeration for IdentityType {
         ]
     }
 }
+/// The provider address/bot account used by an agent on its assigned channel.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AgentChannelIdentity {
+    /// Field 1: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    /// Field 2: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 3: `value`
+    #[serde(
+        rename = "value",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub value: ::buffa::alloc::string::String,
+    /// Field 4: `identity_type`
+    #[serde(
+        rename = "identityType",
+        alias = "identity_type",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub identity_type: ::buffa::EnumValue<IdentityType>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AgentChannelIdentity {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AgentChannelIdentity")
+            .field("connection_id", &self.connection_id)
+            .field("agent_id", &self.agent_id)
+            .field("value", &self.value)
+            .field("identity_type", &self.identity_type)
+            .finish()
+    }
+}
+impl AgentChannelIdentity {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AgentChannelIdentity";
+}
+::buffa::impl_default_instance!(AgentChannelIdentity);
+impl ::buffa::MessageName for AgentChannelIdentity {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "AgentChannelIdentity";
+    const FULL_NAME: &'static str = "tilde.types.v1.AgentChannelIdentity";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.AgentChannelIdentity";
+}
+impl ::buffa::Message for AgentChannelIdentity {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.value.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.value) as u64;
+        }
+        {
+            let val = self.identity_type.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.connection_id, buf);
+        }
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
+        }
+        if !self.value.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.value, buf);
+        }
+        {
+            let val = self.identity_type.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.value, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.identity_type = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connection_id.clear();
+        self.agent_id.clear();
+        self.value.clear();
+        self.identity_type = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AgentChannelIdentity {
+    const PROTO_FQN: &'static str = "tilde.types.v1.AgentChannelIdentity";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AgentChannelIdentity {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AGENT_CHANNEL_IDENTITY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.AgentChannelIdentity",
+    to_json: ::buffa::type_registry::any_to_json::<AgentChannelIdentity>,
+    from_json: ::buffa::type_registry::any_from_json::<AgentChannelIdentity>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -421,6 +626,16 @@ pub struct ChannelAccess {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub verification_instructions: ::buffa::alloc::string::String,
+    /// Field 13: `agent_identity`
+    #[serde(
+        rename = "agentIdentity",
+        alias = "agent_identity",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agent_identity: ::buffa::MessageField<
+        AgentChannelIdentity,
+        ::buffa::Inline<AgentChannelIdentity>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -440,6 +655,7 @@ impl ::core::fmt::Debug for ChannelAccess {
             .field("verification_supported", &self.verification_supported)
             .field("supports_template", &self.supports_template)
             .field("verification_instructions", &self.verification_instructions)
+            .field("agent_identity", &self.agent_identity)
             .finish()
     }
 }
@@ -478,7 +694,7 @@ impl ::buffa::Message for ChannelAccess {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -533,12 +749,20 @@ impl ::buffa::Message for ChannelAccess {
                     + ::buffa::types::string_encoded_len(&self.verification_instructions)
                         as u64;
         }
+        if self.agent_identity.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agent_identity.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -593,6 +817,14 @@ impl ::buffa::Message for ChannelAccess {
                 &self.verification_instructions,
                 buf,
             );
+        }
+        if self.agent_identity.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                13u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agent_identity.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -727,6 +959,17 @@ impl ::buffa::Message for ChannelAccess {
                 )?;
                 ::buffa::types::merge_string(&mut self.verification_instructions, buf)?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agent_identity.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -747,6 +990,7 @@ impl ::buffa::Message for ChannelAccess {
         self.verification_supported = false;
         self.supports_template = false;
         self.verification_instructions.clear();
+        self.agent_identity = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1193,6 +1437,16 @@ pub struct IdentityVerification {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
+    /// Field 10: `agent_identity`
+    #[serde(
+        rename = "agentIdentity",
+        alias = "agent_identity",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agent_identity: ::buffa::MessageField<
+        AgentChannelIdentity,
+        ::buffa::Inline<AgentChannelIdentity>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1209,6 +1463,7 @@ impl ::core::fmt::Debug for IdentityVerification {
             .field("icon_url", &self.icon_url)
             .field("status", &self.status)
             .field("expires_at", &self.expires_at)
+            .field("agent_identity", &self.agent_identity)
             .finish()
     }
 }
@@ -1287,6 +1542,14 @@ impl ::buffa::Message for IdentityVerification {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
+        if self.agent_identity.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agent_identity.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1331,6 +1594,14 @@ impl ::buffa::Message for IdentityVerification {
             if val != 0 {
                 ::buffa::types::put_int32_field(9u32, val, buf);
             }
+        }
+        if self.agent_identity.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agent_identity.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1419,6 +1690,17 @@ impl ::buffa::Message for IdentityVerification {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agent_identity.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1436,6 +1718,7 @@ impl ::buffa::Message for IdentityVerification {
         self.status.clear();
         self.expires_at = ::buffa::MessageField::none();
         self.identity_type = ::buffa::EnumValue::from(0);
+        self.agent_identity = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }

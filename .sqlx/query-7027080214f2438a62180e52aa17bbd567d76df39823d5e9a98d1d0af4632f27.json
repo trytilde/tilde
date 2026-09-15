@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_runs r SET objective=r.objective || E'\\n' || $2\nFROM chat_invocations i WHERE i.id=$1 AND i.run_id=r.id AND i.status='pending';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7027080214f2438a62180e52aa17bbd567d76df39823d5e9a98d1d0af4632f27"
+}

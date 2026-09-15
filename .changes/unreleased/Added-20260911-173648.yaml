@@ -1,0 +1,3 @@
+kind: Added
+body: Integrate Langfuse with durable trace forwarding, an agent-scoped native viewer, sidecar relay support, and automatic local development setup using Compose defaults with .env overrides.
+time: 2026-09-11T17:36:48.300317044+02:00

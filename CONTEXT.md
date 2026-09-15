@@ -128,8 +128,8 @@ identity; the migration retains existing ciphertext bindings without versioned p
 - Task: one agent's work item in one thread, optionally linked to a goal and existing dependencies.
 - Run: a durable objective that can wait across invocations.
 - Invocation: one active reasoning loop for an agent in a thread; stop ends only this loop.
-- Steering input: durable additional input delivered idempotently to an invocation.
-- Agent runtime: an agent-hosted ConnectRPC service for Invoke, Steer, Cancel, Stop and Healthz.
+- Steering input: a durable API event, scheduled into a fresh invocation according to the agent's concurrency policy.
+- Agent runtime: an agent-hosted ConnectRPC service for Invoke and Healthz, with outbound invocation control subscriptions.
 - Agent session: capability-scoped ConnectRPC callbacks to Tilde for message streaming and work tools.
 
 Provider tools are a dynamic catalog. Stop is always available in the SDK, and
@@ -174,6 +174,22 @@ Motion fades that respect reduced motion preferences.
 
 ## Agent access and identity verification
 
+Agents have a typed sending identity for each assigned channel, stored in
+`agent_channel_identities` and linked by foreign key to `connection_agents`.
+It is separate from recipient `chat_channel_identities` and from editable
+connection labels. Catalog adapters derive it from the provider account: an
+AgentMail inbox email, Linq/Telnyx sending number, Meta's actual display phone
+number, Slack bot user ID, or GitHub app bot username. Setup completion and
+assignment of a ready connection store it atomically; unassignment removes the
+old link. Startup restores missing identities from stored provider data without
+sending messages. Legacy Meta channels with only a Graph ID need reconnecting
+to obtain the actual phone number. Verification requires a known sending identity.
+
+Connection setup and identity approval share `ProviderPage` from connection-ui:
+Tilde wordmark × provider icon, a title, description and body. Approval shows
+“Link recipient identity to agent” and explicitly describes incoming and outgoing
+messaging using the stored sender and recipient identities, never a display label.
+
 The agent IAM tab uses management-only AgentAccessService RPCs. Access belongs to the
 agent/channel assignment, with private, public, and disabled modes. Existing assignments
 migrate as public; new assignments start private (GitHub starts disabled). Public still
@@ -195,7 +211,12 @@ the token or approval URL. Removing the assignment invalidates its proofs and gr
 
 `/identity/verify/{id}` hosts the public, no-login approval flow and a sandboxed shared React
 iframe; only the host holds the identity-verification token. AgentMail, Slack, Linq, Meta
-WhatsApp and Telnyx deliver verification messages through their existing credentials.
+WhatsApp and Telnyx deliver verification invitations through their existing credentials.
+Adapters tailor the invitation to the identity/channel: AgentMail supplies an
+agent-named subject and an HTML acceptance link with a plain-text fallback; Slack
+uses a native link; Linq and WhatsApp use plain-text links. All include the
+ten-minute expiry and unsolicited-invitation guidance. Approved WhatsApp template
+copy remains provider-managed.
 WhatsApp can use an approved one-parameter template outside its customer-service window.
 GitHub supports public/disabled only in this pass because it has no private message API.
 Native/management invocations remain separate from provider-triggered runs; an outbound
@@ -210,11 +231,11 @@ synchronous host acknowledgement. Pending work waits for ResumeAgent. Each invoc
 must establish its control subscription before running user code, so late requests
 cannot bypass pause/revocation even on a different serverless instance.
 
-`InvocationControlService` on the runtime listener streams scoped steering, stop and
-suspend controls. It allows a narrowly scoped terminal-token window to acknowledge
+`InvocationControlService` on the runtime listener streams scoped stop and suspend
+controls. Message and explicit steering inputs stay in the runtime-owned queue. It allows a narrowly scoped terminal-token window to acknowledge
 stops without restoring ordinary RPC access. PostgreSQL LISTEN/NOTIFY at the gateway, or
-in-memory change notifications on a sidecar, wake delivery; unacknowledged steering replays after reconnect. SDK
-input IDs deduplicate delivery. Control subscriptions are renewed with current tokens
+in-memory change notifications on a sidecar, wake delivery. Input IDs deduplicate
+queue insertion, including retries after interruption. Control subscriptions are renewed with current tokens
 and the SDK aborts work after a prolonged loss of the control connection.
 
 SuspendInvocation transitions the run through `suspending`; the SDK checkpoint hook
@@ -273,15 +294,14 @@ and goal/task helpers call Tilde.
 
 ## Tracing
 
-Tilde embeds the pinned Rotel fork in `vendor/rotel`. Agent OTLP/HTTP ingestion
-shares the agent runtime listener and authenticates with agent connect tokens.
-`iam::listeners::agent_runtime_router` owns the complete runtime surface, including
-OTLP ingestion outside the strict live-RPC guard. The management router has no ingestion
-route; management/OIDC sessions cannot authorize uploads. Platform request tracing on
-management remains internal instrumentation, separate from accepting agent telemetry.
-It accepts telemetry until five minutes after invocation end; expired JWTs only
-qualify if they were valid at termination. Other actions and renewal still require
-live invocation state and unexpired tokens. No separate telemetry credential exists.
+Langfuse owns observability history. Gateway configuration uses LANGFUSE_BASE_URL,
+LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Absent
+or incomplete configuration disables the native viewer and blackholes valid,
+authenticated OTLP uploads. A configured outage is unavailable, not disabled.
+Rotel batches enabled ingress into the bounded, temporary telemetry_delivery
+outbox. It contains unencrypted OTLP until delivery and seven-day replay receipts;
+it is not a trace-history store. The worker uses commit notifications and retry
+deadlines. Five-minute terminal trace authorization never restores agent actions.
 
 Message and invocation rows retain W3C trace context across durable dispatch.
 Langfuse is the trace system of record. Sidecars accept scoped OTLP, stamp it with the
@@ -297,9 +317,23 @@ disabled. Invocation tokens authorize agent uploads, including the terminal uplo
 grace period; management tokens cannot authorize ingestion. The SDK batches per
 invocation and preserves the runtime callback path prefix in its OTLP URL.
 
-`sdk/ts/langsmith-agent` is an isolated AI SDK 6 / LangSmith demo. It loads the
-OpenAI key from SOPS, sends synthetic recipe/tool traces to LangSmith for UI
-inspection, and can optionally host the same agent through Tilde ConnectRPC.
+W3C context survives durable message/invocation dispatch. The gateway maps verified
+thread IDs to Langfuse sessions and observation-level agent/run/invocation metadata.
+The management-only TracingService scopes observation and session queries by
+agent and verifies agent membership before loading a complete trace. The native shadcn/TanStack Observations and Sessions viewer uses progressive
+pagination, filters, an I/O/tree inspector and safe external deep links. Partial
+groups and missing metrics are explicit. No project secrets reach the browser.
+
+Sidecars retain raw OTLP in their bounded in-memory outbox until gateway queue
+acceptance. They receive enablement but no Langfuse credentials, preserve cached
+configuration through disconnection, and apply terminal token grace.
+
+Development starts a pinned local Langfuse stack with Compose defaults and
+overrides from the existing .env file. Volumes preserve data; startup supports
+opt-out or an external deployment without a separate bootstrap environment file.
+With `TS_ADDR`, host API clients and readiness checks use the same Tailscale
+address as the Compose port binding; without it they use loopback.
+The optional AI SDK dev agent emits model telemetry through Tilde.
 
 ## IAM
 
@@ -362,11 +396,13 @@ failure stops its siblings (fail-fast); Ctrl+C also stops all processes. `pnpm d
 delegate to Task. Disposable Postgres lifecycle remains in a shell wrapper;
 JavaScript remains for substantive generation checks and integration tests.
 
-`task dev ADDRESS=<IPv4>` binds browser-facing development services (management,
-React/Vite, provider UI/HMR and local Dex) to that address and aligns their public
-URLs, browser origins and OIDC redirects. Without ADDRESS they use loopback. Agent
-runtime and Postgres settings are unchanged. Browser PKCE hashing and UUID creation
-work on remote HTTP origins without requiring secure-context WebCrypto methods.
+Dev dotenv files supply bind addresses, public URLs, Vite upstreams, browser
+origins, S3 endpoints and Dex callbacks. `TS_ADDR=<IPv4> task dev` relocates local
+service binds and URL hosts in `scripts/dev.py` before starting Task's services;
+custom external URLs and database settings remain independent.
+Without TS_ADDR, dotenv values pass through directly. `.env.example` lists local
+defaults. Dev ngrok always overrides the ingress public URL.
+`secrets.enc.yaml` and generated dotenv files remain private, ignored local files.
 
 For the default local engine database, `task dev` starts persistent Compose
 Postgres on loopback port 5432 and waits for health before launching the API.
@@ -417,8 +453,8 @@ private and are encrypted when they contain URLs; their bytes are fetched on dem
 then encrypted and cached. Public file fetches pin DNS and reject private destinations;
 provider bearer credentials are restricted to provider-owned file origins. Email HTML
 is rendered inside a script-free sandbox. Attachment-only messages still dispatch to
-an agent. Steering carries the original typed message snapshot, so attachments also reach
-an invocation that is already running. Remote references require their source provider until first download.
+an agent. New input is scheduled as a fresh invocation whose immutable message
+snapshot includes its attachments. Remote references require their source provider until first download.
 
 CacheConvertedMessages and HydrateConvertedMessages retain the original batch cache
 semantics. Values are explicitly opaque agent-converted JSON, separate from canonical
@@ -427,9 +463,12 @@ batch before committing, accept completed messages only, and cannot cross the in
 thread. Incoming edits invalidate conversions. Runtime history includes that agent's cached conversions alongside canonical messages. The TypeScript SDK exposes cache, typing, attachment and local
 tool-audit helpers alongside the generated clients over its shared HTTP/2 transport.
 
-Development and test configuration use committed `.env` / `.env.test` defaults.
+Development falls back to public `.env.example` defaults; private `.env` and
+`.env.local` override them. Tests use `.env.test` and start local storage when
+using its default endpoint.
 The original KMS-encrypted `secrets.enc.yaml` retains top-level dev credentials and
-its `test` overrides; `scripts/load-secrets.py` extracts only chat credentials into
+its `test` overrides; `scripts/load-secrets.py` extracts chat credentials and the
+dev-only ngrok token and OpenAI key into
 ignored `.env.secrets` / `.env.secrets.test`. Exported values and ignored local
 mode-specific overrides take precedence. Test tasks use disposable Postgres.
 All six chat adapters have isolated outbound/inbound fixture coverage. Live account
@@ -474,8 +513,8 @@ persisted state without periodic subscription polling. Listener connections are
 separate from the query pool and close with the service/pool.
 
 Pending message routing and invocation dispatch wake on committed message/work
-changes and on freed local execution capacity. Steering wakes on pending-input
-changes. Trace forwarding wakes on queue changes, drains batches, and schedules
+changes and on freed local execution capacity. Queued API events are dispatched
+when their active invocation finishes, or replace it under interrupt policy. Trace forwarding wakes on queue changes, drains batches, and schedules
 retries from persisted retry deadlines. Startup/reconnect reads recover missed
 notifications. Health probes, lease heartbeats, expiry/retention cleanup and
 failed-operation retries remain time-driven. The registry browser currently
@@ -629,6 +668,59 @@ deduplicate reconnect replay; Langfuse owns all trace history. Platform spans us
 provider routed to the correct local agent, preserving invocation context and
 terminal trace-token grace. The agent Tracing tab queries scoped Langfuse public
 APIs through management-only RPCs. No Langfuse credentials reach agents or browsers.
+
+Development fixtures live under `dev/`: Dex mounts `dev/dex/dex.yaml`.
+`REGISTER_DEV_AGENTS=1 task dev` runs `example-agent-1` as a separate SDK server. It is a private TypeScript member
+of the SDK workspace, importing `@trytilde/sdk` normally and using Vercel AI SDK
+`generateText` with its OpenAI provider. Dev startup launches its compiled `dist/index.js`.
+The debug-only `dev-agent` command registers it through Agents, reusing its fixed
+ID and encrypted signing key. Only thread reading, run updates and provider tools
+are granted on creation. Registration does not alter assigned channels or existing
+grants. The child receives the OpenAI key from private SOPS-backed dev credentials,
+its signing key, model and port; database/encryption credentials are not forwarded.
+Its model receives only the current channel tools and must call a provider tool for visible output.
+
+
+The TypeScript core SDK exposes an invocation-scoped `ctx.message` facade.
+`history()` reads the runtime's authoritative chronological page, derives roles
+relative to the acting agent, includes per-agent cached representations, and
+represents the current objective as a typed context item. `includeWork` adds
+current goal/task state through the existing work.read permission; these are
+context projections, not synthetic persisted chat messages. History pagination does not change the inbound channel binding. Delivery is explicit through provider-owned `ctx.channel` tools.
+
+`@trytilde/sdk-vercel-ai-node` is the framework-specific adapter, matching the
+Dispatch core/framework package split. `convertToAiSdkMessages` produces Vercel
+UI messages for `convertToModelMessages`, with typed callbacks for conversation,
+objective, goal and task items and an overridable attachment callback. Images
+and PDFs become hydrated file parts; textual files become their actual contents.
+Unsupported binary formats retain an explicit description and can be decoded by
+a custom callback. Downloads use the invocation's authenticated attachment API.
+Canonical completed text conversions may use the existing per-agent cache;
+attachment bytes and changing work state are not duplicated into that cache.
+
+
+Agent `concurrency_policy` is a persisted enum exposed in the Capabilities UI:
+`queue` (the default) handles events individually after the active response;
+`interrupt` revokes the old invocation and wakes its outbound stop control before dispatching fresh
+work; `queue_and_batch` combines pending events into the next response. Scheduling
+is per thread/agent. Gateway Postgres and the lease-owning sidecar runtime own
+queue ordering, batching, retries and idempotency. Host receipts do not determine
+which queued event is dispatched next. Every handler call receives a fresh invocation scope
+and cancellation signal. A cancelled scope cannot use runtime tools even if the
+external process ignores cancellation. History is fenced at the triggering event,
+with the current invocation's own output still visible. Explicit StartRun/ResumeRun
+remain durable-work operations; message scheduling never guesses which old goal to resume.
+
+
+The SDK's `ctx.channel` surface groups only tools published for the invocation.
+Built-in provider namespaces have typed callable arguments; dynamic customer
+provider keys use `provider(id)` or `call_channel_tool(fullName, serializedArgs)`.
+`current` is reserved for the inbound connection (or native conversation), and
+never falls back to another enabled provider. Other authorized connections remain
+available by provider or explicit connection ID. Tool descriptions can be customized
+without changing schemas or authorization. `convertToAiSdkTools` preserves those
+schemas, forwards model tool-call IDs, and honors cancellation. Model text is never
+implicitly sent; the example exposes only `ctx.channel.current` to Vercel AI SDK.
 
 ## Agent log history
 

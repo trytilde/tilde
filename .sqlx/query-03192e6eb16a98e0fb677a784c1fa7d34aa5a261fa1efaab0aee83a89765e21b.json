@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_invocations(id,run_id,thread_id,agent_id,status,started_at,ended_at,lease_expires_at,deployment_id,history_through_message_id) VALUES($1,$2,$3,$4,$5,CASE WHEN $5<>'pending' THEN $6::timestamptz END,CASE WHEN $5 IN ('stopped','failed','canceled') THEN $6::timestamptz END,$7,$8,$9) ON CONFLICT(id) DO UPDATE SET status=EXCLUDED.status,ended_at=EXCLUDED.ended_at,lease_expires_at=EXCLUDED.lease_expires_at,history_through_message_id=EXCLUDED.history_through_message_id;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "03192e6eb16a98e0fb677a784c1fa7d34aa5a261fa1efaab0aee83a89765e21b"
+}

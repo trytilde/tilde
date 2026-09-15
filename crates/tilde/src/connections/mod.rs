@@ -19,3 +19,5 @@ mod remote;
 pub mod setup;
 
 pub mod schema;
+
+mod identity;

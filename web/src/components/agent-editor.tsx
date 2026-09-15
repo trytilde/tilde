@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { clone, create } from "@bufbuild/protobuf";
 import {
   type Agent,
+  AgentConcurrencyPolicy,
   type Capabilities,
   CapabilitiesSchema,
   TargetPermissionSchema,
@@ -24,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeftIcon, PencilIcon } from "lucide-react";
-import { useForm } from "@trytilde/connection-ui";
+import { useForm, NativeSelect } from "@trytilde/connection-ui";
 
 type BinaryKey = "agentsCreate" | "threadRead" | "workRead" | "workWrite" | "runUpdate";
 type TargetKey =
@@ -189,6 +190,33 @@ export function AgentEditor({
     else next[option.key] = mode as BinaryPermission;
     await persistCapabilities(option.key, next);
   }
+  const policyForm = useForm<{ policy: AgentConcurrencyPolicy }>({
+    defaultValues: { policy: agent?.concurrencyPolicy || AgentConcurrencyPolicy.QUEUE },
+  });
+  const [policyFeedback, setPolicyFeedback] = useState<{
+    state: InlineSavingState;
+    attempt: number;
+    error?: string;
+  }>({ state: "idle", attempt: 0 });
+  async function changePolicy(policy: AgentConcurrencyPolicy) {
+    const previous = policyForm.getValues("policy");
+    policyForm.setValue("policy", policy);
+    if (!agent) return;
+    setPolicyFeedback((current) => ({ state: "saving", attempt: current.attempt + 1 }));
+    try {
+      const response = await agents.updateAgent({ id: agent.id, concurrencyPolicy: policy });
+      policyForm.setValue("policy", response.agent?.concurrencyPolicy || policy);
+      metadataSaved.current = true;
+      setPolicyFeedback((current) => ({ ...current, state: "success" }));
+    } catch (error) {
+      policyForm.setValue("policy", previous);
+      setPolicyFeedback((current) => ({
+        ...current,
+        state: "error",
+        error: error instanceof Error ? error.message : "Unable to save message policy.",
+      }));
+    }
+  }
   const [name, setName] = useState(agent?.name ?? "");
   const [creationMode, setCreationMode] = useState("gateway");
   const [endpoint, setEndpoint] = useState(agent?.endpointUrl ?? "");
@@ -212,7 +240,7 @@ export function AgentEditor({
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [avatarFile]);
-  const locked = saving || !!createdAgent || capabilitySaving;
+  const locked = saving || !!createdAgent || capabilitySaving || policyFeedback.state === "saving";
   async function uploadAvatar(target: string, file: File) {
     setAvatarSaving(true);
     setAvatarError("");
@@ -264,12 +292,14 @@ export function AgentEditor({
           const response =
             creationMode === "sidecar"
               ? await deployments.createSidecarAgent({
+                  concurrencyPolicy: policyForm.getValues("policy"),
                   capabilities,
                   id: id.current,
                   name,
                   webhookSigningKey: signingKey,
                 })
               : await agents.createAgent({
+                  concurrencyPolicy: policyForm.getValues("policy"),
                   capabilities,
                   id: id.current,
                   name,
@@ -322,6 +352,38 @@ export function AgentEditor({
           </p>
         </div>
       )}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="agent-message-policy">New messages</Label>
+          <InlineSaving
+            state={policyFeedback.state}
+            label="Message policy"
+            resetKey={policyFeedback.attempt}
+            error={policyFeedback.error}
+          />
+        </div>
+        <NativeSelect
+          id="agent-message-policy"
+          aria-describedby="agent-message-policy-help"
+          {...policyForm.register("policy")}
+          value={policyForm.watch("policy")}
+          disabled={locked}
+          onChange={(event) =>
+            void changePolicy(Number(event.target.value) as AgentConcurrencyPolicy)
+          }
+        >
+          <option value={AgentConcurrencyPolicy.QUEUE}>Queue</option>
+          <option value={AgentConcurrencyPolicy.INTERRUPT}>Interrupt</option>
+          <option value={AgentConcurrencyPolicy.QUEUE_AND_BATCH}>Queue and batch</option>
+        </NativeSelect>
+        <p id="agent-message-policy-help" className="text-xs text-muted-foreground">
+          {policyForm.watch("policy") === AgentConcurrencyPolicy.INTERRUPT
+            ? "Cancel the current response and start a fresh response for new messages."
+            : policyForm.watch("policy") === AgentConcurrencyPolicy.QUEUE_AND_BATCH
+              ? "Finish the current response, then handle pending messages together."
+              : "Finish the current response, then handle each pending message separately."}
+        </p>
+      </div>
       <fieldset className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-6 lg:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] lg:gap-x-6">
         <legend className={agent ? "sr-only" : "mb-2 font-medium"}>Capabilities</legend>
         {capabilityOptions.map((option) => {

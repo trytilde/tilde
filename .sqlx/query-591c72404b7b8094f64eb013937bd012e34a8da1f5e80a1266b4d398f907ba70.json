@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO agent_channel_identities(connection_id,agent_id,identity_type,value)\nSELECT connection_id,agent_id,$2,$3 FROM connection_agents WHERE connection_id=$1 AND capability='channel'\nON CONFLICT(connection_id,agent_id) DO UPDATE SET identity_type=EXCLUDED.identity_type,value=EXCLUDED.value;\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "591c72404b7b8094f64eb013937bd012e34a8da1f5e80a1266b4d398f907ba70"
+}

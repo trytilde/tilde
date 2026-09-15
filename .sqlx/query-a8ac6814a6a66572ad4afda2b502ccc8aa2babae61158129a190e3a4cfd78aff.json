@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ca.connection_id,ca.agent_id FROM connection_agents ca\nJOIN connections c ON c.id=ca.connection_id\nJOIN agents a ON a.id=ca.agent_id AND a.deleted_at IS NULL\nLEFT JOIN agent_channel_identities ai ON ai.connection_id=ca.connection_id AND ai.agent_id=ca.agent_id\nWHERE ca.capability='channel' AND c.status='ready' AND ai.connection_id IS NULL;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "connection_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a8ac6814a6a66572ad4afda2b502ccc8aa2babae61158129a190e3a4cfd78aff"
+}

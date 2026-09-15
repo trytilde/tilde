@@ -218,6 +218,7 @@ impl Connections {
         }
         for assignment in assignments {
             Self::assign_in_transaction(&mut tx, &row, assignment).await?;
+            self.sync_agent_identity(&mut tx, &row).await?;
         }
         let row = sqlx::query_file_as!(
             Connection,
@@ -779,6 +780,14 @@ impl Connections {
         )
         .execute(&mut *tx)
         .await?;
+        let ready = sqlx::query_file_as!(
+            Connection,
+            "../../queries/connections/connection_get.sql",
+            setup.connection_id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        self.sync_agent_identity(&mut tx, &ready).await?;
         sqlx::query_file!(
             "../../queries/connections/setup_transition.sql",
             setup.id,
@@ -1020,6 +1029,7 @@ impl Connections {
         .await?
         .ok_or_else(|| invalid("Connection not found"))?;
         Self::assign_in_transaction(&mut tx, &row, assignment).await?;
+        self.sync_agent_identity(&mut tx, &row).await?;
         let row = sqlx::query_file_as!(
             Connection,
             "../../queries/connections/connection_get.sql",

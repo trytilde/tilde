@@ -146,6 +146,17 @@ use crate::connections::service::Connections;
 pub(crate) struct Slack;
 #[async_trait::async_trait]
 impl Runtime for Slack {
+    fn channel_identity(
+        &self,
+        values: &Values,
+        _account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        Some(crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::Username,
+            value: optional(values, "slack_bot_user_id")?.to_owned(),
+        })
+    }
+
     fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
         &[
             "Create a Slack app or connect an existing app using the form below.",

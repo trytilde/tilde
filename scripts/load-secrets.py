@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract this runtime's chat and dev tunnel credentials from the original Tilde SOPS document.
+"""Extract this runtime's chat and development credentials from the original Tilde SOPS document.
 
 The encrypted document retains its original KMS recipient and top-level/test
 layout. Never source generated dotenv files as shell code: PEMs and tokens may
@@ -62,8 +62,9 @@ def main():
     dev = selected(document)
     test = {**dev, **selected(document.get("test", {}))}
     # The tunnel credential belongs only to the interactive development launcher.
-    if isinstance(document.get("ngrok_authtoken"), str):
-        dev["NGROK_AUTHTOKEN"] = document["ngrok_authtoken"]
+    for name in ["ngrok_authtoken", "openai_api_key"]:
+        if isinstance(document.get(name), str):
+            dev[name.upper()] = document[name]
     credential = document.get("test", {}).get("e2e_mcp_whatsapp_credential_json")
     if credential:
         for key, value in json.loads(credential).items():

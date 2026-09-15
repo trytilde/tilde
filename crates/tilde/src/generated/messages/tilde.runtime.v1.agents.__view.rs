@@ -23,6 +23,10 @@ pub struct CreateAgentRequestView<'a> {
     pub capabilities: ::buffa::MessageFieldView<
         super::super::super::super::types::v1::__buffa::view::CapabilitiesView<'a>,
     >,
+    /// Field 7: `concurrency_policy`
+    pub concurrency_policy: ::buffa::EnumValue<
+        super::super::super::super::types::v1::AgentConcurrencyPolicy,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for CreateAgentRequestView<'a> {
@@ -33,6 +37,7 @@ impl<'a> ::core::fmt::Debug for CreateAgentRequestView<'a> {
             .field("endpoint_url", &self.endpoint_url)
             .field("webhook_signing_key", &::core::format_args!("[REDACTED]"))
             .field("capabilities", &self.capabilities)
+            .field("concurrency_policy", &self.concurrency_policy)
             .finish()
     }
 }
@@ -113,6 +118,15 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                     }
                 }
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.concurrency_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -150,6 +164,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            concurrency_policy: self.concurrency_policy,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -184,6 +199,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -214,6 +235,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -252,6 +279,11 @@ impl<'__a> ::serde::Serialize for CreateAgentRequestView<'__a> {
             if let ::core::option::Option::Some(__v) = self.capabilities.as_option() {
                 __map.serialize_entry("capabilities", __v)?;
             }
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(
+            &self.concurrency_policy,
+        ) {
+            __map.serialize_entry("concurrencyPolicy", &self.concurrency_policy)?;
         }
         __map.end()
     }
@@ -384,6 +416,15 @@ impl CreateAgentRequestOwnedView {
         super::super::super::super::types::v1::__buffa::view::CapabilitiesView<'_>,
     > {
         &self.0.reborrow().capabilities
+    }
+    /// Field 7: `concurrency_policy`
+    #[must_use]
+    pub fn concurrency_policy(
+        &self,
+    ) -> ::buffa::EnumValue<
+        super::super::super::super::types::v1::AgentConcurrencyPolicy,
+    > {
+        self.0.reborrow().concurrency_policy
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<CreateAgentRequestView<'static>>>
@@ -1838,6 +1879,10 @@ pub struct UpdateAgentRequestView<'a> {
     pub capabilities: ::buffa::MessageFieldView<
         super::super::super::super::types::v1::__buffa::view::CapabilitiesView<'a>,
     >,
+    /// Field 6: `concurrency_policy`
+    pub concurrency_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::super::super::types::v1::AgentConcurrencyPolicy>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for UpdateAgentRequestView<'a> {
@@ -1910,6 +1955,15 @@ impl<'a> ::buffa::MessageView<'a> for UpdateAgentRequestView<'a> {
                     }
                 }
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.concurrency_policy = Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(&mut cur)?),
+                );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1946,6 +2000,7 @@ impl<'a> ::buffa::MessageView<'a> for UpdateAgentRequestView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            concurrency_policy: self.concurrency_policy,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1974,6 +2029,9 @@ impl<'a> ::buffa::ViewEncode<'a> for UpdateAgentRequestView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.concurrency_policy {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2001,6 +2059,9 @@ impl<'a> ::buffa::ViewEncode<'a> for UpdateAgentRequestView<'a> {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.concurrency_policy {
+            ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2036,6 +2097,9 @@ impl<'__a> ::serde::Serialize for UpdateAgentRequestView<'__a> {
             if let ::core::option::Option::Some(__v) = self.capabilities.as_option() {
                 __map.serialize_entry("capabilities", __v)?;
             }
+        }
+        if let ::core::option::Option::Some(ref __v) = self.concurrency_policy {
+            __map.serialize_entry("concurrencyPolicy", __v)?;
         }
         __map.end()
     }
@@ -2159,6 +2223,15 @@ impl UpdateAgentRequestOwnedView {
         super::super::super::super::types::v1::__buffa::view::CapabilitiesView<'_>,
     > {
         &self.0.reborrow().capabilities
+    }
+    /// Field 6: `concurrency_policy`
+    #[must_use]
+    pub fn concurrency_policy(
+        &self,
+    ) -> ::core::option::Option<
+        ::buffa::EnumValue<super::super::super::super::types::v1::AgentConcurrencyPolicy>,
+    > {
+        self.0.reborrow().concurrency_policy
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<UpdateAgentRequestView<'static>>>

@@ -154,6 +154,7 @@ impl Runtime {
     }
 }
 impl Tracing {
+    /// Logs share connect-token scope and the five-minute terminal upload window.
     pub fn authorize_router(&self, router: Router) -> Router {
         router.layer(middleware::from_fn_with_state(self.clone(), authorize))
     }

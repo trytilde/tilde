@@ -52,6 +52,16 @@ pub struct CreateAgentRequest {
         super::super::types::v1::Capabilities,
         ::buffa::Inline<super::super::types::v1::Capabilities>,
     >,
+    /// Field 7: `concurrency_policy`
+    #[serde(
+        rename = "concurrencyPolicy",
+        alias = "concurrency_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub concurrency_policy: ::buffa::EnumValue<
+        super::super::types::v1::AgentConcurrencyPolicy,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -64,6 +74,7 @@ impl ::core::fmt::Debug for CreateAgentRequest {
             .field("endpoint_url", &self.endpoint_url)
             .field("webhook_signing_key", &::core::format_args!("[REDACTED]"))
             .field("capabilities", &self.capabilities)
+            .field("concurrency_policy", &self.concurrency_policy)
             .finish()
     }
 }
@@ -117,6 +128,12 @@ impl ::buffa::Message for CreateAgentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -146,6 +163,12 @@ impl ::buffa::Message for CreateAgentRequest {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -199,6 +222,15 @@ impl ::buffa::Message for CreateAgentRequest {
                     ctx,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.concurrency_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -212,6 +244,7 @@ impl ::buffa::Message for CreateAgentRequest {
         self.endpoint_url.clear();
         self.webhook_signing_key.clear();
         self.capabilities = ::buffa::MessageField::none();
+        self.concurrency_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1022,6 +1055,16 @@ pub struct UpdateAgentRequest {
         super::super::types::v1::Capabilities,
         ::buffa::Inline<super::super::types::v1::Capabilities>,
     >,
+    /// Field 6: `concurrency_policy`
+    #[serde(
+        rename = "concurrencyPolicy",
+        alias = "concurrency_policy",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub concurrency_policy: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::AgentConcurrencyPolicy>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1033,6 +1076,7 @@ impl ::core::fmt::Debug for UpdateAgentRequest {
             .field("name", &self.name)
             .field("endpoint_url", &self.endpoint_url)
             .field("capabilities", &self.capabilities)
+            .field("concurrency_policy", &self.concurrency_policy)
             .finish()
     }
 }
@@ -1062,6 +1106,18 @@ impl UpdateAgentRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.endpoint_url = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::concurrency_policy`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_concurrency_policy(
+        mut self,
+        value: impl Into<
+            ::buffa::EnumValue<super::super::types::v1::AgentConcurrencyPolicy>,
+        >,
+    ) -> Self {
+        self.concurrency_policy = Some(value.into());
         self
     }
 }
@@ -1102,6 +1158,9 @@ impl ::buffa::Message for UpdateAgentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.concurrency_policy {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1128,6 +1187,9 @@ impl ::buffa::Message for UpdateAgentRequest {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.concurrency_policy {
+            ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1182,6 +1244,15 @@ impl ::buffa::Message for UpdateAgentRequest {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.concurrency_policy = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1194,6 +1265,7 @@ impl ::buffa::Message for UpdateAgentRequest {
         self.name = ::core::option::Option::None;
         self.endpoint_url = ::core::option::Option::None;
         self.capabilities = ::buffa::MessageField::none();
+        self.concurrency_policy = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

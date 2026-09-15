@@ -70,8 +70,8 @@ pub(crate) async fn retire(tx: &mut Transaction<'_, Postgres>, agent: Uuid) -> R
     Ok(())
 }
 
-/// Carry unaccepted input into one pending invocation without reopening a completed run.
-/// The caller holds the thread lock and has terminalized the previous invocation.
+/// Dispatch pending events into a fresh invocation. Inputs are consumed by API policy,
+/// never acknowledged or drained by an agent's implementation. Caller holds the thread lock.
 pub(crate) async fn requeue_inputs(
     tx: &mut Transaction<'_, Postgres>,
     invocation: Uuid,
@@ -80,62 +80,74 @@ pub(crate) async fn requeue_inputs(
     let inputs = sqlx::query_file!("../../queries/chat/inputs_pending.sql", invocation)
         .fetch_all(&mut **tx)
         .await?;
-    if !inputs.is_empty() {
-        let state = sqlx::query_file!("../../queries/chat/run_state.sql", run_id)
-            .fetch_one(&mut **tx)
-            .await?;
-        let next_run = if state.status == "waiting" {
-            sqlx::query_file!("../../queries/chat/run_resume.sql", run_id)
-                .fetch_one(&mut **tx)
-                .await?;
-            run_id
-        } else {
-            let run = Uuid::new_v4();
-            let objective = inputs
-                .iter()
-                .map(|v| v.text.as_str())
-                .collect::<Vec<_>>()
-                .join("\n");
-            let key = format!("pending:{invocation}");
-            sqlx::query_file!(
-                "../../queries/chat/run_create.sql",
-                run,
-                state.thread_id,
-                state.agent_id,
-                objective,
-                None::<Uuid>,
-                key
-            )
-            .fetch_one(&mut **tx)
-            .await?;
-            sqlx::query_file!(
-                "../../queries/channel_access/run_source.sql",
-                run,
-                state.source_identity_id,
-                state.channel_origin
-            )
-            .execute(&mut **tx)
-            .await?;
-            run
-        };
-        let next = Uuid::new_v4();
-        let deployment = super::pin_deployment(tx, state.thread_id, state.agent_id).await?;
-        sqlx::query_file!(
-            "../../queries/chat/invocation_create.sql",
-            next,
-            next_run,
-            state.thread_id,
-            state.agent_id,
-            crate::telemetry::context::capture().0,
-            crate::telemetry::context::capture().1,
-            deployment
-        )
+    if inputs.is_empty() {
+        return Ok(());
+    }
+    let state = sqlx::query_file!("../../queries/chat/run_state.sql", run_id)
+        .fetch_one(&mut **tx)
+        .await?;
+    let count = if state.concurrency_policy == "queue" {
+        1
+    } else {
+        inputs.len()
+    };
+    let selected = &inputs[..count];
+    let last = selected.last().expect("nonempty input batch");
+    let run = Uuid::new_v4();
+    let next = Uuid::new_v4();
+    let objective = selected
+        .iter()
+        .map(|input| input.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    let key = format!("event:{}:{}", invocation, selected[0].id);
+    sqlx::query_file!(
+        "../../queries/chat/run_create.sql",
+        run,
+        state.thread_id,
+        state.agent_id,
+        objective,
+        None::<Uuid>,
+        key
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    sqlx::query_file!(
+        "../../queries/channel_access/run_source.sql",
+        run,
+        last.source_identity_id,
+        last.channel_origin
+    )
+    .execute(&mut **tx)
+    .await?;
+    let deployment = super::pin_deployment(tx, state.thread_id, state.agent_id).await?;
+    sqlx::query_file!(
+        "../../queries/chat/invocation_create.sql",
+        next,
+        run,
+        state.thread_id,
+        state.agent_id,
+        crate::telemetry::context::capture().0,
+        crate::telemetry::context::capture().1,
+        deployment
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query_file!(
+        "../../queries/chat/invocation_cutoff.sql",
+        next,
+        last.history_through_message_id
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query_file!("../../queries/chat/input_move.sql", invocation, next)
         .execute(&mut **tx)
         .await?;
-        sqlx::query_file!("../../queries/chat/input_move.sql", invocation, next)
+    for input in selected {
+        sqlx::query_file!("../../queries/chat/input_accept.sql", next, input.id)
             .execute(&mut **tx)
             .await?;
-        activity(tx, state.thread_id, "invocation.pending", next, "").await?;
     }
+    activity(tx, state.thread_id, "invocation.pending", next, "").await?;
     Ok(())
 }

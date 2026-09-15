@@ -2,7 +2,16 @@ syntax = "proto3";
 package tilde.types.v1;
 import "google/protobuf/timestamp.proto";
 
+// How new messages are handled while this agent is active in a thread.
+enum AgentConcurrencyPolicy {
+  AGENT_CONCURRENCY_POLICY_UNSPECIFIED = 0;
+  AGENT_CONCURRENCY_POLICY_QUEUE = 1;
+  AGENT_CONCURRENCY_POLICY_INTERRUPT = 2;
+  AGENT_CONCURRENCY_POLICY_QUEUE_AND_BATCH = 3;
+}
+
 message Agent {
+  AgentConcurrencyPolicy concurrency_policy = 13;
   // Stable random seed for the generated avatar; retained after custom uploads.
   string avatar_seed = 11;
   // Short-lived signed URL for a custom avatar, when present.

@@ -17,6 +17,9 @@ use zeroize::Zeroizing;
 #[cfg(feature = "embedded-web")]
 mod web;
 
+#[cfg(debug_assertions)]
+mod dev_agent;
+
 #[derive(Parser)]
 #[command(
     version,
@@ -44,6 +47,9 @@ enum Command {
     GenerateKey,
     /// Validate typed configuration without connecting to Postgres or AWS.
     CheckConfig,
+    /// Register and host the local SDK example (development builds only).
+    #[cfg(debug_assertions)]
+    DevAgent,
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.langfuse_public_key.take(),
         config.langfuse_secret_key.take(),
     )?;
+    let _ = tilde::logs::clickhouse::Store::from_config(&config)?;
     if matches!(args.command, Some(Command::CheckConfig)) {
         return Ok(());
     }
@@ -95,6 +102,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|_| "Encryption key initialization timed out")??,
     );
+    #[cfg(debug_assertions)]
+    if matches!(args.command, Some(Command::DevAgent)) {
+        return dev_agent::run(pool, encryption).await;
+    }
     let logs = tilde::logs::Runtime::start(pool.clone(), &config)?;
     let mut agents = Agents::new(pool.clone(), encryption.clone());
     if let Some(avatars) = avatars {
@@ -151,6 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     connections.seed().await?;
     connections.recover().await?;
+    connections.restore_agent_identities().await?;
     let deployments = tilde::deployment::Deployments::new(
         pool.clone(),
         encryption.clone(),

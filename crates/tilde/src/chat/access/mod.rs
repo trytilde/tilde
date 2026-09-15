@@ -31,12 +31,26 @@ struct Route {
     provider_name: String,
     icon_url: Option<String>,
     agent_name: String,
+    agent_identity_type: Option<String>,
+    agent_identity_value: Option<String>,
 }
 impl Route {
     fn wire(self) -> types::ChannelAccess {
         let provider = adapter(&self.provider_id, &self.type_id);
         let template = provider.is_some_and(|p| p.supports_verification_template());
-        types::ChannelAccess { connection_id:self.connection_id.to_string(),agent_id:self.agent_id.to_string(),account_name:self.name,
+        let agent_identity = self
+            .agent_identity_value
+            .map(|value| types::AgentChannelIdentity {
+                connection_id: self.connection_id.to_string(),
+                agent_id: self.agent_id.to_string(),
+                value,
+                identity_type: identity::kind_value(
+                    self.agent_identity_type.as_deref().unwrap_or(""),
+                )
+                .into(),
+                ..Default::default()
+            });
+        types::ChannelAccess { agent_identity: agent_identity.into(), connection_id:self.connection_id.to_string(),agent_id:self.agent_id.to_string(),account_name:self.name,
    provider_id:self.provider_id,provider_name:self.provider_name,icon_url:self.icon_url,connection_status:self.status,
    mode:match self.access_mode.as_str(){"private"=>types::ChannelAccessMode::Private,"public"=>types::ChannelAccessMode::Public,_=>types::ChannelAccessMode::Disabled}.into(),
    identity_types:provider.map(|p|p.identity_types().iter().copied().map(Into::into).collect()).unwrap_or_default(),verification_supported:provider.is_some_and(|p|p.verification_supported()),supports_template:template,
@@ -279,6 +293,11 @@ impl AgentAccess {
                 "Configure this connection before verifying identities",
             ));
         }
+        if route.agent_identity_value.is_none() {
+            return Err(ConnectError::failed_precondition(
+                "Reconnect this channel to establish the agent's sending identity before inviting recipients",
+            ));
+        }
         let provider = adapter(&route.provider_id, &route.type_id)
             .ok_or_else(|| ConnectError::failed_precondition("No identity provider available"))?;
         if !provider.verification_supported() {
@@ -392,12 +411,6 @@ impl AgentAccess {
             token.expose_secret()
         ));
         drop(token);
-        let text = zeroize::Zeroizing::new(format!(
-            "Approve access to {} through {}: {}\nThis link expires in 10 minutes. No Tilde login is required. If you did not request access, ignore this message.",
-            route.agent_name,
-            route.name,
-            url.as_str()
-        ));
         let delivery = async {
             let access = Channels::new(self.connections.clone())
                 .access(connection)
@@ -407,7 +420,7 @@ impl AgentAccess {
                     &access,
                     identity::VerificationMessage {
                         value: &value,
-                        text: &text,
+                        agent_name: &route.agent_name,
                         url: &url,
                         template_name: template_name.as_deref(),
                         template_language: template_language.as_deref(),
@@ -445,7 +458,20 @@ impl AgentAccess {
                 "Invalid or expired verification link",
             ));
         }
+        let agent_identity = row
+            .agent_identity_value
+            .map(|value| types::AgentChannelIdentity {
+                connection_id: row.connection_id.to_string(),
+                agent_id: row.agent_id.to_string(),
+                value,
+                identity_type: identity::kind_value(
+                    row.agent_identity_type.as_deref().unwrap_or(""),
+                )
+                .into(),
+                ..Default::default()
+            });
         Ok(types::IdentityVerification {
+            agent_identity: agent_identity.into(),
             id: row.id.to_string(),
             agent_name: row.agent_name,
             account_name: row.account_name,

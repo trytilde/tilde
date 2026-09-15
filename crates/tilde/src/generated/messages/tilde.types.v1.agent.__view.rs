@@ -3,6 +3,8 @@
 
 #[derive(Clone, Debug, Default)]
 pub struct AgentView<'a> {
+    /// Field 13: `concurrency_policy`
+    pub concurrency_policy: ::buffa::EnumValue<super::super::AgentConcurrencyPolicy>,
     /// Stable random seed for the generated avatar; retained after custom uploads.
     ///
     /// Field 11: `avatar_seed`
@@ -67,6 +69,15 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.concurrency_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             11u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -215,6 +226,7 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::Agent {
+            concurrency_policy: self.concurrency_policy,
             avatar_seed: self.avatar_seed.to_string(),
             avatar_url: self.avatar_url.map(|s| s.to_string()),
             paused: self.paused,
@@ -318,6 +330,12 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
         if let Some(ref v) = self.avatar_url {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -379,6 +397,12 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
         if let Some(ref v) = self.avatar_url {
             ::buffa::types::put_string_field(12u32, v, buf);
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -400,6 +424,11 @@ impl<'__a> ::serde::Serialize for AgentView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(
+            &self.concurrency_policy,
+        ) {
+            __map.serialize_entry("concurrencyPolicy", &self.concurrency_policy)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.avatar_seed) {
             __map.serialize_entry("avatarSeed", self.avatar_seed)?;
         }
@@ -524,6 +553,13 @@ impl AgentOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 13: `concurrency_policy`
+    #[must_use]
+    pub fn concurrency_policy(
+        &self,
+    ) -> ::buffa::EnumValue<super::super::AgentConcurrencyPolicy> {
+        self.0.reborrow().concurrency_policy
     }
     /// Stable random seed for the generated avatar; retained after custom uploads.
     ///

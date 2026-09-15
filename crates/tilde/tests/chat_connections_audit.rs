@@ -17,6 +17,7 @@ use uuid::Uuid;
 async fn agent(db: &common::Database, crypto: Arc<Encryption>, name: &str) -> Uuid {
     Agents::new(db.pool.clone(), crypto)
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: Uuid::new_v4(),
             name: name.into(),
             endpoint_url: "http://127.0.0.1:9999".into(),
@@ -503,6 +504,7 @@ async fn channel_send_and_callback(selected_provider: &str) {
     )]));
     Agents::new(db.pool.clone(), crypto.clone())
         .update(tilde::agent::UpdateAgent {
+            concurrency_policy: None,
             id: agent_id,
             name: None,
             endpoint_url: None,

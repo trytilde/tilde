@@ -8,6 +8,7 @@ pub(crate) mod execution;
 pub(crate) mod messages;
 pub(crate) mod outbox;
 pub mod providers;
+mod scheduling;
 pub(crate) mod store;
 mod work;
 use super::gateway;
@@ -302,6 +303,9 @@ impl Runtime {
         state: State,
         scope: Option<&Scope>,
     ) -> Result<()> {
+        if let (State::Message(message), Some(scope)) = (&state, scope) {
+            t.message_invocations.insert(id(&message.id)?, scope.id);
+        }
         t.sequence += 1;
         let event = types::RuntimeEvent {
             id: Uuid::new_v4().to_string(),
@@ -617,7 +621,7 @@ impl Runtime {
                 break;
             }
             run.status = "active".into();
-            self.begin_invocation(&mut t, &mut run, participant)?;
+            self.begin_invocation(&mut t, &mut run, participant, None)?;
             restarted = true;
         }
         drop(t);
@@ -855,6 +859,16 @@ impl Runtime {
         limit: u32,
         before: Option<Uuid>,
     ) -> Result<chat::MessagePage> {
+        self.invocation_message_page(thread, limit, before, None)
+            .await
+    }
+    pub async fn invocation_message_page(
+        &self,
+        thread: Uuid,
+        limit: u32,
+        before: Option<Uuid>,
+        invocation: Option<Uuid>,
+    ) -> Result<chat::MessagePage> {
         let shared = self.load(thread).await?;
         let t = shared.lock().await;
         let size = if limit == 0 { 100 } else { limit.min(100) } as usize;
@@ -862,11 +876,32 @@ impl Runtime {
             Some(before) => Some(*t.message_keys.get(&before).ok_or(ChatError::NotFound)?),
             None => None,
         };
+        let cutoff = invocation
+            .map(|key| {
+                let state = t.invocations.get(&key).ok_or(ChatError::NotFound)?;
+                Ok::<_, ChatError>(
+                    id(&state.history_through_message_id)
+                        .ok()
+                        .and_then(|id| t.message_keys.get(&id).copied()),
+                )
+            })
+            .transpose()?;
         let mut rows: Vec<types::Message> = t
             .messages
             .iter()
             .rev()
             .filter(|(key, _)| bound.is_none_or(|b| **key < b))
+            .filter(|(key, message)| {
+                cutoff.is_none_or(|anchor| {
+                    anchor.is_some_and(|anchor| **key <= anchor)
+                        || invocation.is_some_and(|invocation| {
+                            id(&message.id)
+                                .ok()
+                                .and_then(|id| t.message_invocations.get(&id).copied())
+                                == Some(invocation)
+                        })
+                })
+            })
             .take(size + 1)
             .map(|(_, m)| m.clone())
             .collect();
@@ -879,6 +914,9 @@ impl Runtime {
         } else {
             String::new()
         };
+        if invocation.is_some() {
+            rows.reverse();
+        }
         Ok(chat::MessagePage {
             messages: rows,
             next_page_token,

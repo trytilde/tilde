@@ -36,6 +36,7 @@ pub struct Agents {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct Agent {
+    pub concurrency_policy: ConcurrencyPolicy,
     pub avatar_seed: Uuid,
     pub avatar_key: Option<String>,
     pub paused: bool,
@@ -48,6 +49,7 @@ pub struct Agent {
 }
 
 pub struct CreateAgent {
+    pub concurrency_policy: ConcurrencyPolicy,
     pub capabilities: crate::iam::capabilities::Capabilities,
     pub id: Uuid,
     pub name: String,
@@ -55,6 +57,7 @@ pub struct CreateAgent {
     pub endpoint_url: String,
 }
 pub struct UpdateAgent {
+    pub concurrency_policy: Option<ConcurrencyPolicy>,
     pub capabilities: Option<crate::iam::capabilities::Capabilities>,
     pub id: Uuid,
     pub name: Option<String>,
@@ -107,6 +110,7 @@ impl Agents {
             name,
             endpoint,
             encrypted_key,
+            input.concurrency_policy.as_str(),
             serde_json::to_value(&input.capabilities)
                 .map_err(|_| Error::Invalid("Invalid capabilities".into()))?
         )
@@ -134,10 +138,12 @@ impl Agents {
             || current.endpoint_url.as_deref() != Some(endpoint.as_str())
             || !same_key
             || current.capabilities.0 != input.capabilities
+            || current.concurrency_policy != input.concurrency_policy.as_str()
         {
             return Err(Error::Conflict);
         }
         Ok(Agent {
+            concurrency_policy: current.concurrency_policy.parse()?,
             avatar_seed: current.avatar_seed,
             avatar_key: current.avatar_key,
             paused: current.paused,
@@ -267,6 +273,7 @@ impl Agents {
             name,
             change_endpoint,
             endpoint,
+            input.concurrency_policy.map(ConcurrencyPolicy::as_str),
             input
                 .capabilities
                 .as_ref()
@@ -323,5 +330,52 @@ fn binding(id: Uuid) -> SecretBinding<'static> {
         resource_kind: "agent",
         resource_id: id,
         name: "webhook_signing_key",
+    }
+}
+
+/// Per-thread input scheduling. Queue is the default, matching the hosted harness.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "text", rename_all = "snake_case")]
+pub enum ConcurrencyPolicy {
+    #[default]
+    Queue,
+    Interrupt,
+    QueueAndBatch,
+}
+impl ConcurrencyPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Queue => "queue",
+            Self::Interrupt => "interrupt",
+            Self::QueueAndBatch => "queue_and_batch",
+        }
+    }
+    pub fn from_wire(value: i32) -> Result<Self, Error> {
+        match value {
+            0 | 1 => Ok(Self::Queue),
+            2 => Ok(Self::Interrupt),
+            3 => Ok(Self::QueueAndBatch),
+            _ => Err(Error::Invalid("Invalid concurrency policy".into())),
+        }
+    }
+    pub fn wire(self) -> crate::proto::tilde::types::v1::AgentConcurrencyPolicy {
+        use crate::proto::tilde::types::v1::AgentConcurrencyPolicy as P;
+        match self {
+            Self::Queue => P::Queue,
+            Self::Interrupt => P::Interrupt,
+            Self::QueueAndBatch => P::QueueAndBatch,
+        }
+    }
+}
+impl std::str::FromStr for ConcurrencyPolicy {
+    type Err = Error;
+    fn from_str(value: &str) -> Result<Self, Error> {
+        match value {
+            "queue" => Ok(Self::Queue),
+            "interrupt" => Ok(Self::Interrupt),
+            "queue_and_batch" => Ok(Self::QueueAndBatch),
+            _ => Err(Error::Invalid("Invalid concurrency policy".into())),
+        }
     }
 }

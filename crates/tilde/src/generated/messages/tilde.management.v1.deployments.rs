@@ -2157,6 +2157,16 @@ pub const __ISSUE_DEPLOYMENT_TOKEN_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateSidecarAgentRequest {
+    /// Field 5: `concurrency_policy`
+    #[serde(
+        rename = "concurrencyPolicy",
+        alias = "concurrency_policy",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub concurrency_policy: ::buffa::EnumValue<
+        super::super::types::v1::AgentConcurrencyPolicy,
+    >,
     /// Field 1: `id`
     #[serde(
         rename = "id",
@@ -2195,6 +2205,7 @@ pub struct CreateSidecarAgentRequest {
 impl ::core::fmt::Debug for CreateSidecarAgentRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateSidecarAgentRequest")
+            .field("concurrency_policy", &self.concurrency_policy)
             .field("id", &self.id)
             .field("name", &self.name)
             .field("webhook_signing_key", &::core::format_args!("[REDACTED]"))
@@ -2249,6 +2260,12 @@ impl ::buffa::Message for CreateSidecarAgentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2275,6 +2292,12 @@ impl ::buffa::Message for CreateSidecarAgentRequest {
                 buf,
             );
             self.capabilities.write_to(__cache, buf);
+        }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2321,6 +2344,15 @@ impl ::buffa::Message for CreateSidecarAgentRequest {
                     ctx,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.concurrency_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2333,6 +2365,7 @@ impl ::buffa::Message for CreateSidecarAgentRequest {
         self.name.clear();
         self.webhook_signing_key.clear();
         self.capabilities = ::buffa::MessageField::none();
+        self.concurrency_policy = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }

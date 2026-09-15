@@ -26,7 +26,22 @@ impl Adapter for Agentmail {
         m: crate::chat::access::identity::VerificationMessage<'a>,
     ) -> BoxFuture<'a, ToolResult<()>> {
         Box::pin(async move {
-            a.json(a.post(a.url("agentmail_api","https://api.agentmail.to/v0",&["inboxes",a.secret("inbox_id")?,"messages","send"])?,"api_key")?.json(&json!({"to":[m.value],"subject":"Approve access to your assistant","text":m.text}))).await?;
+            let text = m.invitation("this email address");
+            let escape = |value: &str| {
+                value
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('"', "&quot;")
+                    .replace('\'', "&#39;")
+            };
+            let html = zeroize::Zeroizing::new(format!(
+                "<p>You've received an invitation to access {} from this email address. Please follow <a href=\"{}\">this link</a> to accept.</p><p>{}</p>",
+                escape(m.agent_name),
+                escape(m.url),
+                crate::chat::access::identity::INVITATION_EXPIRY
+            ));
+            a.json(a.post(a.url("agentmail_api","https://api.agentmail.to/v0",&["inboxes",a.secret("inbox_id")?,"messages","send"])?,"api_key")?.json(&json!({"to":[m.value],"subject":format!("Invitation to access {}", m.agent_name),"text":text.as_str(),"html":html.as_str()}))).await?;
             Ok(())
         })
     }

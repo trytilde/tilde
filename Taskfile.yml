@@ -1,7 +1,7 @@
 version: "3"
 output: interleaved
 
-dotenv: [".env.local", ".env.secrets", ".env"]
+dotenv: [".env.local", ".env.secrets", ".env", ".env.example"]
 
 tasks:
   default:
@@ -41,6 +41,11 @@ tasks:
       - cargo build --locked --release --features embedded-web --bins
 
   dev:
+    desc: Run the local engine and optional example agent
+    cmds:
+      - python3 scripts/dev.py
+
+  dev:run:
     desc: Run the engine on one port with optional management, Vite and dev ngrok
     vars:
       INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.API_PORT | default "8080"}}{{end}}'
@@ -82,17 +87,36 @@ tasks:
       ENGINE_OIDC_ALLOW_HTTP: '{{.ENGINE_OIDC_ALLOW_HTTP | default "true"}}'
     cmds:
       - bash scripts/dev-ngrok.sh --check
+      - python3 scripts/run-dev-agent.py --check
       - task: generate
       - pnpm --dir sdk/ts build
       - bash scripts/dev-api.sh check-config
       - task: dev:postgres
       - task: dev:s3
-      - python3 scripts/dev-logs.py
+      - task: dev:langfuse
+      - task: dev:logs
       - |
         if [ "$ENGINE_MANAGEMENT_ENABLED" = true ] && [ "$ENGINE_OIDC_ISSUER" = "http://$ADDRESS:5556" ]; then
           POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-unused-dev-compose}" docker compose --profile dev up -d dex
         fi
-      - task --parallel --failfast --output interleaved dev:api dev:web dev:connection-ui dev:ngrok
+      - task --parallel --failfast --output interleaved dev:api dev:web dev:connection-ui dev:ngrok dev:example-agent
+
+  test:logs:
+    desc: Exercise log ingestion, ClickHouse reads, and independent forwarding
+    cmds:
+      - python3 scripts/test-dev-logs.py
+      - docker compose --profile logs up -d --wait logs-clickhouse
+      - >-
+        LOGS_TEST_CLICKHOUSE_URL="http://127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}"
+        LOGS_TEST_CLICKHOUSE_USER="${LOGS_CLICKHOUSE_USER:-tilde}"
+        LOGS_TEST_CLICKHOUSE_PASSWORD="${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
+        scripts/with-postgres.sh bash -c 'cargo sqlx migrate run --source migrations && SQLX_OFFLINE=false cargo test -p tilde --test logs -- --include-ignored'
+      - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
+
+  dev:logs:
+    desc: Start local ClickHouse log storage when enabled
+    cmds:
+      - python3 scripts/dev-logs.py
 
   test:logs:
     desc: Exercise log ingestion, ClickHouse reads, and independent forwarding
@@ -144,6 +168,11 @@ tasks:
     cmds:
       - bash scripts/dev-ngrok.sh
 
+  dev:example-agent:
+    desc: Start and register example-agent-1 when REGISTER_DEV_AGENTS=1
+    cmds:
+      - python3 scripts/run-dev-agent.py
+
   dev:api:
     cmds:
       - bash scripts/dev-api.sh
@@ -153,7 +182,7 @@ tasks:
       - 'if [ "$ENGINE_WEB_ENABLED" != false ]; then pnpm --dir web exec vite; fi'
 
   secrets:load:
-    desc: Decrypt SOPS chat credentials into private dev and test dotenv files
+    desc: Decrypt SOPS development and chat credentials into private dotenv files
     aliases: [sops:decrypt]
     silent: true
     cmds:
@@ -205,11 +234,14 @@ tasks:
     env:
       ENGINE_TEST_BINARY: '{{.CARGO_TARGET_DIR | default "target"}}/debug/tilde'
     cmds:
+      - task: dev:s3
       - python3 scripts/test-env.py
       - node scripts/test-dev-services.mjs
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
+      - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs dev/example-agent-1/test/*.test.mjs
+      - pnpm --dir sdk/ts exec tsc --noEmit --strict --skipLibCheck --target ES2023 --module NodeNext packages/sdk/test/channel-types.ts
       - cargo test --workspace
       - cargo build --features embedded-web
       - node web/scripts/test-client.mjs
@@ -217,6 +249,8 @@ tasks:
       - pnpm --dir sdk/ts build
       - node --test sdk/ts/packages/sdk/test/agent-lifecycle.test.mjs
       - scripts/with-postgres.sh pnpm --dir sdk/ts test
+      - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/concurrency.integration.mjs
+      - scripts/with-postgres.sh node sdk/ts/packages/sdk-vercel-ai-node/test/attachments.integration.mjs
 
   sqlx:prepare:
     desc: Refresh SQLx metadata in disposable Postgres (append -- --check to verify)
@@ -342,3 +376,15 @@ tasks:
     cmds:
       - task: agent:langsmith:build
       - python3 scripts/run-langsmith-agent.py --serve
+
+  dev:langfuse:
+    desc: Start and initialize the local Langfuse stack selected by task dev
+    cmds:
+      - python3 scripts/dev-langfuse.py
+
+  test:langfuse:
+    desc: Test Langfuse delivery, scoped reads, native viewer and dev bootstrap
+    cmds:
+      - python3 scripts/test-dev-langfuse.py
+      - scripts/with-postgres.sh cargo test -p tilde --test langfuse
+      - pnpm --dir web exec vitest run src/features/tracing/agent-tracing.test.tsx

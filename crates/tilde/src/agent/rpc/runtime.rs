@@ -51,6 +51,9 @@ impl AgentService for Rpc {
         let agent = self
             .agents
             .create(CreateAgent {
+                concurrency_policy: crate::agent::ConcurrencyPolicy::from_wire(
+                    body.concurrency_policy.to_i32(),
+                )?,
                 id: target,
                 capabilities: caps,
                 name: body.name,
@@ -138,6 +141,10 @@ impl AgentService for Rpc {
             .agents
             .update_as(
                 UpdateAgent {
+                    concurrency_policy: body
+                        .concurrency_policy
+                        .map(|value| crate::agent::ConcurrencyPolicy::from_wire(value.to_i32()))
+                        .transpose()?,
                     capabilities: caps,
                     id: id(&body.id)?,
                     name: body.name,

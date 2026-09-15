@@ -46,6 +46,7 @@ pub mod __buffa {
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
+        reg.register_json_any(super::__AGENT_CHANNEL_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_ACCESS_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_VERIFICATION_JSON_ANY);
@@ -100,6 +101,10 @@ pub mod __buffa {
         reg.register_json_any(super::__PROVIDER_ATTACHMENT_JSON_ANY);
     }
 }
+#[doc(inline)]
+pub use self::__buffa::view::AgentChannelIdentityView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentChannelIdentityOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ChannelAccessView;
 #[doc(inline)]

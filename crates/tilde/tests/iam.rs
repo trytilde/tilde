@@ -21,6 +21,7 @@ async fn create(agents: &Agents, caps: Capabilities) -> Uuid {
     let id = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id,
             name: "IAM fixture".into(),
             endpoint_url: "http://127.0.0.1:9999".into(),
@@ -501,7 +502,7 @@ async fn management_and_runtime_contracts_are_distinct_and_cache_stays_in_runtim
         Capabilities(BTreeMap::from([(Capability::ThreadRead, Reach::Yes)])),
     )
     .await;
-    let (_, thread, token) = invocation(&chat, &db.pool, agent).await;
+    let (invocation_id, thread, token) = invocation(&chat, &db.pool, agent).await;
     let user = chat.create_user("Reader").await.unwrap();
     let roster = chat
         .add_participant(tilde::chat::AddParticipant {
@@ -526,6 +527,13 @@ async fn management_and_runtime_contracts_are_distinct_and_cache_stays_in_runtim
             text: "Original".into(),
             ..Default::default()
         })
+        .await
+        .unwrap();
+    // This handcrafted invocation fixture is triggered by the message created above.
+    sqlx::query("UPDATE chat_invocations SET history_through_message_id=$1 WHERE id=$2")
+        .bind(Uuid::parse_str(&message.id).unwrap())
+        .bind(invocation_id)
+        .execute(&db.pool)
         .await
         .unwrap();
     let (management, management_server) = serve(

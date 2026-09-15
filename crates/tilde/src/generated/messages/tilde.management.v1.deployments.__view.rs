@@ -3833,6 +3833,10 @@ impl ::serde::Serialize for IssueDeploymentTokenResponseOwnedView {
 }
 #[derive(Clone, Default)]
 pub struct CreateSidecarAgentRequestView<'a> {
+    /// Field 5: `concurrency_policy`
+    pub concurrency_policy: ::buffa::EnumValue<
+        super::super::super::super::types::v1::AgentConcurrencyPolicy,
+    >,
     /// Field 1: `id`
     pub id: &'a str,
     /// Field 2: `name`
@@ -3848,6 +3852,7 @@ pub struct CreateSidecarAgentRequestView<'a> {
 impl<'a> ::core::fmt::Debug for CreateSidecarAgentRequestView<'a> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("CreateSidecarAgentRequestView")
+            .field("concurrency_policy", &self.concurrency_policy)
             .field("id", &self.id)
             .field("name", &self.name)
             .field("webhook_signing_key", &::core::format_args!("[REDACTED]"))
@@ -3883,6 +3888,15 @@ impl<'a> ::buffa::MessageView<'a> for CreateSidecarAgentRequestView<'a> {
         let view = self;
         let mut cur = cur;
         match tag.field_number() {
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.concurrency_policy = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -3953,6 +3967,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateSidecarAgentRequestView<'a> {
         use ::buffa::alloc::string::ToString as _;
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::CreateSidecarAgentRequest {
+            concurrency_policy: self.concurrency_policy,
             id: self.id.to_string(),
             name: self.name.to_string(),
             webhook_signing_key: self.webhook_signing_key.to_string(),
@@ -3998,6 +4013,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateSidecarAgentRequestView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4026,6 +4047,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateSidecarAgentRequestView<'a> {
             );
             self.capabilities.write_to(__cache, buf);
         }
+        {
+            let val = self.concurrency_policy.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -4047,6 +4074,11 @@ impl<'__a> ::serde::Serialize for CreateSidecarAgentRequestView<'__a> {
     ) -> ::core::result::Result<__S::Ok, __S::Error> {
         use ::serde::ser::SerializeMap as _;
         let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(
+            &self.concurrency_policy,
+        ) {
+            __map.serialize_entry("concurrencyPolicy", &self.concurrency_policy)?;
+        }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
             __map.serialize_entry("id", self.id)?;
         }
@@ -4155,6 +4187,15 @@ impl CreateSidecarAgentRequestOwnedView {
     #[must_use]
     pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
         self.0.into_bytes()
+    }
+    /// Field 5: `concurrency_policy`
+    #[must_use]
+    pub fn concurrency_policy(
+        &self,
+    ) -> ::buffa::EnumValue<
+        super::super::super::super::types::v1::AgentConcurrencyPolicy,
+    > {
+        self.0.reborrow().concurrency_policy
     }
     /// Field 1: `id`
     #[must_use]

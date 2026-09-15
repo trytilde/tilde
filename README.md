@@ -14,16 +14,16 @@ Install [Task](https://taskfile.dev/docs/installation), then run:
 
 ```sh
 task build  # Complete release build, including embedded React UI
-task dev    # Rust API plus Vite; uses the configuration documented below
+task dev    # Rust API plus Vite; first copy .env.example to .env
 task test   # Rust and Connect client tests against disposable Postgres
 task check  # Generated code, frontend types, formatting and Clippy
 ```
 
 Build and dev install dependencies and generate contracts first. The release
 binary is `target/release/tilde` (or under `CARGO_TARGET_DIR` when configured).
-Task loads committed `.env` defaults and private `.env.secrets` / `.env.local` overrides. Set `DATABASE_URL` and
+Task loads your `.env` and private `.env.secrets` / `.env.local` overrides. Set `DATABASE_URL` and
 encryption configuration there; exported environment variables take precedence.
-Use `API_PORT` and `WEB_PORT` to select development ports. `task generate` runs
+When changing dev ports, also update their matching listen/public URLs in `.env`. `task generate` runs
 contract generation independently of Rust compilation. `task --list` lists commands.
 
 ## Versioning
@@ -127,15 +127,16 @@ carrying copies. `pnpm generate`, the SDK workspace build and every web script b
 it first, so a fresh clone only needs `task setup`.
 SQLx uses checked-in offline metadata, so Rust compilation also needs no database.
 
-The repository commits `.env` and `.env.test` as development and test defaults.
+Copy `.env.example` to ignored `.env` for development; `.env.test` supplies fixture-test defaults.
 The development seed is public and suitable only for disposable local data. For
 persistent data, generate a seed with `tilde generate-key` or `openssl rand -base64 32`
 and retain it in ignored `.env.local`. Never replace the seed for an existing database.
 
-`secrets.enc.yaml` is the original Tilde SOPS document, encrypted with the existing
+Keep `secrets.enc.yaml` locally (it is ignored and absent from Git history). It is
+the original Tilde SOPS document, encrypted with the existing
 AWS KMS key; `.sops.yaml` defines that recipient for future edits. Its top-level
 credentials feed development, and its `test` map overrides them for tests. The
-loader extracts only chat-provider credentials, so legacy database/infrastructure
+loader extracts chat-provider credentials and the dev ngrok token, so legacy database/infrastructure
 settings do not override this runtime's defaults. Decrypted files stay ignored.
 
 ```sh
@@ -398,6 +399,12 @@ The default is `all`. Operators who want network isolation run separate processe
 different `ENGINE_SERVE` values rather than separate ports. Binding outside loopback
 requires `--allow-network`.
 
+The agent's Capabilities tab also controls how new messages are scheduled:
+**Queue** finishes the active response then processes each message separately;
+**Interrupt** cancels it and starts fresh work; **Queue and batch** combines pending
+messages into the next response. The API owns this policy per agent/thread. Agent
+handlers respond to one invocation and honor its cancellation signal.
+
 Every user admitted by the configured OIDC provider has unrestricted management
 access. There is no role model or API-key support. Configure the provider's login
 admission policy accordingly. Agent runtimes never receive user tokens.
@@ -421,14 +428,14 @@ protocol credentials on the management API.
 
 ### Local Dex login
 
-`pnpm dev` starts Dex from the Compose `dev` profile and supplies its local OIDC
-configuration when none is specified. Docker is required for this development
+`pnpm dev` starts Dex from the Compose `dev` profile when the explicit OIDC issuer
+matches the local Dex address. `.env.example` supplies that local configuration. Docker is required for this development
 login provider. Sign in with **`dev@tilde.local` / `password`**. Its client secret
 is the development-only `tilde-local-dev-secret`. The configuration is in
-`dev/dex.yaml`; it uses in-memory storage and defaults to loopback port 5556.
+`dev/dex/dex.yaml`; it uses in-memory storage and defaults to loopback port 5556.
 A production Compose engine should use an externally reachable identity provider.
 
-Task configures Dex redirects from the selected address and API/Vite ports.
+Set the two `DEX_DEV_*_CALLBACK` values to match your management and Vite URLs.
 Localhost redirects for the default ports are also retained.
 To start only Dex manually: `POSTGRES_PASSWORD=unused-local-dev docker compose
 --profile dev up -d dex`. Stop it with the same Compose profile and `stop dex`.
@@ -492,6 +499,21 @@ separately served UI needs its API/auth paths proxied to an enabled management g
 dev Vite supports `ENGINE_DEV_URL` for that upstream. When web is disabled, the dev
 public URL defaults to the API port rather than Vite's port.
 
+### Example SDK agent
+
+`REGISTER_DEV_AGENTS=1 task dev` starts and registers `dev/example-agent-1` on
+loopback port 3001 (`DEV_AGENT_PORT` overrides it). Combine with `TS_ADDR` as usual.
+The TypeScript workspace package uses the Tilde SDK and Vercel AI SDK OpenAI
+provider to reply to native messages
+and assigned provider channels. Its stable registry ID and encrypted signing key
+are reused across restarts; existing names and grants are preserved.
+
+Run `task secrets:load` to load `openai_api_key` into private dev credentials. If
+`OPENAI_API_KEY` is missing, the launcher reads it from SOPS directly. No key is
+printed or passed in command arguments. `OPENAI_MODEL` defaults to `gpt-4o-mini`.
+The registration command exists only in debug builds. See the small implementation
+in `dev/example-agent-1/src`; the workspace builds it before dev startup.
+
 ### Local provider webhooks with ngrok
 
 Install the [ngrok CLI](https://ngrok.com/download), then add to `.env.local`:
@@ -524,25 +546,19 @@ use the matching ingress public URL and port.
 ### Development over Tailscale
 
 ```sh
-task dev ADDRESS=100.102.116.12
+TS_ADDR=100.102.116.12 task dev
 ```
 
-`ADDRESS` is the machine's IPv4 bind/public address; it defaults to `127.0.0.1`.
-Open `http://100.102.116.12:5173` from your browser. Task binds the management API
-(port 8080), web UI (5173), provider setup UI/HMR (5174), and local Dex (5556) to
-that address. It configures public URLs, accepted browser origins, API proxying
-and Dex's issuer/redirects together, and enables the engine's network binding.
-The agent runtime API stays on loopback by default; Postgres configuration is
-unchanged. The existing management/web enable switches still apply.
+Task loads `.env.local`, `.env.secrets`, and `.env`. The small dev launcher applies
+`TS_ADDR` to local management and ingress binds, Vite/HMR, browser origins, setup
+URLs, local Dex callbacks and local MinIO URLs, and enables network binding.
+Custom external URLs and the agent runtime/database settings remain unchanged.
+Ngrok still overrides only the ingress public URL.
 
-Ports remain configurable independently:
-
-```sh
-task dev ADDRESS=100.102.116.12 WEB_PORT=15173 API_PORT=18080 CONNECTION_UI_PORT=15174
-```
-
-A configured external OIDC issuer is preserved; Task only relocates the default
-local Dex provider. The local Dex account remains `dev@tilde.local` / `password`.
+Without `TS_ADDR`, dotenv values pass through directly. `.env.example` lists the
+local defaults. When changing ports, update their matching listen addresses and
+URLs together. When web is disabled, point `ENGINE_PUBLIC_URL` at the
+management API. The local Dex account remains `dev@tilde.local` / `password`.
 
 `task dev` starts the project's persistent Compose Postgres and waits for it to
 be healthy when `DATABASE_URL` uses the default local engine database
@@ -552,7 +568,7 @@ provides matching development defaults. Port 5432 is published only on loopback.
 Custom/external database URLs remain deployment-managed. `task dev:postgres` can
 also start the default local database separately.
 
-## Invocation tracing
+## Invocation tracing with Langfuse
 
 Langfuse stores platform and agent traces. Configure it on the gateway:
 
@@ -588,6 +604,45 @@ settings in `.env.example`; `task dev` starts MinIO and creates the private avat
 When setting `ADDRESS` for Tailscale, `task dev` uses that address for signed avatar URLs.
 For other deployments, set `ENGINE_S3_PUBLIC_ENDPOINT` if the browser-facing storage URL
 is different from `ENGINE_S3_ENDPOINT`; Docker Compose also accepts `ENGINE_S3_CONTAINER_ENDPOINT`.
+
+
+`task dev` starts local Langfuse at [http://127.0.0.1:3003](http://127.0.0.1:3003),
+with web/worker, ClickHouse, Redis, its own Postgres database, and a separate MinIO
+bucket. Development defaults live in `compose.yaml`; override them in the existing
+`.env` file. No separate Langfuse environment file is generated. Database volumes
+preserve data across restarts. Log in as `developer@tilde.local` with the default
+password `tilde-local-password`, or your `LANGFUSE_DEV_LOGIN_PASSWORD` override.
+Local project key overrides use `DEV_LANGFUSE_PUBLIC_KEY` and
+`DEV_LANGFUSE_SECRET_KEY` so they do not select external-collector mode.
+`LANGFUSE_PORT` changes the port; `TS_ADDR` sets the browser-facing address.
+`DEV_LANGFUSE_ENABLED=0 task dev` skips local Langfuse.
+
+To use Langfuse Cloud or another self-hosted instance, supply all three variables:
+
+```sh
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+LANGFUSE_PUBLIC_KEY=pk-lf-your-project
+LANGFUSE_SECRET_KEY=sk-lf-your-project
+```
+
+Complete external configuration skips the local stack. Optional
+`LANGFUSE_PUBLIC_URL` supplies a different browser-facing address. Credentials
+remain on the gateway. With no configuration, observability controls are disabled
+and authenticated valid OTLP uploads are successfully discarded. Configured
+outages retain queued telemetry and show an unavailable state.
+
+The agent **Tracing** tab includes Observations and Sessions, model/tool/error
+presets, time and input/output filters, column preferences, and a trace inspector.
+Its Open in Langfuse links open the corresponding external view in a new tab.
+The viewer uses Langfuse's supported public API: newest-first cursor pagination
+and clearly labeled partial session groups.
+
+Rotel accepts agent traces with connect tokens, preserving the five-minute final
+upload window. A bounded temporary Postgres outbox supplies durable forwarding;
+trace history lives in Langfuse. Payloads are unencrypted protobuf and are removed
+after delivery; replay receipts expire after seven days. See the
+[tracing boundary](crates/tilde/src/tracing/README.md) for delivery semantics and the
+companion sidecar integration. The Postgres trace-history draft remains separate.
 
 ## Agent logs
 

@@ -1,7 +1,7 @@
 services:
   minio:
     image: minio/minio:latest
-    profiles: [dev]
+    profiles: [dev, langfuse]
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
@@ -41,7 +41,7 @@ services:
     ports:
       - "${ADDRESS:-127.0.0.1}:5556:5556"
     volumes:
-      - ./dev/dex.yaml:/etc/dex/config.yaml:ro
+      - ./dev/dex/dex.yaml:/etc/dex/config.yaml:ro
   postgres:
     image: postgres:16-alpine
     ports:
@@ -72,6 +72,10 @@ services:
       LOGS_OTLP_ENDPOINT: ${LOGS_OTLP_ENDPOINT:-}
       LOGS_OTLP_HEADERS: ${LOGS_OTLP_HEADERS:-}
       LOGS_QUEUE_DIR: /var/lib/tilde/log-queue
+      LANGFUSE_BASE_URL: ${LANGFUSE_CONTAINER_BASE_URL:-${LANGFUSE_BASE_URL:-}}
+      LANGFUSE_PUBLIC_URL: ${LANGFUSE_PUBLIC_URL:-${LANGFUSE_BASE_URL:-}}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       ENGINE_ENCRYPTION_BACKEND: ${ENGINE_ENCRYPTION_BACKEND:-seed}
       ENGINE_ENCRYPTION_KEY: ${ENGINE_ENCRYPTION_KEY:-}
       ENGINE_KMS_KEY_ID: ${ENGINE_KMS_KEY_ID:-}
@@ -95,6 +99,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  # Local development only; override these defaults in .env.
   logs-clickhouse:
     image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
     profiles: [logs]
@@ -112,9 +117,124 @@ services:
       interval: 3s
       timeout: 3s
       retries: 40
+  langfuse-postgres:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    profiles: [langfuse]
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse-dev}
+      POSTGRES_DB: langfuse
+    volumes: [langfuse-postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U langfuse -d langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:25.12@sha256:8a790dd3468db22b1d4e7b18a176f378ff5ff6053b9c48dd4ea1fa71a24c5ba6
+    profiles: [langfuse]
+    environment:
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse-dev}
+    volumes: [langfuse-clickhouse:/var/lib/clickhouse]
+    healthcheck:
+      test: [CMD-SHELL, "wget -q --spider http://localhost:8123/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  langfuse-redis:
+    image: redis:7@sha256:71da9275c5f3fcb97d0fa0c8c5b36cc995327265420f17a04bfd544f458059f7
+    profiles: [langfuse]
+    environment:
+      REDIS_PASSWORD: ${LANGFUSE_REDIS_PASSWORD:-langfuse-dev}
+    command:
+      [
+        sh,
+        -c,
+        'exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory-policy noeviction',
+      ]
+    volumes: [langfuse-redis:/data]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  langfuse-bucket:
+    image: minio/mc:latest
+    profiles: [langfuse]
+    environment:
+      ACCESS_KEY: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
+      SECRET_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-minioadmin}
+    entrypoint: [sh, -ec]
+    command:
+      [
+        'mc alias set local http://minio:9000 "$$ACCESS_KEY" "$$SECRET_KEY" >/dev/null; mc mb --ignore-existing local/langfuse >/dev/null',
+      ]
+    depends_on:
+      minio: { condition: service_healthy }
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:4@sha256:5e35e625a214dd868bb22adad90fc52e8f83cc856c3750e47f9a922622c207fb
+    profiles: [langfuse]
+    depends_on: &langfuse-dependencies
+      langfuse-postgres: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    environment: &langfuse-environment
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-langfuse-dev}@langfuse-postgres:5432/langfuse
+      NEXTAUTH_URL: ${LANGFUSE_PUBLIC_URL:-http://127.0.0.1:3003}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-local-development-only}
+      SALT: ${LANGFUSE_SALT:-local-development-only}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+      LANGFUSE_IN_APP_AGENT_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse-dev}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-langfuse-dev}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-minioadmin}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${ENGINE_S3_PUBLIC_ENDPOINT:-http://127.0.0.1:19000}
+      LANGFUSE_S3_MEDIA_UPLOAD_INTERNAL_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${ENGINE_S3_ACCESS_KEY_ID:-minioadmin}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${ENGINE_S3_SECRET_ACCESS_KEY:-minioadmin}
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:4@sha256:a5d8d2457702ab7e051bc0788d73871970caebd10aae6635e87cfb736e4067cd
+    profiles: [langfuse]
+    depends_on: *langfuse-dependencies
+    ports: ["${LANGFUSE_DEV_ADDRESS:-127.0.0.1}:${LANGFUSE_PORT:-3003}:3000"]
+    environment:
+      <<: *langfuse-environment
+      LANGFUSE_INIT_ORG_ID: tilde-local
+      LANGFUSE_INIT_ORG_NAME: Tilde Local
+      LANGFUSE_INIT_PROJECT_ID: tilde-local-traces
+      LANGFUSE_INIT_PROJECT_NAME: Tilde Traces
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${DEV_LANGFUSE_PUBLIC_KEY:-pk-lf-tilde-local}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${DEV_LANGFUSE_SECRET_KEY:-sk-lf-tilde-local}
+      LANGFUSE_INIT_USER_EMAIL: developer@tilde.local
+      LANGFUSE_INIT_USER_NAME: Tilde Developer
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_DEV_LOGIN_PASSWORD:-tilde-local-password}
 
 volumes:
   logs-clickhouse:
   log-queue:
   minio-data:
   postgres-data:
+  langfuse-postgres:
+  langfuse-clickhouse:
+  langfuse-redis:

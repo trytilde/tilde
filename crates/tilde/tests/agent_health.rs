@@ -43,6 +43,7 @@ async fn create(agents: &Agents, endpoint: String) -> Uuid {
     let id = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             capabilities: Default::default(),
             id,
             name: "Health fixture".into(),

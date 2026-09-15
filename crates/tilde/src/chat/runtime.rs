@@ -1,11 +1,6 @@
-//! ConnectRPC agent dispatch, durable pending invocations, steering, and cancellation.
-//!
-//! One invocation per thread/agent can be active; other threads and agents run independently.
-//! New input becomes durable steering. Inputs acknowledged by the host but not consumed by
-//! the reasoning loop carry into another invocation. A new message after execution ends
-//! starts a new run; explicit resume continues an existing waiting or failed objective.
-//! Pending work survives restarts. Expired active leases fail for explicit resume rather
-//! than automatically replaying potentially completed external effects.
+//! ConnectRPC dispatch and API-owned per-agent message concurrency.
+//! Queued inputs become fresh invocations; interrupt revokes old callbacks and sends Cancel.
+//! Hosts only receive invocation snapshots and cancellation signals, never a steering queue.
 use crate::chat as application;
 use crate::proto::tilde::agent_host::v1 as host;
 use crate::proto::tilde::ingress::v1 as ingress_pb;
@@ -273,13 +268,13 @@ impl Chat {
             {
                 continue;
             }
-            if sqlx::query_file!("../../queries/chat/agent_available.sql", message.agent_id)
-                .fetch_optional(&mut *tx)
-                .await?
-                .is_none()
-            {
+            let Some(agent) =
+                sqlx::query_file!("../../queries/chat/agent_available.sql", message.agent_id)
+                    .fetch_optional(&mut *tx)
+                    .await?
+            else {
                 continue;
-            }
+            };
             sqlx::query_file!("../../queries/chat/thread_lock.sql", message.thread_id)
                 .fetch_one(&mut *tx)
                 .await?;
@@ -311,6 +306,58 @@ impl Chat {
                 )
                 .execute(&mut *tx)
                 .await?;
+                match agent.concurrency_policy.as_str() {
+                    "interrupt" => {
+                        sqlx::query_file!(
+                            "../../queries/chat/invocation_finish.sql",
+                            active.id,
+                            "canceled"
+                        )
+                        .fetch_one(&mut *tx)
+                        .await?;
+                        sqlx::query_file!(
+                            "../../queries/chat/run_status.sql",
+                            active.run_id,
+                            "canceled"
+                        )
+                        .execute(&mut *tx)
+                        .await?;
+                        activity(
+                            &mut tx,
+                            message.thread_id,
+                            "invocation.ended",
+                            active.id,
+                            "canceled",
+                        )
+                        .await?;
+                        super::agent_lifecycle::requeue_inputs(&mut tx, active.id, active.run_id)
+                            .await?;
+                    }
+                    "queue_and_batch" if active.status == "pending" => {
+                        sqlx::query_file!(
+                            "../../queries/chat/invocation_batch.sql",
+                            active.id,
+                            message.text
+                        )
+                        .execute(&mut *tx)
+                        .await?;
+                        sqlx::query_file!(
+                            "../../queries/chat/invocation_cutoff.sql",
+                            active.id,
+                            Some(message.id)
+                        )
+                        .execute(&mut *tx)
+                        .await?;
+                        sqlx::query_file!(
+                            "../../queries/chat/input_accept.sql",
+                            active.id,
+                            message.id
+                        )
+                        .execute(&mut *tx)
+                        .await?;
+                    }
+                    _ => {}
+                }
             } else {
                 let run = Uuid::new_v4();
                 let invocation = Uuid::new_v4();
@@ -348,6 +395,13 @@ impl Chat {
                 )
                 .execute(&mut *tx)
                 .await?;
+                sqlx::query_file!(
+                    "../../queries/chat/invocation_cutoff.sql",
+                    invocation,
+                    Some(message.id)
+                )
+                .execute(&mut *tx)
+                .await?;
                 activity(
                     &mut tx,
                     message.thread_id,
@@ -382,7 +436,7 @@ impl Chat {
             ..Default::default()
         })
     }
-    /// Persist steering first; the worker retries until the current host acknowledges it.
+    /// An explicit steering request is a new durable API event. Hosts never receive input queues.
     pub async fn steer_invocation(&self, r: application::SteerInvocation) -> Result<()> {
         if let Some(local) = self.local() {
             return local.steer_invocation(r).await;
@@ -415,7 +469,29 @@ impl Chat {
             .fetch_optional(&mut *tx)
             .await?
             .ok_or(ChatError::NotFound)?;
-        if !["pending", "running"].contains(&row.status.as_str()) {
+        super::access::lock_thread_route(&mut tx, row.thread_id).await?;
+        let agent = sqlx::query_file!("../../queries/chat/agent_available.sql", row.agent_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or(ChatError::Conflict)?;
+        sqlx::query_file!("../../queries/chat/thread_lock.sql", row.thread_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if let Some(existing) =
+            sqlx::query_file!("../../queries/chat/input_get.sql", invocation, input)
+                .fetch_optional(&mut *tx)
+                .await?
+        {
+            return if existing.text == r.text {
+                Ok(())
+            } else {
+                Err(ChatError::Conflict)
+            };
+        }
+        let current = sqlx::query_file!("../../queries/chat/invocation_endpoint.sql", invocation)
+            .fetch_one(&mut *tx)
+            .await?;
+        if !["pending", "running"].contains(&current.status.as_str()) {
             return Err(ChatError::Conflict);
         }
         sqlx::query_file!(
@@ -426,11 +502,47 @@ impl Chat {
         )
         .execute(&mut *tx)
         .await?;
-        let existing = sqlx::query_file!("../../queries/chat/input_get.sql", invocation, input)
+        if agent.concurrency_policy == "interrupt" {
+            sqlx::query_file!(
+                "../../queries/chat/invocation_finish.sql",
+                invocation,
+                "canceled"
+            )
             .fetch_one(&mut *tx)
             .await?;
-        if existing.text != r.text {
-            return Err(ChatError::Conflict);
+            sqlx::query_file!("../../queries/chat/run_status.sql", row.run_id, "canceled")
+                .execute(&mut *tx)
+                .await?;
+            activity(
+                &mut tx,
+                row.thread_id,
+                "invocation.ended",
+                invocation,
+                "canceled",
+            )
+            .await?;
+            super::agent_lifecycle::requeue_inputs(&mut tx, invocation, row.run_id).await?;
+        } else if agent.concurrency_policy == "queue_and_batch" && current.status == "pending" {
+            let event = sqlx::query_file!("../../queries/chat/input_get.sql", invocation, input)
+                .fetch_one(&mut *tx)
+                .await?;
+            sqlx::query_file!(
+                "../../queries/chat/invocation_batch.sql",
+                invocation,
+                r.text
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query_file!(
+                "../../queries/chat/invocation_cutoff.sql",
+                invocation,
+                event.history_through_message_id
+            )
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query_file!("../../queries/chat/input_accept.sql", invocation, input)
+                .execute(&mut *tx)
+                .await?;
         }
         tx.commit().await?;
         Ok(())
@@ -615,7 +727,7 @@ impl Chat {
                 status,
             )
             .await?;
-            if status == "stopped" && !suspending {
+            if !suspending {
                 super::agent_lifecycle::requeue_inputs(&mut tx, invocation, row.run_id).await?;
             }
         }
@@ -659,7 +771,7 @@ impl Chat {
             let capability = self.tokens.issue(scope.agent_id, invocation, scope.thread_id, scope.run_id).await?;
             let row=sqlx::query_file!("../../queries/chat/invocation_endpoint.sql",invocation).fetch_one(self.pg()?).await?;
             let key=self.signing_key(row.agent_id,&row.webhook_signing_key)?;
-            let messages=self.messages(scope.thread_id,100).await?;
+            let messages=self.invocation_message_page(scope.thread_id,None,100,Some(invocation)).await?.messages;
             let cached=self.hydrate_converted_messages(scope.agent_id,scope.thread_id,&messages.iter().map(|m|m.id.clone()).collect::<Vec<_>>()).await?;
             let mut request=host::InvokeRequest{agent_generation:scope.generation,invocation_id:invocation.to_string(),run_id:scope.run_id.to_string(),thread_id:scope.thread_id.to_string(),agent_id:scope.agent_id.to_string(),objective:row.objective,callback_url:self.callback_url.clone(),capability:capability.expose_secret().to_owned(),messages, cached_messages:cached.into_iter().map(|c|runtime_pb::CachedAgentRepresentation{message_id:c.message_id,message_json:c.message_json,..Default::default()}).collect(),thread:self.thread(scope.thread_id).await?.into(),deployment_id:row.deployment_id.map(|d|d.to_string()).unwrap_or_default(),traceparent:crate::telemetry::context::capture().0,tracestate:crate::telemetry::context::capture().1,..Default::default()};
             let woken=self.wake(scope.agent_id,scope.thread_id,invocation,row.deployment_id,row.target.as_deref(),row.target_reference.as_deref(),row.endpoint_url.as_deref(),key.expose_secret(),&mut request).await?;
@@ -672,9 +784,6 @@ impl Chat {
                         message=stream.message()=>{
                             let Some(message)=message.map_err(|_|ChatError::Transport)? else{break;};
                             let view=message.view();
-                            for pending in &view.pending_input_ids {
-                                sqlx::query_file!("../../queries/chat/input_unaccept.sql",invocation,id(pending)?).execute(self.pg()?).await?;
-                            }
                             if !view.reasoning_delta.is_empty() {
                                 let mut tx=self.pg()?.begin().await?;activity(&mut tx,scope.thread_id,"reasoning.delta",invocation,view.reasoning_delta).await?;tx.commit().await?;
                             }
@@ -805,16 +914,6 @@ impl Chat {
                     .await?;
             }
             Some(Event::Stopped(stopped)) => {
-                for pending in &stopped.pending_input_ids {
-                    sqlx::query_file!(
-                        "../../queries/chat/input_unaccept.sql",
-                        invocation,
-                        id(pending)?
-                    )
-                    .execute(self.pg()?)
-                    .await?;
-                }
-                // A host that failed says so; the run does not wait on a stop that never came.
                 let status = if stopped.error.is_empty() {
                     "stopped"
                 } else {
@@ -847,6 +946,7 @@ impl Chat {
                 .execute(&mut *tx)
                 .await?;
             activity(&mut tx, row.thread_id, "invocation.ended", row.id, "failed").await?;
+            super::agent_lifecycle::requeue_inputs(&mut tx, row.id, row.run_id).await?;
         }
         tx.commit().await?;
         Ok(())

@@ -131,3 +131,37 @@ test("trace exports keep the runtime callback path prefix", async (t) => {
     { path: "/runtime/v1/traces", authorization: "Bearer runtime-token" },
   ]);
 });
+
+test("unsampled invocations retain log correlation without constructing a trace exporter", async () => {
+  const traceId = "12345678901234567890123456789012";
+  let credentialReads = 0;
+  const invocation = invocationTracing(
+    {
+      callbackUrl: "http://unused",
+      invocationId: "invocation",
+      runId: "run",
+      threadId: "thread",
+      agentId: "agent",
+    },
+    new Headers({ traceparent: `00-${traceId}-1234567890123456-00` }),
+    () => {
+      credentialReads++;
+      return "Bearer unused";
+    },
+  );
+  await invocation.run(async () => {
+    await Promise.resolve();
+    assert.equal(trace.getSpan(context.active()).spanContext().traceId, traceId);
+    await tracingInterceptor(async (request) => {
+      assert.ok(request.header.get("traceparent").startsWith(`00-${traceId}-`));
+      return { stream: false, message: {} };
+    })({
+      service: { typeName: "LogsOnlyAgent" },
+      method: { name: "Read" },
+      header: new Headers(),
+      signal: new AbortController().signal,
+    });
+  });
+  await invocation.end(false);
+  assert.equal(credentialReads, 0);
+});

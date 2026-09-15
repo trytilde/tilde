@@ -31,7 +31,7 @@ message RetireDeploymentRequest { string agent_id = 1; string deployment_id = 2;
 message RetireDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; }
 message IssueDeploymentTokenRequest { string agent_id = 1; string deployment_id = 2; }
 message IssueDeploymentTokenResponse { string token = 1 [debug_redact = true]; }
-message CreateSidecarAgentRequest { string id = 1; string name = 2; string webhook_signing_key = 3 [debug_redact = true]; tilde.types.v1.Capabilities capabilities = 4; }
+message CreateSidecarAgentRequest { tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 5; string id = 1; string name = 2; string webhook_signing_key = 3 [debug_redact = true]; tilde.types.v1.Capabilities capabilities = 4; }
 message CreateSidecarAgentResponse { tilde.types.v1.Agent agent = 1; }
 message IssueIngressTokenRequest { string agent_id = 1; optional string thread_id = 2; }
 message IssueIngressTokenResponse { string token = 1 [debug_redact = true]; uint32 expires_in = 2; }

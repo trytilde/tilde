@@ -26,7 +26,13 @@ impl Adapter for Linq {
         m: crate::chat::access::identity::VerificationMessage<'a>,
     ) -> BoxFuture<'a, ToolResult<()>> {
         Box::pin(async move {
-            a.json(a.post(a.url("linq_api","https://api.linqapp.com/api/partner/v3",&["chats"])?,"api_token")?.json(&json!({"from":a.secret("phone_number")?,"to":[m.value],"message":{"parts":[{"type":"text","value":m.text}]}}))).await?;
+            let identity = if m.value.contains('@') {
+                "this email address"
+            } else {
+                "this phone number"
+            };
+            let text = m.invitation(identity);
+            a.json(a.post(a.url("linq_api","https://api.linqapp.com/api/partner/v3",&["chats"])?,"api_token")?.json(&json!({"from":a.secret("phone_number")?,"to":[m.value],"message":{"parts":[{"type":"text","value":text.as_str()}]}}))).await?;
             Ok(())
         })
     }

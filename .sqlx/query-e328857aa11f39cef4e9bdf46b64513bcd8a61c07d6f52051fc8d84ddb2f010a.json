@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE agents SET avatar_key = $2, updated_at = NOW()\nWHERE id = $1 AND deleted_at IS NULL\nRETURNING id, name, concurrency_policy AS \"concurrency_policy: _\", avatar_seed, avatar_key, paused, endpoint_url, created_at, updated_at,\n          capabilities AS \"capabilities!: Json<Capabilities>\";\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "concurrency_policy: _",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "avatar_seed",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "avatar_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "paused",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "endpoint_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "capabilities!: Json<Capabilities>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e328857aa11f39cef4e9bdf46b64513bcd8a61c07d6f52051fc8d84ddb2f010a"
+}

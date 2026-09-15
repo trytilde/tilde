@@ -74,7 +74,7 @@ impl Runtime {
             goal_id: r.goal_id,
             ..Default::default()
         };
-        self.begin_invocation(&mut t, &mut run, participant)?;
+        self.begin_invocation(&mut t, &mut run, participant, None)?;
         drop(t);
         self.changed(thread);
         Ok(run)
@@ -94,6 +94,7 @@ impl Runtime {
         t: &mut ThreadState,
         run: &mut types::Run,
         participant: Uuid,
+        history_through: Option<String>,
     ) -> Result<()> {
         let thread = id(&run.thread_id)?;
         let epoch = t.lease.epoch;
@@ -109,6 +110,13 @@ impl Runtime {
         run.invocation_id = invocation_id.to_string();
         run.invocation_status = "pending".into();
         let invocation = types::InvocationState {
+            history_through_message_id: history_through.unwrap_or_else(|| {
+                t.messages
+                    .values()
+                    .next_back()
+                    .map(|m| m.id.clone())
+                    .unwrap_or_default()
+            }),
             id: invocation_id.to_string(),
             thread_id: run.thread_id.clone(),
             run_id: run.id.clone(),
@@ -212,7 +220,7 @@ impl Runtime {
         let participant = self.agent_participant(&t)?;
         let previous = run.invocation_id.clone();
         run.status = "active".into();
-        self.begin_invocation(&mut t, &mut run, participant)?;
+        self.begin_invocation(&mut t, &mut run, participant, None)?;
         let generation = t.lease.epoch;
         let mut carried = vec![];
         for command in t
@@ -278,19 +286,32 @@ impl Runtime {
             .get(&invocation)
             .cloned()
             .ok_or(ChatError::NotFound)?;
+        let command_id = Uuid::new_v5(&invocation, id(&r.input_id)?.as_bytes()).to_string();
+        if let Some(existing) = t.command(&command_id) {
+            return match &existing.command.action {
+                Some(Action::Steer(input)) if input.text == r.text => Ok(()),
+                _ => Err(ChatError::Conflict),
+            };
+        }
         if !["pending", "running"].contains(&v.status.as_str()) {
             return Err(ChatError::Conflict);
         }
         let command = types::AgentCommand {
             id: Uuid::new_v5(&invocation, id(&r.input_id)?.as_bytes()).to_string(),
             thread_id: v.thread_id.clone(),
-            participant_id: v.participant_id,
-            agent_id: v.agent_id,
-            owner_instance_id: v.owner_instance_id,
+            participant_id: v.participant_id.clone(),
+            agent_id: v.agent_id.clone(),
+            owner_instance_id: v.owner_instance_id.clone(),
             generation: v.generation,
             created_at: now(),
             action: Some(
                 types::SteerCommand {
+                    history_through_message_id: t
+                        .messages
+                        .values()
+                        .next_back()
+                        .map(|m| m.id.clone())
+                        .unwrap_or_default(),
                     invocation_id: r.invocation_id,
                     input_id: r.input_id,
                     text: r.text,
@@ -310,6 +331,7 @@ impl Runtime {
                 failure: String::new(),
             });
         }
+        self.schedule_input(&mut t, &v)?;
         drop(t);
         self.changed(thread);
         Ok(())
@@ -389,12 +411,13 @@ impl Runtime {
                 thread_id: message.thread_id.clone(),
                 participant_id: target.id.clone(),
                 agent_id: self.agent_id.to_string(),
-                owner_instance_id: active.owner_instance_id,
+                owner_instance_id: active.owner_instance_id.clone(),
                 generation: active.generation,
                 created_at: now(),
                 action: Some(
                     types::SteerCommand {
-                        invocation_id: active.id,
+                        history_through_message_id: message.id.clone(),
+                        invocation_id: active.id.clone(),
                         input_id: message.id.clone(),
                         text: objective,
                         message: message.clone().into(),
@@ -412,6 +435,7 @@ impl Runtime {
                 finished_at: None,
                 failure: String::new(),
             });
+            self.schedule_input(t, &active)?;
             return Ok(());
         }
         let run_id = Uuid::new_v5(
@@ -437,7 +461,7 @@ impl Runtime {
                 channel_origin: message.delivery.is_set() && sender.user_id.is_some(),
             },
         );
-        self.begin_invocation(t, &mut run, id(&target.id)?)
+        self.begin_invocation(t, &mut run, id(&target.id)?, Some(message.id.clone()))
     }
     pub async fn issue_token(&self, v: &types::InvocationState) -> Result<SecretString> {
         let configuration = self.configuration()?;
@@ -695,18 +719,25 @@ impl Runtime {
         let key = id(&invoke.invocation_id)?;
         let thread = id(&command.thread_id)?;
         let (mut v, tracing_enabled) = {
-            let t = shared.lock().await;
-            (
-                t.invocations
-                    .get(&key)
-                    .cloned()
-                    .ok_or(ChatError::NotFound)?,
-                self.configuration()?.tracing_enabled,
-            )
+            let mut t = shared.lock().await;
+            let mut invocation = t
+                .invocations
+                .get(&key)
+                .cloned()
+                .ok_or(ChatError::NotFound)?;
+            // Claim under the same lock as batching and interruption. A queued wake
+            // must not revive a canceled invocation or overwrite a newer batch.
+            if invocation.status != "pending"
+                || !self.owns(&t)
+                || t.lease.epoch != invocation.generation
+            {
+                return Ok(());
+            }
+            invocation.status = "running".into();
+            invocation.lease_expires_at = now() + 30_000;
+            t.invocations.insert(key, invocation.clone());
+            (invocation, self.configuration()?.tracing_enabled)
         };
-        if v.status != "pending" {
-            return Ok(());
-        }
         let cx = if tracing_enabled {
             crate::telemetry::context::start(
                 "tilde.invocation",
@@ -729,10 +760,14 @@ impl Runtime {
             v.traceparent = parent.0;
             v.tracestate = parent.1;
         }
-        v.status = "running".into();
-        v.lease_expires_at = now() + 30_000;
         {
             let mut t = shared.lock().await;
+            if t.invocations
+                .get(&key)
+                .is_none_or(|current| current.status != "running")
+            {
+                return Ok(());
+            }
             t.invocations.insert(key, v.clone());
             self.emit(&mut t, "invocation.running", v.clone().into(), None)?;
         }
@@ -750,12 +785,12 @@ impl Runtime {
                 run_id: v.run_id.clone(),
                 thread_id: v.thread_id.clone(),
                 agent_id: self.agent_id.to_string(),
-                objective: invoke.objective,
+                objective: v.objective.clone(),
                 callback_url: self.callback_url.clone(),
                 capability: capability.expose_secret().into(),
                 traceparent: v.traceparent.clone(),
                 tracestate: v.tracestate.clone(),
-                messages: self.messages(thread, 100).await?,
+                messages: self.invocation_message_page(thread, 100, None, Some(key)).await?.messages,
                 thread: self.thread(thread).await?.into(),
                 cached_messages: self
                     .hydrate_converted_messages(self.agent_id, thread, &[])
@@ -910,7 +945,7 @@ impl Runtime {
         shared: &Shared,
         key: Uuid,
         status: &str,
-        pending: &[String],
+        _pending: &[String],
     ) -> Result<()> {
         let mut t = shared.lock().await;
         let mut v = t
@@ -949,34 +984,8 @@ impl Runtime {
         t.runs.insert(run_id, run.clone());
         self.emit(&mut t, "invocation.ended", v.clone().into(), None)?;
         self.emit(&mut t, "run.updated", run.clone().into(), None)?;
-        if status == "stopped" {
-            let mut text = Vec::new();
-            for command in t.commands.iter_mut().filter(|c| c.finished_at.is_none()) {
-                if let Some(Action::Steer(steer)) = &command.command.action
-                    && steer.invocation_id == v.id
-                    && (pending.contains(&steer.input_id) || command.acked_at.is_none())
-                {
-                    text.push(steer.text.clone());
-                    if suspending {
-                        command.acked_at = None;
-                    } else {
-                        command.finished_at = Some(now());
-                    }
-                }
-            }
-            if !text.is_empty() && !suspending {
-                let participant = id(&v.participant_id)?;
-                let next_id = Uuid::new_v5(&key, b"unconsumed-input");
-                let mut next = types::Run {
-                    id: next_id.to_string(),
-                    thread_id: v.thread_id.clone(),
-                    agent_id: v.agent_id.clone(),
-                    objective: text.join("\n"),
-                    status: "active".into(),
-                    ..Default::default()
-                };
-                self.begin_invocation(&mut t, &mut next, participant)?;
-            }
+        if !suspending {
+            self.dispatch_queued(&mut t, &v)?;
         }
         drop(t);
         self.changed(id(&v.thread_id)?);
@@ -1049,28 +1058,6 @@ impl Runtime {
             command.finished_at = Some(now());
             command.failure = reason.into();
         }
-    }
-    /// Unacknowledged steering for one invocation as (command id, input) pairs.
-    pub(crate) async fn pending_steering(
-        &self,
-        thread: Uuid,
-        invocation: Uuid,
-    ) -> Result<Vec<(String, types::SteerCommand)>> {
-        let shared = self.local(thread).ok_or(ChatError::NotFound)?;
-        let t = shared.lock().await;
-        let mut out = vec![];
-        for command in t
-            .commands
-            .iter()
-            .filter(|c| c.acked_at.is_none() && c.finished_at.is_none())
-        {
-            if let Some(Action::Steer(input)) = &command.command.action
-                && input.invocation_id == invocation.to_string()
-            {
-                out.push((command.command.id.clone(), (**input).clone()));
-            }
-        }
-        Ok(out)
     }
     pub async fn suspend_invocation(&self, invocation: Uuid) -> Result<()> {
         let thread = self

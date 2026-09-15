@@ -84,23 +84,9 @@ impl Chat {
             }
             Err(error) => return Err(error),
         }
-        let mut commands = vec![];
         if let Some(local) = self.local() {
             if local.run(claims.run_id).await?.status == "suspending" {
                 return Ok(vec![terminal(claims.invocation_id, Kind::Suspend)]);
-            }
-            for (id, input) in local
-                .pending_steering(claims.thread_id, claims.invocation_id)
-                .await?
-            {
-                commands.push(Command {
-                    id,
-                    kind: Kind::Steer.into(),
-                    input_id: input.input_id,
-                    text: input.text,
-                    message: input.message,
-                    ..Default::default()
-                });
             }
         } else {
             let state = sqlx::query_file!(
@@ -115,27 +101,9 @@ impl Chat {
             if state.run_status == "suspending" {
                 return Ok(vec![terminal(claims.invocation_id, Kind::Suspend)]);
             }
-            for input in sqlx::query_file!(
-                "../../queries/chat/inputs_pending.sql",
-                claims.invocation_id
-            )
-            .fetch_all(self.pg()?)
-            .await?
-            {
-                commands.push(Command {
-                    id: input.id.to_string(),
-                    kind: Kind::Steer.into(),
-                    input_id: input.id.to_string(),
-                    text: input.text,
-                    message: self
-                        .steering_message(claims.thread_id, input.id)
-                        .await?
-                        .into(),
-                    ..Default::default()
-                });
-            }
+            // Gateway inputs are dispatched by the agent concurrency policy.
         }
-        Ok(commands)
+        Ok(vec![])
     }
     async fn control_changes(&self, claims: &Claims) -> Result<Changes> {
         if let Some(local) = self.local() {

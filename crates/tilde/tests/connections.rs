@@ -1559,6 +1559,12 @@ async fn account_name_bindings_share_projection_validation_and_encrypted_staging
         )
         .route("/phone-numbers", get(|| async { Json(json!({})) }))
         .route(
+            "/phone123",
+            get(|| async {
+                Json(json!({"id":"phone123", "display_phone_number":"1 555-000-3333"}))
+            }),
+        )
+        .route(
             "/messaging_profiles/profile",
             get(|| async { Json(json!({})) }),
         );
@@ -1573,11 +1579,30 @@ async fn account_name_bindings_share_projection_validation_and_encrypted_staging
         Endpoints(BTreeMap::from([
             ("agentmail_api".into(), origin.clone()),
             ("linq_api".into(), origin.clone()),
-            ("telnyx_api".into(), origin),
+            ("telnyx_api".into(), origin.clone()),
+            ("meta_api".into(), origin),
         ])),
     )
     .unwrap();
     service.seed().await.unwrap();
+    let agents = tilde::agent::Agents::new(
+        db.pool.clone(),
+        Arc::new(Encryption::initialize(&db.pool, seed(7)).await.unwrap()),
+    );
+    let owners = [Uuid::new_v4(), Uuid::new_v4()];
+    for owner in owners {
+        agents
+            .create(tilde::agent::CreateAgent {
+                concurrency_policy: Default::default(),
+                id: owner,
+                name: "Channel owner".into(),
+                endpoint_url: "http://127.0.0.1:18888".into(),
+                webhook_signing_key: SecretString::from("identity-test-signing-key-32-bytes"),
+                capabilities: Default::default(),
+            })
+            .await
+            .unwrap();
+    }
     let public_key = base64::engine::general_purpose::STANDARD.encode([1; 32]);
     for (provider, typ, field, account, credentials) in [
         (
@@ -1612,8 +1637,23 @@ async fn account_name_bindings_share_projection_validation_and_encrypted_staging
             ]),
         ),
     ] {
+        let assignment = Assignment {
+            capability: Capability::Channel,
+            agent_id: owners[0],
+        };
+        let initial_assignments = if provider == "linq" {
+            vec![]
+        } else {
+            vec![assignment.clone()]
+        };
         let start = service
-            .start(Uuid::new_v4(), provider, provider, typ, &[])
+            .start(
+                Uuid::new_v4(),
+                provider,
+                provider,
+                typ,
+                &initial_assignments,
+            )
             .await
             .unwrap();
         let (id, token) = parse_brokering_url(&start.brokering_url);
@@ -1674,7 +1714,113 @@ async fn account_name_bindings_share_projection_validation_and_encrypted_staging
         let resolved = service.resolve(start.connection.id).await.unwrap();
         assert_eq!(resolved[field].expose_secret(), account);
         drop(resolved);
+        if provider == "linq" {
+            service
+                .assign(start.connection.id, &assignment)
+                .await
+                .unwrap();
+        }
+        let sender: (Uuid, String, String) = sqlx::query_as("SELECT agent_id,identity_type,value FROM agent_channel_identities WHERE connection_id=$1")
+            .bind(start.connection.id).fetch_one(&db.pool).await.unwrap();
+        assert_eq!(
+            sender,
+            (
+                owners[0],
+                if provider == "agentmail" {
+                    "email"
+                } else {
+                    "phone_number"
+                }
+                .into(),
+                account.into()
+            )
+        );
+        service
+            .unassign(start.connection.id, &assignment)
+            .await
+            .unwrap();
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM agent_channel_identities WHERE connection_id=$1"
+            )
+            .bind(start.connection.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+            0
+        );
+        service
+            .assign(
+                start.connection.id,
+                &Assignment {
+                    capability: Capability::Channel,
+                    agent_id: owners[1],
+                },
+            )
+            .await
+            .unwrap();
+        // Startup restores existing configured channels from credentials, not mutable labels.
+        sqlx::query("DELETE FROM agent_channel_identities WHERE connection_id=$1")
+            .bind(start.connection.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE connections SET name='Friendly label' WHERE id=$1")
+            .bind(start.connection.id)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        service.restore_agent_identities().await.unwrap();
+        let restored: (Uuid, String) = sqlx::query_as(
+            "SELECT agent_id,value FROM agent_channel_identities WHERE connection_id=$1",
+        )
+        .bind(start.connection.id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(restored, (owners[1], account.into()));
     }
+    let start = service
+        .start(
+            Uuid::new_v4(),
+            "WhatsApp",
+            "whatsapp",
+            "meta",
+            &[Assignment {
+                capability: Capability::Channel,
+                agent_id: owners[0],
+            }],
+        )
+        .await
+        .unwrap();
+    let (id, token) = parse_brokering_url(&start.brokering_url);
+    let initial = service.view(id, &token).await.unwrap();
+    let completed = service
+        .advance(
+            id,
+            &token,
+            initial.action_id,
+            values(&[
+                ("access_token", "meta-token"),
+                ("app_secret", "meta-secret"),
+                ("verify_token", "verify"),
+                ("phone_number_id", "phone123"),
+                ("waba_id", "business123"),
+            ]),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(completed.action, Action::Complete));
+    let sender: String =
+        sqlx::query_scalar("SELECT value FROM agent_channel_identities WHERE connection_id=$1")
+            .bind(start.connection.id)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        sender, "+15550003333",
+        "Meta Graph IDs must not be exposed as the agent's phone number"
+    );
     server.abort();
     db.close().await;
 }

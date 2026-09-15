@@ -456,7 +456,12 @@ impl Deployments {
                     } else {
                         None
                     },
-                    deployment
+                    deployment,
+                    if value.history_through_message_id.is_empty() {
+                        None
+                    } else {
+                        Some(id(&value.history_through_message_id)?)
+                    }
                 )
                 .execute(&mut **tx)
                 .await?;

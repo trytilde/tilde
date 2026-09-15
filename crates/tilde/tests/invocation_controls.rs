@@ -24,13 +24,14 @@ fn client(
     )
 }
 #[tokio::test]
-async fn controls_cross_gateway_instances_replay_and_remain_scoped_after_revocation() {
+async fn controls_cross_gateway_instances_keep_inputs_queued_and_remain_scoped_after_revocation() {
     let db = Database::new().await;
     let encryption = Arc::new(Encryption::initialize(&db.pool, seed(52)).await.unwrap());
     let agents = Agents::new(db.pool.clone(), encryption.clone());
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: agent,
             name: "Serverless".into(),
             endpoint_url: "http://127.0.0.1:1".into(),
@@ -109,41 +110,40 @@ async fn controls_cross_gateway_instances_replay_and_remain_scoped_after_revocat
         })
         .await
         .unwrap();
-    let command = tokio::time::timeout(std::time::Duration::from_secs(3), stream.message())
+    // Queued events remain at the runtime; reconnecting hosts cannot consume them.
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(200), stream.message())
+            .await
+            .is_err()
+    );
+    assert!(
+        rpc.acknowledge_command(wire::AcknowledgeCommandRequest {
+            id: input.to_string(),
+            ..Default::default()
+        })
         .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert_eq!(command.view().id, input.to_string());
+        .is_err()
+    );
     drop(stream);
     let mut stream = rpc
         .watch_commands(wire::WatchCommandsRequest::default())
         .await
         .unwrap();
-    stream.message().await.unwrap();
     assert_eq!(
-        stream.message().await.unwrap().unwrap().view().id,
-        input.to_string()
+        stream
+            .message()
+            .await
+            .unwrap()
+            .unwrap()
+            .view()
+            .kind
+            .as_known(),
+        Some(wire::InvocationCommandKind::Ready)
     );
-    rpc.acknowledge_command(wire::AcknowledgeCommandRequest {
-        id: input.to_string(),
-        ..Default::default()
-    })
-    .await
-    .unwrap();
-    rpc.acknowledge_command(wire::AcknowledgeCommandRequest {
-        id: input.to_string(),
-        ..Default::default()
-    })
-    .await
-    .unwrap();
     assert!(
-        rpc.acknowledge_command(wire::AcknowledgeCommandRequest {
-            id: Uuid::new_v4().to_string(),
-            ..Default::default()
-        })
-        .await
-        .is_err()
+        tokio::time::timeout(std::time::Duration::from_millis(200), stream.message())
+            .await
+            .is_err()
     );
     writer.cancel_invocation(invocation).await.unwrap();
     let stop = tokio::time::timeout(std::time::Duration::from_secs(3), stream.message())
@@ -162,6 +162,12 @@ async fn controls_cross_gateway_instances_replay_and_remain_scoped_after_revocat
     })
     .await
     .unwrap();
+    rpc.acknowledge_command(wire::AcknowledgeCommandRequest {
+        id: stop.view().id.to_owned(),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
     let count: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM invocation_control_receipts WHERE invocation_id=$1",
     )
@@ -169,7 +175,7 @@ async fn controls_cross_gateway_instances_replay_and_remain_scoped_after_revocat
     .fetch_one(&db.pool)
     .await
     .unwrap();
-    assert_eq!(count, 2);
+    assert_eq!(count, 1);
     let mut late = rpc
         .watch_commands(wire::WatchCommandsRequest::default())
         .await

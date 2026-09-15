@@ -25,6 +25,7 @@ async fn pause_revokes_running_work_fences_dispatch_and_preserves_history() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: agent,
             name: "Pause fixture".into(),
             endpoint_url: endpoint,
@@ -145,6 +146,7 @@ async fn messages_received_while_paused_wait_for_resume_notification() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: agent,
             name: "Queue fixture".into(),
             endpoint_url: "http://127.0.0.1:9999".into(),

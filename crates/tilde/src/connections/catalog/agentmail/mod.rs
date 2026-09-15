@@ -26,6 +26,17 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Agentmail;
 #[async_trait::async_trait]
 impl Runtime for Agentmail {
+    fn channel_identity(
+        &self,
+        values: &Values,
+        _account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        Some(crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::Email,
+            value: optional(values, "inbox_id")?.to_owned(),
+        })
+    }
+
     fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
         &[
             "Create an inbox and enter its AgentMail email address below.",

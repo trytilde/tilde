@@ -59,6 +59,7 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             id: agent,
             name: "Connected".into(),
             endpoint_url: "http://127.0.0.1:1".into(),

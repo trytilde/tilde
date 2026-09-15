@@ -181,6 +181,17 @@ use crate::connections::service::Connections;
 pub(crate) struct Github;
 #[async_trait::async_trait]
 impl Runtime for Github {
+    fn channel_identity(
+        &self,
+        values: &Values,
+        _account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        Some(crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::Username,
+            value: format!("{}[bot]", optional(values, "slug")?),
+        })
+    }
+
     fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
         &[
             "Create a GitHub App or connect an existing installation using the form below.",

@@ -101,6 +101,7 @@ impl Harness {
         let crypto = Arc::new(Encryption::initialize(&db.pool, common::seed(35)).await?);
         let agent = Agents::new(db.pool.clone(), crypto.clone())
             .create(CreateAgent {
+                concurrency_policy: Default::default(),
                 id: Uuid::new_v4(),
                 name: "Live chat integration".into(),
                 endpoint_url: "http://127.0.0.1:9999".into(),

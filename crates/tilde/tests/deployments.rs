@@ -47,6 +47,7 @@ impl Fx {
         let agent = Uuid::new_v4();
         agents
             .create(CreateAgent {
+                concurrency_policy: Default::default(),
                 id: agent,
                 name: "Deployed".into(),
                 endpoint_url: "http://127.0.0.1:3001".into(),

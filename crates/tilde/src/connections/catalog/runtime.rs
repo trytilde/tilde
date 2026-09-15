@@ -47,6 +47,14 @@ pub(crate) trait Runtime: Send + Sync {
             .cloned()
             .ok_or_else(|| invalid("OAuth configuration missing"))
     }
+    /// Actual sending address/bot account; never the editable connection display name.
+    fn channel_identity(
+        &self,
+        _values: &Values,
+        _account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        None
+    }
     fn account(&self, _values: &Values) -> Option<String> {
         None
     }

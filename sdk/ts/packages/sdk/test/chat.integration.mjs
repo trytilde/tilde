@@ -37,14 +37,7 @@ const sessions = new Set();
 const errors = [];
 const contexts = [];
 const checkpoints = new Set();
-let goalId,
-  taskId,
-  firstRunId,
-  leaveOnce = true,
-  releaseUnconsumed;
-const unconsumedGate = new Promise((r) => {
-  releaseUnconsumed = r;
-});
+let goalId, taskId, firstRunId;
 let healthReady = true;
 let healthThrows = false;
 const server = createAgentServer({
@@ -64,23 +57,6 @@ const server = createAgentServer({
     assert.equal(ctx.tools["chat.send_message"], undefined);
     try {
       await ctx.reason("private reasoning, not a visible message");
-      if (ctx.objective === "unconsumed") {
-        if (leaveOnce) {
-          leaveOnce = false;
-          await unconsumedGate;
-          return;
-        }
-        while (!ctx.signal.aborted) {
-          const inputs = ctx.takeInputs();
-          if (inputs.length) {
-            assert.equal(inputs[0].text, "carry this forward");
-            await ctx.sendNativeMessage("Carried into the next invocation");
-            await ctx.setRunStatus("completed");
-            return;
-          }
-          await delay(20, undefined, { signal: ctx.signal });
-        }
-      }
       if (ctx.objective === "cancel me") {
         await delay(10000, undefined, { signal: ctx.signal });
         return;
@@ -156,18 +132,6 @@ const server = createAgentServer({
           ),
         );
         return;
-      }
-      if (ctx.objective === "steer me") {
-        while (!ctx.signal.aborted) {
-          const inputs = ctx.takeInputs();
-          if (inputs.length) {
-            assert.equal(inputs.length, 1);
-            await ctx.sendNativeMessage(inputs[0].text);
-            await ctx.setRunStatus("completed");
-            return;
-          }
-          await delay(20, undefined, { signal: ctx.signal });
-        }
       }
     } catch (error) {
       if (error.name !== "StopLoop" && !ctx.signal.aborted) errors.push(error);
@@ -434,43 +398,6 @@ try {
   await eventually(
     async () => (await client.chat.getRun({ id: quiet.id })).run.invocationStatus === "stopped",
   );
-  const steer = await invoke("steer me");
-  await eventually(() => contexts.find((c) => c.invocationId === steer.invocationId));
-  const input = {
-    invocationId: steer.invocationId,
-    inputId: randomUUID(),
-    text: "new direction",
-  };
-  await client.chat.steerInvocation(input);
-  await client.chat.steerInvocation(input);
-  await eventually(
-    async () => (await client.chat.getRun({ id: steer.id })).run.invocationStatus === "stopped",
-  );
-  assert(
-    (await client.chat.listMessages({ threadId: thread.id })).messages.some(
-      (m) => m.text === "new direction",
-    ),
-  );
-  const pending = await invoke("unconsumed");
-  const pendingContext = await eventually(() =>
-    contexts.find((c) => c.invocationId === pending.invocationId),
-  );
-  const carry = {
-    invocationId: pending.invocationId,
-    inputId: randomUUID(),
-    text: "carry this forward",
-  };
-  await client.chat.steerInvocation(carry);
-  await eventually(() => pendingContext.pendingInputIds().includes(carry.inputId));
-  releaseUnconsumed();
-  await eventually(async () => {
-    const current = (await client.chat.getRun({ id: pending.id })).run;
-    return (
-      current.status === "completed" &&
-      current.invocationStatus === "stopped" &&
-      current.invocationId !== pending.invocationId
-    );
-  });
   const broken = await invoke("broken stream");
   await eventually(
     async () => (await client.chat.getRun({ id: broken.id })).run.invocationStatus === "stopped",
@@ -528,12 +455,11 @@ try {
   assert(!logs.includes(signingKey));
   assert(!logs.includes(seed));
   console.log(
-    "PASS: Rust/Node ConnectRPC, all thread topologies, streamed partial/final messages, goal/task isolation and dependencies, stop/resume, steering and cancellation.",
+    "PASS: Rust/Node ConnectRPC, all thread topologies, streamed partial/final messages, goal/task isolation and dependencies, stop/resume and cancellation.",
   );
 } finally {
   await oidc.stop();
   releaseChunk?.();
-  releaseUnconsumed?.();
   watchAbort?.abort();
   if (child && child.exitCode === null) {
     const exited = once(child, "exit");

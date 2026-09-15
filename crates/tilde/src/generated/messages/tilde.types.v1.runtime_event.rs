@@ -187,6 +187,14 @@ impl ::buffa::Enumeration for ProviderEventKind {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct InvocationState {
+    /// Field 14: `history_through_message_id`
+    #[serde(
+        rename = "historyThroughMessageId",
+        alias = "history_through_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub history_through_message_id: ::buffa::alloc::string::String,
     /// Field 12: `traceparent`
     #[serde(
         rename = "traceparent",
@@ -292,6 +300,7 @@ pub struct InvocationState {
 impl ::core::fmt::Debug for InvocationState {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvocationState")
+            .field("history_through_message_id", &self.history_through_message_id)
             .field("traceparent", &self.traceparent)
             .field("tracestate", &self.tracestate)
             .field("ended_at", &self.ended_at)
@@ -380,6 +389,13 @@ impl ::buffa::Message for InvocationState {
         if !self.tracestate.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.tracestate) as u64;
         }
+        if !self.history_through_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(
+                        &self.history_through_message_id,
+                    ) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -428,6 +444,13 @@ impl ::buffa::Message for InvocationState {
         }
         if !self.tracestate.is_empty() {
             ::buffa::types::put_string_field(13u32, &self.tracestate, buf);
+        }
+        if !self.history_through_message_id.is_empty() {
+            ::buffa::types::put_string_field(
+                14u32,
+                &self.history_through_message_id,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -533,6 +556,13 @@ impl ::buffa::Message for InvocationState {
                 )?;
                 ::buffa::types::merge_string(&mut self.tracestate, buf)?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.history_through_message_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -554,6 +584,7 @@ impl ::buffa::Message for InvocationState {
         self.ended_at = 0i64;
         self.traceparent.clear();
         self.tracestate.clear();
+        self.history_through_message_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2881,6 +2912,14 @@ pub const __INVOKE_COMMAND_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SteerCommand {
+    /// Field 5: `history_through_message_id`
+    #[serde(
+        rename = "historyThroughMessageId",
+        alias = "history_through_message_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub history_through_message_id: ::buffa::alloc::string::String,
     /// Field 1: `invocation_id`
     #[serde(
         rename = "invocationId",
@@ -2917,6 +2956,7 @@ pub struct SteerCommand {
 impl ::core::fmt::Debug for SteerCommand {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("SteerCommand")
+            .field("history_through_message_id", &self.history_through_message_id)
             .field("invocation_id", &self.invocation_id)
             .field("input_id", &self.input_id)
             .field("text", &self.text)
@@ -2969,6 +3009,13 @@ impl ::buffa::Message for SteerCommand {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if !self.history_through_message_id.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(
+                        &self.history_through_message_id,
+                    ) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2995,6 +3042,13 @@ impl ::buffa::Message for SteerCommand {
                 buf,
             );
             self.message.write_to(__cache, buf);
+        }
+        if !self.history_through_message_id.is_empty() {
+            ::buffa::types::put_string_field(
+                5u32,
+                &self.history_through_message_id,
+                buf,
+            );
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3041,6 +3095,13 @@ impl ::buffa::Message for SteerCommand {
                     ctx,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.history_through_message_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3053,6 +3114,7 @@ impl ::buffa::Message for SteerCommand {
         self.input_id.clear();
         self.text.clear();
         self.message = ::buffa::MessageField::none();
+        self.history_through_message_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

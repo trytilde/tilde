@@ -296,7 +296,7 @@ impl ChatService for Rpc {
         };
         let page = self
             .0
-            .message_page(scope.thread_id, before, r.limit)
+            .invocation_message_page(scope.thread_id, before, r.limit, Some(scope.id))
             .await?;
         let cached = self
             .0

@@ -25,3 +25,8 @@ __pycache__/
 # Local runtime credentials must not enter the initial repository commit.
 /.env
 /secrets.enc.yaml
+log
+/dev/*/dist/
+/dev/*/node_modules/
+
+/.local/

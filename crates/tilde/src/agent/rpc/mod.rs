@@ -18,6 +18,7 @@ pub(super) fn wire(
             ..Default::default()
         };
     let mut result = types::Agent {
+        concurrency_policy: agent.concurrency_policy.wire().into(),
         avatar_seed: agent.avatar_seed.to_string(),
         avatar_url,
         paused: agent.paused,

@@ -1,1 +1,1 @@
-SELECT text FROM chat_inputs WHERE invocation_id=$1 AND id=$2;
+SELECT text,history_through_message_id FROM chat_inputs WHERE origin_invocation_id=$1 AND id=$2;

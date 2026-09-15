@@ -128,6 +128,9 @@ impl Fixture {
     /// `with_endpoint` false leaves the sidecar without an HTTP agent endpoint: the
     /// agent process must dial in over the run protocol.
     async fn new_with(with_endpoint: bool) -> Self {
+        Self::with_policy(with_endpoint, tilde::agent::ConcurrencyPolicy::Queue).await
+    }
+    async fn with_policy(with_endpoint: bool, policy: tilde::agent::ConcurrencyPolicy) -> Self {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_test_writer()
@@ -139,6 +142,7 @@ impl Fixture {
         let agent = Uuid::new_v4();
         agents
             .create(CreateAgent {
+                concurrency_policy: policy,
                 id: agent,
                 name: "Sidecar".into(),
                 endpoint_url: "http://127.0.0.1:1".into(),
@@ -147,6 +151,7 @@ impl Fixture {
                 ),
                 capabilities: tilde::iam::capabilities::Capabilities::from_wire(
                     types::Capabilities {
+                        thread_read: types::BinaryPermission::Yes.into(),
                         agents_read: types::TargetPermission {
                             mode: types::TargetSelection::All.into(),
                             ..Default::default()
@@ -1058,4 +1063,80 @@ async fn the_projection_keeps_publish_order_and_checks_thread_membership() {
     assert_eq!(intruding.rejected_event_ids.len(), 1, "{intruding:?}");
     assert!(fx.chat.messages(other_thread, 10).await.unwrap().is_empty());
     fx.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn sidecar_message_policies_dispatch_fresh_scoped_invocations() {
+    use tilde::agent::ConcurrencyPolicy as Policy;
+    for policy in [Policy::Queue, Policy::QueueAndBatch, Policy::Interrupt] {
+        let mut fx = Fixture::with_policy(true, policy).await;
+        let base = fx.base(fx.first());
+        let (thread, alice, _) = fx.room().await;
+        assert_eq!(fx.post(&base, thread, &alice, "first").await.0, 200);
+        let first = fx.invocation("first").await;
+        assert_eq!(fx.post(&base, thread, &alice, "second").await.0, 200);
+        if policy == Policy::Interrupt {
+            let next = fx.invocation("second").await;
+            assert_eq!(next.objective, "second");
+            assert_ne!(first.invocation_id, next.invocation_id);
+            let response = fx
+                .http
+                .post(format!(
+                    "{}/tilde.runtime.v1.ChatService/ListMessages",
+                    first.callback_url
+                ))
+                .bearer_auth(&first.capability)
+                .header("content-type", "application/json")
+                .body("{}")
+                .send()
+                .await
+                .unwrap();
+            assert!(
+                !response.status().is_success(),
+                "Interrupted invocation cannot read runtime state"
+            );
+        } else {
+            assert_eq!(fx.post(&base, thread, &alice, "third").await.0, 200);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(200), fx.calls.recv())
+                    .await
+                    .is_err()
+            );
+            let response = fx
+                .http
+                .post(format!(
+                    "{}/tilde.runtime.v1.ChatService/ListMessages",
+                    first.callback_url
+                ))
+                .bearer_auth(&first.capability)
+                .header("content-type", "application/json")
+                .body("{}")
+                .send()
+                .await
+                .unwrap();
+            let status = response.status();
+            let history: serde_json::Value = response.json().await.unwrap();
+            assert!(status.is_success(), "{history}");
+            assert!(
+                history["messages"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|message| message["text"] != "second" && message["text"] != "third")
+            );
+            fx.finish.notify_one();
+            let next = fx.invocation("queued response").await;
+            assert_ne!(first.invocation_id, next.invocation_id);
+            if policy == Policy::Queue {
+                assert_eq!(next.objective, "second");
+                assert!(next.messages.iter().all(|message| message.text != "third"));
+                fx.finish.notify_one();
+                assert_eq!(fx.invocation("third").await.objective, "third");
+            } else {
+                assert_eq!(next.objective, "second\nthird");
+            }
+        }
+        fx.finish.notify_waiters();
+        fx.shutdown().await;
+    }
 }

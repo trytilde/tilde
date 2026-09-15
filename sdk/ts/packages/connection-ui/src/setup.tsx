@@ -1,6 +1,6 @@
 import { ArrowRightIcon, CopyIcon, CheckIcon } from "lucide-react";
 import { LoadingReveal } from "./loading-reveal.js";
-import { TildeWordmark } from "./wordmark.js";
+import { ProviderPage } from "./provider-page.js";
 import { Input } from "./components/input.js";
 import { Label } from "./components/controls.js";
 import { useForm, FormProvider, type UseFormReturn } from "react-hook-form";
@@ -120,40 +120,15 @@ export type Setup = ReturnType<typeof useSetup>;
 // Optional presentation helpers. Providers can replace these with any React components.
 export function Page({ setup, children }: { setup: Setup; children: ReactNode }) {
   const { state, error, busy } = setup;
-  const [failedIcon, setFailedIcon] = useState<string>();
   const action = state?.action;
   return (
     <LoadingReveal loading={!state && !error} label="Loading connection setup">
-      <main className="mx-auto max-w-lg space-y-5 p-6">
-        <header className="space-y-5">
-          <div className="flex items-center gap-4">
-            <TildeWordmark markSize={24} />
-            <span aria-hidden="true" className="text-xl text-muted-foreground">
-              ×
-            </span>
-            {state?.iconUrl && state.iconUrl !== failedIcon ? (
-              <img
-                src={state.iconUrl}
-                alt={state.providerName}
-                width={32}
-                height={32}
-                referrerPolicy="no-referrer"
-                onError={() => setFailedIcon(state.iconUrl)}
-                className="size-8 object-contain"
-              />
-            ) : (
-              <span
-                className="inline-flex size-8 items-center justify-center rounded bg-muted font-semibold"
-                aria-hidden="true"
-              >
-                {state?.providerName?.slice(0, 1)}
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">
-              {state ? `Connect ${state.providerName} to Tilde` : "Connect to Tilde"}
-            </h1>
+      <ProviderPage
+        providerName={state?.providerName}
+        iconUrl={state?.iconUrl}
+        title={state ? `Connect ${state.providerName} to Tilde` : "Connect to Tilde"}
+        description={
+          <>
             {state?.instructions && (
               <p className="whitespace-pre-line text-sm text-muted-foreground">
                 {state.instructions}
@@ -166,8 +141,9 @@ export function Page({ setup, children }: { setup: Setup; children: ReactNode })
                 ))}
               </ol>
             )}
-          </div>
-        </header>
+          </>
+        }
+      >
         {error && (
           <p role="alert" className="text-destructive">
             {error}
@@ -237,7 +213,7 @@ export function Page({ setup, children }: { setup: Setup; children: ReactNode })
               Cancel
             </Button>
           )}
-      </main>
+      </ProviderPage>
     </LoadingReveal>
   );
 }

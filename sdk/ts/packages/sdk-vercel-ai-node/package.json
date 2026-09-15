@@ -1,0 +1,28 @@
+{
+  "name": "@trytilde/sdk-vercel-ai-node",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@trytilde/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "ai": "^6.0.280"
+  },
+  "peerDependencies": {
+    "ai": "^6.0.280"
+  }
+}

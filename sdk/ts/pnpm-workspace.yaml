@@ -2,3 +2,4 @@ packages:
   - packages/*
   - example-agent
   - langsmith-agent
+  - ../../dev/example-agent-1

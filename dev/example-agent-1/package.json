@@ -1,0 +1,19 @@
+{
+  "name": "@trytilde/dev-example-agent-1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.112",
+    "@trytilde/sdk": "workspace:*",
+    "@trytilde/sdk-vercel-ai-node": "workspace:*",
+    "ai": "^6.0.280"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "5.9.3"
+  }
+}

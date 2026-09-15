@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 fn input(id: Uuid, name: &str) -> CreateAgent {
     CreateAgent {
+        concurrency_policy: Default::default(),
         capabilities: Default::default(),
         id,
         name: name.into(),
@@ -60,6 +61,7 @@ async fn central_migrations_and_agent_lifecycle() {
     ));
     let updated = service
         .update(UpdateAgent {
+            concurrency_policy: None,
             capabilities: None,
             id,
             name: Some("Grace".into()),
@@ -75,6 +77,7 @@ async fn central_migrations_and_agent_lifecycle() {
     assert!(matches!(
         service
             .update(UpdateAgent {
+                concurrency_policy: None,
                 capabilities: None,
                 id,
                 name: None,
@@ -85,6 +88,7 @@ async fn central_migrations_and_agent_lifecycle() {
     ));
     let untouched = service
         .update(UpdateAgent {
+            concurrency_policy: None,
             capabilities: None,
             id,
             name: None,
@@ -349,6 +353,7 @@ async fn expired_invocation_fails_atomically_and_can_be_explicitly_resumed() {
     let agents = Agents::new(db.pool.clone(), encryption.clone());
     let agent = agents
         .create(CreateAgent {
+            concurrency_policy: Default::default(),
             capabilities: Default::default(),
             id: Uuid::new_v4(),
             name: "Recovery".into(),

@@ -29,6 +29,23 @@ use crate::{connections::service::Connections, error::Error};
 pub(crate) struct Whatsapp;
 #[async_trait::async_trait]
 impl Runtime for Whatsapp {
+    fn channel_identity(
+        &self,
+        _values: &Values,
+        account: Option<&str>,
+    ) -> Option<crate::chat::access::identity::Identity> {
+        let number = account?.trim();
+        // Old account labels held a Graph ID, not a dialable address. Reconnect those
+        // channels to fetch the real number rather than misrepresenting the Graph ID.
+        if !number.starts_with('+') {
+            return None;
+        }
+        Some(crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::PhoneNumber,
+            value: number.to_owned(),
+        })
+    }
+
     fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
         &[
             "Enter the credentials and IDs for your Meta WhatsApp Business account below.",
@@ -41,17 +58,27 @@ impl Runtime for Whatsapp {
         service: &Connections,
         values: &Values,
     ) -> Result<Option<String>, Error> {
-        let url = super::url(
+        let mut url = super::url(
             service
                 .endpoints
                 .get("meta_api", "https://graph.facebook.com/v21.0"),
             &[value(values, "phone_number_id")?],
         )?;
+        url.query_pairs_mut()
+            .append_pair("fields", "display_phone_number");
         let token = value(values, "access_token")?;
-        service
+        let response = service
             .http
             .json(service.http.client.get(url).bearer_auth(token))
             .await?;
-        Ok(optional(values, "phone_number_id").map(str::to_owned))
+        let digits: String = response
+            .text("/display_phone_number")?
+            .chars()
+            .filter(char::is_ascii_digit)
+            .collect();
+        if !(7..=15).contains(&digits.len()) {
+            return Err(invalid("Invalid WhatsApp sending phone number"));
+        }
+        Ok(Some(format!("+{digits}")))
     }
 }

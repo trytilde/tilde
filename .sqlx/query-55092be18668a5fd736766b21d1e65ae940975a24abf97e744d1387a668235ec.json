@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_invocations(id,run_id,thread_id,agent_id,status,traceparent,tracestate,deployment_id,history_through_message_id)\nVALUES($1,$2,$3,$4,'pending',$5,$6,$7,(SELECT id FROM chat_messages WHERE thread_id=$3 ORDER BY created_at DESC,id DESC LIMIT 1));\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "55092be18668a5fd736766b21d1e65ae940975a24abf97e744d1387a668235ec"
+}

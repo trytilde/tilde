@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_invocations SET history_through_message_id=$2 WHERE id=$1 AND status='pending';\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a9d2da7f22c5639c157d56c24f80ef52a44f4ab3412601dec383bf8ab6a7ae7f"
+}

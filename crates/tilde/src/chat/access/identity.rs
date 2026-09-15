@@ -36,8 +36,21 @@ pub fn kind_value(kind: &str) -> IdentityType {
 }
 pub struct VerificationMessage<'a> {
     pub value: &'a str,
-    pub text: &'a str,
+    pub agent_name: &'a str,
     pub url: &'a str,
     pub template_name: Option<&'a str>,
     pub template_language: Option<&'a str>,
+}
+
+/// Invitations and the verification token share the same ten-minute lifetime.
+pub const INVITATION_EXPIRY: &str =
+    "This link expires in 10 minutes. If you did not request access, please ignore this message.";
+
+impl VerificationMessage<'_> {
+    pub fn invitation(&self, identity: &str) -> zeroize::Zeroizing<String> {
+        zeroize::Zeroizing::new(format!(
+            "You've received an invitation to access {} from {identity}. Please follow this link to accept:\n{}\n\n{INVITATION_EXPIRY}",
+            self.agent_name, self.url
+        ))
+    }
 }

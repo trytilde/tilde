@@ -209,7 +209,8 @@ impl DeploymentService for Rpc {
             agent,
             name,
             sealed,
-            caps
+            caps,
+            crate::agent::ConcurrencyPolicy::from_wire(r.concurrency_policy.to_i32())?.as_str()
         )
         .execute(&self.0.pool)
         .await

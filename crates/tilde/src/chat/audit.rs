@@ -176,7 +176,7 @@ pub async fn snapshot(
     append(tx, thread, event).await
 }
 impl Chat {
-    /// Steering carries the immutable message that caused it, including attachments. Free-text steering has no message.
+    /// Read the immutable message behind an input event, including attachments. Free-text events have no message.
     pub async fn steering_message(
         &self,
         thread: Uuid,
@@ -207,6 +207,22 @@ impl Chat {
         if let Some(local) = self.local() {
             return local.message_page(thread, limit, before).await;
         }
+        self.invocation_message_page(thread, before, limit, None)
+            .await
+    }
+    /// Each invocation sees history through its event, plus replies it has produced itself.
+    pub async fn invocation_message_page(
+        &self,
+        thread: Uuid,
+        before: Option<Uuid>,
+        limit: u32,
+        invocation: Option<Uuid>,
+    ) -> Result<application::MessagePage> {
+        if let Some(local) = self.local() {
+            return local
+                .invocation_message_page(thread, limit, before, invocation)
+                .await;
+        }
         self.thread(thread).await?;
         if let Some(before) = before
             && sqlx::query_file!("../../queries/chat/cache_message_get.sql", before, thread)
@@ -221,7 +237,8 @@ impl Chat {
             "../../queries/chat/messages_page.sql",
             thread,
             i64::from(size) + 1,
-            before
+            before,
+            invocation
         )
         .fetch_all(self.pg()?)
         .await?;

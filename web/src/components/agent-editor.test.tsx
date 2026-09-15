@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, expect, it, vi } from "vitest";
 import {
   AgentSchema,
+  AgentConcurrencyPolicy,
   BinaryPermission,
   TargetSelection,
 } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
@@ -189,4 +190,23 @@ it("shows saving feedback beside only the capability being persisted", async () 
     finish({ agent: { ...agent, capabilities: updateAgent.mock.lastCall![0].capabilities } });
   });
   await screen.findByRole("status", { name: "Read agents saved" });
+});
+
+it("persists the agent's message policy from Capabilities and restores it after a failed save", async () => {
+  updateAgent.mockImplementation(async (patch) => ({ agent: { ...agent, ...patch } }));
+  render(<AgentEditor agent={agent} onClose={vi.fn()} onSaved={vi.fn()} />);
+  const select = screen.getByRole("combobox", { name: "New messages" }) as HTMLSelectElement;
+  expect(select.value).toBe(String(AgentConcurrencyPolicy.QUEUE));
+  fireEvent.change(select, { target: { value: String(AgentConcurrencyPolicy.INTERRUPT) } });
+  await waitFor(() =>
+    expect(updateAgent).toHaveBeenLastCalledWith({
+      id: agent.id,
+      concurrencyPolicy: AgentConcurrencyPolicy.INTERRUPT,
+    }),
+  );
+  await screen.findByRole("status", { name: "Message policy saved" });
+  updateAgent.mockRejectedValueOnce(new Error("Policy save failed"));
+  fireEvent.change(select, { target: { value: String(AgentConcurrencyPolicy.QUEUE_AND_BATCH) } });
+  await screen.findByRole("status", { name: "Message policy failed to save" });
+  expect(select.value).toBe(String(AgentConcurrencyPolicy.INTERRUPT));
 });

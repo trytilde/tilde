@@ -13,7 +13,16 @@ try {
   await copyFile(new URL("../Taskfile.yml", import.meta.url), join(root, "Taskfile.yml"));
   await copyFile(new URL("./dev-ngrok.sh", import.meta.url), join(root, "scripts/dev-ngrok.sh"));
   await copyFile(new URL("./dev-api.sh", import.meta.url), join(root, "scripts/dev-api.sh"));
+  await copyFile(new URL("./dev.py", import.meta.url), join(root, "scripts/dev.py"));
+  await copyFile(
+    new URL("./dev-langfuse.py", import.meta.url),
+    join(root, "scripts/dev-langfuse.py"),
+  );
   await copyFile(new URL("./dev-logs.py", import.meta.url), join(root, "scripts/dev-logs.py"));
+  await copyFile(
+    new URL("./run-dev-agent.py", import.meta.url),
+    join(root, "scripts/run-dev-agent.py"),
+  );
   const stub = `#!/usr/bin/env node
 const fs=require('node:fs');const path=require('node:path');
 const command=path.basename(process.argv[1]);const args=process.argv.slice(2);
@@ -30,71 +39,74 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
     for (const address of [undefined, "100.64.12.34"])
       for (const management of [true, false])
         for (const web of [true, false]) {
+          const registerDevAgents = ngrok && management && web;
           const log = join(root, `calls-${ngrok}-${address}-${management}-${web}`);
+          const configuredHost = "127.0.0.1";
+          const configuration = {
+            REGISTER_DEV_AGENTS: registerDevAgents ? "1" : "0",
+            OPENAI_API_KEY: "fixture-openai-key",
+            NGROK_ENABLED: String(ngrok),
+            NGROK_DOMAIN: "fixture.ngrok.app",
+            NGROK_AUTHTOKEN: "fixture-token",
+            ADDRESS: configuredHost,
+            TS_ADDR: "",
+            WEB_HOST: configuredHost,
+            API_PORT: "18080",
+            WEB_PORT: "15173",
+            INGRESS_PORT: "18082",
+            CONNECTION_UI_PORT: "5174",
+            ENGINE_MANAGEMENT_ENABLED: String(management),
+            ENGINE_WEB_ENABLED: String(web),
+            ENGINE_LISTEN: `${configuredHost}:18080`,
+            ENGINE_PUBLIC_URL: `http://${configuredHost}:${web ? 15173 : 18080}`,
+            ENGINE_INGRESS_PUBLIC_URL: "https://explicit-ingress.example",
+            ENGINE_ALLOW_NETWORK: "false",
+            ENGINE_DEV_URL: `http://${configuredHost}:18080`,
+            ENGINE_CONNECTION_SETUP_PUBLIC_URL: `http://${configuredHost}:18080`,
+            ENGINE_CONNECTION_UI_DEV_URL: `http://${configuredHost}:5174`,
+            ENGINE_OIDC_ISSUER: `http://${configuredHost}:5556`,
+            DEX_DEV_ISSUER: `http://${configuredHost}:5556`,
+            DEX_DEV_WEB_CALLBACK: `http://${configuredHost}:15173/auth/callback`,
+            DEX_DEV_API_CALLBACK: `http://${configuredHost}:18080/auth/callback`,
+            ENGINE_S3_ENDPOINT: "",
+            DATABASE_URL: "postgres://engine:fixture@127.0.0.1:5432/engine",
+            POSTGRES_PASSWORD: "fixture",
+          };
           await writeFile(
             join(root, ".env"),
-            `ENGINE_INGRESS_PUBLIC_URL=https://explicit-ingress.example\nNGROK_ENABLED=false\nNGROK_DOMAIN=fixture.ngrok.app\nNGROK_AUTHTOKEN=fixture-token\nENGINE_MANAGEMENT_ENABLED=${management}\nENGINE_WEB_ENABLED=${web}\nAPI_PORT=18080\nWEB_PORT=15173\nDATABASE_URL=postgres://engine:fixture@127.0.0.1:5432/engine\nPOSTGRES_PASSWORD=fixture\n`,
+            Object.entries(configuration)
+              .map(([key, value]) => `${key}=${value}\n`)
+              .join(""),
           );
           const env = {
             ...process.env,
+            DEV_LANGFUSE_ENABLED: "0",
             DEV_LOGS_ENABLED: "0",
             PATH: `${join(root, "bin")}:${process.env.PATH}`,
             SWITCH_LOG: log,
           };
-          for (const key of [
-            "NGROK_ENABLED",
-            "NGROK_DOMAIN",
-            "NGROK_AUTHTOKEN",
-            "ENGINE_INGRESS_PUBLIC_URL",
-            "ENGINE_SERVE",
-            "ENGINE_RUNTIME_PUBLIC_URL",
-            "DATABASE_URL",
-            "POSTGRES_PASSWORD",
-            "ENGINE_MANAGEMENT_ENABLED",
-            "ENGINE_WEB_ENABLED",
-            "ENGINE_PUBLIC_URL",
-            "ENGINE_OIDC_ISSUER",
-            "API_PORT",
-            "WEB_PORT",
-            "ADDRESS",
-            "WEB_HOST",
-            "ENGINE_LISTEN",
-            "ENGINE_ALLOW_NETWORK",
-            "ENGINE_DEV_URL",
-            "ENGINE_CONNECTION_SETUP_PUBLIC_URL",
-            "ENGINE_CONNECTION_UI_DEV_URL",
-            "CONNECTION_UI_PORT",
-          ])
-            delete env[key];
+          for (const key of Object.keys(configuration)) delete env[key];
+          if (address) env.TS_ADDR = address;
           // Explicit process environment must also yield to the enabled tunnel URL.
           if (address) env.ENGINE_INGRESS_PUBLIC_URL = "https://explicit-ingress.example";
-          const child = spawn(
-            "task",
-            [
-              "--dir",
-              root,
-              "dev",
-              ...(ngrok ? ["NGROK_ENABLED=true"] : []),
-              ...(address ? [`ADDRESS=${address}`] : []),
-            ],
-            {
-              env,
-              detached: true,
-              stdio: ["ignore", "pipe", "pipe"],
-            },
-          );
+          const child = spawn("task", ["--dir", root, "dev"], {
+            env,
+            detached: true,
+            stdio: ["ignore", "pipe", "pipe"],
+          });
           let output = "";
           child.stderr.on("data", (chunk) => (output += chunk));
           try {
             let calls = [];
             for (let i = 0; i < 100; i++) {
+              // A concurrent stub may still be appending the final record.
               calls = (await readFile(log, "utf8").catch(() => ""))
-                .trim()
                 .split("\n")
+                .slice(0, -1)
                 .filter(Boolean)
                 .map((line) => JSON.parse(line));
               if (
-                calls.filter((c) => c.command === "cargo").length === 2 &&
+                calls.filter((c) => c.command === "cargo").length === (registerDevAgents ? 3 : 2) &&
                 (!ngrok || calls.some((c) => c.command === "ngrok")) &&
                 (!web ||
                   calls.some(
@@ -105,7 +117,15 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
               if (child.exitCode !== null) throw new Error(`dev exited: ${output}`);
               await delay(25);
             }
-            assert.equal(calls.filter((c) => c.command === "cargo").length, 2);
+            assert.equal(
+              calls.filter((c) => c.command === "cargo").length,
+              registerDevAgents ? 3 : 2,
+              output,
+            );
+            assert.equal(
+              calls.filter((c) => c.command === "cargo" && c.args.includes("dev-agent")).length,
+              registerDevAgents ? 1 : 0,
+            );
             assert.equal(calls.filter((c) => c.command === "docker").length, management ? 2 : 1);
             assert.equal(
               calls.filter(
@@ -129,12 +149,18 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
               (c) => c.command === "docker" && c.args.at(-1) === "postgres",
             );
             const apiIndex = calls.findIndex(
-              (c) => c.command === "cargo" && !c.args.includes("check-config"),
+              (c) =>
+                c.command === "cargo" &&
+                !c.args.includes("check-config") &&
+                !c.args.includes("dev-agent"),
             );
             assert(postgres >= 0 && postgres < apiIndex, "Postgres starts before the API");
             assert(calls[postgres].args.includes("--wait"), "Startup waits for Postgres readiness");
             const api = calls.find(
-              (c) => c.command === "cargo" && !c.args.includes("check-config"),
+              (c) =>
+                c.command === "cargo" &&
+                !c.args.includes("check-config") &&
+                !c.args.includes("dev-agent"),
             );
             const host = address ?? "127.0.0.1";
             assert.equal(api.serve, management ? "all" : "ingress,runtime,sidecar");
@@ -187,6 +213,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
       cwd: root,
       env: {
         ...process.env,
+        DEV_LANGFUSE_ENABLED: "0",
         DEV_LOGS_ENABLED: "0",
         PATH: `${join(root, "bin")}:${process.env.PATH}`,
         NGROK_ENABLED: "true",
@@ -208,9 +235,11 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
     );
     const env = {
       ...process.env,
+      DEV_LANGFUSE_ENABLED: "0",
       DEV_LOGS_ENABLED: "0",
       PATH: `${join(root, "bin")}:${process.env.PATH}`,
       SWITCH_LOG: join(root, `failure-${failureSource}`),
+      REGISTER_DEV_AGENTS: "0",
       FAIL_API: String(failureSource === "api"),
       FAIL_NGROK: String(failureSource === "ngrok"),
       NGROK_ENABLED: "true",
@@ -256,7 +285,7 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
         .split("\n")
         .map((line) => JSON.parse(line));
       assert(
-        !failureCalls.some((c) => c.command === "docker"),
+        !failureCalls.some((c) => c.command === "docker" && c.args.at(-1) === "postgres"),
         "External databases are not started or changed",
       );
     } finally {

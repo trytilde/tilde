@@ -48,7 +48,19 @@ impl Adapter for Slack {
                 .pointer("/channel/id")
                 .and_then(Value::as_str)
                 .ok_or_else(|| ConnectError::internal("Slack did not return a private channel"))?;
-            let result=a.json(a.post(a.url("slack_api","https://slack.com/api",&["chat.postMessage"])?,"access_token")?.json(&json!({"channel":channel,"text":m.text,"unfurl_links":false,"unfurl_media":false}))).await?;
+            let escape = |value: &str| {
+                value
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+            };
+            let text = zeroize::Zeroizing::new(format!(
+                "You've received an invitation to access {} from this Slack account. Please follow <{}|this link> to accept.\n\n{}",
+                escape(m.agent_name),
+                escape(m.url),
+                crate::chat::access::identity::INVITATION_EXPIRY
+            ));
+            let result=a.json(a.post(a.url("slack_api","https://slack.com/api",&["chat.postMessage"])?,"access_token")?.json(&json!({"channel":channel,"text":text.as_str(),"unfurl_links":false,"unfurl_media":false}))).await?;
             if result["ok"] != true {
                 return Err(ConnectError::failed_precondition(
                     "Slack could not deliver verification",

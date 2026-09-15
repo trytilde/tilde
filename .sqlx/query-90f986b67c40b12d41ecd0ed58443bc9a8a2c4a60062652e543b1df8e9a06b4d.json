@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id,i.text,i.history_through_message_id,CASE WHEN m.id IS NULL THEN r.source_identity_id ELSE m.source_identity_id END AS \"source_identity_id?\",\n EXISTS(SELECT 1 FROM chat_channel_threads b WHERE b.thread_id=v.thread_id) AS \"channel_origin!\"\nFROM chat_inputs i JOIN chat_invocations v ON v.id=i.invocation_id\nJOIN chat_runs r ON r.id=v.run_id\nLEFT JOIN chat_messages m ON m.id=i.id AND m.thread_id=v.thread_id\nWHERE i.invocation_id=$1 AND NOT i.accepted\n AND (m.source_identity_id IS NULL OR chat_identity_allowed(v.agent_id,m.source_identity_id))\nORDER BY i.sequence;\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "history_through_message_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "source_identity_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "channel_origin!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "90f986b67c40b12d41ecd0ed58443bc9a8a2c4a60062652e543b1df8e9a06b4d"
+}
