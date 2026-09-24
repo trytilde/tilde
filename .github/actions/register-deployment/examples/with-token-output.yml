@@ -1,0 +1,29 @@
+# Copy into .github/workflows/ and replace the deployment step with your platform's command.
+name: Deploy agent with token output
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Register deployment
+        id: deployment
+        uses: ./.github/actions/register-deployment
+        # External repos: trytilde/tilde/.github/actions/register-deployment@<full-commit-sha>
+        env:
+          TILDE_API_KEY: ${{ secrets.TILDE_API_KEY }}
+        with:
+          url: ${{ vars.TILDE_URL }}
+          agent-id: ${{ vars.TILDE_AGENT_ID }}
+          type: gateway
+          output-token: "true"
+      - name: Deploy application
+        env:
+          TILDE_DEPLOYMENT_TOKEN: ${{ steps.deployment.outputs.deployment-token }}
+          TILDE_GATEWAY_URL: ${{ vars.TILDE_GATEWAY_URL }}
+        # Supply this script for your hosting platform; this repository does not include it.
+        # Persist the token as a runtime secret. Do not echo it or bake it into an image.
+        run: ./scripts/deploy-agent.sh

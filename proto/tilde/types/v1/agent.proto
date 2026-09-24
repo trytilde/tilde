@@ -1,0 +1,93 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+// How new messages are handled while this agent is active in a thread.
+enum AgentConcurrencyPolicy {
+  AGENT_CONCURRENCY_POLICY_UNSPECIFIED = 0;
+  AGENT_CONCURRENCY_POLICY_QUEUE = 1;
+  AGENT_CONCURRENCY_POLICY_INTERRUPT = 2;
+  AGENT_CONCURRENCY_POLICY_QUEUE_AND_BATCH = 3;
+}
+
+message Agent {
+  AgentConcurrencyPolicy concurrency_policy = 13;
+  // Stable random seed for the generated avatar; retained after custom uploads.
+  string avatar_seed = 11;
+  // Short-lived signed URL for a custom avatar, when present.
+  optional string avatar_url = 12;
+  // Paused agents remain health checked but receive no invocations.
+  bool paused = 10;
+  string id = 1;
+  string name = 2;
+  reserved 3;
+  reserved "description";
+  reserved 4;
+  reserved "endpoint_url";
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  reserved 7;
+  reserved "secret_names";
+  AgentMetrics metrics = 8;
+  Capabilities capabilities = 9;
+}
+
+message AgentMetrics {
+  AgentHealthStatus health = 1;
+  repeated AgentHealthHour health_history = 2;
+  uint64 thread_count = 3;
+  optional double average_turns_per_thread = 4;
+  optional double average_response_ms = 5;
+  google.protobuf.Timestamp last_health_check_at = 6;
+}
+
+enum AgentHealthStatus {
+  AGENT_HEALTH_STATUS_UNSPECIFIED = 0;
+  AGENT_HEALTH_STATUS_HEALTHY = 1;
+  AGENT_HEALTH_STATUS_UNHEALTHY = 2;
+  AGENT_HEALTH_STATUS_UNKNOWN = 3;
+  AGENT_HEALTH_STATUS_DEGRADED = 4;
+}
+
+message AgentHealthHour {
+  google.protobuf.Timestamp hour_start = 1;
+  uint32 total_checks = 2;
+  uint32 failed_checks = 3;
+  uint32 degraded_checks = 4;
+}
+
+// Missing fields deny access. Binary actions cannot carry target IDs.
+message Capabilities {
+  reserved 1;
+  reserved "grants";
+  TargetPermission agents_read = 2;
+  BinaryPermission agents_create = 3;
+  TargetPermission agents_update = 4;
+  TargetPermission agents_delete = 5;
+  TargetPermission agents_invoke = 6;
+  TargetPermission agents_grant_capabilities = 7;
+  BinaryPermission thread_read = 8;
+  BinaryPermission work_read = 9;
+  BinaryPermission work_write = 10;
+  BinaryPermission run_update = 11;
+  TargetPermission tools_invoke = 12;
+}
+
+enum BinaryPermission {
+  BINARY_PERMISSION_UNSPECIFIED = 0;
+  BINARY_PERMISSION_NO = 1;
+  BINARY_PERMISSION_YES = 2;
+}
+
+enum TargetSelection {
+  TARGET_SELECTION_UNSPECIFIED = 0;
+  TARGET_SELECTION_NONE = 1;
+  TARGET_SELECTION_ALL = 2;
+  TARGET_SELECTION_SELECTED = 3;
+}
+
+message TargetPermission {
+  TargetSelection mode = 1;
+  // Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+  repeated string ids = 2;
+}

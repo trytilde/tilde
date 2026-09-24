@@ -1,0 +1,28 @@
+{
+  "name": "@trytilde/sdk-openai-agents-node",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@trytilde/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@openai/agents": "^0.18.0"
+  },
+  "peerDependencies": {
+    "@openai/agents": "^0.18.0"
+  }
+}

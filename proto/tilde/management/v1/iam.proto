@@ -1,0 +1,94 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+import "tilde/types/v1/authorization.proto";
+
+// Groups, memberships and role assignments, for users. Group and user administration requires
+// the administrators group; assigning a role requires holding share on its resources and every
+// action it gives. API keys may only call GetCaller.
+service IamService {
+  rpc GetCaller(GetCallerRequest) returns (GetCallerResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // The actions the caller holds on one resource. Invisible resources are not found.
+  rpc GetAccess(GetAccessRequest) returns (GetAccessResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Ends every session of a user, for removals that cannot wait for session expiry.
+  rpc RevokeUserSessions(RevokeUserSessionsRequest) returns (RevokeUserSessionsResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // A group the caller administers or belongs to; others are not found.
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse);
+  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc AddGroupMember(AddGroupMemberRequest) returns (AddGroupMemberResponse);
+  rpc RemoveGroupMember(RemoveGroupMemberRequest) returns (RemoveGroupMemberResponse);
+  // The roles of one resource, or with an empty resource id the installation-wide ones.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListRoleAssignments(ListRoleAssignmentsRequest) returns (ListRoleAssignmentsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse);
+  rpc RevokeRole(RevokeRoleRequest) returns (RevokeRoleResponse);
+}
+
+enum GroupSource {
+  GROUP_SOURCE_UNSPECIFIED = 0;
+  // Built in; `tilde_system:` ids.
+  GROUP_SOURCE_SYSTEM = 1;
+  // Mirrors an external identity provider group; membership is reconciled at login. `external:` ids.
+  GROUP_SOURCE_EXTERNAL = 2;
+  // Managed here. `local:` ids.
+  GROUP_SOURCE_LOCAL = 3;
+}
+message Group {
+  string id = 1; string name = 2; GroupSource source = 3;
+  google.protobuf.Timestamp created_at = 4; uint64 member_count = 5;
+}
+message IamUser {
+  string id = 1; string issuer = 2; string subject = 3;
+  optional string email = 4; optional string display_name = 5; repeated string group_ids = 6;
+}
+message GroupMember { string user_id = 1; string label = 2; }
+
+message GetCallerRequest {}
+message GetCallerResponse {
+  // Exactly one is set.
+  optional string user_id = 1;
+  optional string api_key_id = 5;
+  repeated string group_ids = 2;
+  bool admin = 3;
+  // Kinds the caller may create. Users may create any; a key needs edit on the whole kind.
+  repeated tilde.types.v1.ResourceKind creatable = 4;
+}
+message GetAccessRequest { tilde.types.v1.Resource resource = 1; }
+message GetAccessResponse { repeated string actions = 1; }
+message ListUsersRequest { uint32 page_size = 1; string page_token = 2; string search = 3; }
+message ListUsersResponse { repeated IamUser users = 1; string next_page_token = 2; }
+message RevokeUserSessionsRequest { string user_id = 1; }
+message RevokeUserSessionsResponse {}
+message CreateGroupRequest {
+  // LOCAL or EXTERNAL. An external group may be created before any member signs in so it can be granted access.
+  GroupSource source = 1;
+  // Lowercase kebab-case; for external groups, the normalised provider group name.
+  string slug = 2;
+  string name = 3;
+}
+message CreateGroupResponse { Group group = 1; }
+message ListGroupsRequest { uint32 page_size = 1; string page_token = 2; string search = 3; }
+message ListGroupsResponse { repeated Group groups = 1; string next_page_token = 2; }
+message GetGroupRequest { string id = 1; }
+message GetGroupResponse { Group group = 1; }
+message DeleteGroupRequest { string id = 1; }
+message DeleteGroupResponse {}
+message ListGroupMembersRequest { string group_id = 1; uint32 page_size = 2; string page_token = 3; }
+message ListGroupMembersResponse { repeated GroupMember members = 1; string next_page_token = 2; }
+// External group membership belongs to the identity provider and cannot be edited.
+message AddGroupMemberRequest { string group_id = 1; string user_id = 2; }
+message AddGroupMemberResponse {}
+message RemoveGroupMemberRequest { string group_id = 1; string user_id = 2; }
+message RemoveGroupMemberResponse {}
+message ListRolesRequest { tilde.types.v1.Resource resource = 1; }
+message ListRolesResponse { repeated tilde.types.v1.Role roles = 1; }
+message ListRoleAssignmentsRequest { tilde.types.v1.Resource resource = 1; }
+message ListRoleAssignmentsResponse { repeated tilde.types.v1.RoleAssignment assignments = 1; }
+message AssignRoleRequest { string role_id = 1; tilde.types.v1.Principal principal = 2; }
+message AssignRoleResponse {}
+message RevokeRoleRequest { string role_id = 1; tilde.types.v1.Principal principal = 2; }
+message RevokeRoleResponse {}

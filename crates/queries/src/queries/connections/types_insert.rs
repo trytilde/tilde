@@ -1,0 +1,188 @@
+// This file was generated with `cornucopia`. Do not modify.
+
+#[derive(Debug)]
+pub struct RunParams<
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
+    T6: crate::StringSql,
+    T7: crate::StringSql,
+    T8: crate::StringSql,
+    T9: crate::ArraySql<Item = T8>,
+    T10: crate::StringSql,
+    T11: crate::StringSql,
+    T12: crate::StringSql,
+    T13: crate::StringSql,
+    T14: crate::StringSql,
+    T15: crate::StringSql,
+    T16: crate::JsonSql,
+> {
+    pub p1: T1,
+    pub p2: T2,
+    pub p3: T3,
+    pub p4: T4,
+    pub p5: bool,
+    pub p6: Option<T5>,
+    pub p7: Option<T6>,
+    pub p8: T7,
+    pub p9: bool,
+    pub p10: T9,
+    pub p11: T10,
+    pub p12: T11,
+    pub p13: T12,
+    pub p14: T13,
+    pub p15: T14,
+    pub p16: Option<T15>,
+    pub p17: Option<T16>,
+    pub p18: bool,
+}
+use crate::client::async_::GenericClient;
+use futures::{self, StreamExt, TryStreamExt};
+pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
+pub fn run() -> RunStmt {
+    RunStmt(
+        "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema,inference_capable=excluded.inference_capable",
+        None,
+    )
+}
+impl RunStmt {
+    pub async fn prepare<'a, C: GenericClient>(
+        mut self,
+        client: &'a C,
+    ) -> Result<Self, tokio_postgres::Error> {
+        self.1 = Some(client.prepare(self.0).await?);
+        Ok(self)
+    }
+    pub async fn bind<
+        'c,
+        'a,
+        's,
+        C: GenericClient,
+        T1: crate::StringSql,
+        T2: crate::StringSql,
+        T3: crate::StringSql,
+        T4: crate::StringSql,
+        T5: crate::StringSql,
+        T6: crate::StringSql,
+        T7: crate::StringSql,
+        T8: crate::StringSql,
+        T9: crate::ArraySql<Item = T8>,
+        T10: crate::StringSql,
+        T11: crate::StringSql,
+        T12: crate::StringSql,
+        T13: crate::StringSql,
+        T14: crate::StringSql,
+        T15: crate::StringSql,
+        T16: crate::JsonSql,
+    >(
+        &'s self,
+        client: &'c C,
+        p1: &'a T1,
+        p2: &'a T2,
+        p3: &'a T3,
+        p4: &'a T4,
+        p5: &'a bool,
+        p6: &'a Option<T5>,
+        p7: &'a Option<T6>,
+        p8: &'a T7,
+        p9: &'a bool,
+        p10: &'a T9,
+        p11: &'a T10,
+        p12: &'a T11,
+        p13: &'a T12,
+        p14: &'a T13,
+        p15: &'a T14,
+        p16: &'a Option<T15>,
+        p17: &'a Option<T16>,
+        p18: &'a bool,
+    ) -> Result<u64, tokio_postgres::Error> {
+        client
+            .execute(
+                self.0,
+                &[
+                    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
+                ],
+            )
+            .await
+    }
+}
+impl<
+    'a,
+    C: GenericClient + Send + Sync,
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
+    T6: crate::StringSql,
+    T7: crate::StringSql,
+    T8: crate::StringSql,
+    T9: crate::ArraySql<Item = T8>,
+    T10: crate::StringSql,
+    T11: crate::StringSql,
+    T12: crate::StringSql,
+    T13: crate::StringSql,
+    T14: crate::StringSql,
+    T15: crate::StringSql,
+    T16: crate::JsonSql,
+>
+    crate::client::async_::Params<
+        'a,
+        'a,
+        'a,
+        RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>,
+        std::pin::Pin<
+            Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
+        >,
+        C,
+    > for RunStmt
+{
+    fn params(
+        &'a self,
+        client: &'a C,
+        params: &'a RunParams<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12,
+            T13,
+            T14,
+            T15,
+            T16,
+        >,
+    ) -> std::pin::Pin<
+        Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
+    > {
+        Box::pin(self.bind(
+            client,
+            &params.p1,
+            &params.p2,
+            &params.p3,
+            &params.p4,
+            &params.p5,
+            &params.p6,
+            &params.p7,
+            &params.p8,
+            &params.p9,
+            &params.p10,
+            &params.p11,
+            &params.p12,
+            &params.p13,
+            &params.p14,
+            &params.p15,
+            &params.p16,
+            &params.p17,
+            &params.p18,
+        ))
+    }
+}

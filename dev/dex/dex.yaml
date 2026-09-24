@@ -1,0 +1,23 @@
+# Local development only. Login: dev@tilde.local / password.
+issuer: '{{ getenv "DEX_DEV_ISSUER" }}'
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+staticClients:
+  - id: tilde-dev
+    name: Tilde development
+    secret: tilde-local-dev-secret
+    redirectURIs:
+      - '{{ getenv "DEX_DEV_WEB_CALLBACK" }}'
+      - '{{ getenv "DEX_DEV_API_CALLBACK" }}'
+      - http://localhost:5173/auth/callback
+      - http://localhost:8080/auth/callback
+enablePasswordDB: true
+staticPasswords:
+  - email: dev@tilde.local
+    hashFromEnv: DEX_DEV_PASSWORD_HASH
+    username: developer
+    userID: 6a3b9b39-73ab-4ad4-a1ca-d665f4b957ef
+oauth2:
+  skipApprovalScreen: true

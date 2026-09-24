@@ -1,0 +1,124 @@
+// This file was generated with `cornucopia`. Do not modify.
+
+#[derive(Clone, Copy, Debug)]
+pub struct RunParams {
+    pub p1: uuid::Uuid,
+    pub p2: f64,
+}
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct Record {
+    pub id: uuid::Uuid,
+}
+use crate::client::async_::GenericClient;
+use futures::{self, StreamExt, TryStreamExt};
+pub struct RecordQuery<'c, 'a, 's, C: GenericClient, T, const N: usize> {
+    client: &'c C,
+    params: [&'a (dyn postgres_types::ToSql + Sync); N],
+    query: &'static str,
+    cached: Option<&'s tokio_postgres::Statement>,
+    extractor: fn(&tokio_postgres::Row) -> Result<Record, tokio_postgres::Error>,
+    mapper: fn(Record) -> T,
+}
+impl<'c, 'a, 's, C, T: 'c, const N: usize> RecordQuery<'c, 'a, 's, C, T, N>
+where
+    C: GenericClient,
+{
+    pub fn map<R>(self, mapper: fn(Record) -> R) -> RecordQuery<'c, 'a, 's, C, R, N> {
+        RecordQuery {
+            client: self.client,
+            params: self.params,
+            query: self.query,
+            cached: self.cached,
+            extractor: self.extractor,
+            mapper,
+        }
+    }
+    pub async fn one(self) -> Result<T, tokio_postgres::Error> {
+        let row =
+            crate::client::async_::one(self.client, self.query, &self.params, self.cached).await?;
+        Ok((self.mapper)((self.extractor)(&row)?))
+    }
+    pub async fn all(self) -> Result<Vec<T>, tokio_postgres::Error> {
+        self.iter().await?.try_collect().await
+    }
+    pub async fn opt(self) -> Result<Option<T>, tokio_postgres::Error> {
+        let opt_row =
+            crate::client::async_::opt(self.client, self.query, &self.params, self.cached).await?;
+        Ok(opt_row
+            .map(|row| {
+                let extracted = (self.extractor)(&row)?;
+                Ok((self.mapper)(extracted))
+            })
+            .transpose()?)
+    }
+    pub async fn iter(
+        self,
+    ) -> Result<
+        impl futures::Stream<Item = Result<T, tokio_postgres::Error>> + 'c,
+        tokio_postgres::Error,
+    > {
+        let stream = crate::client::async_::raw(
+            self.client,
+            self.query,
+            crate::slice_iter(&self.params),
+            self.cached,
+        )
+        .await?;
+        let mapped = stream
+            .map(move |res| {
+                res.and_then(|row| {
+                    let extracted = (self.extractor)(&row)?;
+                    Ok((self.mapper)(extracted))
+                })
+            })
+            .into_stream();
+        Ok(mapped)
+    }
+}
+pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
+pub fn run() -> RunStmt {
+    RunStmt(
+        "WITH policy AS ( SELECT s.routing,s.serving_deployment_id FROM agent_deployment_settings s JOIN agents a ON a.id=s.agent_id WHERE s.agent_id=$1 AND a.deleted_at IS NULL ), available AS ( SELECT d.id,d.created_at,d.traffic_weight FROM agent_deployments d WHERE d.agent_id=$1 AND d.status='registered' AND (d.target='lambda' OR EXISTS ( SELECT 1 FROM agent_instances n WHERE n.agent_id=d.agent_id AND n.deployment_id=d.id AND n.connection_id IS NOT NULL AND n.ready AND n.agent_ready AND n.agent_connected AND n.last_seen_at>NOW()-make_interval(secs=>$2::float8) )) ), candidates AS ( SELECT id,SUM(traffic_weight) OVER (ORDER BY id) AS ceiling FROM available WHERE traffic_weight>0 ), ticket AS MATERIALIZED (SELECT random() * COALESCE(MAX(ceiling),0) AS value FROM candidates) SELECT d.id FROM available d CROSS JOIN policy p WHERE d.id = CASE WHEN p.routing='weighted' THEN (SELECT c.id FROM candidates c CROSS JOIN ticket t WHERE c.ceiling>t.value ORDER BY c.ceiling LIMIT 1) ELSE COALESCE((SELECT id FROM available WHERE id=p.serving_deployment_id), (SELECT id FROM available ORDER BY created_at DESC,id LIMIT 1)) END",
+        None,
+    )
+}
+impl RunStmt {
+    pub async fn prepare<'a, C: GenericClient>(
+        mut self,
+        client: &'a C,
+    ) -> Result<Self, tokio_postgres::Error> {
+        self.1 = Some(client.prepare(self.0).await?);
+        Ok(self)
+    }
+    pub fn bind<'c, 'a, 's, C: GenericClient>(
+        &'s self,
+        client: &'c C,
+        p1: &'a uuid::Uuid,
+        p2: &'a f64,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+        RecordQuery {
+            client,
+            params: [p1, p2],
+            query: self.0,
+            cached: self.1.as_ref(),
+            extractor: |row: &tokio_postgres::Row| -> Result<Record, tokio_postgres::Error> {
+                Ok(Record {
+                    id: row.try_get(0)?,
+                })
+            },
+            mapper: |it| Record::from(it),
+        }
+    }
+}
+impl<'c, 'a, 's, C: GenericClient>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 2>, C>
+    for RunStmt
+{
+    fn params(
+        &'s self,
+        client: &'c C,
+        params: &'a RunParams,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+        self.bind(client, &params.p1, &params.p2)
+    }
+}

@@ -1,0 +1,10 @@
+[project]
+name = "example-agent-pydantic-ai"
+version = "0.1.0"
+description = "Local development agent: Tilde host plus a Pydantic AI agent driving channel tools"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["trytilde", "trytilde-pydantic-ai", "pydantic-ai-slim[openai]"]
+
+[tool.uv]
+package = false

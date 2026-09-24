@@ -1,0 +1,3 @@
+kind: Added
+body: Collect agent OTel logs through Rotel into ClickHouse, independently forward to external collectors, and browse correlated logs in the agent Logs tab.
+time: 2026-09-12T08:56:03.055965906+02:00

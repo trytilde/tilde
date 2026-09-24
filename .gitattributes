@@ -1,0 +1,4 @@
+# Generated inputs stay tracked but fold in GitHub diffs.
+.sqlx/*.json linguist-generated=true
+crates/tilde/src/generated/** linguist-generated=true
+web/src/routeTree.gen.ts linguist-generated=true

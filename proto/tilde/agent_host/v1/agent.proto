@@ -1,0 +1,10 @@
+syntax = "proto3";
+package tilde.agent_host.v1;
+import "tilde/runtime/v1/cache.proto";
+import "tilde/types/v1/chat.proto";
+
+// A wake. Tilde never calls an agent host: hosts dial in through tilde.run.v1.RunService.Watch
+// and receive this message as a frame (Lambda receives it as the invoke event), then report
+// through RunService.Report with the invocation capability.
+
+message InvokeRequest { string deployment_id = 15; string traceparent = 16; string tracestate = 17; string command_id = 12; uint64 assignment_generation = 13; string owner_instance_id = 14; int64 agent_generation = 11; string invocation_id = 1; string run_id = 2; string thread_id = 3; string agent_id = 4; string objective = 5; string callback_url = 6; string capability = 7 [debug_redact = true]; repeated tilde.types.v1.Message messages = 8; tilde.types.v1.Thread thread = 9;  repeated tilde.runtime.v1.CachedAgentRepresentation cached_messages = 10; }

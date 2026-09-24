@@ -1,0 +1,3 @@
+kind: Added
+body: Sidecar agents dial their sidecar over the run protocol with the deployment token, so the HTTP endpoint map and health probe become optional fallbacks; sidecars leave gracefully by releasing idle leases and reporting themselves gone, and keep cached conversations within a per-agent byte budget.
+time: 2026-09-14T16:02:00.000000000+02:00

@@ -1,0 +1,3 @@
+kind: Added
+body: Support agent sidecars that cache conversations in memory beside the agent process and execute the threads they hold a lease on, taking the lease in the same gateway call that hydrates a thread and paying no per-event gateway calls afterwards; they dial the gateway over one connection for configuration, leases, projection and forwarding, and relay traces and logs through the gateway. The gateway serves every route group on one listener selected by ENGINE_SERVE.
+time: 2026-09-11T16:40:30.721150731+02:00

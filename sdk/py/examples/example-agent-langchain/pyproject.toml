@@ -1,0 +1,16 @@
+[project]
+name = "example-agent-langchain"
+version = "0.1.0"
+description = "Local development agent built on the Tilde Python SDK and LangChain"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = [
+  "trytilde",
+  "trytilde-langchain",
+  "langchain>=1,<2",
+  "langgraph>=1,<2",
+  "langchain-openai>=1,<2",
+]
+
+[tool.uv]
+package = false

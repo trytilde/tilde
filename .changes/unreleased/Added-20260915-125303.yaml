@@ -1,0 +1,3 @@
+kind: Added
+body: Preserve agent queue, interrupt and batch policies across gateway and sidecar runtimes; add provider sending identities, typed SDK history and channel tools, the Vercel AI SDK adapter, and automatic local example-agent and Langfuse startup.
+time: 2026-09-15T12:53:03.662621042+02:00

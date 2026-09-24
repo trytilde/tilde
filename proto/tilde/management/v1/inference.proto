@@ -1,0 +1,39 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+
+// Spend and ceilings for inference calls. Costs are micro-dollars priced at write time from the
+// price table; budgets are settled by a worker and enforced at token issue and renewal.
+service InferenceService {
+  rpc GetUsage(GetUsageRequest) returns (GetUsageResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListBudgets(ListBudgetsRequest) returns (ListBudgetsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc SetBudget(SetBudgetRequest) returns (SetBudgetResponse);
+  rpc DeleteBudget(DeleteBudgetRequest) returns (DeleteBudgetResponse);
+}
+// Identity budgets name a root identity; an identity without a root is its own root.
+enum BudgetScope { BUDGET_SCOPE_UNSPECIFIED = 0; BUDGET_SCOPE_AGENT = 1; BUDGET_SCOPE_IDENTITY = 2; }
+enum BudgetPeriod { BUDGET_PERIOD_UNSPECIFIED = 0; BUDGET_PERIOD_DAY = 1; BUDGET_PERIOD_MONTH = 2; BUDGET_PERIOD_TOTAL = 3; }
+enum BudgetAction { BUDGET_ACTION_UNSPECIFIED = 0; BUDGET_ACTION_BLOCK = 1; BUDGET_ACTION_FLAG = 2; }
+message Budget {
+  string id = 1; BudgetScope scope = 2; string scope_id = 3; BudgetPeriod period = 4;
+  int64 limit_micros = 5; BudgetAction action = 6; int64 spent_micros = 7;
+  optional google.protobuf.Timestamp exhausted_until = 8;
+  // Agent budgets may cap one connection; unset caps the agent's whole spend.
+  optional string connection_id = 9;
+}
+// Per-connection totals for one agent since `since` (default: start of the current month).
+// `bucket` is `day` or `hour`; the series is one point per bucket and connection with spend.
+// The window is [since, until); `since` defaults to the start of the current month and
+// `until` to now. `total_cost_micros` is the agent's all-time spend regardless of the window.
+message GetUsageRequest { string agent_id = 1; optional google.protobuf.Timestamp since = 2; string bucket = 3; optional google.protobuf.Timestamp until = 4; }
+// `unpriced_requests` had no usable token usage (binary responses, unknown models) and are not in `cost_micros`.
+message ConnectionUsage { string connection_id = 1; int64 requests = 2; int64 input_tokens = 3; int64 output_tokens = 4; optional int64 cost_micros = 5; int64 unpriced_requests = 6; }
+message UsagePoint { google.protobuf.Timestamp bucket_start = 1; string connection_id = 2; int64 requests = 3; optional int64 cost_micros = 4; }
+message GetUsageResponse { repeated ConnectionUsage connections = 1; repeated UsagePoint series = 2; int64 total_cost_micros = 3; }
+message ListBudgetsRequest { optional BudgetScope scope = 1; optional string scope_id = 2; }
+message ListBudgetsResponse { repeated Budget budgets = 1; }
+// One budget per (scope, scope_id, period); setting an existing one replaces its limit and action.
+message SetBudgetRequest { BudgetScope scope = 1; string scope_id = 2; BudgetPeriod period = 3; int64 limit_micros = 4; BudgetAction action = 5; optional string connection_id = 6; }
+message SetBudgetResponse { Budget budget = 1; }
+message DeleteBudgetRequest { string id = 1; }
+message DeleteBudgetResponse {}

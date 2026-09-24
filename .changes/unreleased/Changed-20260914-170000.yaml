@@ -1,0 +1,3 @@
+kind: Changed
+body: Generated TypeScript contracts move into the @trytilde/contracts package, built from the protos on demand and no longer committed; the web app and SDK import from it instead of carrying duplicate copies.
+time: 2026-09-14T17:00:00.000000000+02:00

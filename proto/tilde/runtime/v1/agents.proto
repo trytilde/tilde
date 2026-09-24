@@ -1,0 +1,63 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/agent.proto";
+
+service AgentService {
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  rpc DeleteAgent(DeleteAgentRequest) returns (DeleteAgentResponse);
+
+}
+
+message CreateAgentRequest {
+  // Optional caller-generated UUID. Supply it for retry-safe creation.
+  // If omitted, the server generates an ID.
+  string id = 1;
+  string name = 2;
+  reserved 3;
+  reserved "description";
+  reserved 4, 5;
+  reserved "endpoint_url", "webhook_signing_key";
+  tilde.types.v1.Capabilities capabilities = 6;
+  tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 7;
+}
+
+message CreateAgentResponse { tilde.types.v1.Agent agent = 1; }
+
+message GetAgentRequest { string id = 1; }
+
+message GetAgentResponse { tilde.types.v1.Agent agent = 1; }
+
+message ListAgentsRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListAgentsResponse {
+  repeated tilde.types.v1.Agent agents = 1;
+  string next_page_token = 2;
+}
+
+message UpdateAgentRequest {
+  string id = 1;
+  optional string name = 2;
+  reserved 3;
+  reserved "description";
+  reserved 4;
+  reserved "endpoint_url";
+  // Present empty map clears grants; absence preserves them.
+  tilde.types.v1.Capabilities capabilities = 5;
+  optional tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 6;
+}
+
+message UpdateAgentResponse { tilde.types.v1.Agent agent = 1; }
+
+message DeleteAgentRequest { string id = 1; }
+
+message DeleteAgentResponse {}

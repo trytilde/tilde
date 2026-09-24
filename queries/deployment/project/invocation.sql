@@ -1,0 +1,2 @@
+--! run (p1, p2, p3, p4, p5, p6, p7?, p8?, p9?)
+INSERT INTO chat_invocations(id,run_id,thread_id,agent_id,status,started_at,ended_at,lease_expires_at,deployment_id,history_through_message_id) VALUES(:p1,:p2,:p3,:p4,:p5,CASE WHEN :p5<>'pending' THEN :p6::timestamptz END,CASE WHEN :p5 IN ('stopped','failed','canceled') THEN :p6::timestamptz END,:p7,:p8,:p9) ON CONFLICT(id) DO UPDATE SET status=EXCLUDED.status,ended_at=EXCLUDED.ended_at,lease_expires_at=EXCLUDED.lease_expires_at,history_through_message_id=EXCLUDED.history_through_message_id;

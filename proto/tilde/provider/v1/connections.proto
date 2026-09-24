@@ -1,0 +1,27 @@
+syntax = "proto3";
+package tilde.provider.v1;
+import "tilde/types/v1/connections.proto";
+
+// Implemented by remote connection providers and called by Tilde using dedicated backend credentials.
+
+service ConnectionProviderService { rpc HandleSetup(HandleSetupRequest) returns (HandleSetupResponse); }
+
+message HandleSetupRequest {
+ string setup_id = 1; string connection_id = 2; string action = 3;
+ repeated tilde.types.v1.InputField fields = 4; repeated tilde.types.v1.InputField draft = 5;
+ string callback_url = 6; string callback_state = 7 [debug_redact = true];
+ bool is_callback = 8;
+ string action_id = 9;
+ string provider_id = 10;
+ string type_id = 11;
+ reserved 12;
+}
+
+message HandleSetupResponse {
+ repeated tilde.types.v1.InputField draft = 1;
+ oneof result { AwaitSetupInput await_input = 2; SetupCredentials complete = 3; }
+}
+
+message AwaitSetupInput { optional string redirect_url = 1 [debug_redact = true]; }
+
+message SetupCredentials { repeated tilde.types.v1.InputField fields = 1; optional string account_label = 2; }

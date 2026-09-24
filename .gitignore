@@ -1,0 +1,55 @@
+/target/
+/dist/
+/node_modules/
+/web/node_modules/
+/web/dist/
+/.tools/
+/.env.*
+!/.env.example
+!/.env.test
+/secrets.yaml
+/.secrets.*
+/.load-secrets.*
+/.run/
+.run/
+
+/sdk/ts/node_modules/
+/sdk/ts/**/node_modules/
+/sdk/ts/**/dist/
+# Generated TypeScript contracts; @trytilde/contracts builds them from proto/.
+/sdk/ts/packages/contracts/gen/
+
+/web/provider-dist/
+
+__pycache__/
+
+# Local runtime credentials must not enter the initial repository commit.
+/.env
+/secrets.enc.yaml
+log
+
+/.local/
+
+# Bifrost benchmark container state
+/dev/inference-bench/bifrost/*
+!/dev/inference-bench/bifrost/config.json
+
+# Local Claude Code worktrees
+/.claude/worktrees/
+
+# Python SDK: uv environments and generated contracts (sdk/py/scripts/generate.py).
+/sdk/py/.venv/
+/sdk/py/.venv-crewai/
+/sdk/py/**/.venv/
+/sdk/py/packages/tilde/src/tilde/agent_event_ingress/
+/sdk/py/packages/tilde/src/tilde/agent_host/
+/sdk/py/packages/tilde/src/tilde/ingress/
+/sdk/py/packages/tilde/src/tilde/management/
+/sdk/py/packages/tilde/src/tilde/provider/
+/sdk/py/packages/tilde/src/tilde/run/
+/sdk/py/packages/tilde/src/tilde/runtime/
+/sdk/py/packages/tilde/src/tilde/setup/
+/sdk/py/packages/tilde/src/tilde/types/
+/sdk/py/**/*.egg-info/
+.pytest_cache/
+.ruff_cache/

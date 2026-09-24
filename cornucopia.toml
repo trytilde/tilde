@@ -1,0 +1,16 @@
+# Generates the `tilde-queries` crate from queries/**/*.sql.
+# Regenerate with `task queries:generate` (needs Postgres; runs migrations into a scratch database).
+queries = "queries"
+destination = "crates/queries"
+async = true
+sync = false
+ignore-underscore-files = true
+use-workspace-deps = true
+
+[manifest.package]
+name = "tilde-queries"
+version.workspace = true
+publish = false
+
+[types.mapping]
+"pg_catalog.timestamptz" = "chrono::DateTime<chrono::Utc>"

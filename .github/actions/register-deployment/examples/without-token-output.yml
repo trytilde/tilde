@@ -1,0 +1,26 @@
+# Copy into .github/workflows/. This registers a release for manual runtime setup.
+name: Register agent without token output
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Register deployment for manual setup
+        id: deployment
+        uses: ./.github/actions/register-deployment
+        # External repos: trytilde/tilde/.github/actions/register-deployment@<full-commit-sha>
+        with:
+          api-token: ${{ secrets.TILDE_API_KEY }}
+          url: ${{ vars.TILDE_URL }}
+          ui-url: ${{ vars.TILDE_UI_URL }}
+          agent-id: ${{ vars.TILDE_AGENT_ID }}
+          type: gateway
+          output-token: "false"
+        # Only deployment-id, deployment-url and created are returned.
+        # Open the job summary's Tilde link, sign in, and use Rotate token to get
+        # a replacement token. Copy it directly into your runtime configuration.
+        # The CI-generated token is discarded; retries do not rotate it.

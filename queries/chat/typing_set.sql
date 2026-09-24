@@ -1,0 +1,4 @@
+--: Record()
+
+--! run (p1, p2) : Record
+INSERT INTO chat_typing(thread_id,participant_id,expires_at) VALUES(:p1,:p2,NOW()+INTERVAL '10 seconds') ON CONFLICT(thread_id,participant_id) DO UPDATE SET expires_at=EXCLUDED.expires_at RETURNING expires_at;

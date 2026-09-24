@@ -1,0 +1,54 @@
+# This file was generated with `cornucopia`. Do not modify.
+
+[package]
+name = "tilde-queries"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[package.version]
+workspace = true
+
+[dependencies.chrono]
+features = ["serde"]
+workspace = true
+
+[dependencies.deadpool-postgres]
+optional = true
+workspace = true
+
+[dependencies.futures]
+version = "^0.3.32"
+
+[dependencies.postgres]
+version = "^0.19.13"
+features = ["with-chrono-0_4", "with-uuid-1", "with-serde_json-1"]
+optional = true
+
+[dependencies.postgres-protocol]
+version = "^0.6.11"
+
+[dependencies.postgres-types]
+version = "^0.2.13"
+features = ["derive"]
+
+[dependencies.serde]
+features = ["derive"]
+workspace = true
+
+[dependencies.serde_json]
+features = ["raw_value"]
+workspace = true
+
+[dependencies.tokio-postgres]
+features = ["with-chrono-0_4", "with-uuid-1", "with-serde_json-1"]
+workspace = true
+
+[dependencies.uuid]
+version = "^1.23.1"
+features = ["serde"]
+
+[features]
+deadpool = ["dep:deadpool-postgres", "tokio-postgres/default"]
+default = ["dep:postgres", "deadpool"]
+wasm-async = ["tokio-postgres/js", "chrono/wasmbind"]

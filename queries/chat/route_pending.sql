@@ -1,0 +1,10 @@
+--: Record(source_identity_id?)
+
+--! run (p1) : Record
+SELECT EXISTS(SELECT 1 FROM chat_channel_threads b WHERE b.thread_id=m.thread_id) AS channel_origin,m.id,m.thread_id,m.source_identity_id,m.traceparent,m.tracestate,CASE WHEN m.text<>'' THEN m.text ELSE 'New message with attachments.' END AS text,p.agent_id AS agent_id FROM chat_messages m JOIN chat_threads r ON r.id=m.thread_id JOIN chat_participants sender ON sender.id=m.participant_id LEFT JOIN chat_messages reply ON reply.id=m.in_reply_to_message_id LEFT JOIN chat_participants reply_author ON reply_author.id=reply.participant_id JOIN chat_participants p ON p.thread_id=m.thread_id AND p.agent_id IS NOT NULL AND p.active JOIN agents a ON a.id=p.agent_id AND NOT a.paused AND a.deleted_at IS NULL WHERE NOT EXISTS(SELECT 1 FROM agent_deployments d WHERE d.id=p.deployment_id AND d.target='sidecar' AND d.status='registered')
+AND EXISTS (SELECT 1 FROM agent_deployments eligible WHERE eligible.agent_id=p.agent_id AND eligible.status='registered'
+ AND (eligible.id=p.deployment_id OR NOT EXISTS(SELECT 1 FROM agent_deployments pinned WHERE pinned.id=p.deployment_id AND pinned.status='registered'))
+ AND (eligible.id=p.deployment_id OR eligible.traffic_weight>0 OR EXISTS(SELECT 1 FROM agent_deployment_settings policy WHERE policy.agent_id=p.agent_id AND policy.routing='latest'))
+ AND (eligible.target='lambda' OR EXISTS(SELECT 1 FROM agent_instances n WHERE n.agent_id=p.agent_id AND n.deployment_id=eligible.id
+ AND n.connection_id IS NOT NULL AND n.ready AND n.agent_ready AND n.agent_connected AND n.last_seen_at>NOW()-make_interval(secs=>:p1::float8))))
+ AND m.status='complete' AND chat_channel_message_allowed(p.agent_id,m.thread_id,m.source_identity_id) AND (EXISTS(SELECT 1 FROM chat_message_targets t WHERE t.message_id=m.id AND t.participant_id=p.id) OR (sender.user_id IS NOT NULL AND p.agent_id=COALESCE(reply_author.agent_id,r.primary_agent_id) AND NOT EXISTS(SELECT 1 FROM chat_message_targets t WHERE t.message_id=m.id))) AND NOT EXISTS(SELECT 1 FROM chat_message_dispatch d WHERE d.message_id=m.id AND d.agent_id=p.agent_id) ORDER BY m.created_at LIMIT 50;

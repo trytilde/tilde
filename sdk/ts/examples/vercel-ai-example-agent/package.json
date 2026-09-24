@@ -1,0 +1,25 @@
+{
+  "name": "@trytilde/vercel-ai-example-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.112",
+    "@opentelemetry/api-logs": "0.222.0",
+    "@opentelemetry/instrumentation": "0.222.0",
+    "@opentelemetry/instrumentation-pino": "0.68.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-logs": "0.222.0",
+    "@trytilde/sdk": "workspace:*",
+    "@trytilde/sdk-vercel-ai-node": "workspace:*",
+    "ai": "^6.0.280",
+    "pino": "10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "5.9.3"
+  }
+}

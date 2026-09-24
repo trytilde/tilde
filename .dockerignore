@@ -1,0 +1,17 @@
+.git
+.tools
+.run
+target
+dist
+sdk/ts/node_modules
+sdk/ts/**/node_modules
+sdk/ts/**/dist
+node_modules
+web/node_modules
+web/dist
+.env*
+
+web/provider-dist
+
+secrets*.yaml
+.sops.yaml

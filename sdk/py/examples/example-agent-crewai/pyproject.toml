@@ -1,0 +1,10 @@
+[project]
+name = "example-agent-crewai"
+version = "0.1.0"
+description = "Local development agent built on CrewAI and the Tilde Python SDK"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["trytilde", "trytilde-crewai", "crewai>=1.15,<2"]
+
+[tool.uv]
+package = false

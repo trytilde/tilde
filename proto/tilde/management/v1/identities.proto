@@ -1,0 +1,67 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+import "tilde/types/v1/access.proto";
+
+service IdentitiesService {
+ rpc CreateIdentity(CreateIdentityRequest) returns (CreateIdentityResponse);
+ rpc GetIdentity(GetIdentityRequest) returns (GetIdentityResponse);
+ rpc ListIdentities(ListIdentitiesRequest) returns (ListIdentitiesResponse);
+ rpc CreateRootIdentity(CreateRootIdentityRequest) returns (CreateRootIdentityResponse);
+ rpc GetRootIdentity(GetRootIdentityRequest) returns (GetRootIdentityResponse);
+ rpc ListRootIdentities(ListRootIdentitiesRequest) returns (ListRootIdentitiesResponse);
+ rpc LinkIdentity(LinkIdentityRequest) returns (LinkIdentityResponse);
+ rpc UnlinkIdentity(UnlinkIdentityRequest) returns (UnlinkIdentityResponse);
+}
+// The ID remains the chat user/participant ID. Grouping never changes message routing.
+message Identity {
+ string id = 1;
+ string name = 2;
+ string provider_id = 3;
+ optional string connection_id = 4;
+ tilde.types.v1.IdentityType identity_type = 5;
+ string value = 6;
+ optional string root_identity_id = 7;
+ google.protobuf.Timestamp verified_at = 8;
+ google.protobuf.Timestamp attested_at = 9;
+ optional string attested_by_user_id = 10;
+ optional string attested_by_api_key_id = 11;
+}
+message RootIdentity { string id = 1; google.protobuf.Timestamp created_at = 2; }
+message CreateIdentityRequest {
+ // Omit agent_id and provider_id for native Tilde identities (username subjects).
+ optional string agent_id = 1;
+ // Agent-scoped provider/account-name from the chat providers table.
+ optional string provider_id = 7;
+ // Create and associate a root atomically. Mutually exclusive with root_identity_id.
+ bool create_root = 6;
+ tilde.types.v1.IdentityType identity_type = 2;
+ string value = 3;
+ optional string root_identity_id = 4;
+ // Records management attestation; does not create an agent access grant.
+ // Otherwise the identity remains unverified. Use AgentAccessService to request verification.
+ bool skip_verification = 5;
+}
+message CreateIdentityResponse { Identity identity = 1; }
+message GetIdentityRequest { string id = 1; }
+message GetIdentityResponse { Identity identity = 1; }
+message ListIdentitiesRequest { uint32 page_size = 1; string page_token = 2; optional string root_identity_id = 3; optional string connection_id = 4; }
+message ListIdentitiesResponse { repeated Identity identities = 1; string next_page_token = 2; }
+message CreateRootIdentityRequest {
+ // Client-generated UUID makes retries idempotent. Associations commit atomically.
+ string id = 1;
+ repeated string identity_ids = 2;
+}
+message CreateRootIdentityResponse { RootIdentity root_identity = 1; }
+message GetRootIdentityRequest { string id = 1; }
+message GetRootIdentityResponse { RootIdentity root_identity = 1; }
+message ListRootIdentitiesRequest { uint32 page_size = 1; string page_token = 2; }
+message ListRootIdentitiesResponse { repeated RootIdentity root_identities = 1; string next_page_token = 2; }
+message LinkIdentityRequest { string identity_id = 1; string root_identity_id = 2; }
+message LinkIdentityResponse { Identity identity = 1; }
+message UnlinkIdentityRequest {
+ string identity_id = 1;
+ // Expected current root prevents a stale unlink from removing a newer association.
+ string root_identity_id = 2;
+}
+message UnlinkIdentityResponse { Identity identity = 1; }

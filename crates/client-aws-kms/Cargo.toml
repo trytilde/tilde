@@ -1,0 +1,15 @@
+[package]
+name = "client-aws-kms"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+base64.workspace = true
+client-aws-config.workspace = true
+client-aws-sigv4.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true

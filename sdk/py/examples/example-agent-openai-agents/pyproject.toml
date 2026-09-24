@@ -1,0 +1,10 @@
+[project]
+name = "example-agent-openai-agents"
+version = "0.1.0"
+description = "Local development agent: Tilde host plus the OpenAI Agents SDK"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["trytilde", "trytilde-openai-agents", "openai-agents"]
+
+[tool.uv]
+package = false

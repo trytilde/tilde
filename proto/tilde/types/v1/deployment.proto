@@ -1,0 +1,27 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+enum SidecarFailureMode { SIDECAR_FAILURE_MODE_UNSPECIFIED = 0; SIDECAR_FAILURE_MODE_REASSIGN = 1; SIDECAR_FAILURE_MODE_STOP = 2; }
+// Which deployment new threads go to: the most recently registered one automatically, or a weighted split across active deployments.
+enum DeploymentRouting { DEPLOYMENT_ROUTING_UNSPECIFIED = 0; DEPLOYMENT_ROUTING_LATEST = 1; DEPLOYMENT_ROUTING_WEIGHTED = 2; }
+enum DeploymentSource { DEPLOYMENT_SOURCE_UNSPECIFIED = 0; DEPLOYMENT_SOURCE_CI = 1; DEPLOYMENT_SOURCE_MANUAL = 2; }
+// Gateway agent servers and sidecars dial in. Lambda requires a function ARN.
+enum DeploymentTarget { DEPLOYMENT_TARGET_UNSPECIFIED = 0; DEPLOYMENT_TARGET_GATEWAY = 1; DEPLOYMENT_TARGET_SIDECAR = 2; DEPLOYMENT_TARGET_LAMBDA = 3; }
+enum DeploymentStatus { DEPLOYMENT_STATUS_UNSPECIFIED = 0; DEPLOYMENT_STATUS_REGISTERED = 1; DEPLOYMENT_STATUS_RETIRED = 2; }
+// Agent-level deployment settings.
+message Deployment { string agent_id = 1; SidecarFailureMode failure_mode = 4; DeploymentRouting routing = 6; string serving_deployment_id = 7; reserved 2, 3, 5; }
+// One registered deployment: the declared half of what is running, tied to a commit.
+message AgentDeployment {
+  string id = 1; string agent_id = 2; DeploymentSource source = 3; DeploymentTarget target = 4;
+  reserved 5; string target_reference = 6; string repository = 7; string commit_sha = 8;
+  string external_id = 9; string label = 10; DeploymentStatus status = 11; bool token_issued = 12; bool serving = 13;
+  google.protobuf.Timestamp created_at = 14; google.protobuf.Timestamp retired_at = 15;
+  // What the git provider knows about the commit; set by CI, empty for manual deployments.
+  string commit_message = 16; string branch = 17; string commit_author = 18;
+  // Whole percentage of new conversations in weighted routing.
+  uint32 traffic_weight = 19;
+  // Registered Lambda, or a live/ready Gateway or Sidecar connection chain.
+  bool routable = 20;
+}
+// One process incarnation that dialed in with a deployment's token.
+message AgentInstance { string instance_id = 1; string agent_id = 2; string public_url = 3; string runtime_url = 4; bool ready = 5; google.protobuf.Timestamp last_seen_at = 6; string deployment_id = 7; }

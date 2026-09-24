@@ -1,0 +1,7 @@
+# TypeScript contracts only. The Rust generators live in the repository root template.
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: gen
+    opt: [target=js+dts, import_extension=js]

@@ -1,0 +1,28 @@
+# Comparison gateways for `task bench:inference`. Both reach the host's mock upstream through
+# host.docker.internal; ports are offset so they never collide with the local dev stack.
+services:
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:main-stable
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    volumes:
+      - ./litellm.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: sk-bench-master
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-unset}
+      LITELLM_LOG: ERROR
+    ports:
+      - "127.0.0.1:14000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  bifrost:
+    image: maximhq/bifrost:latest
+    # Bifrost writes its store beside config.json, so the directory is mounted writable
+    # (chmod 0777; the container runs as an unprivileged user). Defaults: /app/data, port 8080.
+    volumes:
+      - ./bifrost:/app/data
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-unset}
+    ports:
+      - "127.0.0.1:18080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

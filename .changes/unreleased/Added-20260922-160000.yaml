@@ -1,0 +1,13 @@
+kind: Changed
+body: >-
+  The built-in Tilde chat provider is now a catalog provider like the others: every agent owns
+  one system-managed Tilde connection, created with the agent, whose application key is the
+  connection's credential. Its access mode and asserted identities live where every other
+  provider keeps them, so the IAM tab lists it beside the connections with public, private or
+  disabled modes (private by default) and per-identity allow switches, with no provider-specific
+  handling; identities asserted by the application are recorded on first contact and can be
+  added ahead of time. The IAM tab also refreshes when it is opened so providers added moments
+  earlier appear without a reload. Agent settings tabs moved to a row under the breadcrumb,
+  sharing is an icon button beside it, and provider setup failures are logged with the
+  provider's reason.
+time: 2026-09-22T16:00:00.000000000+02:00

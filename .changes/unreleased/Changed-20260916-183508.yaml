@@ -1,0 +1,3 @@
+kind: Changed
+body: Move native chat to the Tilde ConnectRPC provider with encrypted API keys, identity-scoped access, session search/read state and queue controls; add embeddable React chat, a server proxy and Next.js routes.
+time: 2026-09-16T18:35:08.108573209+02:00

@@ -1,0 +1,4 @@
+--: Record()
+
+--! run : Record
+SELECT i.id FROM chat_invocations i JOIN agents a ON a.id=i.agent_id JOIN chat_runs r ON r.id=i.run_id WHERE i.status='pending' AND chat_channel_run_allowed(i.agent_id,i.thread_id,r.source_identity_id,r.channel_origin) AND EXISTS(SELECT 1 FROM agent_deployments d WHERE d.id=i.deployment_id AND d.target IN ('gateway','lambda')) AND NOT a.paused AND a.deleted_at IS NULL LIMIT 50;

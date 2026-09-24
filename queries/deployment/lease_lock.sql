@@ -1,0 +1,4 @@
+--: Record()
+
+--! run (p1, p2) : Record
+SELECT instance_id,updated_at FROM thread_leases WHERE thread_id=:p1 AND agent_id=:p2 FOR UPDATE;

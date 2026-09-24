@@ -1,0 +1,18 @@
+[project]
+name = "trytilde-openai-agents"
+version = "0.1.0"
+description = "Tilde adapter for the OpenAI Agents SDK: typed history to Responses input items and channel tools to function tools"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = ["trytilde", "openai-agents>=0.22,<1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tilde_openai_agents"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/tilde_openai_agents", "README.md"]

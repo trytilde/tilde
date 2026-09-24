@@ -1,0 +1,40 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/deployment.proto";
+service DeploymentService {
+  rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse);
+  rpc SetDeploymentWeights(SetDeploymentWeightsRequest) returns (SetDeploymentWeightsResponse);
+  rpc SetDeployment(SetDeploymentRequest) returns (SetDeploymentResponse);
+  // Register a deployment from CI or by hand. Idempotent on (agent, external_id): a repeat
+  // returns the existing record without a token. The token is returned once, on creation.
+  rpc RegisterDeployment(RegisterDeploymentRequest) returns (RegisterDeploymentResponse);
+  rpc PromoteDeployment(PromoteDeploymentRequest) returns (PromoteDeploymentResponse);
+  // Retiring invalidates the deployment's token; its instances can no longer register.
+  rpc RetireDeployment(RetireDeploymentRequest) returns (RetireDeploymentResponse);
+  rpc IssueDeploymentToken(IssueDeploymentTokenRequest) returns (IssueDeploymentTokenResponse);
+  rpc IssueIngressToken(IssueIngressTokenRequest) returns (IssueIngressTokenResponse);
+}
+message GetDeploymentRequest { string agent_id = 1; }
+message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.AgentInstance instances = 2; repeated tilde.types.v1.AgentDeployment deployments = 3; }
+message SetDeploymentRequest { string agent_id = 1; tilde.types.v1.SidecarFailureMode failure_mode = 4; tilde.types.v1.DeploymentRouting routing = 5; reserved 2, 3; }
+message SetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
+message RegisterDeploymentRequest {
+  string agent_id = 1; tilde.types.v1.DeploymentSource source = 2; tilde.types.v1.DeploymentTarget target = 3;
+  reserved 4; optional string target_reference = 5; optional string repository = 6;
+  optional string commit_sha = 7; optional string external_id = 8; optional string label = 9;
+  optional string commit_message = 10; optional string branch = 11; optional string commit_author = 12;
+}
+message RegisterDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; string token = 2 [debug_redact = true]; bool created = 3; }
+message PromoteDeploymentRequest { string agent_id = 1; string deployment_id = 2; }
+message PromoteDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }
+message RetireDeploymentRequest { string agent_id = 1; string deployment_id = 2; }
+message RetireDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; }
+message IssueDeploymentTokenRequest { string agent_id = 1; string deployment_id = 2; }
+message IssueDeploymentTokenResponse { string token = 1 [debug_redact = true]; }
+message IssueIngressTokenRequest { string agent_id = 1; optional string thread_id = 2; }
+message IssueIngressTokenResponse { string token = 1 [debug_redact = true]; uint32 expires_in = 2; }
+
+message DeploymentWeight { string deployment_id = 1; uint32 weight = 2; }
+// Supply every registered deployment, across all execution types; total must be 100.
+message SetDeploymentWeightsRequest { string agent_id = 1; repeated DeploymentWeight weights = 2; }
+message SetDeploymentWeightsResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.AgentDeployment deployments = 2; }

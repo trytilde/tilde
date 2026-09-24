@@ -1,0 +1,79 @@
+syntax = "proto3";
+package tilde.management.v1;
+
+// Read-only observability. Langfuse credentials never cross this API boundary.
+service TracingService {
+  rpc GetTracingStatus(GetTracingStatusRequest) returns (GetTracingStatusResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListObservations(ListObservationsRequest) returns (ListObservationsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetObservationMetrics(GetObservationMetricsRequest) returns (GetObservationMetricsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+enum TracingState { TRACING_STATE_UNSPECIFIED = 0; TRACING_STATE_DISABLED = 1; TRACING_STATE_READY = 2; TRACING_STATE_UNAVAILABLE = 3; }
+message GetTracingStatusRequest { string agent_id = 1; }
+message GetTracingStatusResponse { TracingState state = 1; string message = 2; string project_url = 3; }
+message ObservationFilter {
+  string from_time = 1;
+  string to_time = 2;
+  string name = 3;
+  string type = 4;
+  string level = 5;
+  string model = 6;
+  string session_id = 7;
+  string invocation_id = 8;
+  string input_search = 9;
+  string output_search = 10;
+}
+message ListObservationsRequest { string agent_id = 1; ObservationFilter filter = 2; string cursor = 3; bool refresh = 4; bool include_session_details = 5; }
+message GetTraceRequest { string agent_id = 1; string trace_id = 2; string cursor = 3; bool refresh = 4; }
+message GetSessionRequest { string agent_id = 1; string session_id = 2; ObservationFilter filter = 3; string cursor = 4; bool refresh = 5; }
+message TraceAttribute { string key = 1; string value = 2; }
+message Observation {
+  string id = 1; string trace_id = 2; string parent_id = 3;
+  string name = 4; string type = 5; string level = 6; string status_message = 7;
+  string start_time = 8; string end_time = 9;
+  string input = 10; string output = 11; string model = 12;
+  optional double latency_seconds = 13; optional double time_to_first_token_seconds = 14;
+  optional double input_tokens = 15; optional double output_tokens = 16; optional double total_tokens = 17;
+  optional double cost_usd = 18;
+  string session_id = 19; string user_id = 20; string environment = 21;
+  repeated string tags = 22; repeated TraceAttribute attributes = 23;
+  string observation_url = 24; string trace_url = 25; string session_url = 26;
+  string invocation_id = 27;
+  string updated_time = 28;
+}
+// Session facts are the newest captured metadata among the returned traces;
+// identity values are resolved for display.
+// Trace metrics cover this cursor page.
+message TraceSessionSummary {
+  string id = 1;
+  reserved 2, 3, 4;
+  optional double total_tokens = 5;
+  optional double cost_usd = 6;
+  uint32 error_count = 7;
+  string session_url = 8;
+  string provider_id = 9;
+  string provider_name = 10;
+  string provider_icon_url = 11;
+  repeated string identities = 12;
+  // Absent when the traces do not contain a captured message count.
+  optional uint64 message_count = 13;
+  string last_turn_time = 14;
+  repeated string identity_ids = 15;
+  string metadata_time = 16;
+}
+message ListObservationsResponse { repeated Observation observations = 1; string next_cursor = 2; bool partial = 3; repeated TraceSessionSummary sessions = 4; }
+
+message GetTraceResponse { repeated Observation observations = 1; string next_cursor = 2; bool partial = 3; }
+message GetSessionResponse { repeated Observation observations = 1; string next_cursor = 2; bool partial = 3; }
+
+// Full filtered range, independent of the observation table's cursor pages.
+message GetObservationMetricsRequest { string agent_id = 1; ObservationFilter filter = 2; bool refresh = 3; }
+message ObservationMetricBucket {
+  string start_time = 1;
+  string end_time = 2;
+  uint64 observation_count = 3;
+  uint64 error_count = 4;
+  optional double average_latency_seconds = 5;
+}
+message GetObservationMetricsResponse { repeated ObservationMetricBucket buckets = 1; }

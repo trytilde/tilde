@@ -1,0 +1,22 @@
+-- Retire the experimental session projection. Session facts now travel on traces.
+DROP TRIGGER chat_session_projection_thread ON chat_threads;
+DROP TRIGGER chat_session_projection_message ON chat_messages;
+DROP TRIGGER chat_session_projection_message_change ON chat_messages;
+DROP TRIGGER chat_session_projection_attachment ON chat_message_attachments;
+DROP TRIGGER chat_session_projection_participant ON chat_participants;
+DROP TRIGGER chat_session_projection_channel ON chat_channel_threads;
+DROP TRIGGER chat_session_projection_turn ON chat_invocations;
+DROP TRIGGER chat_session_projection_turn_start ON chat_invocations;
+DROP TRIGGER chat_session_projection_identity ON chat_channel_identities;
+DROP TRIGGER chat_session_projection_provider ON connection_providers;
+DROP TRIGGER chat_session_projection_connection ON connections;
+DROP TRIGGER chat_session_projection_agent ON agents;
+DROP FUNCTION chat_session_projection_thread();
+DROP FUNCTION chat_session_projection_child();
+DROP FUNCTION chat_session_projection_identity();
+DROP FUNCTION chat_session_projection_provider();
+DROP FUNCTION chat_session_projection_connection();
+DROP FUNCTION chat_session_projection_agent();
+DROP FUNCTION chat_session_projection_mark(UUID);
+DROP TABLE chat_session_projection_pending;
+DROP SEQUENCE chat_session_projection_version;

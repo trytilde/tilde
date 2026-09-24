@@ -1,0 +1,23 @@
+{
+  "name": "@trytilde/contracts",
+  "version": "0.1.0",
+  "description": "Generated TypeScript Protobuf and ConnectRPC contracts for Tilde",
+  "license": "Apache-2.0",
+  "files": [
+    "gen"
+  ],
+  "type": "module",
+  "exports": {
+    "./*": "./gen/*"
+  },
+  "scripts": {
+    "build": "node scripts/generate.mjs"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.14.1"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.72.0",
+    "@bufbuild/protoc-gen-es": "2.14.1"
+  }
+}

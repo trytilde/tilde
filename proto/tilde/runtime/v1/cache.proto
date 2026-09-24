@@ -1,0 +1,6 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+
+// Opaque agent conversions belong to runtime history and invocation payloads. Management contracts must not depend on this file.
+
+message CachedAgentRepresentation { string message_id = 1; string message_json = 2 [debug_redact = true]; }

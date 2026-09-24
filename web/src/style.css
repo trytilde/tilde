@@ -1,0 +1,161 @@
+@import "@microcharts/react/styles.css";
+@import "../../sdk/ts/packages/chat-ui/src/style.css";
+@import "../../sdk/ts/packages/connection-ui/src/style.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-700.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@source "./**/*.{ts,tsx}";
+@source "../../sdk/ts/packages/agent-avatar/src";
+
+/* Customer-result-card materials from the marketing homepage, confined to navigation. */
+:root {
+  --sidebar: #ddd5c7;
+  --sidebar-accent: rgb(250 249 245 / 65%);
+  --sidebar-accent-foreground: var(--espresso);
+}
+.dark {
+  --sidebar: var(--espresso);
+  --sidebar-accent: rgb(250 249 245 / 12%);
+  --sidebar-accent-foreground: var(--paper);
+}
+/* Neutral surfaces for the black content card and its portaled controls.
+   The outer shell and sidebar retain their warm material palette. */
+.dark
+  :is(
+    [data-slot="sidebar-inset"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"],
+    [data-slot="tooltip-content"]
+  ) {
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #000000;
+  --card-foreground: #f5f5f5;
+  --popover: #121212;
+  --popover-foreground: #f5f5f5;
+  --primary-foreground: #000000;
+  --secondary: #1b1b1b;
+  --secondary-foreground: #f5f5f5;
+  --muted: #161616;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #f5f5f5;
+  --border: #303030;
+  --input: #3d3d3d;
+}
+.tilde-sidebar-surface {
+  background: linear-gradient(150deg, #cebea8, #ddd5c7 55%, #b09e84);
+  color: var(--sidebar-foreground);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 20%);
+}
+.tilde-sidebar-material,
+.tilde-sidebar-grain,
+.tilde-sidebar-glass,
+.tilde-sidebar-paper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tilde-sidebar-grain {
+  opacity: 0.65;
+}
+.tilde-sidebar-glass {
+  background: rgb(250 249 245 / 12%);
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+}
+.tilde-sidebar-paper {
+  opacity: 0.2;
+  mix-blend-mode: multiply;
+}
+.dark .tilde-sidebar-surface {
+  background: var(--espresso);
+}
+.dark .tilde-sidebar-grain {
+  opacity: 0.15;
+}
+.dark .tilde-sidebar-glass {
+  background: rgb(62 39 35 / 55%);
+}
+
+.tracing-table {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.trace-controls {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+.trace-controls :is(input, button, [role="option"], [role="tab"], [role="combobox"]) {
+  font-family: inherit;
+  font-size: 11px;
+}
+.trace-controls code {
+  font-family: inherit;
+}
+.trace-waterfall {
+  --mc-font: "IBM Plex Mono", ui-monospace, monospace;
+}
+.trace-fold-chunk .mc-trace-live {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.trace-fold-chunk .mc-root {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  overflow: visible;
+}
+.trace-fold-chunk .mc-root text {
+  fill: var(--foreground);
+}
+.trace-fold-chunk [data-mc-active] {
+  stroke: var(--foreground);
+  stroke-width: 1;
+}
+.trace-prose :is(p, ul, ol, pre, blockquote) {
+  margin: 0 0 0.4rem;
+}
+.trace-prose :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.6rem 0 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.trace-prose :is(ul, ol) {
+  padding-left: 1.1rem;
+}
+.trace-prose ul {
+  list-style: disc;
+}
+.trace-prose ol {
+  list-style: decimal;
+}
+.trace-prose pre {
+  overflow: auto;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  font-size: 11px;
+}
+.trace-prose code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.trace-prose blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 0.5rem;
+  color: var(--muted-foreground);
+}
+.trace-prose > :last-child {
+  margin-bottom: 0;
+}
+
+@source "../../sdk/ts/packages/chat-ui/src";

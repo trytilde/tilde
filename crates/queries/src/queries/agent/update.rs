@@ -1,0 +1,197 @@
+// This file was generated with `cornucopia`. Do not modify.
+
+#[derive(Debug)]
+pub struct RunParams<T1: crate::StringSql, T2: crate::StringSql, T3: crate::JsonSql> {
+    pub p2: Option<T1>,
+    pub p3: Option<T2>,
+    pub p4: Option<T3>,
+    pub p1: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Record {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub concurrency_policy: String,
+    pub avatar_seed: uuid::Uuid,
+    pub avatar_key: Option<String>,
+    pub paused: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub capabilities: serde_json::Value,
+}
+pub struct RecordBorrowed<'a> {
+    pub id: uuid::Uuid,
+    pub name: &'a str,
+    pub concurrency_policy: &'a str,
+    pub avatar_seed: uuid::Uuid,
+    pub avatar_key: Option<&'a str>,
+    pub paused: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub capabilities: postgres_types::Json<&'a serde_json::value::RawValue>,
+}
+impl<'a> From<RecordBorrowed<'a>> for Record {
+    fn from(
+        RecordBorrowed {
+            id,
+            name,
+            concurrency_policy,
+            avatar_seed,
+            avatar_key,
+            paused,
+            created_at,
+            updated_at,
+            capabilities,
+        }: RecordBorrowed<'a>,
+    ) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            concurrency_policy: concurrency_policy.into(),
+            avatar_seed,
+            avatar_key: avatar_key.map(|v| v.into()),
+            paused,
+            created_at,
+            updated_at,
+            capabilities: serde_json::from_str(capabilities.0.get()).unwrap(),
+        }
+    }
+}
+use crate::client::async_::GenericClient;
+use futures::{self, StreamExt, TryStreamExt};
+pub struct RecordQuery<'c, 'a, 's, C: GenericClient, T, const N: usize> {
+    client: &'c C,
+    params: [&'a (dyn postgres_types::ToSql + Sync); N],
+    query: &'static str,
+    cached: Option<&'s tokio_postgres::Statement>,
+    extractor: fn(&tokio_postgres::Row) -> Result<RecordBorrowed, tokio_postgres::Error>,
+    mapper: fn(RecordBorrowed) -> T,
+}
+impl<'c, 'a, 's, C, T: 'c, const N: usize> RecordQuery<'c, 'a, 's, C, T, N>
+where
+    C: GenericClient,
+{
+    pub fn map<R>(self, mapper: fn(RecordBorrowed) -> R) -> RecordQuery<'c, 'a, 's, C, R, N> {
+        RecordQuery {
+            client: self.client,
+            params: self.params,
+            query: self.query,
+            cached: self.cached,
+            extractor: self.extractor,
+            mapper,
+        }
+    }
+    pub async fn one(self) -> Result<T, tokio_postgres::Error> {
+        let row =
+            crate::client::async_::one(self.client, self.query, &self.params, self.cached).await?;
+        Ok((self.mapper)((self.extractor)(&row)?))
+    }
+    pub async fn all(self) -> Result<Vec<T>, tokio_postgres::Error> {
+        self.iter().await?.try_collect().await
+    }
+    pub async fn opt(self) -> Result<Option<T>, tokio_postgres::Error> {
+        let opt_row =
+            crate::client::async_::opt(self.client, self.query, &self.params, self.cached).await?;
+        Ok(opt_row
+            .map(|row| {
+                let extracted = (self.extractor)(&row)?;
+                Ok((self.mapper)(extracted))
+            })
+            .transpose()?)
+    }
+    pub async fn iter(
+        self,
+    ) -> Result<
+        impl futures::Stream<Item = Result<T, tokio_postgres::Error>> + 'c,
+        tokio_postgres::Error,
+    > {
+        let stream = crate::client::async_::raw(
+            self.client,
+            self.query,
+            crate::slice_iter(&self.params),
+            self.cached,
+        )
+        .await?;
+        let mapped = stream
+            .map(move |res| {
+                res.and_then(|row| {
+                    let extracted = (self.extractor)(&row)?;
+                    Ok((self.mapper)(extracted))
+                })
+            })
+            .into_stream();
+        Ok(mapped)
+    }
+}
+pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
+pub fn run() -> RunStmt {
+    RunStmt(
+        "UPDATE agents SET name = COALESCE($1, name), concurrency_policy = COALESCE($2, concurrency_policy), capabilities = COALESCE($3, capabilities), updated_at = NOW() WHERE deleted_at IS NULL AND id = $4 RETURNING id, name, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities",
+        None,
+    )
+}
+impl RunStmt {
+    pub async fn prepare<'a, C: GenericClient>(
+        mut self,
+        client: &'a C,
+    ) -> Result<Self, tokio_postgres::Error> {
+        self.1 = Some(client.prepare(self.0).await?);
+        Ok(self)
+    }
+    pub fn bind<
+        'c,
+        'a,
+        's,
+        C: GenericClient,
+        T1: crate::StringSql,
+        T2: crate::StringSql,
+        T3: crate::JsonSql,
+    >(
+        &'s self,
+        client: &'c C,
+        p2: &'a Option<T1>,
+        p3: &'a Option<T2>,
+        p4: &'a Option<T3>,
+        p1: &'a uuid::Uuid,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
+        RecordQuery {
+            client,
+            params: [p2, p3, p4, p1],
+            query: self.0,
+            cached: self.1.as_ref(),
+            extractor:
+                |row: &tokio_postgres::Row| -> Result<RecordBorrowed, tokio_postgres::Error> {
+                    Ok(RecordBorrowed {
+                        id: row.try_get(0)?,
+                        name: row.try_get(1)?,
+                        concurrency_policy: row.try_get(2)?,
+                        avatar_seed: row.try_get(3)?,
+                        avatar_key: row.try_get(4)?,
+                        paused: row.try_get(5)?,
+                        created_at: row.try_get(6)?,
+                        updated_at: row.try_get(7)?,
+                        capabilities: row.try_get(8)?,
+                    })
+                },
+            mapper: |it| Record::from(it),
+        }
+    }
+}
+impl<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql, T3: crate::JsonSql>
+    crate::client::async_::Params<
+        'c,
+        'a,
+        's,
+        RunParams<T1, T2, T3>,
+        RecordQuery<'c, 'a, 's, C, Record, 4>,
+        C,
+    > for RunStmt
+{
+    fn params(
+        &'s self,
+        client: &'c C,
+        params: &'a RunParams<T1, T2, T3>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
+        self.bind(client, &params.p2, &params.p3, &params.p4, &params.p1)
+    }
+}

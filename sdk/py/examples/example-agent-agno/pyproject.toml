@@ -1,0 +1,10 @@
+[project]
+name = "example-agent-agno"
+version = "0.1.0"
+description = "Local development agent built on Agno and the Tilde Python SDK"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["trytilde", "trytilde-agno", "agno>=3,<4", "openai"]
+
+[tool.uv]
+package = false

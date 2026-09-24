@@ -1,0 +1,3 @@
+kind: Added
+body: Add framework adapters for LangChain/LangGraph, OpenAI Agents and Mastra to the TypeScript SDK with example agents, and a Python SDK workspace (`trytilde` core with the ConnectRPC agent host, FastAPI mounting and chat proxy, plus `trytilde-langchain`, `trytilde-pydantic-ai`, `trytilde-openai-agents`, `trytilde-agno` and `trytilde-crewai` adapters with example agents). `REGISTER_DEV_AGENTS=1 task dev` now registers and starts one example agent per adapter, filtered by `DEV_AGENTS`.
+time: 2026-09-17T01:00:00.000000000+02:00

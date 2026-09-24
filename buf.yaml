@@ -1,0 +1,26 @@
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE
+    # A field may go once its number and name are reserved, so old clients never collide.
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+  except:
+    - FIELD_NO_DELETE
+  # These two contracts were deliberately retired in favor of the Tilde provider.
+  # Keep compatibility checks for every active contract.
+  ignore:
+    - proto/tilde/management/v1/chat.proto
+    - proto/tilde/ingress/v1/chat.proto
+  # AgentService (Invoke/Healthz) was deliberately retired: hosts only dial in through
+  # RunService.Watch. InvokeRequest stays in that file and stays checked.
+  ignore_only:
+    MESSAGE_NO_DELETE:
+      - proto/tilde/agent_host/v1/agent.proto
+    SERVICE_NO_DELETE:
+      - proto/tilde/agent_host/v1/agent.proto

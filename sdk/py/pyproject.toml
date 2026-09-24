@@ -1,0 +1,90 @@
+[project]
+name = "tilde-py-workspace"
+version = "0.0.0"
+description = "uv workspace for the Tilde Python SDK packages and example agents"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
+# CrewAI pins openai<3 while the OpenAI Agents SDK needs openai>=3, so they cannot share an
+# environment. Both are locked; CrewAI is synced into its own environment (.venv-crewai).
+conflicts = [
+  [
+    { package = "trytilde-crewai" },
+    { package = "trytilde-openai-agents" },
+  ],
+  [
+    { package = "trytilde-crewai" },
+    { package = "example-agent-openai-agents" },
+  ],
+  [
+    { package = "example-agent-crewai" },
+    { package = "trytilde-openai-agents" },
+  ],
+  [
+    { package = "example-agent-crewai" },
+    { package = "example-agent-openai-agents" },
+  ],
+]
+
+[tool.uv.workspace]
+members = ["packages/*", "examples/*"]
+
+[tool.uv.sources]
+trytilde = { workspace = true }
+trytilde-langchain = { workspace = true }
+trytilde-pydantic-ai = { workspace = true }
+trytilde-openai-agents = { workspace = true }
+trytilde-agno = { workspace = true }
+trytilde-crewai = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "grpcio-tools>=1.84",
+  "protoc-gen-connectrpc>=0.12",
+  "pytest>=8",
+  "pytest-asyncio>=1",
+  "ruff>=0.14",
+  "hypercorn>=0.17",
+  "fastapi>=0.120",
+  "httpx>=0.28",
+  "cryptography>=43",
+  "hatchling>=1.27",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+  "packages/tilde/src/tilde/agent_event_ingress",
+  "packages/tilde/src/tilde/agent_host",
+  "packages/tilde/src/tilde/ingress",
+  "packages/tilde/src/tilde/management",
+  "packages/tilde/src/tilde/provider",
+  "packages/tilde/src/tilde/run",
+  "packages/tilde/src/tilde/runtime",
+  "packages/tilde/src/tilde/setup",
+  "packages/tilde/src/tilde/types",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "tilde",
+  "tilde_langchain",
+  "tilde_pydantic_ai",
+  "tilde_openai_agents",
+  "tilde_agno",
+  "tilde_crewai",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "--import-mode=importlib"
+pythonpath = ["packages/tilde/tests"]
+testpaths = ["packages"]
+filterwarnings = ["ignore:.*LoggingHandler.*:DeprecationWarning"]
+markers = ["integration: needs the Tilde engine binary and disposable Postgres"]

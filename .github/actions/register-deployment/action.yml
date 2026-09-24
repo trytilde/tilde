@@ -1,0 +1,54 @@
+name: Register Tilde deployment
+description: Register a CI deployment and optionally return a masked deployment token for subsequent steps in the same job.
+inputs:
+  api-token:
+    description: Management API key. Falls back to TILDE_API_KEY; pass secrets.TILDE_API_KEY from the calling workflow.
+    required: false
+  url:
+    description: Tilde management API URL. Falls back to TILDE_URL.
+    required: false
+  ui-url:
+    description: Optional browser-facing Tilde URL for the deployment link. Falls back to TILDE_UI_URL, then url.
+    required: false
+  agent-id:
+    description: Agent UUID. Falls back to TILDE_AGENT_ID.
+    required: false
+  type:
+    description: Deployment execution type (gateway, sidecar, or lambda).
+    default: gateway
+  function-arn:
+    description: Required for Lambda. Register an already deployed, preferably version-qualified function ARN.
+    required: false
+  external-id:
+    description: Stable release ID for idempotency. Defaults to GITHUB_REPOSITORY:GITHUB_RUN_ID (unchanged on retries).
+    required: false
+  label:
+    description: Optional deployment name.
+    required: false
+  repository:
+    description: Repository owner/name or URL. Defaults to GITHUB_REPOSITORY.
+    required: false
+  commit-sha:
+    description: Deployed commit SHA. Defaults to GITHUB_SHA.
+    required: false
+  branch:
+    description: Deployed branch or tag. Defaults to GITHUB_REF_NAME.
+    required: false
+  rotate-existing-token:
+    description: Explicitly rotate the token when external-id already exists. Invalidates its previous token; defaults to failing without rotation.
+    default: "false"
+  output-token:
+    description: Return the masked deployment-token output. Set false for manual setup through Tilde; retries never rotate credentials in this mode.
+    default: "true"
+outputs:
+  deployment-id:
+    description: Registered deployment UUID.
+  deployment-token:
+    description: Masked secret for subsequent steps in this job only; omitted when output-token is false. Never put this in artifacts, logs, summaries, or job outputs.
+  deployment-url:
+    description: Authenticated Tilde deployment page (contains no token).
+  created:
+    description: Whether this run created the deployment.
+runs:
+  using: node24
+  main: index.mjs

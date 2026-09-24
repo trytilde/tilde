@@ -1,0 +1,555 @@
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::aws_api::creds::AwsCredsProvider;
+use crate::bounded_channel::BoundedReceiver;
+use crate::exporters::http::acknowledger::DefaultHTTPAcknowledger;
+use crate::exporters::http::retry::{RetryConfig, RetryPolicy};
+use crate::exporters::shared::aws_signing_service::{AwsSigningService, AwsSigningServiceBuilder};
+use crate::exporters::xray::request_builder::RequestBuilder;
+use crate::exporters::xray::transformer::Transformer;
+
+use crate::exporters::http::client::ResponseDecode;
+use crate::exporters::http::client::{Client, Protocol};
+use crate::exporters::http::exporter::Exporter;
+use crate::exporters::http::request_builder_mapper::RequestBuilderMapper;
+use crate::exporters::http::request_iter::RequestIterator;
+use crate::exporters::http::tls;
+use crate::exporters::http::types::ContentEncoding;
+use crate::topology::flush_control::FlushReceiver;
+use crate::topology::payload::Message;
+use bytes::Bytes;
+use flume::r#async::RecvStream;
+use http::Request;
+use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
+use std::time::Duration;
+use tower::retry::Retry as TowerRetry;
+use tower::timeout::Timeout;
+use tower::{BoxError, ServiceBuilder};
+
+use super::http::finalizer::SuccessStatusFinalizer;
+use super::shared::aws::Region;
+
+mod request_builder;
+mod transformer;
+mod xray_request;
+
+/// Type alias for XRay payloads using the generic MessagePayload
+use crate::exporters::http::metadata_extractor::MessagePayload;
+use http_body_util::Full;
+
+pub type XRayPayload = MessagePayload<Full<Bytes>>;
+
+type SvcType<RespBody> = TowerRetry<
+    RetryPolicy<RespBody>,
+    AwsSigningService<Timeout<Client<XRayPayload, RespBody, XRayTraceDecoder>>>,
+>;
+
+type ExporterType<'a, Resource> = Exporter<
+    RequestIterator<
+        RequestBuilderMapper<
+            RecvStream<'a, Vec<Message<Resource>>>,
+            Resource,
+            XRayPayload,
+            RequestBuilder<Resource, Transformer>,
+        >,
+        Vec<Request<XRayPayload>>,
+        XRayPayload,
+    >,
+    SvcType<String>,
+    XRayPayload,
+    SuccessStatusFinalizer,
+    DefaultHTTPAcknowledger,
+>;
+
+pub struct XRayExporterConfigBuilder {
+    region: Region,
+    custom_endpoint: Option<String>,
+    retry_config: RetryConfig,
+}
+
+impl XRayExporterConfigBuilder {
+    pub fn new(region: Region, custom_endpoint: Option<String>, retry_config: RetryConfig) -> Self {
+        Self {
+            region,
+            custom_endpoint,
+            retry_config,
+        }
+    }
+
+    pub fn set_indefinite_retry(&mut self) {
+        self.retry_config.indefinite_retry = true;
+    }
+
+    pub fn build(self) -> XRayExporterBuilder {
+        XRayExporterBuilder {
+            region: self.region,
+            custom_endpoint: self.custom_endpoint,
+            retry_config: self.retry_config,
+        }
+    }
+}
+
+pub struct XRayExporterBuilder {
+    region: Region,
+    custom_endpoint: Option<String>,
+    retry_config: RetryConfig,
+}
+
+impl XRayExporterBuilder {
+    pub fn build<'a>(
+        self,
+        rx: BoundedReceiver<Vec<Message<ResourceSpans>>>,
+        flush_receiver: Option<FlushReceiver>,
+        environment: String,
+        creds_provider: AwsCredsProvider,
+    ) -> Result<ExporterType<'a, ResourceSpans>, BoxError> {
+        use crate::exporters::http::client::{
+            DEFAULT_POOL_IDLE_TIMEOUT, DEFAULT_POOL_MAX_IDLE_PER_HOST,
+        };
+        let client = Client::build(
+            tls::Config::default(),
+            Protocol::Http,
+            Default::default(),
+            DEFAULT_POOL_IDLE_TIMEOUT,
+            DEFAULT_POOL_MAX_IDLE_PER_HOST,
+        )?;
+        let transformer = Transformer::new(environment);
+
+        let req_builder =
+            RequestBuilder::new(transformer, self.region, self.custom_endpoint.clone())?;
+
+        let retry_layer = RetryPolicy::new(self.retry_config, None);
+        let retry_broadcast = retry_layer.retry_broadcast();
+
+        let region = self.region.to_string();
+        let signing_builder =
+            AwsSigningServiceBuilder::new("xray", region.as_str(), creds_provider);
+
+        let svc = ServiceBuilder::new()
+            .retry(retry_layer)
+            .layer_fn(|inner| signing_builder.clone().build(inner))
+            .timeout(Duration::from_secs(5))
+            .service(client);
+
+        let enc_stream =
+            RequestIterator::new(RequestBuilderMapper::new(rx.into_stream(), req_builder));
+
+        let exp = Exporter::new(
+            "x-ray",
+            "traces",
+            enc_stream,
+            svc,
+            SuccessStatusFinalizer::default(),
+            DefaultHTTPAcknowledger::default(),
+            flush_receiver,
+            retry_broadcast,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        );
+
+        Ok(exp)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct XRayTraceDecoder;
+
+impl ResponseDecode<String> for XRayTraceDecoder {
+    fn decode(&self, _: Bytes, _: ContentEncoding) -> Result<String, BoxError> {
+        Ok(String::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate utilities;
+
+    use crate::aws_api::creds::{AwsCreds, AwsCredsProvider};
+    use crate::bounded_channel::{BoundedReceiver, bounded};
+    use crate::exporters::crypto_init_tests::init_crypto;
+    use crate::exporters::http::retry::RetryConfig;
+    use crate::exporters::xray::{ExporterType, Region, XRayExporterConfigBuilder};
+    use crate::topology::payload::{KafkaAcknowledgement, KafkaMetadata, Message, MessageMetadata};
+    use httpmock::prelude::*;
+    use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
+    use std::time::Duration;
+    use tokio::join;
+    use tokio_test::{assert_err, assert_ok};
+    use tokio_util::sync::CancellationToken;
+    use utilities::otlp::FakeOTLP;
+
+    #[test_log::test(tokio::test)]
+    async fn success_and_retry() {
+        init_crypto();
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        let hello_mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(200)
+                .header("content-type", "application/x-protobuf")
+                .body("ohi");
+        });
+
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+        let exporter = new_exporter(addr, brx);
+
+        let cancellation_token = CancellationToken::new();
+
+        let cancel_clone = cancellation_token.clone();
+        let jh = tokio::spawn(async move { exporter.start(cancel_clone).await.unwrap() });
+
+        let traces = FakeOTLP::trace_service_request();
+        btx.send(vec![Message {
+            metadata: None,
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+        drop(btx);
+        let res = join!(jh);
+        assert_ok!(res.0);
+
+        hello_mock.assert();
+
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        let hello_mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(429)
+                .header("content-type", "application/x-protobuf")
+                .body("hold up");
+        });
+
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+        let exporter = new_exporter(addr, brx);
+
+        let cancellation_token = CancellationToken::new();
+
+        let cancel_clone = cancellation_token.clone();
+        let jh = tokio::spawn(async move { exporter.start(cancel_clone).await });
+
+        let traces = FakeOTLP::trace_service_request();
+        btx.send(vec![Message {
+            metadata: None,
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+        drop(btx);
+        let res = join!(jh);
+        assert_err!(res.0.unwrap()); // failed to drain
+
+        assert!(hello_mock.hits() >= 3); // somewhat timing dependent
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_message_acknowledgment_flow() {
+        init_crypto();
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        // Mock XRay endpoint
+        let _mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(200)
+                .header("content-type", "application/x-protobuf")
+                .body("ok");
+        });
+
+        // Create acknowledgment channel for real acknowledgment flow
+        let (ack_tx, mut ack_rx) = crate::bounded_channel::bounded(1);
+
+        // Create metadata with real acknowledgment channel
+        let metadata = MessageMetadata::kafka(crate::topology::payload::KafkaMetadata {
+            offset: 123,
+            partition: 0,
+            topic_id: 1,
+            ack_chan: Some(ack_tx),
+        });
+
+        // Create a channel for sending messages with metadata
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+
+        // Use DefaultHTTPAcknowledger to test real acknowledgment flow
+        let exporter = new_exporter(addr, brx);
+
+        // Start exporter
+        let cancellation_token = CancellationToken::new();
+        let cancel_clone = cancellation_token.clone();
+        let exporter_handle =
+            tokio::spawn(async move { exporter.start(cancel_clone).await.unwrap() });
+
+        // Send traces with metadata
+        let traces = FakeOTLP::trace_service_request();
+        btx.send(vec![Message {
+            metadata: Some(metadata),
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+
+        // Wait for acknowledgment or timeout
+        let ack_received = tokio::select! {
+            result = ack_rx.next() => {
+                match result {
+                    Some(_) => true,  // Acknowledgment received
+                    None => false,    // Channel closed without acknowledgment
+                }
+            }
+            _ = tokio::time::sleep(Duration::from_millis(5000)) => false, // Timeout
+        };
+
+        // Clean up
+        drop(btx);
+        cancellation_token.cancel();
+        let _ = exporter_handle.await;
+
+        // ASSERTION: This should pass since XRay now properly acknowledges messages
+        assert!(
+            ack_received,
+            "Message was not acknowledged by XRay exporter - real acknowledgment flow failed!"
+        );
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn splits_payload() {
+        init_crypto();
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        let hello_mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(200)
+                .header("content-type", "application/x-protobuf")
+                .body("ohi");
+        });
+
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+        let exporter = new_exporter(addr, brx);
+
+        let cancellation_token = CancellationToken::new();
+
+        let cancel_clone = cancellation_token.clone();
+        let jh = tokio::spawn(async move { exporter.start(cancel_clone).await.unwrap() });
+
+        let traces = FakeOTLP::trace_service_request_with_spans(1, 51);
+        btx.send(vec![Message {
+            metadata: None,
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+        drop(btx);
+        let res = join!(jh);
+        assert_ok!(res.0);
+
+        assert_eq!(2, hello_mock.hits());
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_multi_chunk_acknowledgment_flow() {
+        init_crypto();
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        // Mock server that accepts all requests
+        let hello_mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(200)
+                .header("content-type", "application/x-protobuf")
+                .body("success");
+        });
+
+        // Create acknowledgment channel
+        let (ack_tx, mut ack_rx) = bounded(10);
+        let expected_offset = 123;
+        let expected_partition = 1;
+        let expected_topic_id = 2;
+        let metadata = MessageMetadata::kafka(KafkaMetadata {
+            offset: expected_offset,
+            partition: expected_partition,
+            topic_id: expected_topic_id,
+            ack_chan: Some(ack_tx),
+        });
+
+        // Create exporter
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+        let exporter = new_exporter(addr, brx);
+
+        // Start exporter
+        let cancellation_token = CancellationToken::new();
+        let cancel_clone = cancellation_token.clone();
+        let exporter_handle =
+            tokio::spawn(async move { exporter.start(cancel_clone).await.unwrap() });
+
+        // Send traces with 75 spans (should split into 2 chunks: 50 + 25)
+        let traces = FakeOTLP::trace_service_request_with_spans(1, 75);
+
+        btx.send(vec![Message {
+            metadata: Some(metadata),
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+
+        // Wait for the expected acknowledgment with timeout
+        let (ack_count, received_acks) =
+            match tokio::time::timeout(Duration::from_millis(10000), ack_rx.next()).await {
+                Ok(Some(ack)) => (1, vec![ack]),
+                Ok(None) => {
+                    // Channel closed without receiving acknowledgment
+                    (0, vec![])
+                }
+                Err(_) => {
+                    // Timeout occurred
+                    (0, vec![])
+                }
+            };
+
+        // Clean up
+        drop(btx);
+        cancellation_token.cancel();
+        let _ = exporter_handle.await;
+
+        // Verify the server received 2 requests (75 spans split into 50+25)
+        let actual_hits = hello_mock.hits();
+        assert_eq!(2, actual_hits, "Expected 2 HTTP requests for 75 spans");
+
+        // Verify acknowledgment behavior
+        for ack in received_acks.iter() {
+            match ack {
+                KafkaAcknowledgement::Ack(kafka_ack) => {
+                    assert_eq!(kafka_ack.offset, expected_offset);
+                    assert_eq!(kafka_ack.partition, expected_partition);
+                    assert_eq!(kafka_ack.topic_id, expected_topic_id);
+                }
+                KafkaAcknowledgement::Nack(_) => {
+                    panic!("Received Nack instead of Ack");
+                }
+            }
+        }
+
+        assert_eq!(
+            ack_count, 1,
+            "Expected exactly 1 acknowledgment for multi-chunk XRay request, got {}",
+            ack_count
+        );
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_exact_multiple_of_50_spans_acknowledgment() {
+        init_crypto();
+        let server = MockServer::start();
+        let addr = format!("http://127.0.0.1:{}", server.port());
+
+        // Mock server that accepts all requests
+        let hello_mock = server.mock(|when, then| {
+            when.method(POST).path("/TraceSegments");
+            then.status(200)
+                .header("content-type", "application/x-protobuf")
+                .body("success");
+        });
+
+        // Create acknowledgment channel
+        let (ack_tx, mut ack_rx) = bounded(10);
+        let expected_offset = 200;
+        let expected_partition = 2;
+        let expected_topic_id = 3;
+        let metadata = MessageMetadata::kafka(KafkaMetadata {
+            offset: expected_offset,
+            partition: expected_partition,
+            topic_id: expected_topic_id,
+            ack_chan: Some(ack_tx),
+        });
+
+        // Create exporter
+        let (btx, brx) = bounded::<Vec<Message<ResourceSpans>>>(100);
+        let exporter = new_exporter(addr, brx);
+
+        // Start exporter
+        let cancellation_token = CancellationToken::new();
+        let cancel_clone = cancellation_token.clone();
+        let exporter_handle =
+            tokio::spawn(async move { exporter.start(cancel_clone).await.unwrap() });
+
+        // Send traces with exactly 100 spans (should split into exactly 2 chunks: 50 + 50)
+        let traces = FakeOTLP::trace_service_request_with_spans(1, 100);
+
+        btx.send(vec![Message {
+            metadata: Some(metadata),
+            request_context: None,
+            payload: traces.resource_spans,
+        }])
+        .await
+        .unwrap();
+
+        // Wait for the expected acknowledgment with timeout
+        let (ack_count, received_acks) =
+            match tokio::time::timeout(Duration::from_millis(10000), ack_rx.next()).await {
+                Ok(Some(ack)) => (1, vec![ack]),
+                Ok(None) => (0, vec![]),
+                Err(_) => (0, vec![]),
+            };
+
+        // Clean up
+        drop(btx);
+        cancellation_token.cancel();
+        let _ = exporter_handle.await;
+
+        // Verify the server received exactly 2 requests (100 spans split into 50+50)
+        let actual_hits = hello_mock.hits();
+        assert_eq!(
+            2, actual_hits,
+            "Expected exactly 2 HTTP requests for 100 spans"
+        );
+
+        // Verify acknowledgment behavior
+        for ack in received_acks.iter() {
+            match ack {
+                KafkaAcknowledgement::Ack(kafka_ack) => {
+                    assert_eq!(kafka_ack.offset, expected_offset);
+                    assert_eq!(kafka_ack.partition, expected_partition);
+                    assert_eq!(kafka_ack.topic_id, expected_topic_id);
+                }
+                KafkaAcknowledgement::Nack(_) => {
+                    panic!("Received Nack instead of Ack");
+                }
+            }
+        }
+
+        assert_eq!(
+            ack_count, 1,
+            "Expected exactly 1 acknowledgment for 100-span (multiple of 50) XRay request, got {}",
+            ack_count
+        );
+    }
+
+    fn new_exporter<'a>(
+        addr: String,
+        brx: BoundedReceiver<Vec<Message<ResourceSpans>>>,
+    ) -> ExporterType<'a, ResourceSpans> {
+        let creds = AwsCreds::new("".to_string(), "".to_string(), None);
+        let retry = RetryConfig::new(
+            Duration::from_millis(10),
+            Duration::from_millis(50),
+            Duration::from_millis(50),
+            false,
+        );
+        XRayExporterConfigBuilder::new(Region::UsEast1, Some(addr), retry)
+            .build()
+            .build(
+                brx,
+                None,
+                "production".to_string(),
+                AwsCredsProvider::from_static(creds),
+            )
+            .unwrap()
+    }
+}

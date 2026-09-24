@@ -1,0 +1,16 @@
+# LiteLLM proxy pointed at the shared mock upstream (and real OpenAI when a key is present).
+model_list:
+  - model_name: gpt-mock
+    litellm_params:
+      model: openai/gpt-mock
+      api_base: http://host.docker.internal:18300/v1
+      api_key: sk-mock
+  - model_name: gpt-real
+    litellm_params:
+      model: openai/gpt-5-nano
+      api_key: os.environ/OPENAI_API_KEY
+general_settings:
+  master_key: sk-bench-master
+litellm_settings:
+  drop_params: true
+  set_verbose: false

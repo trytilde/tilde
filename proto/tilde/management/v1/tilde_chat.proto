@@ -1,0 +1,13 @@
+syntax = "proto3";
+package tilde.management.v1;
+// The application API key of an agent's built-in Tilde connection. Access policy and
+// identities use AgentAccessService like every other chat provider; conversation
+// operations belong to the provider.
+service TildeChatProviderService {
+ rpc GetCredentials(GetCredentialsRequest) returns (GetCredentialsResponse);
+ rpc RotateCredentials(RotateCredentialsRequest) returns (RotateCredentialsResponse);
+}
+message GetCredentialsRequest { string agent_id = 1; }
+message GetCredentialsResponse { string api_key = 1 [debug_redact = true]; }
+message RotateCredentialsRequest { string agent_id = 1; }
+message RotateCredentialsResponse { string api_key = 1 [debug_redact = true]; }
