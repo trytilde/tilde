@@ -126,8 +126,10 @@ try {
   const { apiKey } = await management.tildeChat.getCredentials({ agentId: agent.id });
   assert.equal((await management.tildeChat.getCredentials({ agentId: agent.id })).apiKey, apiKey);
   // The agent's Tilde connection starts private; open it so asserted identities are admitted.
-  const { routes } = await management.access.listChannelAccess({ agentId: agent.id });
-  const tildeRoute = routes.find((route) => route.providerId === "tilde");
+  const { routes: channelRoutes } = await management.access.listChannelAccess({
+    agentId: agent.id,
+  });
+  const tildeRoute = channelRoutes.find((route) => route.providerId === "tilde");
   assert(tildeRoute, "every agent owns a Tilde connection");
   await management.access.setChannelAccess({
     agentId: agent.id,
