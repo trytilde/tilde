@@ -1,6 +1,6 @@
 [project]
 name = "trytilde-crewai"
-version = "0.1.0"
+version = "3.0.0"
 description = "Tilde adapter for CrewAI: convert invocation history to CrewAI messages and channel tools to CrewAI tools"
 readme = "README.md"
 license = "Apache-2.0"

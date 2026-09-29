@@ -1,6 +1,6 @@
 [project]
 name = "trytilde"
-version = "0.1.0"
+version = "3.0.0"
 description = "Tilde agent SDK for Python: dial-in agent hosts, invocation context, channel tools, FastAPI integration and the chat proxy"
 readme = "README.md"
 license = "Apache-2.0"

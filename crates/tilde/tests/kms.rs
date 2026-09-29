@@ -43,7 +43,7 @@ async fn kms(
     let target = headers.get("x-amz-target").unwrap().to_str().unwrap();
     let mut calls = state.calls.lock().unwrap();
     let valid =
-        body["KeyId"] == "alias/test" && body["EncryptionContext"]["application"] == "agent-engine";
+        body["KeyId"] == "alias/test" && body["EncryptionContext"]["application"] == "tilde";
     if !valid {
         return Err((
             StatusCode::BAD_REQUEST,

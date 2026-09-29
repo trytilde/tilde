@@ -3,32 +3,32 @@ revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
-    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents')",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')",
-    "python_full_version == '3.13.*' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform != 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version == '3.12.*' and sys_platform == 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version < '3.12' and sys_platform == 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version < '3.12' and sys_platform != 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
-    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents')",
-    "python_full_version == '3.13.*' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform == 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version >= '3.14' and sys_platform != 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version == '3.13.*' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version == '3.13.*' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents'",
     "python_full_version == '3.12.*' and sys_platform == 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
-    "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents')",
+    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra == 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')",
+    "python_full_version < '3.12' and sys_platform == 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "python_full_version < '3.12' and sys_platform != 'win32' and extra == 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
+    "(python_full_version < '3.14' and sys_platform != 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents') or (python_full_version < '3.12' and sys_platform == 'emscripten' and extra != 'project-15-trytilde-crewai' and extra != 'project-20-example-agent-crewai' and extra != 'project-22-trytilde-openai-agents' and extra == 'project-27-example-agent-openai-agents')",
+    "python_full_version < '3.12' and sys_platform == 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
     "python_full_version < '3.12' and sys_platform != 'win32' and extra != 'project-15-trytilde-crewai' and extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents'",
 ]
 conflicts = [[
@@ -1704,13 +1704,13 @@ name = "jiter"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6e/c1/0cddc6eb17d4c53a99840953f95dd3accdc5cfc7a337b0e9b26476276be9/jiter-0.14.0.tar.gz", hash = "sha256:e8a39e66dac7153cf3f964a12aad515afa8d74938ec5cc0018adcdae5367c79e", size = 165725, upload-time = "2026-04-10T14:28:42.01Z" }
@@ -1805,8 +1805,8 @@ version = "0.17.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9c/1f/8176d92e001f86505424b41664032ae26a882bc9ca41a32c803f373f9195/jiter-0.17.0.tar.gz", hash = "sha256:03e432f226a453851079fb84cd17c6da9991eab723e28d716f14ae3d906e0c12", size = 229037, upload-time = "2026-09-12T15:14:14.253Z" }
@@ -2348,13 +2348,13 @@ name = "mcp"
 version = "1.28.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -2384,8 +2384,8 @@ version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -2824,9 +2824,9 @@ name = "numpy"
 version = "2.5.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
@@ -2952,13 +2952,13 @@ name = "openai"
 version = "2.54.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -2982,8 +2982,8 @@ version = "3.14.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -3935,13 +3935,13 @@ name = "pydantic"
 version = "2.12.5"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -3961,8 +3961,8 @@ version = "2.13.5"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -3981,13 +3981,13 @@ name = "pydantic-ai-slim"
 version = "2.31.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -4017,8 +4017,8 @@ version = "2.43.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -4047,13 +4047,13 @@ name = "pydantic-core"
 version = "2.41.5"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -4155,8 +4155,8 @@ version = "2.46.5"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -4262,13 +4262,13 @@ name = "pydantic-graph"
 version = "2.31.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -4289,8 +4289,8 @@ version = "2.43.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -4609,13 +4609,13 @@ name = "regex"
 version = "2026.1.15"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/86/07d5056945f9ec4590b518171c4254a5925832eb727b56d3c38a7476f316/regex-2026.1.15.tar.gz", hash = "sha256:164759aa25575cbc0651bef59a0b18353e54300d79ace8084c818ad8ac72b7d5", size = 414811, upload-time = "2026-01-14T23:18:02.775Z" }
@@ -4724,8 +4724,8 @@ version = "2026.9.10"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/5c/f403115361de25809e8f785686ec7096e30fef73be9ae35aa51da4e80abb/regex-2026.9.10.tar.gz", hash = "sha256:1e321e2c84f0e52c457f5ea5944f796d6e8e09cb99738ea98dcc1bfe402a128d", size = 417072, upload-time = "2026-09-09T21:00:21.521Z" }
@@ -4889,13 +4889,13 @@ name = "rich"
 version = "14.3.4"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.13.*'",
     "python_full_version >= '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.14' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
@@ -4913,8 +4913,8 @@ version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 dependencies = [
@@ -5345,7 +5345,7 @@ wheels = [
 
 [[package]]
 name = "trytilde"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde" }
 dependencies = [
     { name = "connectrpc" },
@@ -5375,7 +5375,7 @@ provides-extras = ["fastapi"]
 
 [[package]]
 name = "trytilde-agno"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde-agno" }
 dependencies = [
     { name = "agno" },
@@ -5390,7 +5390,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-crewai"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde-crewai" }
 dependencies = [
     { name = "crewai", marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
@@ -5405,7 +5405,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-langchain"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde-langchain" }
 dependencies = [
     { name = "langchain-core" },
@@ -5420,7 +5420,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-openai-agents"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde-openai-agents" }
 dependencies = [
     { name = "openai-agents", marker = "extra == 'project-22-trytilde-openai-agents' or extra == 'project-27-example-agent-openai-agents'" },
@@ -5435,7 +5435,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-pydantic-ai"
-version = "0.1.0"
+version = "3.0.0"
 source = { editable = "packages/tilde-pydantic-ai" }
 dependencies = [
     { name = "pydantic-ai-slim", version = "2.31.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },

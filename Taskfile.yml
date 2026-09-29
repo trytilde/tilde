@@ -394,6 +394,7 @@ tasks:
       - changie merge
       - cargo metadata --offline --format-version 1 > /dev/null
       - pnpm --dir sdk/ts install --lockfile-only --offline --ignore-scripts
+      - uv lock --project sdk/py
       - task: version:check
 
   release:archive:

@@ -279,11 +279,11 @@ fn random_nonce() -> [u8; 12] {
     nonce
 }
 fn wrap_context(id: Uuid) -> Vec<u8> {
-    format!("agent-engine:data-key:v1:{id}").into_bytes()
+    format!("tilde:data-key:v1:{id}").into_bytes()
 }
 fn secret_context(key: Uuid, binding: SecretBinding<'_>) -> Result<Vec<u8>, Error> {
     serde_json::to_vec(&(
-        "agent-engine:secret",
+        "tilde:secret",
         FORMAT_VERSION,
         key,
         binding.resource_kind,
@@ -325,7 +325,7 @@ fn decrypt(
 
 fn kms_context(id: Uuid) -> BTreeMap<String, String> {
     BTreeMap::from([
-        ("application".into(), "agent-engine".into()),
+        ("application".into(), "tilde".into()),
         ("data_key_id".into(), id.to_string()),
     ])
 }

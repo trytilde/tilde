@@ -1,4 +1,0 @@
-kind: Removed
-body: >-
-  Remove every gateway-to-agent and sidecar-to-agent HTTP call. Agent hosts only dial in (`connectAgent` / `connect_agent`) and receive wakes as `RunService.Watch` frames; the `AgentService` Invoke/Healthz contract, `createAgentServer`/`createAgentHandler`, wake signatures, agent endpoint URLs, webhook signing keys, the sidecar HTTP fallback (`ENGINE_SIDECAR_AGENT_ENDPOINTS`) and HTTP health probes are gone. Sidecar replicas no longer call each other: work for a conversation held elsewhere goes through the gateway. Agent creation no longer creates a deployment; readiness comes from heartbeats.
-time: 2026-09-17T12:00:00.000000000+02:00

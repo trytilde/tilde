@@ -1,6 +1,6 @@
 [project]
 name = "trytilde-agno"
-version = "0.1.0"
+version = "3.0.0"
 description = "Tilde adapter for Agno: convert invocation history to Agno messages and channel tools to Agno functions"
 readme = "README.md"
 license = "Apache-2.0"

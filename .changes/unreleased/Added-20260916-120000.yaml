@@ -1,3 +1,0 @@
-kind: Added
-body: Inference gateway that forwards agents' provider SDK traffic (OpenAI, Anthropic, Azure OpenAI, Azure AI, Google AI Studio, Bedrock, Baseten, Cerebras, Vercel AI Gateway, Cohere, Voyage) by connection slug with the invocation token, swaps credentials from memory on gateway and sidecar, accounts usage off the request path, and warms channel tools, credentials and first-page history when an invocation starts.
-time: 2026-09-16T12:00:00.000000000+02:00
