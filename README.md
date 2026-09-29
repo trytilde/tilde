@@ -62,7 +62,7 @@ task release:prepare -- patch    # Or minor, major, auto, or v1.2.3
 Like `tilde-api`, `auto` selects a **major** bump for Added, Changed, or Removed.
 Use an explicit bump when preparing a patch or minor release. Release preparation
 batches fragments, merges the changelog, updates package versions, refreshes
-lockfiles offline, and checks version agreement. Install dependencies first with
+the Cargo, pnpm and uv lockfiles, and checks version agreement. Install dependencies first with
 `task setup` and `cargo fetch --locked`. Review and commit the generated changes
 together before tagging `v<version>` and building/publishing the release artifacts.
 `release:prepare` only prepares versions locally. `task sdk:pack` builds public SDK
@@ -78,14 +78,16 @@ to npm (`-- --dry-run` previews publishing).
   embedded UI, uploads archives/checksums and npm tarballs, and builds/tests the
   Linux amd64 Docker image without pushing it.
 - **Create Release PR** is manually dispatched on the default branch. Select a
-  patch/minor/major/auto bump; it updates `codex/release` with versions, lockfiles,
+  patch/minor/major/auto bump or give an explicit version; it updates `codex/release` with versions, lockfiles,
   release notes, and a blank acknowledgement so the PR passes the fragment rule.
-- **Release** is manually dispatched on the default branch after merging that PR.
-  It reruns Changie, Check, and Build against the dispatch commit, creates the
-  `v<version>` tag and a draft release with artifacts, publishes public SDK packages
-  to npm and `ghcr.io/<owner>/<repository>:<version>` plus `:latest`, then makes the
-  GitHub release public. Rust crates remain internal build dependencies; the Rust
-  distribution is the binary/container, not crates.io packages.
+- **Release** runs when that PR's `VERSION` change lands on the default branch, and
+  can be dispatched there to rerun a release. It reruns Changie, Check, and Build,
+  creates the `v<version>` tag and a draft release with artifacts, publishes every
+  public `@trytilde/*` SDK package to npm and the open-source image
+  `ghcr.io/trytilde/tilde` as `<version>`, `<major>.<minor>` and `latest`, then makes
+  the GitHub release public. Rust crates remain internal build dependencies; the Rust
+  distribution is the binary/container, not crates.io packages. The proprietary
+  `ghcr.io/trytilde/tilde-cloud` image is released from `trytilde/tilde-cloud`.
 
 Configure `GIT_BOT_TOKEN` with repository contents and pull-request write access
 for release PR creation; a bot token allows the PR to trigger CI. Configure
@@ -95,7 +97,9 @@ use the repository's `GITHUB_TOKEN`; allow Actions to write packages and release
 Require the Changie, Check, and Build checks before merging release PRs.
 
 Publishing currently accepts stable semantic versions only. All public SDK packages
-release together and pnpm skips versions already published. If publishing partially
+release together and pnpm skips versions already published. Releases start at 3.0.0,
+above the `@trytilde/sdk` (0.3.0) and `@trytilde/sdk-vercel-ai-node` (2.0.0) versions
+published from `trytilde/dispatch`, so no release version can collide with them. If publishing partially
 fails, rerun the failed jobs for the **same workflow run/commit**; the GitHub release
 stays a draft until both registries succeed. A tag pointing at another commit is
 rejected, and a completed release cannot be republished through this workflow.

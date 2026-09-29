@@ -10,7 +10,7 @@ fi
 tag="v$version"
 test "$(changie latest)" = "$tag"
 changie merge
-git diff --exit-code -- CHANGELOG.md VERSION Cargo.toml sdk/ts/packages
+git diff --exit-code -- CHANGELOG.md VERSION Cargo.toml sdk/ts/packages sdk/py/packages
 if git show-ref --verify --quiet "refs/tags/$tag"; then
   test "$(git rev-list -n 1 "$tag")" = "$(git rev-parse HEAD)" || {
     echo "$tag already points at another commit; prepare a new version." >&2

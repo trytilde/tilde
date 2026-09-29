@@ -8,6 +8,10 @@ on:
         options: [patch, minor, major, auto]
         default: patch
         required: true
+      version:
+        description: Explicit release version such as v0.5.0 (overrides bump)
+        type: string
+        required: false
 permissions:
   contents: write
   pull-requests: write
@@ -31,10 +35,11 @@ jobs:
       - name: Prepare versions and lockfiles
         env:
           RELEASE_BUMP: ${{ inputs.bump }}
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
           pnpm --dir sdk/ts install --frozen-lockfile --ignore-scripts
           cargo fetch --locked
-          task release:prepare -- "$RELEASE_BUMP"
+          task release:prepare -- "${RELEASE_VERSION:-$RELEASE_BUMP}"
           python3 scripts/release-acknowledgement.py
       - name: Read release version
         id: version
@@ -58,3 +63,5 @@ jobs:
             Cargo.lock
             sdk/ts/packages/*/package.json
             sdk/ts/pnpm-lock.yaml
+            sdk/py/packages/*/pyproject.toml
+            sdk/py/uv.lock

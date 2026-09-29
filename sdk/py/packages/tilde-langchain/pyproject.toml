@@ -1,6 +1,6 @@
 [project]
 name = "trytilde-langchain"
-version = "0.1.0"
+version = "3.0.0"
 description = "Tilde adapter for LangChain and LangGraph: typed context to LangChain messages and channel tools"
 readme = "README.md"
 license = "Apache-2.0"

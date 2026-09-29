@@ -30,11 +30,11 @@ COPY --from=web /src/web/provider-dist web/provider-dist
 RUN cargo build --locked --release --features embedded-web --bins
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 libsystemd0 && apt-get clean && useradd --uid 10001 --create-home engine
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 libsystemd0 && apt-get clean && useradd --uid 10001 --create-home tilde
 COPY --from=rust /src/target/release/tilde /usr/local/bin/tilde
 COPY --from=rust /src/target/release/tilde-sidecar /usr/local/bin/tilde-sidecar
-RUN install -d -o engine -g engine -m 0700 /var/lib/tilde/log-queue
+RUN install -d -o tilde -g tilde -m 0700 /var/lib/tilde/log-queue
 ENV LOGS_QUEUE_DIR=/var/lib/tilde/log-queue
-USER engine
+USER tilde
 EXPOSE 8080 8081 8082
 ENTRYPOINT ["/usr/local/bin/tilde"]
