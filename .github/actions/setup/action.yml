@@ -23,10 +23,31 @@ runs:
     - uses: astral-sh/setup-uv@v6
       with:
         version: "0.12.13"
+        enable-cache: true
+        cache-dependency-glob: sdk/py/uv.lock
     - uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: 1.98.1
         components: rustfmt, clippy
+    # .cargo/config.toml compiles through sccache; here it caches in the GitHub Actions cache, so
+    # jobs reuse compiled crates instead of rebuilding the workspace and vendored Rotel.
+    - uses: mozilla-actions/sccache-action@v0.0.9
+    - name: Use the GitHub Actions cache for sccache
+      shell: bash
+      run: echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+    # The Cargo registry and installed tools (cornucopia); sccache covers compiled crates.
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: tilde
+        cache-targets: false
+    # Pinned code generators that `pnpm tools` downloads.
+    - uses: actions/cache@v4
+      with:
+        path: .tools
+        key: codegen-${{ runner.os }}-${{ hashFiles('scripts/install-codegen.mjs') }}
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-nextest
     # protoc: the vendored Rotel crate compiles its Datadog protos at build time.
     - name: Install Linux build dependencies
       if: runner.os == 'Linux'

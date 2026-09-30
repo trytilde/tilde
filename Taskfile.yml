@@ -11,6 +11,8 @@ tasks:
   setup:
     desc: Install JavaScript dependencies and pinned Protobuf generators
     cmds:
+      # .cargo/config.toml compiles through sccache; install it (without itself) when missing.
+      - command -v sccache > /dev/null || RUSTC_WRAPPER= cargo install sccache --locked
       - pnpm install --frozen-lockfile
       - pnpm tools
       - pnpm --dir sdk/ts install --frozen-lockfile
@@ -60,7 +62,7 @@ tasks:
   test:session-metadata:
     desc: Verify session metadata through trace delivery and session reads
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test session_metadata --test trace_store
+      - scripts/with-postgres.sh cargo nextest run -p tilde --test session_metadata --test trace_store
 
   test:deployment-action:
     desc: Test the standalone GitHub deployment action
@@ -87,7 +89,7 @@ tasks:
   test:sidecar:
     desc: Exercise two in-process sidecar replicas, gateway projection, forwarding and failover
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test sidecars
+      - scripts/with-postgres.sh cargo nextest run -p tilde --test sidecars
 
   build:
     desc: Build the complete release binary with the React UI embedded
@@ -158,7 +160,7 @@ tasks:
         TEST_CLICKHOUSE_USER="${ENGINE_CLICKHOUSE_USER:-tilde}"
         TEST_CLICKHOUSE_PASSWORD="${ENGINE_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
         TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
-        scripts/with-postgres.sh cargo test -p tilde --test logs -- --include-ignored
+        scripts/with-postgres.sh cargo nextest run -p tilde --test logs --run-ignored all
       - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
 
   dev:logs:
@@ -235,13 +237,13 @@ tasks:
     desc: Verify agent uploads against local MinIO and disposable Postgres
     cmds:
       - task: dev:s3
-      - scripts/with-postgres.sh cargo test -p tilde --test agent_avatar
+      - scripts/with-postgres.sh cargo nextest run -p tilde --test agent_avatar
 
   test:chat:
     desc: Test all six chat providers against local HTTP fixtures and disposable Postgres
     dotenv: [".env.test.local", ".env.test"]
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test chat_connections_audit --test chat_tools
+      - scripts/with-postgres.sh cargo nextest run -p tilde --test chat_connections_audit --test chat_tools
 
   test:
     desc: Run Rust and generated-client tests with disposable Postgres
@@ -268,7 +270,7 @@ tasks:
       - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk/test/prompts.test.mjs sdk/ts/packages/sdk/test/deploy.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs sdk/ts/examples/langchain-example-agent/test/*.test.mjs sdk/ts/examples/openai-agents-example-agent/test/*.test.mjs
       - task: test:sdk:py
       - pnpm --dir sdk/ts exec tsc --noEmit --strict --skipLibCheck --target ES2023 --module NodeNext packages/sdk/test/channel-types.ts
-      - cargo test --workspace
+      - cargo nextest run --workspace --profile ci
       - cargo build --features embedded-web
       - node web/scripts/test-client.mjs
       - scripts/with-postgres.sh node scripts/test-services.mjs
@@ -375,7 +377,7 @@ tasks:
   test:tracing:
     desc: Verify embedded Rotel forwarding and SDK trace propagation
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test tracing
+      - scripts/with-postgres.sh cargo nextest run -p tilde --test tracing
       - pnpm --dir sdk/ts build
       - node --test sdk/ts/packages/sdk/test/tracing.test.mjs
 
@@ -407,5 +409,5 @@ tasks:
       - >-
         TEST_CLICKHOUSE_URL="http://127.0.0.1:${ENGINE_CLICKHOUSE_PORT:-18123}"
         TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
-        scripts/with-postgres.sh cargo test -p tilde --test trace_store --test session_metadata --test tracing --test metrics
+        scripts/with-postgres.sh cargo nextest run -p tilde --test trace_store --test session_metadata --test tracing --test metrics
       - pnpm --dir web exec vitest run src/features/tracing/agent-tracing.test.tsx

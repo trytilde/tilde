@@ -1,0 +1,9 @@
+# Tests run under scripts/with-postgres.sh against one disposable Postgres, plus the local MinIO
+# and ClickHouse; each test creates its own schema, bucket prefix and ids.
+[profile.default]
+# Report a test as slow after a minute and stop it after five, so a hung test fails the run.
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+[profile.ci]
+fail-fast = false
+

@@ -15,6 +15,7 @@ Tilde's goal is to be the ubiqutous harness for AI agents. We want to focus on a
 - simple light interfaces and traits that can have fat implementations. Traits explain functionality, functionality needs to be simple, trait implementation can be complex
 - Keep `docs/` clean. Add documents there only when explicitly asked. Document implementation details and decisions in the relevant source files. If temporary documents are needed to share context with subagents, delete them when that coordination is finished. This overrides automatic documentation or ADR requirements in skills.
 - always zeroize and drop secret values decrypted via encryption crate. always encrypt sensitive info via the encryption crate
+- Run Rust tests with `cargo nextest run` (through `scripts/with-postgres.sh` when they need a database), not `cargo test`. `.config/nextest.toml` holds the profiles.
 - Focus on writing tests that test orchestration across boundaries, not unit tests within a single boundary unless there's sufficient complexity. good test = repository -> local postgres, domain interface A -> domain interface B -> domain interface A -> domain interface C.
 - Keep a file CONTEXT.md up to date with definitions of domain models and how they interact
 - Never assume backwards compatability, always ask first. if not eneded, assume no consumers. drop fields from interfaces and contracts or sql tables
