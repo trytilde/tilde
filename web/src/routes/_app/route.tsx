@@ -15,22 +15,22 @@ function AppLayout() {
       /^\/skills\/(?!catalog$)[^/]+$/.test(state.location.pathname),
   });
   return (
-      <DashboardBreadcrumbProvider>
-        <TooltipProvider>
-          <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset
-              className={
-                fullHeight ? "h-svh min-h-0 overflow-hidden md:h-[calc(100svh-1rem)]" : undefined
-              }
-            >
-              <SiteHeader />
-              <main className="flex min-h-0 flex-1 flex-col">
-                <Outlet />
-              </main>
-            </SidebarInset>
-          </SidebarProvider>
-        </TooltipProvider>
-      </DashboardBreadcrumbProvider>
+    <DashboardBreadcrumbProvider>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset
+            className={
+              fullHeight ? "h-svh min-h-0 overflow-hidden md:h-[calc(100svh-1rem)]" : undefined
+            }
+          >
+            <SiteHeader />
+            <main className="flex min-h-0 flex-1 flex-col">
+              <Outlet />
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
+    </DashboardBreadcrumbProvider>
   );
 }

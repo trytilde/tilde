@@ -208,22 +208,22 @@ export function SkillsPage() {
         </div>
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
-          <div className="flex flex-wrap gap-3">
-            <Pill
-              icon={<LayoutGridIcon />}
-              label="Tilde Catalog"
-              onClick={() => void navigate({ to: "/skills/catalog" })}
-            />
-            <Pill icon={<GitBranchIcon />} label="Add from Git" onClick={() => setDialog("git")} />
-            <Pill
-              icon={<SquarePenIcon />}
-              label="Create in editor"
-              onClick={() => {
-                setEditorGroup(undefined);
-                setDialog("editor");
-              }}
-            />
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <Pill
+            icon={<LayoutGridIcon />}
+            label="Tilde Catalog"
+            onClick={() => void navigate({ to: "/skills/catalog" })}
+          />
+          <Pill icon={<GitBranchIcon />} label="Add from Git" onClick={() => setDialog("git")} />
+          <Pill
+            icon={<SquarePenIcon />}
+            label="Create in editor"
+            onClick={() => {
+              setEditorGroup(undefined);
+              setDialog("editor");
+            }}
+          />
+        </div>
         {failing.length > 0 && (
           <p
             role="status"

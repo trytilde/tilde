@@ -75,9 +75,7 @@ export function credentialFields(type: ConnectionType): CredentialField[] | unde
         required: ["issuer", "private_key"],
       };
     // A client registered at setup needs nothing from the person setting up.
-    else if (
-      client !== OAuthClient.DYNAMIC
-    ) {
+    else if (client !== OAuthClient.DYNAMIC) {
       base = {
         properties: { client_id: { type: "string", title: "Client ID" } },
         required: ["client_id"],

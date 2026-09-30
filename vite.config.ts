@@ -16,6 +16,10 @@ const generated = [
   "crates/queries/**",
   // Canonical generated data from scripts/update-inference-prices.py.
   "crates/tilde/src/inference/prices.json",
+  // Tool catalog snapshots embedded with include_str!: the AWS and curated MCP server tool lists and
+  // Sentry's generated OpenAPI catalog.
+  "crates/tilde/src/tools/mcp_catalog_tools.json",
+  "crates/tilde/src/tools/providers/*/catalog.json",
   ".run/**",
   ".git/**",
 ];

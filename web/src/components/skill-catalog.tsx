@@ -256,9 +256,9 @@ function CatalogGroupPanel({
                 Open skills
               </Link>
             ) : (
-                <Button disabled={busy} onClick={() => void enable()}>
-                  {busy ? "Enabling…" : "Enable"}
-                </Button>
+              <Button disabled={busy} onClick={() => void enable()}>
+                {busy ? "Enabling…" : "Enable"}
+              </Button>
             )}
           </div>
 

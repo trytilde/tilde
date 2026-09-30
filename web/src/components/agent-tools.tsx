@@ -201,20 +201,10 @@ export function AgentTools({ agentId }: { agentId: string }) {
               aria-label="How the agent's tools are offered"
               aria-describedby="tool-mode-description"
             >
-              <TabsTrigger
-                value="direct"
-                disabled={
-                  busy
-                }
-              >
+              <TabsTrigger value="direct" disabled={busy}>
                 Listed directly
               </TabsTrigger>
-              <TabsTrigger
-                value="dynamic"
-                disabled={
-                  busy
-                }
-              >
+              <TabsTrigger value="dynamic" disabled={busy}>
                 Found by search
               </TabsTrigger>
             </TabsList>
@@ -222,27 +212,27 @@ export function AgentTools({ agentId }: { agentId: string }) {
         </div>
       </div>
       <div className="space-y-5 px-4 py-5 lg:px-6">
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                disabled={busy}
-                render={<Button className="cursor-pointer gap-2" />}
-              >
-                <PlusIcon />
-                Add tool
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-56">
-                <DropdownMenuItem onClick={() => setChoosing(true)}>
-                  <CableIcon />
-                  Choose existing
-                </DropdownMenuItem>
-                <DropdownMenuItem render={<Link to="/tools/connections" />}>
-                  <WrenchIcon />
-                  Connect a new tool
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+        <div className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={busy}
+              render={<Button className="cursor-pointer gap-2" />}
+            >
+              <PlusIcon />
+              Add tool
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-56">
+              <DropdownMenuItem onClick={() => setChoosing(true)}>
+                <CableIcon />
+                Choose existing
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link to="/tools/connections" />}>
+                <WrenchIcon />
+                Connect a new tool
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <ChooseExisting
           open={choosing}
           providers={providers}
@@ -301,12 +291,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
               </TableHeader>
               <TableBody>
                 {entries.map((entry) => (
-                  <SourceRows
-                    key={entry.source.id}
-                    entry={entry}
-                    busy={busy}
-                    act={act}
-                  />
+                  <SourceRows key={entry.source.id} entry={entry} busy={busy} act={act} />
                 ))}
                 {bundled.map((group) => (
                   <BundledRows key={group.id} group={group} />
@@ -518,34 +503,30 @@ function SourceRows({
         </TableCell>
         <TableCell className="px-5">
           <span className="flex items-center justify-end">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove ${name}`}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={busy}
-                onClick={() => setRemoving(true)}
-              >
-                <Trash2Icon />
-              </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${name}`}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={busy}
+              onClick={() => setRemoving(true)}
+            >
+              <Trash2Icon />
+            </Button>
           </span>
         </TableCell>
       </TableRow>
       {(expanded ? listed : []).map((tool) => {
         const current = used.get(tool.name);
         // Overrides are the agent's own; clearing one falls back to the tool's text.
-        const editing =
-          !!current &&
-          !busy;
+        const editing = !!current && !busy;
         return (
           <TableRow key={tool.name}>
             <TableCell className="px-5">
               <Switch
                 aria-label={`Use ${tool.name}`}
                 checked={!!current}
-                disabled={
-                  busy
-                }
+                disabled={busy}
                 onCheckedChange={(checked) =>
                   void act(() =>
                     checked
@@ -589,28 +570,13 @@ function SourceRows({
                   }}
                 >
                   <TabsList aria-label={`How ${tool.name} is displayed`}>
-                    <TabsTrigger
-                      value="full"
-                      disabled={
-                        busy
-                      }
-                    >
+                    <TabsTrigger value="full" disabled={busy}>
                       Full
                     </TabsTrigger>
-                    <TabsTrigger
-                      value="summary"
-                      disabled={
-                        busy
-                      }
-                    >
+                    <TabsTrigger value="summary" disabled={busy}>
                       Summary
                     </TabsTrigger>
-                    <TabsTrigger
-                      value="hidden"
-                      disabled={
-                        busy
-                      }
-                    >
+                    <TabsTrigger value="hidden" disabled={busy}>
                       Hidden
                     </TabsTrigger>
                   </TabsList>
@@ -622,9 +588,7 @@ function SourceRows({
                 <Switch
                   aria-label={`Run ${tool.name} in the background`}
                   checked={current.isAsync}
-                  disabled={
-                    busy
-                  }
+                  disabled={busy}
                   onCheckedChange={(checked) => void update(current, tool, { isAsync: checked })}
                 />
               )}

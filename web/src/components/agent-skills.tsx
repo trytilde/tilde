@@ -169,27 +169,27 @@ export function AgentSkills({ agentId }: { agentId: string }) {
           {error || bundled.error}
         </p>
       )}
-        <div className="flex justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              disabled={busy || loading}
-              render={<Button className="cursor-pointer gap-2" />}
-            >
-              <PlusIcon />
-              Add skills
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-56">
-              <DropdownMenuItem onClick={() => setChoosing(true)}>
-                <LayersIcon />
-                Choose existing
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link to="/skills" />}>
-                <SparklesIcon />
-                Add a new skill
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            disabled={busy || loading}
+            render={<Button className="cursor-pointer gap-2" />}
+          >
+            <PlusIcon />
+            Add skills
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-56">
+            <DropdownMenuItem onClick={() => setChoosing(true)}>
+              <LayersIcon />
+              Choose existing
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link to="/skills" />}>
+              <SparklesIcon />
+              Add a new skill
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="overflow-hidden rounded-xl border">
         <Table aria-label="Assigned skills">
           <TableHeader className="bg-background">
@@ -231,9 +231,7 @@ export function AgentSkills({ agentId }: { agentId: string }) {
                             aria-label={`Use every skill in ${group.name}`}
                             title="Every skill in the group, including those a later sync adds."
                             checked={whole}
-                            disabled={
-                              busy
-                            }
+                            disabled={busy}
                             onCheckedChange={(checked) =>
                               void act(
                                 () =>
@@ -295,23 +293,20 @@ export function AgentSkills({ agentId }: { agentId: string }) {
                       </div>
                     </TableCell>
                     <TableCell className="pr-3 text-right">
-                      {
-                          !isBundled &&
-                          removable && (
-                            <RemoveButton
-                              label={`Remove ${group.name}`}
-                              title={`Remove ${group.name} from this agent?`}
-                              description="The agent stops seeing every skill from this group on its next invocation. The group itself is kept."
-                              disabled={busy}
-                              onConfirm={() =>
-                                act(
-                                  () => skills.unassignSkillSource({ agentId, sourceId: group.id }),
-                                  "Unable to remove the group.",
-                                )
-                              }
-                            />
-                          )
-                      }
+                      {!isBundled && removable && (
+                        <RemoveButton
+                          label={`Remove ${group.name}`}
+                          title={`Remove ${group.name} from this agent?`}
+                          description="The agent stops seeing every skill from this group on its next invocation. The group itself is kept."
+                          disabled={busy}
+                          onConfirm={() =>
+                            act(
+                              () => skills.unassignSkillSource({ agentId, sourceId: group.id }),
+                              "Unable to remove the group.",
+                            )
+                          }
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                   {expanded &&
@@ -332,10 +327,7 @@ export function AgentSkills({ agentId }: { agentId: string }) {
                                     : undefined
                                 }
                                 checked={on(row)}
-                                disabled={
-                                  locked ||
-                                  busy
-                                }
+                                disabled={locked || busy}
                                 onCheckedChange={(checked) =>
                                   void act(
                                     () =>
@@ -424,23 +416,23 @@ export function AgentSkills({ agentId }: { agentId: string }) {
                   {count(connectionCount(connection))}
                   {connection.status !== "ready" && ` · ${connection.status || "not ready"}`}
                 </span>
-                  <RemoveButton
-                    size="icon-xs"
-                    label={`Remove ${connection.connectionName}`}
-                    title={`Remove ${connection.connectionName}'s skills from this agent?`}
-                    description="The agent stops seeing the skills linked to this connection. The connection and its other capabilities are kept."
-                    disabled={busy}
-                    onConfirm={() =>
-                      act(
-                        () =>
-                          connections.unassignCapability({
-                            connectionId: connection.connectionId,
-                            assignment: { capability: Capability.SKILLS, agentId },
-                          }),
-                        "Unable to remove the connection's skills.",
-                      )
-                    }
-                  />
+                <RemoveButton
+                  size="icon-xs"
+                  label={`Remove ${connection.connectionName}`}
+                  title={`Remove ${connection.connectionName}'s skills from this agent?`}
+                  description="The agent stops seeing the skills linked to this connection. The connection and its other capabilities are kept."
+                  disabled={busy}
+                  onConfirm={() =>
+                    act(
+                      () =>
+                        connections.unassignCapability({
+                          connectionId: connection.connectionId,
+                          assignment: { capability: Capability.SKILLS, agentId },
+                        }),
+                      "Unable to remove the connection's skills.",
+                    )
+                  }
+                />
               </li>
             ))}
           </ul>

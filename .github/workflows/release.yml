@@ -130,7 +130,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: [trytilde, trytilde-langchain, trytilde-pydantic-ai, trytilde-openai-agents, trytilde-agno, trytilde-crewai]
+        project:
+          - trytilde
+          - trytilde-langchain
+          - trytilde-pydantic-ai
+          - trytilde-openai-agents
+          - trytilde-agno
+          - trytilde-crewai
     environment: pypi-${{ matrix.project }}
     permissions:
       id-token: write
