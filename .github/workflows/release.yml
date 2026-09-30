@@ -120,18 +120,33 @@ jobs:
               npm publish "$tarball" --access public --tag latest
             fi
           done
-  # PyPI trusted publishing: each project trusts this repository's release.yml, so no token
-  # is stored. Attestations need a public repository; enable them once this repository is public.
+  # PyPI trusted publishing: each project trusts this repository's release.yml in its own
+  # environment, pypi-<project>. PyPI allows one pending publisher per owner, repository,
+  # workflow and environment, so the environment is what tells the six projects apart. No
+  # token is stored. Attestations need a public repository; enable them once it is public.
   pypi:
     needs: [version, changie, check, build]
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [trytilde, trytilde-langchain, trytilde-pydantic-ai, trytilde-openai-agents, trytilde-agno, trytilde-crewai]
+    environment: pypi-${{ matrix.project }}
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: python-packages
-          path: dist/py
+          path: dist/all
+      # Wheels and sdists name the project with underscores (trytilde_langchain-3.0.0...).
+      - name: Select this project's distributions
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          mkdir -p dist/py
+          mv dist/all/"${PROJECT//-/_}"-[0-9]* dist/py/
+          ls dist/py
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/py
