@@ -1,4 +1,5 @@
-//! Complete API surfaces for each listener, with independent user, invocation and trace authentication.
+//! Complete API surfaces for each listener. Agent RPCs and trace ingestion authenticate their own
+//! tokens; management routes are unauthenticated and belong behind the operator's proxy.
 use crate::{agent::Agents, chat::Chat};
 use axum::{
     Router,
@@ -12,7 +13,7 @@ use axum::{
 pub fn agent_runtime_router(
     agents: Agents,
     chat: Chat,
-    tracing: &crate::telemetry::Tracing,
+    tracing: &crate::telemetry::tracing::Tracing,
 ) -> Router {
     agent_rpc_router(agents, chat).merge(tracing.agent_ingestion_router())
 }
@@ -22,6 +23,18 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     let mut router = Router::new()
         .merge(crate::agent::rpc::runtime::router(agents, chat.clone()))
         .merge(crate::chat::rpc::runtime::router(chat.clone()));
+    // Prompts and skills live in Postgres; a sidecar relays these RPCs to the gateway instead.
+    if let Ok(pool) = chat.pg() {
+        router = router
+            .merge(crate::prompts::rpc::runtime_router(
+                crate::prompts::Prompts::new(pool.clone()),
+                chat.clone(),
+            ))
+            .merge(crate::skills::rpc::runtime_router(
+                chat.skills().expect("Postgres chat has skills"),
+                chat.clone(),
+            ));
+    }
     // Model calls ride the same invocation token as every other runtime RPC.
     if let Some(inference) = chat.inference.clone() {
         router = router.merge(crate::inference::router(inference));
@@ -29,6 +42,10 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     let mut router = router
         .layer(middleware::from_fn_with_state(chat.clone(), agent_guard))
         .merge(crate::chat::controls::router(chat.clone()));
+    // Tool hosts dial in with their own tokens.
+    if let Some(tools) = &chat.tools {
+        router = router.merge(crate::tools::hosts::router(tools.hosts.clone()));
+    }
     // Hosts that dial in: deployment-token Watch/Heartbeat and capability-scoped Report.
     if let Some(deployments) = chat.deployments.clone() {
         router = router.merge(crate::deployment::run::router(deployments, chat));
@@ -36,12 +53,11 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     router
 }
 
-/// User-facing APIs and provider setup/callbacks. Agent trace ingestion is deliberately absent.
+/// Management APIs and provider setup/callbacks. Agent trace ingestion is deliberately absent.
 pub fn management_router(
     agents: Agents,
     chat: Chat,
     connections: crate::connections::service::Connections,
-    oidc: super::oidc::Oidc,
 ) -> Router {
     let deployments = crate::deployment::Deployments::new(
         chat.pg()
@@ -50,18 +66,10 @@ pub fn management_router(
         chat.encryption.clone(),
         agents.clone(),
         connections.clone(),
-    );
+    )
+    .with_skills(chat.skills().expect("management routes require Postgres"));
     let access = crate::chat::access::AgentAccess::new(connections.clone(), chat.clone());
     Router::new()
-        .merge(oidc.api_keys().router())
-        .merge(
-            super::service::Iam::new(
-                chat.pg()
-                    .expect("management routes require Postgres")
-                    .clone(),
-            )
-            .router(),
-        )
         .merge(crate::identities::Identities::new(connections.clone()).router())
         .merge(crate::agent::rpc::management::router(agents))
         .merge(crate::deployment::rpc::management_router(deployments))
@@ -72,16 +80,26 @@ pub fn management_router(
         .merge(crate::connections::rpc::management::router(
             connections.clone(),
         ))
+        .merge(crate::tools::rpc::router(
+            chat.tools
+                .clone()
+                .unwrap_or_else(|| crate::tools::Tools::new(connections.clone())),
+        ))
         .merge(crate::inference::rpc::router(
             chat.pg()
                 .expect("management routes require Postgres")
                 .clone(),
         ))
-        .layer(middleware::from_fn_with_state(
-            oidc.clone(),
-            super::oidc::management_guard,
+        .merge(crate::prompts::rpc::management_router(
+            crate::prompts::Prompts::new(
+                chat.pg()
+                    .expect("management routes require Postgres")
+                    .clone(),
+            ),
         ))
-        .merge(oidc.router())
+        .merge(crate::skills::rpc::management_router(
+            chat.skills().expect("management routes require Postgres"),
+        ))
         .merge(crate::chat::access::rpc::public_router(access))
         .merge(crate::connections::rpc::setup::router(connections.clone()))
 }

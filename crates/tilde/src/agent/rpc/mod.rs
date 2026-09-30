@@ -25,6 +25,7 @@ pub(super) fn wire(
         capabilities: agent.capabilities.0.wire().into(),
         id: agent.id.to_string(),
         name: agent.name,
+        description: agent.description,
         created_at: timestamp(agent.created_at).into(),
         updated_at: timestamp(agent.updated_at).into(),
         ..Default::default()

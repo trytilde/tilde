@@ -250,6 +250,19 @@ impl ChatService for Rpc {
             ..Default::default()
         })
     }
+    async fn register_bundled_tools<'a>(
+        &'a self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, runtime_pb::RegisterBundledToolsRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<runtime_pb::RegisterBundledToolsResponse> + Send + use<'a>,
+    > {
+        let scope = self.scope(&ctx).await?;
+        self.0
+            .register_bundled_tools(&scope, request.to_owned_message().tools)
+            .await?;
+        Response::ok(runtime_pb::RegisterBundledToolsResponse::default())
+    }
     async fn invoke_tool<'a>(
         &'a self,
         ctx: RequestContext,

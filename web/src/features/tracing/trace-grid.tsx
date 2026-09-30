@@ -23,6 +23,7 @@ import { ProviderIcon } from "@/components/provider-icon";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cost, date, duration, number } from "./format";
 import type { TraceSearch } from "./search";
+import { TableSkeletonRows } from "@/components/table-skeleton";
 
 const features = tableFeatures({ columnSizingFeature });
 const observation = createColumnHelper<typeof features, Observation>();
@@ -177,7 +178,6 @@ export function TraceGrid({
   filter,
   refresh,
   view,
-  ready,
   onInspect,
   onObservations,
 }: {
@@ -185,7 +185,6 @@ export function TraceGrid({
   filter: MessageInitShape<typeof ObservationFilterSchema>;
   refresh: boolean;
   view: string;
-  ready: boolean;
   onInspect: (patch: TraceSearch) => void;
   onObservations: (rows: Observation[]) => void;
 }) {
@@ -193,7 +192,7 @@ export function TraceGrid({
   const [sessionDetails, setSessionDetails] = useState(new Map<string, TraceSessionSummary>());
   const currentRows = useRef<Observation[]>(emptyObservations);
   const [nextCursor, setNextCursor] = useState("");
-  const [busy, setBusy] = useState(ready);
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const request = useRef<AbortController | null>(null);
@@ -201,7 +200,7 @@ export function TraceGrid({
   const received = useRef(new Set<string>());
   const load = useCallback(
     async (cursor: string) => {
-      if (inFlight.current || !ready) return;
+      if (inFlight.current) return;
       inFlight.current = true;
       const abort = new AbortController();
       request.current = abort;
@@ -210,7 +209,7 @@ export function TraceGrid({
       setError("");
       try {
         const page = await traces.listObservations(
-          { agentId, filter, cursor, refresh, includeSessionDetails: view === "sessions" },
+          { agentId, filter, cursor, includeSessionDetails: view === "sessions" },
           { signal: abort.signal },
         );
         if (abort.signal.aborted) return;
@@ -245,7 +244,7 @@ export function TraceGrid({
         }
       }
     },
-    [agentId, filter, refresh, ready, onObservations, view],
+    [agentId, filter, refresh, onObservations, view],
   );
   useEffect(() => {
     currentRows.current = emptyObservations;
@@ -255,10 +254,10 @@ export function TraceGrid({
     setSessionDetails(new Map());
     onObservations(emptyObservations);
     setNextCursor("");
-    setBusy(ready);
-    if (ready) void load("");
+    setBusy(true);
+    void load("");
     return () => request.current?.abort();
-  }, [load, ready, onObservations]);
+  }, [load, onObservations]);
   const more = useCallback(() => {
     if (nextCursor && !error) void load(nextCursor);
   }, [nextCursor, error, load]);
@@ -301,7 +300,7 @@ export function TraceGrid({
           busy={busy}
           hasNext={!!nextCursor && !error}
           onLoadMore={more}
-          empty={ready ? "No sessions match these filters" : "Session browsing is disabled"}
+          empty="No sessions match these filters"
           rowLabel={(row) => `Inspect session ${row.id}`}
           onInspect={(row) =>
             onInspect({ inspectSession: row.id, trace: undefined, observation: undefined })
@@ -315,7 +314,7 @@ export function TraceGrid({
           busy={busy}
           hasNext={!!nextCursor && !error}
           onLoadMore={more}
-          empty={ready ? "No observations match these filters" : "Observation browsing is disabled"}
+          empty="No observations match these filters"
           rowLabel={(row) => `Inspect ${row.name}`}
           onInspect={(row) =>
             onInspect({ trace: row.traceId, observation: row.id, inspectSession: undefined })
@@ -484,16 +483,22 @@ function Rows<T extends RowData>({
               </TableCell>
             </TableRow>
           )}
-          {!rows.length && (
-            <TableRow className="hover:bg-transparent">
-              <TableCell
-                colSpan={table.getAllLeafColumns().length}
-                className="h-28 text-center text-xs text-muted-foreground"
-              >
-                {busy ? "Loading…" : hasNext ? "Scroll to continue loading" : empty}
-              </TableCell>
-            </TableRow>
-          )}
+          {!rows.length &&
+            (busy ? (
+              <TableSkeletonRows
+                columns={table.getAllLeafColumns().length}
+                label={`Loading ${label.toLowerCase()}`}
+              />
+            ) : (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={table.getAllLeafColumns().length}
+                  className="h-28 text-center text-xs text-muted-foreground"
+                >
+                  {hasNext ? "Scroll to continue loading" : empty}
+                </TableCell>
+              </TableRow>
+            ))}
         </TableBody>
       </table>
     </div>

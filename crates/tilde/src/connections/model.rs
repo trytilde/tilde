@@ -10,12 +10,18 @@ use uuid::Uuid;
 pub enum Capability {
     Channel,
     Inference,
+    /// Gives the agent the skills linked to the connection. Every connection offers it.
+    Skills,
+    /// Granted by adding the connection to an agent as a tool source, not by an assignment.
+    Tool,
 }
 impl Capability {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Channel => "channel",
             Self::Inference => "inference",
+            Self::Skills => "skills",
+            Self::Tool => "tool",
         }
     }
 }
@@ -113,6 +119,103 @@ pub struct OAuth {
     pub scope_path: String,
     pub success_path: Option<String>,
     pub result_fields: Vec<ResultField>,
+    #[serde(default)]
+    pub client: OAuthClient,
+    /// A tool host published these endpoints, so its token endpoint is reached like a discovered
+    /// one: HTTPS to public addresses only. Set from storage, never from a definition.
+    #[serde(skip)]
+    pub host_published: bool,
+}
+/// Where an OAuth type's client comes from. Form: the person setting up enters their own app's
+/// client ID and secret. Dynamic: registered with an MCP server at setup (RFC 7591), which also yields the
+/// authorization and token endpoints (RFC 9728/8414 discovery), so the type declares no URLs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OAuthClient {
+    #[default]
+    Form,
+    Dynamic,
+}
+impl OAuthClient {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Form => "form",
+            Self::Dynamic => "dynamic",
+        }
+    }
+    pub fn parse(value: &str) -> Result<Self, Error> {
+        match value {
+            "form" => Ok(Self::Form),
+            "dynamic" => Ok(Self::Dynamic),
+            _ => Err(invalid("Invalid OAuth client")),
+        }
+    }
+}
+/// The MCP server that serves a connection type's tools, and how the connection's credential
+/// reaches it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpServer {
+    pub url: String,
+    pub credential: McpCredential,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum McpCredential {
+    None,
+    /// The OAuth access token, or else `api_key`, as `Authorization: Bearer`.
+    Bearer,
+    /// `prefix + api_key` in the header `name`.
+    Header {
+        name: String,
+        prefix: String,
+    },
+    /// `api_key` as the query parameter `name`.
+    Query {
+        name: String,
+    },
+}
+impl McpCredential {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Bearer => "bearer",
+            Self::Header { .. } => "header",
+            Self::Query { .. } => "query",
+        }
+    }
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::Header { name, .. } | Self::Query { name } => Some(name),
+            _ => None,
+        }
+    }
+    pub fn prefix(&self) -> &str {
+        match self {
+            Self::Header { prefix, .. } => prefix,
+            _ => "",
+        }
+    }
+    pub(crate) fn from_storage(
+        kind: &str,
+        name: Option<String>,
+        prefix: String,
+    ) -> Result<Self, Error> {
+        let name = || {
+            name.clone()
+                .ok_or_else(|| invalid("MCP credential name missing"))
+        };
+        Ok(match kind {
+            "none" => Self::None,
+            "bearer" => Self::Bearer,
+            "header" => Self::Header {
+                name: name()?,
+                prefix,
+            },
+            "query" => Self::Query { name: name()? },
+            _ => return Err(invalid("Invalid MCP credential")),
+        })
+    }
 }
 impl OAuth {
     pub fn standard(token_url: &str) -> Self {
@@ -131,6 +234,8 @@ impl OAuth {
             scope_path: "/scope".into(),
             success_path: None,
             result_fields: vec![],
+            client: OAuthClient::Form,
+            host_published: false,
         }
     }
 }
@@ -229,6 +334,9 @@ pub struct ConnectionType {
     pub name: String,
     pub capabilities: Vec<Capability>,
     pub credential_source: CredentialSource,
+    /// Set when the type's tools are served by an MCP server rather than built into Tilde.
+    #[serde(default)]
+    pub mcp: Option<McpServer>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -287,6 +395,7 @@ pub struct Connection {
     pub updated_at: DateTime<Utc>,
     pub channel_capable: bool,
     pub inference_capable: bool,
+    pub tool_capable: bool,
     pub associated_agents: tokio_postgres::types::Json<Vec<AssociatedAgent>>,
 }
 impl Connection {
@@ -298,6 +407,8 @@ impl Connection {
         match capability {
             Capability::Channel => self.channel_capable,
             Capability::Inference => self.inference_capable,
+            Capability::Skills => true,
+            Capability::Tool => self.tool_capable,
         }
     }
 }
@@ -503,11 +614,45 @@ impl ConnectionType {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        if self.name.trim().is_empty() || self.capabilities.len() > 1 {
+        // A type is at most one of channel or inference; a channel may also ship tools.
+        let exclusive = self
+            .capabilities
+            .iter()
+            .filter(|c| **c != Capability::Tool)
+            .count();
+        let tools = self.capabilities.len() - exclusive;
+        if self.name.trim().is_empty() || exclusive > 1 || tools > 1 {
             return Err(invalid("Invalid connection type"));
         }
         if let CredentialSource::Static { schema } = &self.credential_source {
             super::schema::validate_schema(schema)?;
+        }
+        if let Some(server) = &self.mcp {
+            let url =
+                url::Url::parse(&server.url).map_err(|_| invalid("Invalid MCP server URL"))?;
+            if !["https", "http"].contains(&url.scheme())
+                || !self.capabilities.contains(&Capability::Tool)
+            {
+                return Err(invalid("An MCP server is an http(s) URL serving tools"));
+            }
+            // Every credential but a bearer OAuth token is the connection's `api_key`.
+            let api_key = match &self.credential_source {
+                CredentialSource::Static { schema } => {
+                    schema["properties"].get("api_key").is_some()
+                }
+                _ => false,
+            };
+            match (&server.credential, &self.credential_source) {
+                (McpCredential::None, _)
+                | (McpCredential::Bearer, CredentialSource::OAuth { .. }) => {}
+                _ if api_key => {}
+                _ => return Err(invalid("This MCP credential needs an api_key field")),
+            }
+            if let McpCredential::Header { name, .. } = &server.credential
+                && reqwest::header::HeaderName::from_bytes(name.as_bytes()).is_err()
+            {
+                return Err(invalid("Invalid MCP credential header"));
+            }
         }
         if let CredentialSource::OAuth {
             additional_schema: Some(extra),
@@ -535,7 +680,16 @@ impl ConnectionType {
                 ));
             }
         }
-        if let Some(config) = self.oauth() {
+        if let Some(config) = self.oauth()
+            && config.client == OAuthClient::Dynamic
+        {
+            // Endpoints are discovered from the MCP server when a connection is set up.
+            if self.driver() != Driver::OAuthCode || self.mcp.is_none() {
+                return Err(invalid(
+                    "Dynamic OAuth clients need an authorization code grant and a fixed MCP server",
+                ));
+            }
+        } else if let Some(config) = self.oauth() {
             endpoint(&config.token_url)?;
             if self.driver() == Driver::OAuthCode
                 && config.client_auth == ClientAuth::None

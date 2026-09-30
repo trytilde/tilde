@@ -5,7 +5,7 @@ import type {
   TraceSessionSummary,
 } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 export const observationKey = (row: Observation) => `${row.traceId}:${row.id}`;
-/** OTLP retries may be visible as multiple versions while Langfuse converges. */
+/** A retried span may be loaded twice across pages until the span store collapses it. */
 export function mergeObservations(previous: Observation[], incoming: Observation[]) {
   const rows = new Map(previous.map((row) => [observationKey(row), row]));
   for (const row of incoming) {
@@ -29,7 +29,6 @@ export function summarizeLoadedSessions(
     if (!summary) {
       summary = create(TraceSessionSummarySchema, details.get(row.sessionId));
       summary.id = row.sessionId;
-      summary.sessionUrl = row.sessionUrl;
       summary.errorCount = 0;
       summary.totalTokens = undefined;
       summary.costUsd = undefined;

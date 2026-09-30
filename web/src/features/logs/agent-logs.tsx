@@ -2,11 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { Controller, useForm } from "@trytilde/connection-ui";
 import { logs } from "@/client";
-import {
-  LogsState,
-  type GetLogsStatusResponse,
-  type LogRecord,
-} from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
+import { type LogRecord } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import { Button } from "@/components/ui/button";
 import { TimeRangeSelect } from "../observability/time-range-select";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -33,7 +29,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState(0),
     [live, setLive] = useState(false);
-  const [status, setStatus] = useState<GetLogsStatusResponse>();
   const [records, setRecords] = useState<LogRecord[]>([]),
     [cursor, setCursor] = useState("");
   const [busy, setBusy] = useState(false),
@@ -136,30 +131,12 @@ export function AgentLogs({ agentId }: { agentId: string }) {
     update({ from: new Date(from).toISOString(), to: new Date(to).toISOString() });
   }
   useEffect(() => {
-    const abort = new AbortController();
-    void logs
-      .getLogsStatus({ agentId }, { signal: abort.signal })
-      .then((s) => {
-        if (!abort.signal.aborted) setStatus(s);
-      })
-      .catch((e) => {
-        if (!abort.signal.aborted) setError(e.message);
-      });
-    return () => abort.abort();
-  }, [agentId, attempt]);
-  const ready = status?.state === LogsState.READY;
-  useEffect(() => {
     generation.current++;
     pageRequest.current?.abort();
     seenCursors.current.clear();
     setRecords([]);
     setCursor("");
     setSelected(undefined);
-    if (!ready) {
-      inFlight.current = false;
-      setBusy(false);
-      return;
-    }
     const abort = new AbortController();
     inFlight.current = true;
     setBusy(true);
@@ -185,15 +162,15 @@ export function AgentLogs({ agentId }: { agentId: string }) {
       abort.abort();
       pageRequest.current?.abort();
     };
-  }, [agentId, ready, filter]);
+  }, [agentId, filter]);
   useEffect(() => {
-    if (!live || !ready || busy || error) return;
+    if (!live || busy || error) return;
     const timer = setTimeout(() => {
       if (!document.hidden) setAttempt((a) => a + 1);
       else setLive(false);
     }, 3000);
     return () => clearTimeout(timer);
-  }, [live, ready, busy, error, attempt]);
+  }, [live, busy, error, attempt]);
   async function more() {
     if (inFlight.current || !cursor || live || seenCursors.current.has(cursor)) return;
     const expected = generation.current,
@@ -228,10 +205,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
           aria-label="Log filter bar"
           className="flex min-h-10 w-full flex-wrap items-center gap-2 px-3 py-1.5"
         >
-          <fieldset
-            disabled={!ready}
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-2 disabled:opacity-60"
-          >
+          <fieldset className="flex min-w-0 flex-1 flex-wrap items-center gap-2 disabled:opacity-60">
             <Tooltip>
               <TooltipTrigger render={<div className="shrink-0" />}>
                 <Tabs
@@ -244,7 +218,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                       <TabsTrigger
                         key={value}
                         value={value}
-                        disabled={!ready}
                         className="h-[22px] rounded px-2 text-[11px] font-normal data-active:font-bold"
                       >
                         {label}
@@ -261,7 +234,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
             <FilterSearchInput
               label="Search logs"
               canonical={serializeLogQuery(search)}
-              disabled={!ready}
               validate={parseLogQuery}
               suggest={suggest}
               onApply={(query) => update(parseLogQuery(query))}
@@ -270,7 +242,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
           <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5">
             <TimeRangeSelect
               value={search.range ?? "24h"}
-              disabled={!ready}
               label="Log time range"
               timezone={timezone}
               onChange={(range) => update({ range })}
@@ -284,7 +255,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                     size="icon-sm"
                     className="size-[26px]"
                     aria-label="Clear date range"
-                    disabled={!ready || (!search.range && !search.from && !search.to)}
+                    disabled={!search.range && !search.from && !search.to}
                     onClick={() => {
                       form.clearErrors();
                       update({ range: undefined, from: undefined, to: undefined });
@@ -308,7 +279,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                     className="size-[26px]"
                     aria-label={live ? "Pause live logs" : "Live logs"}
                     aria-pressed={live}
-                    disabled={!ready || search.range === "custom"}
+                    disabled={search.range === "custom"}
                     onClick={() => setLive((value) => !value)}
                   >
                     {live ? <PauseIcon className="size-3.5" /> : <PlayIcon className="size-3.5" />}
@@ -345,7 +316,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
             className="border-t bg-muted/10 px-3 py-1.5"
             onSubmit={(event) => event.preventDefault()}
           >
-            <fieldset disabled={!ready} className="flex items-center gap-2">
+            <fieldset className="flex items-center gap-2">
               <Controller
                 control={form.control}
                 name="from"
@@ -354,7 +325,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                     value={field.value}
                     label="Start"
                     timezone={timezone}
-                    disabled={!ready}
                     onChange={(value) => {
                       field.onChange(value);
                       applyRange();
@@ -371,7 +341,6 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                     value={field.value}
                     label="End"
                     timezone={timezone}
-                    disabled={!ready}
                     onChange={(value) => {
                       field.onChange(value);
                       applyRange();
@@ -388,43 +357,41 @@ export function AgentLogs({ agentId }: { agentId: string }) {
           </form>
         )}
       </div>
-      {(!ready || error) && (
+      {error && (
         <p
-          role={error || status?.state === LogsState.UNAVAILABLE ? "alert" : "status"}
+          role="alert"
           className="shrink-0 border-b bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
         >
-          {error || status?.message || "Checking log availability…"}
+          {error}
         </p>
       )}
-      {ready && (
-        <ActivityChart
-          key={`${agentId}:${attempt}`}
-          kind="Log"
-          fromTime={activityFilter.fromTime}
-          toTime={activityFilter.toTime}
-          load={loadMetrics}
-          selectedRange={selectedRange}
-          onRange={(from, to) => {
-            setActivityWindow(
-              (previous) =>
-                previous ?? {
-                  fromTime: filter.fromTime,
-                  toTime: filter.toTime,
-                  previous: { range: search.range, from: search.from, to: search.to },
-                },
-            );
-            update({ range: "custom", from, to }, true);
-          }}
-          onClear={() => {
-            if (activityWindow) update(activityWindow.previous, true);
-          }}
-        />
-      )}
+      <ActivityChart
+        key={`${agentId}:${attempt}`}
+        kind="Log"
+        fromTime={activityFilter.fromTime}
+        toTime={activityFilter.toTime}
+        load={loadMetrics}
+        selectedRange={selectedRange}
+        onRange={(from, to) => {
+          setActivityWindow(
+            (previous) =>
+              previous ?? {
+                fromTime: filter.fromTime,
+                toTime: filter.toTime,
+                previous: { range: search.range, from: search.from, to: search.to },
+              },
+          );
+          update({ range: "custom", from, to }, true);
+        }}
+        onClear={() => {
+          if (activityWindow) update(activityWindow.previous, true);
+        }}
+      />
       <LogTable
         key={`${agentId}:${key}:${attempt}`}
         records={records}
         busy={busy}
-        error={ready ? error : "Logs unavailable"}
+        error={error}
         hasMore={!!cursor && !live}
         onMore={() => void more()}
         onSelect={(record) => {

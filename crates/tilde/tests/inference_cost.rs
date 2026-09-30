@@ -53,6 +53,7 @@ fn record(
         cache_write_tokens: None,
         units: None,
         usage: Usage::Parsed,
+        prompts: vec![],
     }
 }
 
@@ -242,6 +243,7 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Budget".into(),
@@ -331,12 +333,9 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
         10_000,
         Some(200_000),
     );
-    inference::db::requests_insert_execute(
-        &db.pool.get().await.unwrap(),
-        &[priced.clone(), unknown.clone()],
-    )
-    .await
-    .unwrap();
+    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[&priced, &unknown])
+        .await
+        .unwrap();
     let rows = inference::db::requests_for_agent_all(&db.pool.get().await.unwrap(), agent)
         .await
         .unwrap();
@@ -356,7 +355,7 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
     );
     sonnet.provider_id = "anthropic".into();
     sonnet.cache_write_tokens = Some(1_000);
-    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[sonnet.clone()])
+    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[&sonnet])
         .await
         .unwrap();
     let rows = inference::db::requests_for_agent_all(&db.pool.get().await.unwrap(), agent)
@@ -393,12 +392,9 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
     let mut speech = record(agent, connection, run, "tts-test", 0, 0, None);
     speech.kind = "speech".into();
     speech.units = Some(2_000);
-    inference::db::requests_insert_execute(
-        &db.pool.get().await.unwrap(),
-        &[image.clone(), speech.clone()],
-    )
-    .await
-    .unwrap();
+    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[&image, &speech])
+        .await
+        .unwrap();
     let rows = inference::db::requests_for_agent_all(&db.pool.get().await.unwrap(), agent)
         .await
         .unwrap();
@@ -415,7 +411,7 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
     let mut transcript = record(agent, connection, run, "whisper-test", 0, 0, None);
     transcript.kind = "transcription".into();
     transcript.units = Some(95);
-    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[transcript.clone()])
+    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[&transcript])
         .await
         .unwrap();
     let rows = inference::db::requests_for_agent_all(&db.pool.get().await.unwrap(), agent)
@@ -443,7 +439,7 @@ async fn prices_cost_requests_and_budgets_gate_the_inference_claim() {
     let mut token_image = record(agent, connection, run, "gpt-image-tokens", 100, 1_000, None);
     token_image.kind = "image".into();
     token_image.units = Some(1);
-    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[token_image.clone()])
+    inference::db::requests_insert_execute(&db.pool.get().await.unwrap(), &[&token_image])
         .await
         .unwrap();
     let rows = inference::db::requests_for_agent_all(&db.pool.get().await.unwrap(), agent)

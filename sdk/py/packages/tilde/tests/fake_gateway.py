@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 from connectrpc.code import Code
 from connectrpc.errors import ConnectError
+from support import serve_app
 
+from tilde import AgentContext, Cancellation
+from tilde._transport import close_http_client
 from tilde.agent_host.v1.agent_pb2 import InvokeRequest
 from tilde.run.v1 import run_pb2
 from tilde.run.v1.run_connect import RunService, RunServiceASGIApplication
@@ -19,6 +24,8 @@ from tilde.runtime.v1.controls_connect import (
     InvocationControlService,
     InvocationControlServiceASGIApplication,
 )
+from tilde.runtime.v1.skills_connect import SkillService, SkillServiceASGIApplication
+from tilde.runtime.v1.skills_pb2 import ListSkillsResponse, ReadSkillFileResponse, SkillSummary
 from tilde.types.v1 import chat_pb2 as types
 
 NATIVE_SEND = types.ToolDefinition(
@@ -45,15 +52,29 @@ SLACK_SEND = types.ToolDefinition(
         }
     ),
 )
+TOOLS_EXECUTE = types.ToolDefinition(
+    name="tools.execute",
+    provider_id="tilde",
+    description="Call a tool found with tools.search.",
+    input_schema_json=json.dumps(
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "input": {"type": "object"}},
+            "required": ["name"],
+        }
+    ),
+)
 
 
 @dataclass
-class FakeGateway(ChatService, InvocationControlService, RunService):
+class FakeGateway(ChatService, InvocationControlService, RunService, SkillService):
     """Unimplemented RPCs raise UNIMPLEMENTED through the generated service defaults."""
 
     token: str = "capability-token"
     reports: list[run_pb2.ReportRequest] = field(default_factory=list)
     tool_calls: list[list[chat_pb2.InvokeToolRequest]] = field(default_factory=list)
+    bundled_registrations: list[list[types.ToolDefinition]] = field(default_factory=list)
+    tool_reports: list[types.ToolCall] = field(default_factory=list)
     goals: list[types.Goal] = field(default_factory=list)
     tasks: list[types.Task] = field(default_factory=list)
     run_status: list[str] = field(default_factory=list)
@@ -66,6 +87,12 @@ class FakeGateway(ChatService, InvocationControlService, RunService):
     renewals: int = 0
     wakes: asyncio.Queue[InvokeRequest | None] = field(default_factory=asyncio.Queue)
     heartbeats: list[bool] = field(default_factory=list)
+    skills: list[SkillSummary] = field(default_factory=list)
+    # (skill address, path) -> file; `blobs` serves presigned-style downloads at /blobs/<key>.
+    skill_files: dict[tuple[str, str], ReadSkillFileResponse] = field(default_factory=dict)
+    skill_reads: list[tuple[str, str]] = field(default_factory=list)
+    skill_lists: int = 0
+    blobs: dict[str, bytes] = field(default_factory=dict)
 
     def _auth(self, ctx) -> None:
         authorization = ctx.request_headers.get("authorization", "")
@@ -188,7 +215,13 @@ class FakeGateway(ChatService, InvocationControlService, RunService):
 
     async def report_tool_call(self, request, ctx):
         self._auth(ctx)
+        self.tool_reports.append(request.tool_call)
         return chat_pb2.ReportToolCallResponse()
+
+    async def register_bundled_tools(self, request, ctx):
+        self._auth(ctx)
+        self.bundled_registrations.append(list(request.tools))
+        return chat_pb2.RegisterBundledToolsResponse()
 
     async def set_typing(self, request, ctx):
         self._auth(ctx)
@@ -238,16 +271,35 @@ class FakeGateway(ChatService, InvocationControlService, RunService):
         self.heartbeats.append(request.ready)
         return run_pb2.HeartbeatResponse()
 
+    async def list_skills(self, request, ctx):
+        self._auth(ctx)
+        self.skill_lists += 1
+        return ListSkillsResponse(skills=self.skills)
+
+    async def read_skill_file(self, request, ctx):
+        self._auth(ctx)
+        self.skill_reads.append((request.name, request.path))
+        file = self.skill_files.get((request.name, request.path))
+        if file is None:
+            raise ConnectError(Code.NOT_FOUND, "No such skill file")
+        return file
+
     def app(self):
         apps = [
             ChatServiceASGIApplication(self),
             InvocationControlServiceASGIApplication(self),
             RunServiceASGIApplication(self),
+            SkillServiceASGIApplication(self),
         ]
 
         async def router(scope, receive, send):
             if scope["type"] == "lifespan":
                 return await apps[0](scope, receive, send)
+            blob = self.blobs.get(scope["path"].removeprefix("/blobs/"))
+            if scope["path"].startswith("/blobs/") and blob is not None:
+                await send({"type": "http.response.start", "status": 200, "headers": []})
+                await send({"type": "http.response.body", "body": blob})
+                return
             for app in apps:
                 if scope["path"].startswith(app.path + "/"):
                     return await app(scope, receive, send)
@@ -255,3 +307,28 @@ class FakeGateway(ChatService, InvocationControlService, RunService):
             await send({"type": "http.response.body", "body": b""})
 
         return router
+
+
+@asynccontextmanager
+async def invocation_context() -> AsyncIterator[tuple[AgentContext, FakeGateway]]:
+    """A live invocation context against a served fake gateway, without a host. The gateway
+    publishes the native send tool and Tilde's ``tools.execute``."""
+    gateway = FakeGateway(tools=[NATIVE_SEND, TOOLS_EXECUTE])
+    served = await serve_app(gateway.app())
+    request = InvokeRequest(
+        invocation_id=str(uuid.uuid4()),
+        run_id="run-1",
+        thread_id="thread-1",
+        agent_id="agent-1",
+        callback_url=served.url,
+        capability="capability-token",
+    )
+    ctx = AgentContext(request, Cancellation(), lambda _error=None: None)
+    try:
+        await ctx.refresh_tools()
+        yield ctx, gateway
+    finally:
+        ctx.cancellation.abort()
+        await ctx.close_reports()
+        await close_http_client()
+        await served.close()

@@ -26,6 +26,7 @@ impl Fixture {
         let encryption = Arc::new(Encryption::initialize(&db.pool, seed(81)).await.unwrap());
         let agent = Agents::new(db.pool.clone(), encryption.clone())
             .create(CreateAgent {
+                description: String::new(),
                 id: Uuid::new_v4(),
                 name: "Batch fixture".into(),
                 concurrency_policy: Default::default(),

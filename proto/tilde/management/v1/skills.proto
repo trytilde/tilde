@@ -1,0 +1,105 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/skill.proto";
+
+service SkillService {
+  rpc ListCatalog(ListCatalogRequest) returns (ListCatalogResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // One catalog group with its skills. A managed provider not yet enabled is previewed from
+  // its repository (scoped as a sync would be, stores nothing), cached for an hour.
+  rpc GetCatalogGroup(GetCatalogGroupRequest) returns (GetCatalogGroupResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ListSkillSources(ListSkillSourcesRequest) returns (ListSkillSourcesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetSkillSource(GetSkillSourceRequest) returns (GetSkillSourceResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Enable a catalog group. Idempotent: an enabled group's source is returned.
+  rpc EnableCatalogGroup(EnableCatalogGroupRequest) returns (EnableCatalogGroupResponse);
+  // Add a git repository and sync it once; later syncs run hourly or on request.
+  rpc AddGitSource(AddGitSourceRequest) returns (AddGitSourceResponse);
+  rpc CreateEditorSource(CreateEditorSourceRequest) returns (CreateEditorSourceResponse);
+  rpc SyncSkillSource(SyncSkillSourceRequest) returns (SyncSkillSourceResponse);
+  rpc DeleteSkillSource(DeleteSkillSourceRequest) returns (DeleteSkillSourceResponse);
+  // Skills of every source, or of one source.
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetSkill(GetSkillRequest) returns (GetSkillResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetSkillVersion(GetSkillVersionRequest) returns (GetSkillVersionResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Editor sources only: author, revise and remove skills.
+  rpc CreateSkill(CreateSkillRequest) returns (CreateSkillResponse);
+  rpc UpdateSkill(UpdateSkillRequest) returns (UpdateSkillResponse);
+  rpc DeleteSkill(DeleteSkillRequest) returns (DeleteSkillResponse);
+  // What an agent is given.
+  rpc ListAgentSkills(ListAgentSkillsRequest) returns (ListAgentSkillsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Add a group to the agent with its skills switched off: switch on every skill (including
+  // those a later sync adds) with SetSkillSourceEnabled.
+  rpc AssignSkillSource(AssignSkillSourceRequest) returns (AssignSkillSourceResponse);
+  // Remove a group from the agent, with the single skills from it that were switched on.
+  rpc UnassignSkillSource(UnassignSkillSourceRequest) returns (UnassignSkillSourceResponse);
+  // Switch a group the agent has on (every skill in it, including those a later sync adds) or
+  // off (none of them, single skills given from it included).
+  rpc SetSkillSourceEnabled(SetSkillSourceEnabledRequest) returns (SetSkillSourceEnabledResponse);
+  // Switch one skill of an enabled group off for the agent, or back on.
+  rpc SetSkillEnabled(SetSkillEnabledRequest) returns (SetSkillEnabledResponse);
+  rpc UnassignSkill(UnassignSkillRequest) returns (UnassignSkillResponse);
+  // Skill groups linked to a connection reach every agent assigned its skills capability
+  // (ConnectionsService.AssignCapability with CAPABILITY_SKILLS).
+  rpc LinkConnectionSkillSource(LinkConnectionSkillSourceRequest) returns (LinkConnectionSkillSourceResponse);
+  rpc UnlinkConnectionSkillSource(UnlinkConnectionSkillSourceRequest) returns (UnlinkConnectionSkillSourceResponse);
+}
+message ListCatalogRequest {}
+message ListCatalogResponse { repeated tilde.types.v1.CatalogGroup groups = 1; }
+message GetCatalogGroupRequest { string id = 1; }
+message GetCatalogGroupResponse { tilde.types.v1.CatalogGroup group = 1; }
+message ListSkillSourcesRequest {}
+message ListSkillSourcesResponse { repeated tilde.types.v1.SkillSource sources = 1; }
+message GetSkillSourceRequest { string id = 1; }
+// Connection ids link the whole source.
+message GetSkillSourceResponse { tilde.types.v1.SkillSource source = 1; repeated tilde.types.v1.Skill skills = 2; repeated string agent_ids = 3; repeated string connection_ids = 4; }
+message EnableCatalogGroupRequest { string group = 1; }
+message EnableCatalogGroupResponse { tilde.types.v1.SkillSource source = 1; }
+// A GitHub https URL. `git_ref` defaults to main; `git_path` narrows the scan to a directory.
+message AddGitSourceRequest { string name = 1; string repository_url = 2; string git_ref = 3; string git_path = 4; }
+message AddGitSourceResponse { tilde.types.v1.SkillSource source = 1; }
+message CreateEditorSourceRequest { string name = 1; }
+message CreateEditorSourceResponse { tilde.types.v1.SkillSource source = 1; }
+message SyncSkillSourceRequest { string id = 1; }
+message SyncSkillSourceResponse { tilde.types.v1.SkillSource source = 1; }
+message DeleteSkillSourceRequest { string id = 1; }
+message DeleteSkillSourceResponse {}
+message ListSkillsRequest { string source_id = 1; }
+message ListSkillsResponse { repeated tilde.types.v1.Skill skills = 1; }
+message GetSkillRequest { string id = 1; }
+// Versions newest first, without their files.
+message GetSkillResponse { tilde.types.v1.Skill skill = 1; repeated tilde.types.v1.SkillVersion versions = 2; }
+message GetSkillVersionRequest { string id = 1; }
+message GetSkillVersionResponse { tilde.types.v1.SkillVersion version = 1; }
+message CreateSkillRequest { string source_id = 1; string name = 2; repeated tilde.types.v1.SkillFile files = 3; }
+message CreateSkillResponse { tilde.types.v1.Skill skill = 1; }
+// Files marked `keep` reuse the current version's copy by path, so assets need not be re-sent.
+message UpdateSkillRequest { string id = 1; repeated tilde.types.v1.SkillFile files = 2; }
+message UpdateSkillResponse { tilde.types.v1.Skill skill = 1; }
+message DeleteSkillRequest { string id = 1; }
+message DeleteSkillResponse {}
+message ListAgentSkillsRequest { string agent_id = 1; }
+// Sources assigned whole, skills assigned on their own, and connections whose skills
+// capability the agent holds, with the groups each links.
+message ListAgentSkillsResponse {
+  repeated tilde.types.v1.SkillSource sources = 1; repeated tilde.types.v1.Skill skills = 2; repeated ConnectionSkills connections = 3;
+  // Every skill in the groups given whole, directly or through a connection.
+  repeated tilde.types.v1.Skill group_skills = 4;
+  // Groups in `sources` that are switched off.
+  repeated string disabled_source_ids = 5;
+  // Skills of enabled groups that are switched off.
+  repeated string disabled_skill_ids = 6;
+}
+message ConnectionSkills { string connection_id = 1; string connection_name = 2; string provider_id = 3; string status = 4; repeated tilde.types.v1.SkillSource sources = 5; }
+message LinkConnectionSkillSourceRequest { string connection_id = 1; string source_id = 2; }
+message LinkConnectionSkillSourceResponse {}
+message UnlinkConnectionSkillSourceRequest { string connection_id = 1; string source_id = 2; }
+message UnlinkConnectionSkillSourceResponse {}
+message AssignSkillSourceRequest { string agent_id = 1; string source_id = 2; }
+message AssignSkillSourceResponse {}
+message UnassignSkillSourceRequest { string agent_id = 1; string source_id = 2; }
+message UnassignSkillSourceResponse {}
+message SetSkillSourceEnabledRequest { string agent_id = 1; string source_id = 2; bool enabled = 3; }
+message SetSkillSourceEnabledResponse {}
+message SetSkillEnabledRequest { string agent_id = 1; string skill_id = 2; bool enabled = 3; }
+message SetSkillEnabledResponse {}
+message UnassignSkillRequest { string agent_id = 1; string skill_id = 2; }
+message UnassignSkillResponse {}

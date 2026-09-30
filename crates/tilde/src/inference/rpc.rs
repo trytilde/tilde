@@ -82,35 +82,11 @@ fn budget_wire(b: budgets::Budget) -> management::Budget {
         ..Default::default()
     }
 }
-/// Agent budgets belong to their agent: `edit` changes one, `view` reads it. Identity budgets
-/// are installation policy, for administrators.
-async fn authorize_budget(
-    ctx: &RequestContext,
-    scope: Scope,
-    scope_id: Uuid,
-    edit: bool,
-) -> Result<(), connectrpc::ConnectError> {
-    use crate::iam::authz;
-    match scope {
-        Scope::Agent => {
-            let action = if edit {
-                authz::Action::Edit
-            } else {
-                authz::Action::View
-            };
-            authz::require(ctx, authz::Resource::agent(scope_id), action).await?;
-        }
-        Scope::Identity => {
-            authz::require_admin(ctx)?;
-        }
-    }
-    Ok(())
-}
 impl InferenceService for Rpc {
     /// Per-connection totals for the window, the daily series and the agent's all-time spend.
     async fn get_usage<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::GetUsageRequest>,
     ) -> ServiceResult<impl Encodable<management::GetUsageResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -137,12 +113,6 @@ impl InferenceService for Rpc {
             })
             .unwrap_or_else(chrono::Utc::now);
         let agent = id(&request.agent_id)?;
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(agent),
-            crate::iam::authz::Action::View,
-        )
-        .await?;
         let total = super::db::usage_total_one(&self.0.get().await.map_err(Error::from)?, agent)
             .await
             .map_err(Error::from)?;
@@ -198,18 +168,12 @@ impl InferenceService for Rpc {
     /// Budgets, optionally filtered by scope and scope id.
     async fn list_budgets<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::ListBudgetsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListBudgetsResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
         let scope = request.scope.map(scope_model).transpose()?;
         let scope_id = request.scope_id.as_deref().map(id).transpose()?;
-        match (scope, scope_id) {
-            (Some(scope), Some(scope_id)) => authorize_budget(&ctx, scope, scope_id, false).await?,
-            _ => {
-                crate::iam::authz::require_admin(&ctx)?;
-            }
-        }
         Response::ok(management::ListBudgetsResponse {
             budgets: budgets::list(&self.0, scope, scope_id)
                 .await?
@@ -222,17 +186,10 @@ impl InferenceService for Rpc {
     /// Create or replace the budget for (scope, scope id, period, connection); settles at once.
     async fn set_budget<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::SetBudgetRequest>,
     ) -> ServiceResult<impl Encodable<management::SetBudgetResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
-        authorize_budget(
-            &ctx,
-            scope_model(request.scope)?,
-            id(&request.scope_id)?,
-            true,
-        )
-        .await?;
         let budget = budgets::set(
             &self.0,
             scope_model(request.scope)?,
@@ -251,17 +208,10 @@ impl InferenceService for Rpc {
     /// Remove a budget; its scope is unblocked at the next token renewal.
     async fn delete_budget<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::DeleteBudgetRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteBudgetResponse> + Send + use<'a>> {
-        let target = id(request.id)?;
-        let budget = budgets::list(&self.0, None, None)
-            .await?
-            .into_iter()
-            .find(|budget| budget.id == target)
-            .ok_or(Error::NotFound)?;
-        authorize_budget(&ctx, budget.scope, budget.scope_id, true).await?;
-        budgets::delete(&self.0, target).await?;
+        budgets::delete(&self.0, id(request.id)?).await?;
         Response::ok(management::DeleteBudgetResponse::default())
     }
 }

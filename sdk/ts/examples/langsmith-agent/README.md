@@ -12,14 +12,12 @@ From the repository root:
 
 ```sh
 pnpm --dir sdk/ts install --frozen-lockfile
-export LANGSMITH_API_KEY='your-key'
+export OPENAI_API_KEY='your-openai-key' LANGSMITH_API_KEY='your-langsmith-key'
 task agent:langsmith
 ```
 
-Alternatively put `LANGSMITH_API_KEY` in the ignored root `.env.langsmith` file.
-The runner extracts only `openai_api_key` from `secrets.enc.yaml` using SOPS and
-passes it to Node as `OPENAI_API_KEY`. It never prints the key or writes a decrypted
-key file. The current AWS session must have access to the SOPS KMS recipient.
+Alternatively put the keys in the ignored root `.env.local` or `.env.langsmith` file.
+The runner never prints them.
 
 The recipe streams to the terminal. The command waits for pending trace batches
 and prints a direct LangSmith trace URL. Open that URL to inspect the run tree,
@@ -60,5 +58,5 @@ task agent:langsmith:build
 python3 scripts/run-langsmith-agent.py --check
 ```
 
-The second command verifies SOPS access and reports whether a LangSmith key is
-present without displaying either credential. Live generation requires both keys.
+The second command reports whether the OpenAI and LangSmith keys are present without
+displaying either credential. Live generation requires both keys.

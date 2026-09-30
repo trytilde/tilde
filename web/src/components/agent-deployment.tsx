@@ -12,6 +12,14 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { InlineSaving, type InlineSavingState } from "./inline-saving";
+import { DeploymentContents } from "./deployment-contents";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { date } from "@/features/tracing/format";
 import {
   DeploymentRouting,
@@ -50,6 +58,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TildeLoader } from "@/components/loading-screen";
 
 type SettingsFields = {
   failureMode: SidecarFailureMode;
@@ -86,13 +95,44 @@ function commitTitle(deployment: RegisteredDeployment) {
   return deployment.commitMessage.split("\n")[0]?.trim() ?? "";
 }
 /** The row's headline: the commit message from the git provider, else the label, else the id. */
-function describe(deployment: RegisteredDeployment) {
+export function describeDeployment(deployment: RegisteredDeployment) {
   return (
     commitTitle(deployment) ||
     deployment.label ||
     shortCommit(deployment.commitSha) ||
     shortId(deployment.id)
   );
+}
+/**
+ * The deployments that can receive the agent's invocations, with what each shipped: the routing
+ * target under Latest and every deployment with traffic weight under Weighted; with none
+ * serving, invocations fall back to the newest registered deployment. `detail` is its short
+ * commit and, when several share traffic, its weight.
+ */
+export async function servingContents(agentId: string, signal?: AbortSignal) {
+  const response = await deployments.getDeployment({ agentId }, { signal });
+  const registered = response.deployments
+    .filter((d) => d.status === DeploymentStatus.REGISTERED)
+    .sort((a, b) => Number((b.createdAt?.seconds ?? 0n) - (a.createdAt?.seconds ?? 0n)));
+  const serving = registered.filter((d) => d.serving);
+  const targets = serving.length ? serving : registered.slice(0, 1);
+  const weighted = response.deployment?.routing === DeploymentRouting.WEIGHTED;
+  const contents = await Promise.all(
+    targets.map((target) =>
+      deployments.getDeploymentContents({ agentId, deploymentId: target.id }, { signal }),
+    ),
+  );
+  return targets.map((deployment, index) => ({
+    deployment,
+    name: describeDeployment(deployment),
+    detail: [
+      deployment.commitSha.slice(0, 7),
+      weighted && targets.length > 1 ? `${deployment.trafficWeight}% of traffic` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    contents: contents[index]!,
+  }));
 }
 /** The commit page on the git provider. Accepts `owner/repo` (GitHub) or a full repository URL. */
 export function commitUrl(repository: string, commitSha: string) {
@@ -164,6 +204,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
     deployment: RegisteredDeployment;
   } | null>(null);
   const [confirmationError, setConfirmationError] = useState("");
+  const [contentsOf, setContentsOf] = useState<RegisteredDeployment>();
   const weighted = settings.watch("routing") === DeploymentRouting.WEIGHTED;
   const saving = useRef<AbortController | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -313,7 +354,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
       if (!/^\d+$/.test(value) || Number(value) > 100) {
         showDialog({
           kind: "error",
-          message: `Enter a whole percentage from 0 to 100 for ${describe(row)}.`,
+          message: `Enter a whole percentage from 0 to 100 for ${describeDeployment(row)}.`,
         });
         return;
       }
@@ -406,7 +447,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
       async () => {
         await deployments.promoteDeployment({ agentId, deploymentId: deployment.id });
       },
-      `${describe(deployment)} is now serving.`,
+      `${describeDeployment(deployment)} is now serving.`,
       "Unable to promote deployment.",
     );
   }
@@ -416,7 +457,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
       async () => {
         await deployments.retireDeployment({ agentId, deploymentId: deployment.id });
       },
-      `${describe(deployment)} retired.`,
+      `${describeDeployment(deployment)} retired.`,
       "Unable to retire deployment.",
     );
   }
@@ -430,7 +471,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
         });
         setIssued({ deployment, token: response.token });
       },
-      `Token rotated for ${describe(deployment)}.`,
+      `Token rotated for ${describeDeployment(deployment)}.`,
       "Unable to issue deployment token.",
     );
   }
@@ -460,7 +501,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
       setIssued(
         response.token ? { deployment: response.deployment, token: response.token } : undefined,
       );
-      setNotice(`${describe(response.deployment)} registered.`);
+      setNotice(`${describeDeployment(response.deployment)} registered.`);
       // Registration succeeded even if refreshing the table fails; don't offer a duplicate submission.
       await load().catch((error) => setError(message(error, "Unable to refresh deployments.")));
     } catch (error) {
@@ -492,9 +533,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
         </p>
       )}
       {loaded === undefined ? (
-        <p role="status" className="p-4">
-          Loading deployment…
-        </p>
+        <TildeLoader />
       ) : (
         <>
           <section aria-label="Deployment settings" className="shrink-0 border-b px-4 py-5 lg:px-6">
@@ -560,7 +599,6 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
               className="tracing-table flex shrink-0 justify-end border-b px-2 py-1.5"
             >
               <Button
-                variant="outline"
                 size="sm"
                 className="rounded-none text-[11px]"
                 disabled={locked}
@@ -639,7 +677,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
                       (instance) => instance.deploymentId === deployment.id,
                     );
                     const ready = instances.filter((instance) => instance.ready).length;
-                    const name = describe(deployment);
+                    const name = describeDeployment(deployment);
                     const hash = shortCommit(deployment.commitSha, loaded.deployments);
                     const link = commitUrl(deployment.repository, deployment.commitSha);
                     const status = !registered
@@ -656,12 +694,14 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
                         className="h-7 border-b border-border/50 hover:bg-muted/60"
                       >
                         <TableCell className="overflow-hidden">
-                          <span
-                            className="block truncate"
-                            title={`${name} · ${deployment.source === DeploymentSource.CI ? "CI" : "Manual"}`}
+                          <button
+                            type="button"
+                            className="block max-w-full cursor-pointer truncate hover:underline"
+                            title={`${name} · ${deployment.source === DeploymentSource.CI ? "CI" : "Manual"} · view prompts and skills`}
+                            onClick={() => setContentsOf(deployment)}
                           >
                             {name}
-                          </span>
+                          </button>
                         </TableCell>
                         {weighted && (
                           <TableCell>
@@ -811,6 +851,26 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
           </section>
         </>
       )}
+      <Sheet
+        open={!!contentsOf}
+        onOpenChange={(open) => {
+          if (!open) setContentsOf(undefined);
+        }}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{contentsOf ? describeDeployment(contentsOf) : ""}</SheetTitle>
+            <SheetDescription>
+              Prompts and skills this deployment shipped, registered by <code>tilde deploy</code>{" "}
+              from its code.
+              {contentsOf?.commitSha && ` Commit ${contentsOf.commitSha.slice(0, 7)}.`}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-4">
+            {contentsOf && <DeploymentContents agentId={agentId} deploymentId={contentsOf.id} />}
+          </div>
+        </SheetContent>
+      </Sheet>
       <Dialog
         open={!!issued}
         onOpenChange={(open) => {
@@ -827,7 +887,7 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
           {issued && (
             <div className="min-w-0 space-y-2">
               <Label htmlFor="deployment-token">
-                Copy this token now for {describe(issued.deployment)}
+                Copy this token now for {describeDeployment(issued.deployment)}
               </Label>
               <Input
                 id="deployment-token"
@@ -952,9 +1012,9 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmation?.kind === "rotate"
-                ? `Replace the token for ${describe(confirmation.deployment)}? The old token will stop authenticating. Update your agent or sidecar with the new token so it can reconnect.`
+                ? `Replace the token for ${describeDeployment(confirmation.deployment)}? The old token will stop authenticating. Update your agent or sidecar with the new token so it can reconnect.`
                 : confirmation
-                  ? `Retire ${describe(confirmation.deployment)}? It will stop receiving routed work and its token will be invalidated. Existing conversations assigned to it may be interrupted.`
+                  ? `Retire ${describeDeployment(confirmation.deployment)}? It will stop receiving routed work and its token will be invalidated. Existing conversations assigned to it may be interrupted.`
                   : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1003,7 +1063,9 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
               {dialog.weights.map((row) => (
                 <div key={row.deploymentId} className="flex justify-between gap-4">
                   <dt className="truncate">
-                    {describe(loaded!.deployments.find((item) => item.id === row.deploymentId)!)}
+                    {describeDeployment(
+                      loaded!.deployments.find((item) => item.id === row.deploymentId)!,
+                    )}
                   </dt>
                   <dd>{row.weight}%</dd>
                 </div>

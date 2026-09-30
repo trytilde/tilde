@@ -5,6 +5,7 @@
 //! queue drops the record with a warning rather than slowing an inference call.
 use super::{Kind, Provider};
 use crate::chat::Scope;
+use crate::prompts::matching;
 use crate::proto::tilde::agent_event_ingress::v1 as wire;
 use axum::body::Bytes;
 use chrono::{DateTime, Utc};
@@ -27,6 +28,9 @@ pub struct Raw {
     pub provider: Provider,
     pub kind: Kind,
     pub path: String,
+    /// `name@hash` stamps from the SDK's `x-tilde-prompt` header: dynamic prompt versions the
+    /// call used, which the request text cannot show.
+    pub prompts: Vec<(String, Vec<u8>)>,
     pub status: u16,
     pub started: Instant,
     pub first_byte: Option<Duration>,
@@ -94,6 +98,30 @@ pub struct Record {
     /// Images generated or characters synthesised, for kinds billed without tokens.
     pub units: Option<i64>,
     pub usage: Usage,
+    /// Stamped prompt versions as (name, hash); the gateway resolves them to versions.
+    pub prompts: Vec<(String, Vec<u8>)>,
+}
+const MAX_STAMPS: usize = 64;
+fn prompt_stamp(value: &str) -> Option<(String, Vec<u8>)> {
+    let (name, hash) = value.trim().rsplit_once('@')?;
+    let hash = hex::decode(hash).ok().filter(|h| h.len() == 32)?;
+    (!name.is_empty()
+        && name.len() <= 128
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'/')))
+    .then(|| (name.to_owned(), hash))
+}
+/// Parse the SDK's `name@hash, name@hash` stamps; malformed entries are ignored rather than
+/// refused, since the header never reaches the provider and a bad stamp should not fail a call.
+pub fn prompt_stamps(value: &str) -> Vec<(String, Vec<u8>)> {
+    let mut stamps: Vec<(String, Vec<u8>)> = Vec::new();
+    for stamp in value.split(',').filter_map(prompt_stamp) {
+        if stamps.len() < MAX_STAMPS && !stamps.contains(&stamp) {
+            stamps.push(stamp);
+        }
+    }
+    stamps
 }
 impl Record {
     fn from_raw(raw: Raw) -> Self {
@@ -128,6 +156,7 @@ impl Record {
             cache_write_tokens: tokens.cache_write,
             units,
             usage,
+            prompts: raw.prompts,
         }
     }
     pub fn wire(&self) -> wire::InferenceUsage {
@@ -154,6 +183,11 @@ impl Record {
             cache_write_tokens: self.cache_write_tokens,
             units: self.units,
             usage: self.usage.as_str().into(),
+            prompts: self
+                .prompts
+                .iter()
+                .map(|(name, hash)| format!("{name}@{}", hex::encode(hash)))
+                .collect(),
             ..Default::default()
         }
     }
@@ -208,6 +242,7 @@ impl Record {
             cache_write_tokens: tokens(w.cache_write_tokens)?,
             units: tokens(w.units)?,
             usage: Usage::parse(&w.usage),
+            prompts: prompt_stamps(&w.prompts.join(",")),
         })
     }
 }
@@ -442,6 +477,47 @@ fn tokens_in(value: &Value) -> Tokens {
     tokens
 }
 
+/// A deployment's text-matchable prompt versions (see `Prompts::for_deployment`), sent to its
+/// sidecars so they can match request bodies without shipping them.
+pub fn prompt_patterns(
+    versions: Vec<(Uuid, String, crate::prompts::PromptVersion)>,
+) -> Vec<wire::PromptPattern> {
+    versions
+        .into_iter()
+        .filter_map(|(_, name, v)| {
+            let sections: Vec<(String, String)> = v
+                .sections
+                .into_iter()
+                .map(|s| (s.name, s.content))
+                .collect();
+            Some(wire::PromptPattern {
+                segments: matching::segments(v.format, &v.template, &sections)?,
+                name,
+                hash: v.hash,
+                ..Default::default()
+            })
+        })
+        .collect()
+}
+/// Add each version whose text the request carries to the record's stamps.
+fn stamp_matches(record: &mut Record, body: &[u8], patterns: &[wire::PromptPattern]) {
+    if patterns.is_empty() {
+        return;
+    }
+    let texts = matching::request_texts(body);
+    for pattern in patterns {
+        let stamp = (pattern.name.clone(), pattern.hash.clone());
+        if record.prompts.len() < MAX_STAMPS
+            && !record.prompts.contains(&stamp)
+            && texts
+                .iter()
+                .any(|t| matching::found_in(&pattern.segments, t))
+        {
+            record.prompts.push(stamp);
+        }
+    }
+}
+
 /// Where parsed records go.
 pub enum Sink {
     Postgres(crate::database::Pool),
@@ -482,38 +558,81 @@ impl Audit {
     }
 }
 async fn run(sink: Sink, mut receiver: mpsc::Receiver<Command>) {
-    let mut pending: Vec<Record> = Vec::new();
+    // Each record keeps its request body until the flush that matches prompts against it.
+    let mut pending: Vec<(Record, Bytes)> = Vec::new();
+    let mut linker = match &sink {
+        Sink::Postgres(pool) => Some(matching::Linker::new(crate::prompts::Prompts::new(
+            pool.clone(),
+        ))),
+        Sink::Sidecar(_) => None,
+    };
     let mut tick = tokio::time::interval(FLUSH_INTERVAL);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         let barrier = tokio::select! {
             command = receiver.recv() => match command {
                 Some(Command::Raw(raw)) => {
-                    pending.push(Record::from_raw(*raw));
+                    let body = raw.request.clone();
+                    pending.push((Record::from_raw(*raw), body));
                     if pending.len() < BATCH { continue; }
                     None
                 }
                 Some(Command::Flush(done)) => Some(done),
-                None => { flush(&sink, &mut pending).await; break; }
+                None => { flush(&sink, linker.as_mut(), &mut pending).await; break; }
             },
             _ = tick.tick() => None,
         };
         if !pending.is_empty() {
-            flush(&sink, &mut pending).await;
+            flush(&sink, linker.as_mut(), &mut pending).await;
         }
         if let Some(done) = barrier {
             let _ = done.send(());
         }
     }
 }
-async fn flush(sink: &Sink, pending: &mut Vec<Record>) {
+/// Link each stored call to the prompt versions it used. A failure loses only the links.
+pub(crate) async fn link_prompts(
+    db: &impl crate::database::GenericClient,
+    linker: &mut matching::Linker,
+    records: &[(&Record, Option<&[u8]>)],
+) {
+    let calls: Vec<matching::Call<'_>> = records
+        .iter()
+        .map(|(r, body)| matching::Call {
+            request: r.id,
+            agent: r.agent_id,
+            invocation: r.invocation_id,
+            stamps: &r.prompts,
+            body: *body,
+        })
+        .collect();
+    if let Err(error) = linker.link(db, &calls).await {
+        tracing::warn!(%error, "Inference calls not linked to prompt versions");
+    }
+}
+async fn flush(
+    sink: &Sink,
+    linker: Option<&mut matching::Linker>,
+    pending: &mut Vec<(Record, Bytes)>,
+) {
     match sink {
         Sink::Postgres(pool) => {
-            let result =
-                async { super::db::requests_insert_execute(&pool.get().await?, pending).await }
-                    .await;
+            let result = async {
+                let db = pool.get().await?;
+                let records: Vec<&Record> = pending.iter().map(|(r, _)| r).collect();
+                super::db::requests_insert_execute(&db, &records).await?;
+                if let Some(linker) = linker {
+                    let with_bodies: Vec<(&Record, Option<&[u8]>)> = pending
+                        .iter()
+                        .map(|(r, body)| (r, Some(body.as_ref())))
+                        .collect();
+                    link_prompts(&db, linker, &with_bodies).await;
+                }
+                Ok::<_, crate::database::DbError>(())
+            }
+            .await;
             match result {
-                Ok(_) => pending.clear(),
+                Ok(()) => pending.clear(),
                 Err(error) => {
                     tracing::warn!(%error, "Inference usage batch not written; retaining");
                     if pending.len() > RETAIN {
@@ -525,7 +644,11 @@ async fn flush(sink: &Sink, pending: &mut Vec<Record>) {
         }
         Sink::Sidecar(runtime) => {
             if let Some(runtime) = runtime.upgrade() {
-                for record in pending.drain(..) {
+                // Bodies never leave the replica: static prompts are matched here against the
+                // deployment's patterns from the Watch snapshot and shipped as stamps.
+                let patterns = runtime.state.prompts.get().map(Vec::as_slice);
+                for (mut record, body) in pending.drain(..) {
+                    stamp_matches(&mut record, &body, patterns.unwrap_or_default());
                     runtime
                         .push_ephemeral(wire::upstream::Frame::Inference(Box::new(record.wire())));
                 }

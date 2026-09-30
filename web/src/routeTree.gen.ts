@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppApiKeysRouteImport } from './routes/_app/api-keys'
-import { Route as AppGroupsRouteImport } from './routes/_app/groups'
+import { Route as AppSkillsRouteImport } from './routes/_app/skills'
 import { Route as AppAgentAgentIdRouteRouteImport } from './routes/_app/agent/$agentId/route'
 import { Route as AppAgentNewRouteImport } from './routes/_app/agent/new'
-import { Route as AppApiKeysNewRouteImport } from './routes/_app/api-keys_.new'
-import { Route as AppAuthCallbackRouteImport } from './routes/_app/auth/callback'
-import { Route as AppGroupsGroupIdRouteImport } from './routes/_app/groups_.$groupId'
+import { Route as AppSkillsSkillIdRouteImport } from './routes/_app/skills_.$skillId'
+import { Route as AppSkillsCatalogRouteImport } from './routes/_app/skills_.catalog'
+import { Route as AppToolsIndexRouteImport } from './routes/_app/tools/index'
+import { Route as AppToolsToolIdRouteImport } from './routes/_app/tools/$toolId'
+import { Route as AppToolsCatalogRouteImport } from './routes/_app/tools/catalog'
+import { Route as AppToolsConnectionsRouteImport } from './routes/_app/tools/connections'
+import { Route as AppToolsRemoteServersRouteImport } from './routes/_app/tools/remote-servers'
 import { Route as ConnectionsBrokerSetupIdRouteImport } from './routes/connections/broker/$setupId'
 import { Route as AppAgentAgentIdIndexRouteImport } from './routes/_app/agent/$agentId/index'
 import { Route as AppAgentAgentIdCapabilitiesRouteImport } from './routes/_app/agent/$agentId/capabilities'
@@ -26,8 +29,14 @@ import { Route as AppAgentAgentIdDeploymentRouteImport } from './routes/_app/age
 import { Route as AppAgentAgentIdIamRouteImport } from './routes/_app/agent/$agentId/iam'
 import { Route as AppAgentAgentIdInferenceRouteImport } from './routes/_app/agent/$agentId/inference'
 import { Route as AppAgentAgentIdLogsRouteImport } from './routes/_app/agent/$agentId/logs'
+import { Route as AppAgentAgentIdPromptsRouteImport } from './routes/_app/agent/$agentId/prompts'
 import { Route as AppAgentAgentIdSessionsRouteImport } from './routes/_app/agent/$agentId/sessions'
+import { Route as AppAgentAgentIdSkillsRouteImport } from './routes/_app/agent/$agentId/skills'
+import { Route as AppAgentAgentIdToolsRouteImport } from './routes/_app/agent/$agentId/tools'
 import { Route as AppAgentAgentIdTracingRouteImport } from './routes/_app/agent/$agentId/tracing'
+import { Route as AppSkillsCatalogGroupIdRouteImport } from './routes/_app/skills_.catalog.$groupId'
+import { Route as AppSkillsSourcesSourceIdRouteImport } from './routes/_app/skills_.sources.$sourceId'
+import { Route as AppToolsCatalogProviderIdRouteImport } from './routes/_app/tools/catalog.$providerId'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -38,14 +47,9 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppApiKeysRoute = AppApiKeysRouteImport.update({
-  id: '/api-keys',
-  path: '/api-keys',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppGroupsRoute = AppGroupsRouteImport.update({
-  id: '/groups',
-  path: '/groups',
+const AppSkillsRoute = AppSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppAgentAgentIdRouteRoute = AppAgentAgentIdRouteRouteImport.update({
@@ -58,19 +62,39 @@ const AppAgentNewRoute = AppAgentNewRouteImport.update({
   path: '/agent/new',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppApiKeysNewRoute = AppApiKeysNewRouteImport.update({
-  id: '/api-keys_/new',
-  path: '/api-keys/new',
+const AppSkillsSkillIdRoute = AppSkillsSkillIdRouteImport.update({
+  id: '/skills_/$skillId',
+  path: '/skills/$skillId',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAuthCallbackRoute = AppAuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
+const AppSkillsCatalogRoute = AppSkillsCatalogRouteImport.update({
+  id: '/skills_/catalog',
+  path: '/skills/catalog',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppGroupsGroupIdRoute = AppGroupsGroupIdRouteImport.update({
-  id: '/groups_/$groupId',
-  path: '/groups/$groupId',
+const AppToolsIndexRoute = AppToolsIndexRouteImport.update({
+  id: '/tools/',
+  path: '/tools/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
+  id: '/tools/$toolId',
+  path: '/tools/$toolId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppToolsCatalogRoute = AppToolsCatalogRouteImport.update({
+  id: '/tools/catalog',
+  path: '/tools/catalog',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppToolsConnectionsRoute = AppToolsConnectionsRouteImport.update({
+  id: '/tools/connections',
+  path: '/tools/connections',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppToolsRemoteServersRoute = AppToolsRemoteServersRouteImport.update({
+  id: '/tools/remote-servers',
+  path: '/tools/remote-servers',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const ConnectionsBrokerSetupIdRoute =
@@ -118,9 +142,24 @@ const AppAgentAgentIdLogsRoute = AppAgentAgentIdLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
+const AppAgentAgentIdPromptsRoute = AppAgentAgentIdPromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
 const AppAgentAgentIdSessionsRoute = AppAgentAgentIdSessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
+const AppAgentAgentIdSkillsRoute = AppAgentAgentIdSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
+const AppAgentAgentIdToolsRoute = AppAgentAgentIdToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
 const AppAgentAgentIdTracingRoute = AppAgentAgentIdTracingRouteImport.update({
@@ -128,128 +167,199 @@ const AppAgentAgentIdTracingRoute = AppAgentAgentIdTracingRouteImport.update({
   path: '/tracing',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
+const AppSkillsCatalogGroupIdRoute = AppSkillsCatalogGroupIdRouteImport.update({
+  id: '/$groupId',
+  path: '/$groupId',
+  getParentRoute: () => AppSkillsCatalogRoute,
+} as any)
+const AppSkillsSourcesSourceIdRoute =
+  AppSkillsSourcesSourceIdRouteImport.update({
+    id: '/skills_/sources/$sourceId',
+    path: '/skills/sources/$sourceId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppToolsCatalogProviderIdRoute =
+  AppToolsCatalogProviderIdRouteImport.update({
+    id: '/$providerId',
+    path: '/$providerId',
+    getParentRoute: () => AppToolsCatalogRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/api-keys': typeof AppApiKeysRoute
-  '/groups': typeof AppGroupsRoute
+  '/skills': typeof AppSkillsRoute
   '/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
   '/agent/new': typeof AppAgentNewRoute
-  '/api-keys/new': typeof AppApiKeysNewRoute
-  '/auth/callback': typeof AppAuthCallbackRoute
-  '/groups/$groupId': typeof AppGroupsGroupIdRoute
+  '/skills/$skillId': typeof AppSkillsSkillIdRoute
+  '/skills/catalog': typeof AppSkillsCatalogRouteWithChildren
+  '/tools/$toolId': typeof AppToolsToolIdRoute
+  '/tools/catalog': typeof AppToolsCatalogRouteWithChildren
+  '/tools/connections': typeof AppToolsConnectionsRoute
+  '/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/tools/': typeof AppToolsIndexRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
   '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
   '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
   '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
+  '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
+  '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
+  '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
+  '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRoutesByTo {
-  '/api-keys': typeof AppApiKeysRoute
-  '/groups': typeof AppGroupsRoute
+  '/skills': typeof AppSkillsRoute
   '/': typeof AppIndexRoute
   '/agent/new': typeof AppAgentNewRoute
-  '/api-keys/new': typeof AppApiKeysNewRoute
-  '/auth/callback': typeof AppAuthCallbackRoute
-  '/groups/$groupId': typeof AppGroupsGroupIdRoute
+  '/skills/$skillId': typeof AppSkillsSkillIdRoute
+  '/skills/catalog': typeof AppSkillsCatalogRouteWithChildren
+  '/tools/$toolId': typeof AppToolsToolIdRoute
+  '/tools/catalog': typeof AppToolsCatalogRouteWithChildren
+  '/tools/connections': typeof AppToolsConnectionsRoute
+  '/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/tools': typeof AppToolsIndexRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
   '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
   '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
   '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
+  '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
+  '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
+  '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
+  '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/agent/$agentId': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
-  '/_app/api-keys': typeof AppApiKeysRoute
-  '/_app/groups': typeof AppGroupsRoute
+  '/_app/skills': typeof AppSkillsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
   '/_app/agent/new': typeof AppAgentNewRoute
-  '/_app/api-keys_/new': typeof AppApiKeysNewRoute
-  '/_app/auth/callback': typeof AppAuthCallbackRoute
-  '/_app/groups_/$groupId': typeof AppGroupsGroupIdRoute
+  '/_app/skills_/$skillId': typeof AppSkillsSkillIdRoute
+  '/_app/skills_/catalog': typeof AppSkillsCatalogRouteWithChildren
+  '/_app/tools/$toolId': typeof AppToolsToolIdRoute
+  '/_app/tools/catalog': typeof AppToolsCatalogRouteWithChildren
+  '/_app/tools/connections': typeof AppToolsConnectionsRoute
+  '/_app/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/_app/tools/': typeof AppToolsIndexRoute
   '/_app/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/_app/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
   '/_app/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
   '/_app/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
   '/_app/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/_app/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
+  '/_app/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
   '/_app/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
+  '/_app/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
+  '/_app/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/_app/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/_app/skills_/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
+  '/_app/skills_/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
+  '/_app/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/_app/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/api-keys'
-    | '/groups'
+    | '/skills'
     | '/agent/$agentId'
     | '/agent/new'
-    | '/api-keys/new'
-    | '/auth/callback'
-    | '/groups/$groupId'
+    | '/skills/$skillId'
+    | '/skills/catalog'
+    | '/tools/$toolId'
+    | '/tools/catalog'
+    | '/tools/connections'
+    | '/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/tools/'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
     | '/agent/$agentId/deployment'
     | '/agent/$agentId/iam'
     | '/agent/$agentId/inference'
     | '/agent/$agentId/logs'
+    | '/agent/$agentId/prompts'
     | '/agent/$agentId/sessions'
+    | '/agent/$agentId/skills'
+    | '/agent/$agentId/tools'
     | '/agent/$agentId/tracing'
+    | '/skills/catalog/$groupId'
+    | '/skills/sources/$sourceId'
+    | '/tools/catalog/$providerId'
     | '/agent/$agentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/api-keys'
-    | '/groups'
+    | '/skills'
     | '/'
     | '/agent/new'
-    | '/api-keys/new'
-    | '/auth/callback'
-    | '/groups/$groupId'
+    | '/skills/$skillId'
+    | '/skills/catalog'
+    | '/tools/$toolId'
+    | '/tools/catalog'
+    | '/tools/connections'
+    | '/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/tools'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
     | '/agent/$agentId/deployment'
     | '/agent/$agentId/iam'
     | '/agent/$agentId/inference'
     | '/agent/$agentId/logs'
+    | '/agent/$agentId/prompts'
     | '/agent/$agentId/sessions'
+    | '/agent/$agentId/skills'
+    | '/agent/$agentId/tools'
     | '/agent/$agentId/tracing'
+    | '/skills/catalog/$groupId'
+    | '/skills/sources/$sourceId'
+    | '/tools/catalog/$providerId'
     | '/agent/$agentId'
   id:
     | '__root__'
     | '/_app'
-    | '/_app/api-keys'
-    | '/_app/groups'
+    | '/_app/skills'
     | '/_app/'
     | '/_app/agent/$agentId'
     | '/_app/agent/new'
-    | '/_app/api-keys_/new'
-    | '/_app/auth/callback'
-    | '/_app/groups_/$groupId'
+    | '/_app/skills_/$skillId'
+    | '/_app/skills_/catalog'
+    | '/_app/tools/$toolId'
+    | '/_app/tools/catalog'
+    | '/_app/tools/connections'
+    | '/_app/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/_app/tools/'
     | '/_app/agent/$agentId/capabilities'
     | '/_app/agent/$agentId/chat-providers'
     | '/_app/agent/$agentId/deployment'
     | '/_app/agent/$agentId/iam'
     | '/_app/agent/$agentId/inference'
     | '/_app/agent/$agentId/logs'
+    | '/_app/agent/$agentId/prompts'
     | '/_app/agent/$agentId/sessions'
+    | '/_app/agent/$agentId/skills'
+    | '/_app/agent/$agentId/tools'
     | '/_app/agent/$agentId/tracing'
+    | '/_app/skills_/catalog/$groupId'
+    | '/_app/skills_/sources/$sourceId'
+    | '/_app/tools/catalog/$providerId'
     | '/_app/agent/$agentId/'
   fileRoutesById: FileRoutesById
 }
@@ -274,18 +384,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/api-keys': {
-      id: '/_app/api-keys'
-      path: '/api-keys'
-      fullPath: '/api-keys'
-      preLoaderRoute: typeof AppApiKeysRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/groups': {
-      id: '/_app/groups'
-      path: '/groups'
-      fullPath: '/groups'
-      preLoaderRoute: typeof AppGroupsRouteImport
+    '/_app/skills': {
+      id: '/_app/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof AppSkillsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/agent/$agentId': {
@@ -302,25 +405,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAgentNewRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/api-keys_/new': {
-      id: '/_app/api-keys_/new'
-      path: '/api-keys/new'
-      fullPath: '/api-keys/new'
-      preLoaderRoute: typeof AppApiKeysNewRouteImport
+    '/_app/skills_/$skillId': {
+      id: '/_app/skills_/$skillId'
+      path: '/skills/$skillId'
+      fullPath: '/skills/$skillId'
+      preLoaderRoute: typeof AppSkillsSkillIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/auth/callback': {
-      id: '/_app/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AppAuthCallbackRouteImport
+    '/_app/skills_/catalog': {
+      id: '/_app/skills_/catalog'
+      path: '/skills/catalog'
+      fullPath: '/skills/catalog'
+      preLoaderRoute: typeof AppSkillsCatalogRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/groups_/$groupId': {
-      id: '/_app/groups_/$groupId'
-      path: '/groups/$groupId'
-      fullPath: '/groups/$groupId'
-      preLoaderRoute: typeof AppGroupsGroupIdRouteImport
+    '/_app/tools/': {
+      id: '/_app/tools/'
+      path: '/tools'
+      fullPath: '/tools/'
+      preLoaderRoute: typeof AppToolsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/tools/$toolId': {
+      id: '/_app/tools/$toolId'
+      path: '/tools/$toolId'
+      fullPath: '/tools/$toolId'
+      preLoaderRoute: typeof AppToolsToolIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/tools/catalog': {
+      id: '/_app/tools/catalog'
+      path: '/tools/catalog'
+      fullPath: '/tools/catalog'
+      preLoaderRoute: typeof AppToolsCatalogRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/tools/connections': {
+      id: '/_app/tools/connections'
+      path: '/tools/connections'
+      fullPath: '/tools/connections'
+      preLoaderRoute: typeof AppToolsConnectionsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/tools/remote-servers': {
+      id: '/_app/tools/remote-servers'
+      path: '/tools/remote-servers'
+      fullPath: '/tools/remote-servers'
+      preLoaderRoute: typeof AppToolsRemoteServersRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/connections/broker/$setupId': {
@@ -379,11 +510,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAgentAgentIdLogsRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
+    '/_app/agent/$agentId/prompts': {
+      id: '/_app/agent/$agentId/prompts'
+      path: '/prompts'
+      fullPath: '/agent/$agentId/prompts'
+      preLoaderRoute: typeof AppAgentAgentIdPromptsRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
     '/_app/agent/$agentId/sessions': {
       id: '/_app/agent/$agentId/sessions'
       path: '/sessions'
       fullPath: '/agent/$agentId/sessions'
       preLoaderRoute: typeof AppAgentAgentIdSessionsRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
+    '/_app/agent/$agentId/skills': {
+      id: '/_app/agent/$agentId/skills'
+      path: '/skills'
+      fullPath: '/agent/$agentId/skills'
+      preLoaderRoute: typeof AppAgentAgentIdSkillsRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
+    '/_app/agent/$agentId/tools': {
+      id: '/_app/agent/$agentId/tools'
+      path: '/tools'
+      fullPath: '/agent/$agentId/tools'
+      preLoaderRoute: typeof AppAgentAgentIdToolsRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
     '/_app/agent/$agentId/tracing': {
@@ -392,6 +544,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/agent/$agentId/tracing'
       preLoaderRoute: typeof AppAgentAgentIdTracingRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
+    '/_app/skills_/catalog/$groupId': {
+      id: '/_app/skills_/catalog/$groupId'
+      path: '/$groupId'
+      fullPath: '/skills/catalog/$groupId'
+      preLoaderRoute: typeof AppSkillsCatalogGroupIdRouteImport
+      parentRoute: typeof AppSkillsCatalogRoute
+    }
+    '/_app/skills_/sources/$sourceId': {
+      id: '/_app/skills_/sources/$sourceId'
+      path: '/skills/sources/$sourceId'
+      fullPath: '/skills/sources/$sourceId'
+      preLoaderRoute: typeof AppSkillsSourcesSourceIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/tools/catalog/$providerId': {
+      id: '/_app/tools/catalog/$providerId'
+      path: '/$providerId'
+      fullPath: '/tools/catalog/$providerId'
+      preLoaderRoute: typeof AppToolsCatalogProviderIdRouteImport
+      parentRoute: typeof AppToolsCatalogRoute
     }
   }
 }
@@ -403,7 +576,10 @@ interface AppAgentAgentIdRouteRouteChildren {
   AppAgentAgentIdIamRoute: typeof AppAgentAgentIdIamRoute
   AppAgentAgentIdInferenceRoute: typeof AppAgentAgentIdInferenceRoute
   AppAgentAgentIdLogsRoute: typeof AppAgentAgentIdLogsRoute
+  AppAgentAgentIdPromptsRoute: typeof AppAgentAgentIdPromptsRoute
   AppAgentAgentIdSessionsRoute: typeof AppAgentAgentIdSessionsRoute
+  AppAgentAgentIdSkillsRoute: typeof AppAgentAgentIdSkillsRoute
+  AppAgentAgentIdToolsRoute: typeof AppAgentAgentIdToolsRoute
   AppAgentAgentIdTracingRoute: typeof AppAgentAgentIdTracingRoute
   AppAgentAgentIdIndexRoute: typeof AppAgentAgentIdIndexRoute
 }
@@ -415,7 +591,10 @@ const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
   AppAgentAgentIdIamRoute: AppAgentAgentIdIamRoute,
   AppAgentAgentIdInferenceRoute: AppAgentAgentIdInferenceRoute,
   AppAgentAgentIdLogsRoute: AppAgentAgentIdLogsRoute,
+  AppAgentAgentIdPromptsRoute: AppAgentAgentIdPromptsRoute,
   AppAgentAgentIdSessionsRoute: AppAgentAgentIdSessionsRoute,
+  AppAgentAgentIdSkillsRoute: AppAgentAgentIdSkillsRoute,
+  AppAgentAgentIdToolsRoute: AppAgentAgentIdToolsRoute,
   AppAgentAgentIdTracingRoute: AppAgentAgentIdTracingRoute,
   AppAgentAgentIdIndexRoute: AppAgentAgentIdIndexRoute,
 }
@@ -423,26 +602,57 @@ const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
 const AppAgentAgentIdRouteRouteWithChildren =
   AppAgentAgentIdRouteRoute._addFileChildren(AppAgentAgentIdRouteRouteChildren)
 
+interface AppSkillsCatalogRouteChildren {
+  AppSkillsCatalogGroupIdRoute: typeof AppSkillsCatalogGroupIdRoute
+}
+
+const AppSkillsCatalogRouteChildren: AppSkillsCatalogRouteChildren = {
+  AppSkillsCatalogGroupIdRoute: AppSkillsCatalogGroupIdRoute,
+}
+
+const AppSkillsCatalogRouteWithChildren =
+  AppSkillsCatalogRoute._addFileChildren(AppSkillsCatalogRouteChildren)
+
+interface AppToolsCatalogRouteChildren {
+  AppToolsCatalogProviderIdRoute: typeof AppToolsCatalogProviderIdRoute
+}
+
+const AppToolsCatalogRouteChildren: AppToolsCatalogRouteChildren = {
+  AppToolsCatalogProviderIdRoute: AppToolsCatalogProviderIdRoute,
+}
+
+const AppToolsCatalogRouteWithChildren = AppToolsCatalogRoute._addFileChildren(
+  AppToolsCatalogRouteChildren,
+)
+
 interface AppRouteRouteChildren {
-  AppApiKeysRoute: typeof AppApiKeysRoute
-  AppGroupsRoute: typeof AppGroupsRoute
+  AppSkillsRoute: typeof AppSkillsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAgentAgentIdRouteRoute: typeof AppAgentAgentIdRouteRouteWithChildren
   AppAgentNewRoute: typeof AppAgentNewRoute
-  AppApiKeysNewRoute: typeof AppApiKeysNewRoute
-  AppAuthCallbackRoute: typeof AppAuthCallbackRoute
-  AppGroupsGroupIdRoute: typeof AppGroupsGroupIdRoute
+  AppSkillsSkillIdRoute: typeof AppSkillsSkillIdRoute
+  AppSkillsCatalogRoute: typeof AppSkillsCatalogRouteWithChildren
+  AppToolsToolIdRoute: typeof AppToolsToolIdRoute
+  AppToolsCatalogRoute: typeof AppToolsCatalogRouteWithChildren
+  AppToolsConnectionsRoute: typeof AppToolsConnectionsRoute
+  AppToolsRemoteServersRoute: typeof AppToolsRemoteServersRoute
+  AppToolsIndexRoute: typeof AppToolsIndexRoute
+  AppSkillsSourcesSourceIdRoute: typeof AppSkillsSourcesSourceIdRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppApiKeysRoute: AppApiKeysRoute,
-  AppGroupsRoute: AppGroupsRoute,
+  AppSkillsRoute: AppSkillsRoute,
   AppIndexRoute: AppIndexRoute,
   AppAgentAgentIdRouteRoute: AppAgentAgentIdRouteRouteWithChildren,
   AppAgentNewRoute: AppAgentNewRoute,
-  AppApiKeysNewRoute: AppApiKeysNewRoute,
-  AppAuthCallbackRoute: AppAuthCallbackRoute,
-  AppGroupsGroupIdRoute: AppGroupsGroupIdRoute,
+  AppSkillsSkillIdRoute: AppSkillsSkillIdRoute,
+  AppSkillsCatalogRoute: AppSkillsCatalogRouteWithChildren,
+  AppToolsToolIdRoute: AppToolsToolIdRoute,
+  AppToolsCatalogRoute: AppToolsCatalogRouteWithChildren,
+  AppToolsConnectionsRoute: AppToolsConnectionsRoute,
+  AppToolsRemoteServersRoute: AppToolsRemoteServersRoute,
+  AppToolsIndexRoute: AppToolsIndexRoute,
+  AppSkillsSourcesSourceIdRoute: AppSkillsSourcesSourceIdRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

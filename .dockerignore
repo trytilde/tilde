@@ -12,6 +12,3 @@ web/dist
 .env*
 
 web/provider-dist
-
-secrets*.yaml
-.sops.yaml

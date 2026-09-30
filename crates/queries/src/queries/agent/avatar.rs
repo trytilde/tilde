@@ -9,6 +9,7 @@ pub struct RunParams<T1: crate::StringSql> {
 pub struct Record {
     pub id: uuid::Uuid,
     pub name: String,
+    pub description: String,
     pub concurrency_policy: String,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<String>,
@@ -20,6 +21,7 @@ pub struct Record {
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub name: &'a str,
+    pub description: &'a str,
     pub concurrency_policy: &'a str,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<&'a str>,
@@ -33,6 +35,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         RecordBorrowed {
             id,
             name,
+            description,
             concurrency_policy,
             avatar_seed,
             avatar_key,
@@ -45,6 +48,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         Self {
             id,
             name: name.into(),
+            description: description.into(),
             concurrency_policy: concurrency_policy.into(),
             avatar_seed,
             avatar_key: avatar_key.map(|v| v.into()),
@@ -124,7 +128,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "UPDATE agents SET avatar_key = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id, name, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities",
+        "UPDATE agents SET avatar_key = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING id, name, description, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities",
         None,
     )
 }
@@ -152,13 +156,14 @@ impl RunStmt {
                     Ok(RecordBorrowed {
                         id: row.try_get(0)?,
                         name: row.try_get(1)?,
-                        concurrency_policy: row.try_get(2)?,
-                        avatar_seed: row.try_get(3)?,
-                        avatar_key: row.try_get(4)?,
-                        paused: row.try_get(5)?,
-                        created_at: row.try_get(6)?,
-                        updated_at: row.try_get(7)?,
-                        capabilities: row.try_get(8)?,
+                        description: row.try_get(2)?,
+                        concurrency_policy: row.try_get(3)?,
+                        avatar_seed: row.try_get(4)?,
+                        avatar_key: row.try_get(5)?,
+                        paused: row.try_get(6)?,
+                        created_at: row.try_get(7)?,
+                        updated_at: row.try_get(8)?,
+                        capabilities: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),

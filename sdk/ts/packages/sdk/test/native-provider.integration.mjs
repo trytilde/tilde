@@ -20,10 +20,8 @@ import { createClient, Code } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { ChatService } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 import { AgentConcurrencyPolicy, ChannelAccessMode } from "../dist/management.js";
-import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 assert(process.env.TEST_DATABASE_URL, "Use scripts/with-postgres.sh");
 const scratch = await mkdtemp(join(tmpdir(), "tilde-concurrency-"));
-const oidc = await startOidc();
 const contexts = [];
 const errors = [];
 const releases = new Map();
@@ -58,7 +56,6 @@ const agentOptions = {
 };
 const env = {
   ...process.env,
-  ...oidc.env,
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   LOGS_QUEUE_DIR: scratch,
   ENGINE_ENCRYPTION_BACKEND: "seed",
@@ -101,11 +98,7 @@ try {
     const match = logs.match(/ address=(127\.0\.0\.1:\d+)/);
     return match && `http://${match[1]}`;
   });
-  const managementToken = await loginManagement(url);
-  const management = createManagementClient({
-    baseUrl: url,
-    accessToken: managementToken,
-  });
+  const management = createManagementClient({ baseUrl: url });
   const { agent } = await management.agents.createAgent({
     name: "Embedded",
     concurrencyPolicy: AgentConcurrencyPolicy.QUEUE,
@@ -118,7 +111,6 @@ try {
   connectedFixtures.push(
     await connectAgentFixture({
       url,
-      accessToken: managementToken,
       agentId: agent.id,
       options: agentOptions,
     }),
@@ -126,10 +118,8 @@ try {
   const { apiKey } = await management.tildeChat.getCredentials({ agentId: agent.id });
   assert.equal((await management.tildeChat.getCredentials({ agentId: agent.id })).apiKey, apiKey);
   // The agent's Tilde connection starts private; open it so asserted identities are admitted.
-  const { routes: channelRoutes } = await management.access.listChannelAccess({
-    agentId: agent.id,
-  });
-  const tildeRoute = channelRoutes.find((route) => route.providerId === "tilde");
+  const access = await management.access.listChannelAccess({ agentId: agent.id });
+  const tildeRoute = access.routes.find((route) => route.providerId === "tilde");
   assert(tildeRoute, "every agent owns a Tilde connection");
   await management.access.setChannelAccess({
     agentId: agent.id,
@@ -355,7 +345,6 @@ try {
   connectedFixtures.push(
     await connectAgentFixture({
       url,
-      accessToken: managementToken,
       agentId: otherAgent.id,
       options: agentOptions,
     }),
@@ -476,6 +465,5 @@ try {
     await done;
     clearTimeout(timeout);
   }
-  await oidc.stop();
   await rm(scratch, { recursive: true, force: true });
 }

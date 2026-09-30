@@ -8,6 +8,7 @@ import { AgentAvatar } from "./agent-avatar";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
+import { SkeletonLines } from "@/components/table-skeleton";
 
 export function AgentTargetPicker({
   label,
@@ -182,11 +183,7 @@ export function AgentTargetPicker({
               </button>
             ))}
           </div>
-          {loading && (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading agents…
-            </p>
-          )}
+          {loading && <SkeletonLines label="Loading agents" />}
           {!loading && !error && !items.length && (
             <p className="text-sm text-muted-foreground">No agents found.</p>
           )}

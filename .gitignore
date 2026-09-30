@@ -1,20 +1,16 @@
 /target/
 /dist/
-/node_modules/
-/web/node_modules/
+node_modules/
+# Build output of an older example-agent layout; the examples live under sdk/ts/examples.
+/dev/example-agent-1/
 /web/dist/
 /.tools/
 /.env.*
 !/.env.example
 !/.env.test
-/secrets.yaml
-/.secrets.*
-/.load-secrets.*
 /.run/
 .run/
 
-/sdk/ts/node_modules/
-/sdk/ts/**/node_modules/
 /sdk/ts/**/dist/
 # Generated TypeScript contracts; @trytilde/contracts builds them from proto/.
 /sdk/ts/packages/contracts/gen/
@@ -25,7 +21,6 @@ __pycache__/
 
 # Local runtime credentials must not enter the initial repository commit.
 /.env
-/secrets.enc.yaml
 log
 
 /.local/
@@ -49,6 +44,7 @@ log
 /sdk/py/packages/tilde/src/tilde/run/
 /sdk/py/packages/tilde/src/tilde/runtime/
 /sdk/py/packages/tilde/src/tilde/setup/
+/sdk/py/packages/tilde/src/tilde/tool_host/
 /sdk/py/packages/tilde/src/tilde/types/
 /sdk/py/**/*.egg-info/
 .pytest_cache/

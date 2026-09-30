@@ -19,6 +19,7 @@ async fn committed_activity_reaches_another_instance_and_drains_multiple_pages()
     let crypto = Arc::new(Encryption::initialize(&db.pool, seed(9)).await.unwrap());
     let agent = Agents::new(db.pool.clone(), crypto.clone())
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: Uuid::new_v4(),
             name: "Notifications".into(),

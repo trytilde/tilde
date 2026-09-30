@@ -6,12 +6,10 @@ import type { TraceSearch } from "./search";
 export function TraceSearchInput({
   search,
   observations,
-  disabled,
   onApply,
 }: {
   search: TraceSearch;
   observations: Observation[];
-  disabled: boolean;
   onApply: (patch: TraceSearch) => void;
 }) {
   const suggest = useCallback(
@@ -22,7 +20,6 @@ export function TraceSearchInput({
     <FilterSearchInput
       label="Search traces"
       canonical={serializeQuery(search)}
-      disabled={disabled}
       validate={parseQuery}
       suggest={suggest}
       onApply={(query) => {

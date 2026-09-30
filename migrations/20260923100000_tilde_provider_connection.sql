@@ -13,10 +13,3 @@ ON CONFLICT(provider_id,type_id) DO NOTHING;
 DROP TABLE IF EXISTS tilde_chat_access;
 DROP TABLE tilde_chat_identities;
 DROP TABLE tilde_chat_keys;
--- The application asserting a Tilde identity vouches for it without a management actor:
--- attested with no attester means the provider application attested.
-ALTER TABLE chat_users DROP CONSTRAINT identity_attestation,
- ADD CONSTRAINT identity_attestation CHECK (
-  (attested_at IS NULL AND num_nonnulls(attested_by_user_id,attested_by_api_key_id)=0) OR
-  (attested_at IS NOT NULL AND num_nonnulls(attested_by_user_id,attested_by_api_key_id)<=1)
- );

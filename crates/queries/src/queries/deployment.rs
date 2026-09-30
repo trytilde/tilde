@@ -1,6 +1,5 @@
 // This file was generated with `cornucopia`. Do not modify.
 
-pub mod active_work;
 pub mod agent_runs;
 pub mod agent_secrets;
 pub mod assigned_connections;
@@ -41,7 +40,6 @@ pub mod lease_lock;
 pub mod lease_move;
 pub mod lease_pin;
 pub mod lease_release;
-pub mod leases_clear;
 pub mod leases_held;
 pub mod leases_since;
 pub mod live_node;
@@ -55,7 +53,6 @@ pub mod relay_invocation;
 pub mod relay_pending;
 pub mod run_origins;
 pub mod secrets_init;
-pub mod serving_clear;
 pub mod settings;
 pub mod stop_runs;
 pub mod store_secrets;

@@ -13,3 +13,13 @@ pub(crate) fn mount(router: connectrpc::Router, max_bytes: usize) -> axum::Route
         )
     })
 }
+
+/// A list request's optional search term: trimmed, blank as none, at most 200 bytes as other
+/// list searches allow.
+pub(crate) fn search(value: Option<&str>) -> Result<Option<&str>, crate::error::Error> {
+    let value = value.map(str::trim).filter(|v| !v.is_empty());
+    if value.is_some_and(|v| v.len() > 200) {
+        return Err(crate::error::Error::Invalid("Search is too long".into()));
+    }
+    Ok(value)
+}

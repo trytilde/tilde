@@ -1,30 +1,52 @@
-"""Reply generation: history in, provider tool calls out. Model text stays private."""
+"""The Pydantic AI agent, defined once at module scope; each invocation runs it with Tilde's
+per-run pieces (channel, Tilde and bundled tools, steering, skills, cancellation). Model text
+stays private."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
+from bundled_tools import TOOL_GUIDANCE, TOOLS
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelHTTPError
-from pydantic_ai.models import Model
-from pydantic_ai.models.openai import OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.usage import UsageLimits
 
+import tilde
 from tilde import AgentContext, InvocationCancelled, StopLoop
-from tilde_pydantic_ai import convert_to_pydantic_ai_messages, convert_to_pydantic_ai_tools
+from tilde_pydantic_ai import convert_to_pydantic_ai_messages, tilde_pydantic_ai
 
 log = logging.getLogger("example-agent-pydantic-ai")
 
-INSTRUCTIONS = (
-    "You are Example Agent 1, a helpful local development assistant. Use the current channel "
-    "tools to respond to the latest message, concisely and helpfully. Model text is private and "
-    "is not delivered to the user. Choose the appropriate provider tool using its instructions "
-    "and conversation references. Use the supplied attachments when answering."
+# The inference connection this agent was given; the gateway holds its provider key. Built once:
+# each request resolves the invocation running it.
+INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
+model = OpenAIResponsesModel(
+    os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+    provider=OpenAIProvider(
+        base_url=INFERENCE.base_url,
+        api_key=INFERENCE.api_key,
+        http_client=INFERENCE.async_client(),
+    ),
+)
+responder = Agent(
+    model,
+    instructions=(
+        "You are Example Agent 1, a helpful local development assistant. Use the current channel "
+        "tools to respond to the latest message, concisely and helpfully. Model text is private "
+        "and is not delivered to the user. Choose the appropriate provider tool using its "
+        "instructions and conversation references. Use the supplied attachments when answering."
+        + TOOL_GUIDANCE
+    ),
+    retries=0,
+    model_settings=OpenAIResponsesModelSettings(max_tokens=600, openai_store=False),
 )
 
 
-async def respond(ctx: AgentContext, model: Model) -> None:
+async def respond(ctx: AgentContext) -> None:
     """Visible responses are explicit provider tool calls; a text-only result sends nothing."""
     log.info("Agent invocation started")
     stage = "history"
@@ -33,16 +55,11 @@ async def respond(ctx: AgentContext, model: Model) -> None:
         log.debug("Loaded conversation history: %d items", len(history.items))
         messages = await convert_to_pydantic_ai_messages(history.items, context=ctx)
         stage = "inference"
-        agent = Agent(
-            model,
-            instructions=INSTRUCTIONS,
-            tools=convert_to_pydantic_ai_tools(ctx.channel.current),
-            retries=0,
-            model_settings=OpenAIResponsesModelSettings(max_tokens=600, openai_store=False),
-        )
         async with asyncio.timeout(60):
-            result = await agent.run(
-                message_history=messages, usage_limits=UsageLimits(request_limit=8)
+            result = await responder.run(
+                message_history=messages,
+                usage_limits=UsageLimits(request_limit=8),
+                **await tilde_pydantic_ai(ctx, bundled=TOOLS),
             )
         log.info("Agent invocation completed: %d requests", result.usage.requests)
     except (StopLoop, InvocationCancelled, asyncio.CancelledError):

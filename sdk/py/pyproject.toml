@@ -49,7 +49,6 @@ dev = [
   "hypercorn>=0.17",
   "fastapi>=0.120",
   "httpx>=0.28",
-  "cryptography>=43",
   "hatchling>=1.27",
 ]
 

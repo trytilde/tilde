@@ -38,6 +38,9 @@ impl PrivateJson {
 #[derive(Clone)]
 pub struct Http {
     pub(crate) client: reqwest::Client,
+    /// The one origin that may serve discovered URLs over plain HTTP from a private address:
+    /// isolated tests' loopback MCP servers (`mcp_private_origin`). Production has none.
+    private_origin: Option<String>,
 }
 impl Http {
     pub fn new() -> Result<Self, Error> {
@@ -48,7 +51,27 @@ impl Http {
                 .user_agent("tilde-connections")
                 .build()
                 .map_err(|_| invalid("Unable to create provider HTTP client"))?,
+            private_origin: None,
         })
+    }
+    pub(crate) fn with_private_origin(mut self, origin: Option<String>) -> Self {
+        self.private_origin = origin;
+        self
+    }
+    /// A client for a URL a remote server supplied, such as an MCP server's OAuth discovery:
+    /// HTTPS to public addresses only, resolved once and pinned so the checked address is the
+    /// one dialed. Admin-configured provider endpoints use `client`.
+    pub(crate) async fn discovered(&self, raw: &str) -> Result<reqwest::Client, Error> {
+        let url = url::Url::parse(raw).map_err(|_| invalid("Invalid discovered URL"))?;
+        if self.private_origin.as_deref() == Some(url.origin().ascii_serialization().as_str()) {
+            return Ok(self.client.clone());
+        }
+        if url.scheme() != "https" {
+            return Err(invalid("Discovered OAuth endpoints must use HTTPS"));
+        }
+        crate::chat::providers::files::public_client(&url, std::time::Duration::from_secs(25))
+            .await
+            .map_err(|_| invalid("Discovered OAuth endpoints must be public addresses"))
     }
     pub(crate) async fn json(
         &self,
@@ -216,8 +239,14 @@ pub(crate) async fn exchange(
         }
         Zeroizing::new(serializer.finish())
     };
-    let mut request = http
-        .client
+    // A dynamic client's token endpoint came from the MCP server's own discovery; a tool host's
+    // from its own definition. Neither may reach a private address.
+    let client = if config.client == OAuthClient::Dynamic || config.host_published {
+        http.discovered(&config.token_url).await?
+    } else {
+        http.client.clone()
+    };
+    let mut request = client
         .post(endpoint(&config.token_url)?)
         .header("accept", "application/json")
         .header("content-type", "application/x-www-form-urlencoded")

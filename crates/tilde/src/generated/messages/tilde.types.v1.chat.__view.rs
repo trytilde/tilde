@@ -2974,6 +2974,27 @@ pub struct ToolDefinitionView<'a> {
     ///
     /// Field 5: `chunk_schema_json`
     pub chunk_schema_json: &'a str,
+    /// Empty when the provider does not describe its result.
+    ///
+    /// Field 6: `output_schema_json`
+    pub output_schema_json: &'a str,
+    /// Field 7: `annotations`
+    pub annotations: ::buffa::MessageFieldView<
+        super::super::__buffa::view::ToolAnnotationsView<'a>,
+    >,
+    /// Short human-readable label shown in place of tool detail; empty falls back to the description.
+    ///
+    /// Field 8: `summary`
+    pub summary: &'a str,
+    /// The call returns a ticket at once; its result arrives later as new input to the agent and
+    /// can be read with `tools.result`.
+    ///
+    /// Field 9: `detached`
+    pub detached: bool,
+    /// How its calls appear in end-user chats (the Tilde chat stream); traces keep full detail.
+    ///
+    /// Field 10: `display`
+    pub display: ::buffa::EnumValue<super::super::ToolDisplay>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ToolDefinitionView<'a> {
@@ -3039,6 +3060,57 @@ impl<'a> ::buffa::MessageView<'a> for ToolDefinitionView<'a> {
                 )?;
                 view.chunk_schema_json = ::buffa::types::borrow_str(&mut cur)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.output_schema_json = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.annotations.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.annotations = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::ToolAnnotationsView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.summary = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.detached = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.display = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -3066,6 +3138,19 @@ impl<'a> ::buffa::MessageView<'a> for ToolDefinitionView<'a> {
             description: self.description.to_string(),
             input_schema_json: self.input_schema_json.to_string(),
             chunk_schema_json: self.chunk_schema_json.to_string(),
+            output_schema_json: self.output_schema_json.to_string(),
+            annotations: match self.annotations.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::ToolAnnotations,
+                        ::buffa::Inline<super::super::ToolAnnotations>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            summary: self.summary.to_string(),
+            detached: self.detached,
+            display: self.display,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -3073,7 +3158,7 @@ impl<'a> ::buffa::MessageView<'a> for ToolDefinitionView<'a> {
 }
 impl<'a> ::buffa::ViewEncode<'a> for ToolDefinitionView<'a> {
     #[allow(clippy::needless_borrow, clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -3096,13 +3181,39 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolDefinitionView<'a> {
                 += 1u64
                     + ::buffa::types::string_encoded_len(&self.chunk_schema_json) as u64;
         }
+        if !self.output_schema_json.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.output_schema_json)
+                        as u64;
+        }
+        if self.annotations.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.annotations.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.summary.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.summary) as u64;
+        }
+        if self.detached {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        {
+            let val = self.display.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     #[allow(clippy::needless_borrow)]
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -3121,6 +3232,29 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolDefinitionView<'a> {
         }
         if !self.chunk_schema_json.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.chunk_schema_json, buf);
+        }
+        if !self.output_schema_json.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.output_schema_json, buf);
+        }
+        if self.annotations.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                7u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.annotations.write_to(__cache, buf);
+        }
+        if !self.summary.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.summary, buf);
+        }
+        if self.detached {
+            ::buffa::types::put_bool_field(9u32, self.detached, buf);
+        }
+        {
+            let val = self.display.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3157,6 +3291,23 @@ impl<'__a> ::serde::Serialize for ToolDefinitionView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.chunk_schema_json) {
             __map.serialize_entry("chunkSchemaJson", self.chunk_schema_json)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.output_schema_json) {
+            __map.serialize_entry("outputSchemaJson", self.output_schema_json)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.annotations.as_option() {
+                __map.serialize_entry("annotations", __v)?;
+            }
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.summary) {
+            __map.serialize_entry("summary", self.summary)?;
+        }
+        if self.detached {
+            __map.serialize_entry("detached", &self.detached)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.display) {
+            __map.serialize_entry("display", &self.display)?;
         }
         __map.end()
     }
@@ -3278,6 +3429,44 @@ impl ToolDefinitionOwnedView {
     pub fn chunk_schema_json(&self) -> &'_ str {
         self.0.reborrow().chunk_schema_json
     }
+    /// Empty when the provider does not describe its result.
+    ///
+    /// Field 6: `output_schema_json`
+    #[must_use]
+    pub fn output_schema_json(&self) -> &'_ str {
+        self.0.reborrow().output_schema_json
+    }
+    /// Field 7: `annotations`
+    #[must_use]
+    pub fn annotations(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::ToolAnnotationsView<'_>,
+    > {
+        &self.0.reborrow().annotations
+    }
+    /// Short human-readable label shown in place of tool detail; empty falls back to the description.
+    ///
+    /// Field 8: `summary`
+    #[must_use]
+    pub fn summary(&self) -> &'_ str {
+        self.0.reborrow().summary
+    }
+    /// The call returns a ticket at once; its result arrives later as new input to the agent and
+    /// can be read with `tools.result`.
+    ///
+    /// Field 9: `detached`
+    #[must_use]
+    pub fn detached(&self) -> bool {
+        self.0.reborrow().detached
+    }
+    /// How its calls appear in end-user chats (the Tilde chat stream); traces keep full detail.
+    ///
+    /// Field 10: `display`
+    #[must_use]
+    pub fn display(&self) -> ::buffa::EnumValue<super::super::ToolDisplay> {
+        self.0.reborrow().display
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<ToolDefinitionView<'static>>>
 for ToolDefinitionOwnedView {
@@ -3302,6 +3491,324 @@ impl ::buffa::HasMessageView for super::super::ToolDefinition {
     type ViewHandle = ToolDefinitionOwnedView;
 }
 impl ::serde::Serialize for ToolDefinitionOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// Hints, not guarantees: frameworks may use them to order, confirm or parallelise calls.
+#[derive(Clone, Debug, Default)]
+pub struct ToolAnnotationsView<'a> {
+    /// Field 1: `read_only`
+    pub read_only: bool,
+    /// Field 2: `destructive`
+    pub destructive: bool,
+    /// Field 3: `idempotent`
+    pub idempotent: bool,
+    /// Field 4: `open_world`
+    pub open_world: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for ToolAnnotationsView<'a> {
+    type Owned = super::super::ToolAnnotations;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.read_only = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.destructive = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.idempotent = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.open_world = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::ToolAnnotations, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::ToolAnnotations, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::ToolAnnotations {
+            read_only: self.read_only,
+            destructive: self.destructive,
+            idempotent: self.idempotent,
+            open_world: self.open_world,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for ToolAnnotationsView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.read_only {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.destructive {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.idempotent {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.open_world {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.read_only {
+            ::buffa::types::put_bool_field(1u32, self.read_only, buf);
+        }
+        if self.destructive {
+            ::buffa::types::put_bool_field(2u32, self.destructive, buf);
+        }
+        if self.idempotent {
+            ::buffa::types::put_bool_field(3u32, self.idempotent, buf);
+        }
+        if self.open_world {
+            ::buffa::types::put_bool_field(4u32, self.open_world, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for ToolAnnotationsView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if self.read_only {
+            __map.serialize_entry("readOnly", &self.read_only)?;
+        }
+        if self.destructive {
+            __map.serialize_entry("destructive", &self.destructive)?;
+        }
+        if self.idempotent {
+            __map.serialize_entry("idempotent", &self.idempotent)?;
+        }
+        if self.open_world {
+            __map.serialize_entry("openWorld", &self.open_world)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for ToolAnnotationsView<'a> {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "ToolAnnotations";
+    const FULL_NAME: &'static str = "tilde.types.v1.ToolAnnotations";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.ToolAnnotations";
+}
+::buffa::impl_default_view_instance!(ToolAnnotationsView);
+::buffa::impl_view_reborrow!(ToolAnnotationsView);
+/** Self-contained, `'static` owned view of a `ToolAnnotations` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ToolAnnotationsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ToolAnnotationsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct ToolAnnotationsOwnedView(::buffa::OwnedView<ToolAnnotationsView<'static>>);
+impl ToolAnnotationsOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ToolAnnotationsOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ToolAnnotationsOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::ToolAnnotations,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ToolAnnotationsOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`ToolAnnotationsView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &ToolAnnotationsView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::ToolAnnotations {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `read_only`
+    #[must_use]
+    pub fn read_only(&self) -> bool {
+        self.0.reborrow().read_only
+    }
+    /// Field 2: `destructive`
+    #[must_use]
+    pub fn destructive(&self) -> bool {
+        self.0.reborrow().destructive
+    }
+    /// Field 3: `idempotent`
+    #[must_use]
+    pub fn idempotent(&self) -> bool {
+        self.0.reborrow().idempotent
+    }
+    /// Field 4: `open_world`
+    #[must_use]
+    pub fn open_world(&self) -> bool {
+        self.0.reborrow().open_world
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<ToolAnnotationsView<'static>>>
+for ToolAnnotationsOwnedView {
+    fn from(inner: ::buffa::OwnedView<ToolAnnotationsView<'static>>) -> Self {
+        ToolAnnotationsOwnedView(inner)
+    }
+}
+impl ::core::convert::From<ToolAnnotationsOwnedView>
+for ::buffa::OwnedView<ToolAnnotationsView<'static>> {
+    fn from(wrapper: ToolAnnotationsOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<ToolAnnotationsView<'static>>>
+for ToolAnnotationsOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<ToolAnnotationsView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::ToolAnnotations {
+    type View<'a> = ToolAnnotationsView<'a>;
+    type ViewHandle = ToolAnnotationsOwnedView;
+}
+impl ::serde::Serialize for ToolAnnotationsOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,
@@ -4045,6 +4552,16 @@ pub struct ToolCallView<'a> {
     pub error: &'a str,
     /// Field 8: `input_delta`
     pub input_delta: &'a str,
+    /// Set when the call starts; agent-local reports may supply their own.
+    ///
+    /// Field 9: `summary`
+    pub summary: &'a str,
+    /// Field 10: `detached`
+    pub detached: bool,
+    /// Fixed when the call starts, like the summary.
+    ///
+    /// Field 11: `display`
+    pub display: ::buffa::EnumValue<super::super::ToolDisplay>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for ToolCallView<'a> {
@@ -4058,6 +4575,9 @@ impl<'a> ::core::fmt::Debug for ToolCallView<'a> {
             .field("output_json", &::core::format_args!("[REDACTED]"))
             .field("error", &self.error)
             .field("input_delta", &::core::format_args!("[REDACTED]"))
+            .field("summary", &self.summary)
+            .field("detached", &self.detached)
+            .field("display", &self.display)
             .finish()
     }
 }
@@ -4145,6 +4665,29 @@ impl<'a> ::buffa::MessageView<'a> for ToolCallView<'a> {
                 )?;
                 view.input_delta = ::buffa::types::borrow_str(&mut cur)?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.summary = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.detached = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.display = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -4175,6 +4718,9 @@ impl<'a> ::buffa::MessageView<'a> for ToolCallView<'a> {
             output_json: self.output_json.to_string(),
             error: self.error.to_string(),
             input_delta: self.input_delta.to_string(),
+            summary: self.summary.to_string(),
+            detached: self.detached,
+            display: self.display,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -4210,6 +4756,18 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolCallView<'a> {
         if !self.input_delta.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.input_delta) as u64;
         }
+        if !self.summary.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.summary) as u64;
+        }
+        if self.detached {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        {
+            let val = self.display.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4244,6 +4802,18 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolCallView<'a> {
         }
         if !self.input_delta.is_empty() {
             ::buffa::types::put_string_field(8u32, &self.input_delta, buf);
+        }
+        if !self.summary.is_empty() {
+            ::buffa::types::put_string_field(9u32, &self.summary, buf);
+        }
+        if self.detached {
+            ::buffa::types::put_bool_field(10u32, self.detached, buf);
+        }
+        {
+            let val = self.display.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(11u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4289,6 +4859,15 @@ impl<'__a> ::serde::Serialize for ToolCallView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.input_delta) {
             __map.serialize_entry("inputDelta", self.input_delta)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.summary) {
+            __map.serialize_entry("summary", self.summary)?;
+        }
+        if self.detached {
+            __map.serialize_entry("detached", &self.detached)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.display) {
+            __map.serialize_entry("display", &self.display)?;
         }
         __map.end()
     }
@@ -4418,6 +4997,25 @@ impl ToolCallOwnedView {
     #[must_use]
     pub fn input_delta(&self) -> &'_ str {
         self.0.reborrow().input_delta
+    }
+    /// Set when the call starts; agent-local reports may supply their own.
+    ///
+    /// Field 9: `summary`
+    #[must_use]
+    pub fn summary(&self) -> &'_ str {
+        self.0.reborrow().summary
+    }
+    /// Field 10: `detached`
+    #[must_use]
+    pub fn detached(&self) -> bool {
+        self.0.reborrow().detached
+    }
+    /// Fixed when the call starts, like the summary.
+    ///
+    /// Field 11: `display`
+    #[must_use]
+    pub fn display(&self) -> ::buffa::EnumValue<super::super::ToolDisplay> {
+        self.0.reborrow().display
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ToolCallView<'static>>>

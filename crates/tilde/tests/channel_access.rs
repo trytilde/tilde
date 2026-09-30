@@ -77,6 +77,7 @@ async fn host(
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await
@@ -154,6 +155,7 @@ async fn setup(
     let agent = Uuid::new_v4();
     Agents::new(db.pool.clone(), crypto.clone())
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Assistant <&>".into(),

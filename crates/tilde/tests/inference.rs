@@ -97,6 +97,7 @@ async fn create_agent(agents: &Agents) -> Uuid {
     let id = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id,
             name: "Inference fixture".into(),

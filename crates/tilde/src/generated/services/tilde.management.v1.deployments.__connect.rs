@@ -90,6 +90,42 @@ pub type OwnedIssueIngressTokenResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<MissingDeploymentFilesRequestView<'static>>`.
+pub type OwnedMissingDeploymentFilesRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<MissingDeploymentFilesResponseView<'static>>`.
+pub type OwnedMissingDeploymentFilesResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UploadDeploymentFileRequestView<'static>>`.
+pub type OwnedUploadDeploymentFileRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<UploadDeploymentFileResponseView<'static>>`.
+pub type OwnedUploadDeploymentFileResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetDeploymentContentsRequestView<'static>>`.
+pub type OwnedGetDeploymentContentsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetDeploymentContentsResponseView<'static>>`.
+pub type OwnedGetDeploymentContentsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetDeploymentResponse>
 for crate::proto::tilde::management::v1::__buffa::view::GetDeploymentResponseView<'_> {
     fn encode(
@@ -414,6 +450,132 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::MissingDeploymentFilesResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::MissingDeploymentFilesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::UploadDeploymentFileResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::UploadDeploymentFileResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const DEPLOYMENT_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.DeploymentService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -464,6 +626,24 @@ pub const DEPLOYMENT_SERVICE_ISSUE_INGRESS_TOKEN_SPEC: ::connectrpc::Spec = ::co
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `MissingDeploymentFiles` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_MISSING_DEPLOYMENT_FILES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/MissingDeploymentFiles",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `UploadDeploymentFile` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_UPLOAD_DEPLOYMENT_FILE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/UploadDeploymentFile",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetDeploymentContents` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/GetDeploymentContents",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Server trait for DeploymentService.
 ///
 /// # Implementing handlers
@@ -697,6 +877,76 @@ pub trait DeploymentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::IssueIngressTokenResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Skill files too large or binary to send inline are uploaded first, content-addressed:
+    /// `tilde deploy` asks which digests are missing and uploads only those.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn missing_deployment_files<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::MissingDeploymentFilesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the UploadDeploymentFile RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn upload_deployment_file<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::UploadDeploymentFileResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// The prompt and skill versions and the bundled tools a deployment shipped.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_deployment_contents<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -964,6 +1214,93 @@ impl<S: DeploymentService> DeploymentServiceExt for S {
                 },
             )
             .with_spec(DEPLOYMENT_SERVICE_ISSUE_INGRESS_TOKEN_SPEC)
+            .route_view_idempotent(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "MissingDeploymentFiles",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.missing_deployment_files(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::MissingDeploymentFilesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_MISSING_DEPLOYMENT_FILES_SPEC)
+            .route_view(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "UploadDeploymentFile",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.upload_deployment_file(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::UploadDeploymentFileResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_UPLOAD_DEPLOYMENT_FILE_SPEC)
+            .route_view_idempotent(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "GetDeploymentContents",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_deployment_contents(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1064,6 +1401,24 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(DEPLOYMENT_SERVICE_ISSUE_INGRESS_TOKEN_SPEC),
+                )
+            }
+            "MissingDeploymentFiles" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(DEPLOYMENT_SERVICE_MISSING_DEPLOYMENT_FILES_SPEC),
+                )
+            }
+            "UploadDeploymentFile" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DEPLOYMENT_SERVICE_UPLOAD_DEPLOYMENT_FILE_SPEC),
+                )
+            }
+            "GetDeploymentContents" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC),
                 )
             }
             _ => None,
@@ -1255,6 +1610,72 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::IssueIngressTokenResponse,
+                        >(format)
+                })
+            }
+            "MissingDeploymentFiles" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+                    >::from_parts(&req, &body);
+                    svc.missing_deployment_files(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::MissingDeploymentFilesResponse,
+                        >(format)
+                })
+            }
+            "UploadDeploymentFile" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+                    >::from_parts(&req, &body);
+                    svc.upload_deployment_file(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::UploadDeploymentFileResponse,
+                        >(format)
+                })
+            }
+            "GetDeploymentContents" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_deployment_contents(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
                         >(format)
                 })
             }
@@ -1743,6 +2164,141 @@ where
                 &self.transport,
                 &self.config,
                 DEPLOYMENT_SERVICE_ISSUE_INGRESS_TOKEN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the MissingDeploymentFiles RPC. Sends a request to /tilde.management.v1.DeploymentService/MissingDeploymentFiles.
+    pub async fn missing_deployment_files(
+        &self,
+        request: crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.missing_deployment_files_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the MissingDeploymentFiles RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn missing_deployment_files_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::MissingDeploymentFilesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::MissingDeploymentFilesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_MISSING_DEPLOYMENT_FILES_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UploadDeploymentFile RPC. Sends a request to /tilde.management.v1.DeploymentService/UploadDeploymentFile.
+    pub async fn upload_deployment_file(
+        &self,
+        request: crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.upload_deployment_file_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UploadDeploymentFile RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn upload_deployment_file_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::UploadDeploymentFileRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::UploadDeploymentFileResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_UPLOAD_DEPLOYMENT_FILE_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetDeploymentContents RPC. Sends a request to /tilde.management.v1.DeploymentService/GetDeploymentContents.
+    pub async fn get_deployment_contents(
+        &self,
+        request: crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_deployment_contents_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetDeploymentContents RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_deployment_contents_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::GetDeploymentContentsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetDeploymentContentsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

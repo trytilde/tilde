@@ -1,5 +1,6 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { cn } from "cn";
+import { CheckIcon } from "lucide-react";
 
 const DropdownMenu = MenuPrimitive.Root;
 const DropdownMenuTrigger = MenuPrimitive.Trigger;
@@ -50,6 +51,27 @@ function DropdownMenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
     />
   );
 }
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  ...props
+}: MenuPrimitive.CheckboxItem.Props) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-checkbox-item"
+      className={cn(
+        "relative flex cursor-pointer items-center gap-2 rounded-lg py-2 pr-3 pl-8 text-sm outline-none select-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:size-4",
+        className,
+      )}
+      {...props}
+    >
+      <MenuPrimitive.CheckboxItemIndicator className="absolute left-2.5 flex items-center">
+        <CheckIcon />
+      </MenuPrimitive.CheckboxItemIndicator>
+      {children}
+    </MenuPrimitive.CheckboxItem>
+  );
+}
 function DropdownMenuLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props) {
   return (
     <MenuPrimitive.GroupLabel
@@ -74,6 +96,7 @@ export {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 };

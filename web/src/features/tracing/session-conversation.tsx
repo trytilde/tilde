@@ -3,6 +3,7 @@ import { Transcript } from "@trytilde/chat-ui";
 import type { Observation } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 import { Button } from "@/components/ui/button";
 import { sessionTranscript } from "./session-transcript";
+import { SkeletonLines } from "@/components/table-skeleton";
 export function SessionConversation({
   rows,
   busy,
@@ -33,9 +34,13 @@ export function SessionConversation({
       {entries.length ? (
         <Transcript className="flex-1" entries={entries} onInspect={onInspect} />
       ) : (
-        <p role="status" className="p-4 text-xs text-muted-foreground">
-          {busy ? "Loading session…" : "No message content was recorded for this session."}
-        </p>
+        <div className="p-4 text-xs text-muted-foreground">
+          {busy ? (
+            <SkeletonLines rows={5} label="Loading session" />
+          ) : (
+            <p role="status">No message content was recorded for this session.</p>
+          )}
+        </div>
       )}
     </section>
   );

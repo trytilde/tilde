@@ -14,6 +14,7 @@ jobs:
         uses: ./.github/actions/register-deployment
         # External repos: trytilde/tilde/.github/actions/register-deployment@<full-commit-sha>
         with:
+          # Tilde Cloud only; open-source Tilde needs no key (an unset secret is empty).
           api-token: ${{ secrets.TILDE_API_KEY }}
           url: ${{ vars.TILDE_URL }}
           ui-url: ${{ vars.TILDE_UI_URL }}
@@ -21,6 +22,6 @@ jobs:
           type: gateway
           output-token: "false"
         # Only deployment-id, deployment-url and created are returned.
-        # Open the job summary's Tilde link, sign in, and use Rotate token to get
+        # Open the job summary's Tilde link and use Rotate token to get
         # a replacement token. Copy it directly into your runtime configuration.
         # The CI-generated token is discarded; retries do not rotate it.

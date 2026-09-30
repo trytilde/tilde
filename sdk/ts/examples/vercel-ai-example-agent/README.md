@@ -8,18 +8,25 @@ with its own stable ID; `DEV_AGENTS=vercel-ai` (or a comma-separated list of key
 ones start. Python examples run from the uv workspace in `sdk/py`, which the launcher syncs.
 Deployment tokens and keys are never logged.
 
-`task secrets:load` reads `openai_api_key` into the private dev dotenv. Without that
-file, the launcher reads SOPS directly. The model receives only `ctx.channel.current`
+The launcher needs `OPENAI_API_KEY` in the ignored `.env.local`. The model receives only `ctx.channel.current`
 tools and responds by calling them. Returned model text remains private; visible
 responses are provider tool actions. Native threads and all six built-in channel
 providers are supported. Attachments are downloaded through the scoped SDK and
 converted into model file or text parts by `@trytilde/sdk-vercel-ai-node`. Assign channels in Tilde normally.
 
 This private TypeScript package is part of the SDK workspace. `task dev` builds it
-after `@trytilde/sdk` and runs `dist/index.js`. `src/index.ts` configures the Tilde
-connection and Vercel AI SDK OpenAI provider; `src/agent.ts` generates replies with
-`generateText`. History, typed context conversion, attachments and reply routing
-are owned by the SDK through `ctx.message.history()`, `convertToAiSdkMessages`
-and `convertToAiSdkTools(ctx.channel.current)`.
+after `@trytilde/sdk` and runs `dist/index.js`. `src/agent.ts` defines the AI SDK
+`ToolLoopAgent` once at module scope (instructions, model, 8-step limit, `...tildeCallOptions`)
+and `respond(ctx)` calls `agent.generate({ messages, ...tildeAiSdk(ctx) })`, which adds the
+channel tools, the agent's Tilde skills (tools plus a summary in the instructions), steering and
+`ctx.signal`. `src/index.ts` exports the agent and connects; `tilde deploy --dry-run` prints its
+instructions as the prompt `vercel-ai-example-agent/instructions`. History, typed context
+conversion, attachments and reply routing are owned by the SDK through `ctx.message.history()`,
+`convertToAiSdkMessages` and `@trytilde/sdk-vercel-ai-node`.
 
 Build on its own with `pnpm --dir sdk/ts --filter @trytilde/vercel-ai-example-agent... build`.
+
+Model calls go through Tilde's inference gateway: `inference(TILDE_INFERENCE)` (default `default`,
+the alias the local registrar gives the shared OpenAI connection) builds the model client once;
+each request goes through the invocation running when it is made, with its token, so the
+process never holds a provider key.

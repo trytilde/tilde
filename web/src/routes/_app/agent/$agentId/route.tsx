@@ -6,18 +6,22 @@ import { AgentEditor, type AgentTab } from "@/components/agent-editor";
 import { Button } from "@/components/ui/button";
 import { agents } from "@/client";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
+import { TildeLoader } from "@/components/loading-screen";
 
 export const Route = createFileRoute("/_app/agent/$agentId")({ component: AgentPage });
 
 const tabPaths = {
   capabilities: "/agent/$agentId/capabilities",
   "chat-providers": "/agent/$agentId/chat-providers",
+  tools: "/agent/$agentId/tools",
   inference: "/agent/$agentId/inference",
   iam: "/agent/$agentId/iam",
   sessions: "/agent/$agentId/sessions",
   tracing: "/agent/$agentId/tracing",
   logs: "/agent/$agentId/logs",
   deployment: "/agent/$agentId/deployment",
+  prompts: "/agent/$agentId/prompts",
+  skills: "/agent/$agentId/skills",
 } as const;
 function AgentPage(): JSX.Element {
   const { agentId } = Route.useParams();
@@ -25,23 +29,35 @@ function AgentPage(): JSX.Element {
     select: (state) =>
       state.matches.some((match) => match.routeId === "/_app/agent/$agentId/sessions")
         ? "sessions"
-        : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/logs")
-          ? "logs"
-          : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/tracing")
-            ? "tracing"
-            : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/deployment")
-              ? "deployment"
-              : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
-                ? "iam"
-                : state.matches.some(
-                      (match) => match.routeId === "/_app/agent/$agentId/chat-providers",
-                    )
-                  ? "chat-providers"
-                  : state.matches.some(
-                        (match) => match.routeId === "/_app/agent/$agentId/inference",
-                      )
-                    ? "inference"
-                    : "capabilities",
+        : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/prompts")
+          ? "prompts"
+          : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/skills")
+            ? "skills"
+            : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/logs")
+              ? "logs"
+              : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/tracing")
+                ? "tracing"
+                : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/deployment")
+                  ? "deployment"
+                  : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
+                    ? "iam"
+                    : state.matches.some(
+                          (match) => match.routeId === "/_app/agent/$agentId/chat-providers",
+                        )
+                      ? "chat-providers"
+                      : state.matches.some(
+                            (match) => match.routeId === "/_app/agent/$agentId/tools",
+                          )
+                        ? "tools"
+                        : state.matches.some(
+                              (match) => match.routeId === "/_app/agent/$agentId/inference",
+                            )
+                          ? "inference"
+                          : "capabilities",
+  });
+  // An open prompt (`?prompt=`) takes the whole page, like the skill editor.
+  const promptOpen = useRouterState({
+    select: (state) => !!(state.location.search as { prompt?: string }).prompt,
   });
   const navigate = Route.useNavigate();
   // The shared route remains mounted while child routes select the editor's tab.
@@ -51,6 +67,7 @@ function AgentPage(): JSX.Element {
         key={agentId}
         agentId={agentId}
         tab={tab}
+        promptOpen={promptOpen}
         onTabChange={(next) => {
           void navigate({ to: tabPaths[next], params: { agentId } });
         }}
@@ -65,11 +82,13 @@ function AgentPage(): JSX.Element {
 function AgentDetails({
   agentId,
   tab,
+  promptOpen,
   onTabChange,
   onClose,
 }: {
   agentId: string;
   tab: AgentTab;
+  promptOpen: boolean;
   onTabChange: (tab: AgentTab) => void;
   onClose: () => void;
 }) {
@@ -93,7 +112,6 @@ function AgentDetails({
   }, [agent?.id, agent?.name, agent?.avatarSeed, agent?.avatarUrl, setBreadcrumbAgent]);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  // Fetch after Auth mounts its children. Router loaders would run before that session check.
   useEffect(() => {
     const abort = new AbortController();
     setError("");
@@ -126,16 +144,12 @@ function AgentDetails({
         </div>
       </section>
     );
-  if (!agent)
-    return (
-      <p role="status" className="p-6 text-muted-foreground">
-        Loading agent…
-      </p>
-    );
+  if (!agent) return <TildeLoader className="flex-1" />;
   return (
     <AgentEditor
       agent={agent}
       tab={tab}
+      promptOpen={promptOpen}
       onTabChange={onTabChange}
       onClose={onClose}
       onSaved={onClose}

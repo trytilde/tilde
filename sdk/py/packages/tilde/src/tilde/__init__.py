@@ -6,7 +6,17 @@ after changing proto/.
 """
 
 from tilde._cancel import Cancellation, InvocationCancelled, StopLoop
-from tilde._tools import Tool, ToolCatalog, tool_id
+from tilde._inference import Inference, inference
+from tilde._invocation import current_invocation
+from tilde._tools import (
+    BundledOptions,
+    BundledTools,
+    Tool,
+    ToolAnnotations,
+    ToolCatalog,
+    define_tools,
+    tool_id,
+)
 from tilde.channels import Channels, ChannelTool, ChannelTools
 from tilde.clients import (
     ManagementClient,
@@ -36,10 +46,23 @@ from tilde.messages import (
     ObjectiveMessage,
     TaskMessage,
 )
+from tilde.prompts import PromptDefinition, define_prompt
+from tilde.skills import (
+    SkillDefinition,
+    SkillFile,
+    SkillFileBody,
+    SkillsClient,
+    SkillsDefinition,
+    define_skill,
+    define_skills,
+)
 from tilde.tracing import agent_span_processor
 
 __all__ = [
+    "Inference",
     "AgentContext",
+    "BundledOptions",
+    "BundledTools",
     "Cancellation",
     "ChannelTool",
     "ChannelTools",
@@ -57,11 +80,18 @@ __all__ = [
     "MessageClient",
     "MessageHistory",
     "ObjectiveMessage",
+    "PromptDefinition",
     "RuntimeClient",
+    "SkillDefinition",
+    "SkillFile",
+    "SkillFileBody",
+    "SkillsClient",
+    "SkillsDefinition",
     "SteeringInput",
     "StopLoop",
     "TaskMessage",
     "Tool",
+    "ToolAnnotations",
     "ToolCatalog",
     "Wake",
     "agent_log_processor",
@@ -72,6 +102,12 @@ __all__ = [
     "create_management_client",
     "create_runtime_client",
     "create_tilde_chat_client",
+    "current_invocation",
+    "define_prompt",
+    "define_skill",
+    "define_skills",
+    "define_tools",
+    "inference",
     "run_connected_agent",
     "run_invocation",
     "tool_id",

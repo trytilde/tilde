@@ -2,25 +2,53 @@
 
 Core history and delivery live in `@trytilde/sdk`. This package converts typed
 context to LangChain messages and tools, following Dispatch's core/framework
-separation. It depends only on `@langchain/core` 1.x; bring your own chat model
-and agent loop (`createAgent` from `langchain` v1 or `createReactAgent` from
-`@langchain/langgraph/prebuilt`).
+separation. It works with `langchain` v1 (`createAgent`) and `@langchain/core` 1.x.
+
+Define the agent once at module scope, with its model built from module-level
+`inference(alias)`, and add `tildeMiddleware()`: `createAgent` fixes its tools and
+middleware when it builds the graph, so the middleware brings each invocation's pieces.
 
 ```ts
-import { convertToLangChainMessages, convertToLangChainTools } from "@trytilde/sdk-langchain-node";
+import { inference } from "@trytilde/sdk";
+import {
+  convertToLangChainMessages,
+  tildeLangChain,
+  tildeMiddleware,
+} from "@trytilde/sdk-langchain-node";
+import { ChatOpenAI } from "@langchain/openai";
 import { createAgent } from "langchain";
 
-const history = await ctx.message.history();
-const messages = await convertToLangChainMessages({ messages: history.items, context: ctx });
-const agent = createAgent({
-  model,
-  tools: convertToLangChainTools(ctx.channel.current),
+const { baseURL, apiKey, fetch } = inference("default");
+export const agent = createAgent({
+  name: "my-agent",
+  model: new ChatOpenAI({ apiKey, configuration: { baseURL, fetch }, model: "gpt-4o-mini" }),
   systemPrompt: "Respond using the current channel's tools. Returned model text is private.",
+  middleware: [tildeMiddleware()],
 });
-await agent.invoke({ messages }, { signal: ctx.signal, recursionLimit: 16 });
+
+export async function run(ctx: AgentContext) {
+  const history = await ctx.message.history();
+  const messages = await convertToLangChainMessages({ messages: history.items, context: ctx });
+  await agent.invoke({ messages }, { ...tildeLangChain(ctx), recursionLimit: 16 });
+}
 ```
 
-The same messages and tools work with `createReactAgent({ llm, tools })` from
+`tildeLangChain(ctx)` is the call's `signal` and a `configurable` entry carrying the
+invocation (spread it when you pass your own `configurable`, e.g. a `thread_id`).
+`tildeMiddleware()` then, per model call, adds the current channel's tools and runs them
+(tools added in `wrapModelCall` execute through its `wrapToolCall`), adds steering input
+sent while the agent works to the agent state as user messages before each model call,
+and offers the invocation's skills: LangChain has no native skills, so it adds Tilde's
+`list_skills`/`read_skill` tools and appends `ctx.skills.summary()` to the system message.
+Without `tildeLangChain(ctx)` in the call the middleware refuses to run.
+
+`tilde deploy` reads exported `createAgent` agents (`systemPrompt` as the plain prompt
+`<name or export>/system_prompt`), `PromptTemplate`s (`<export>`: f-string as braces,
+mustache as mustache) and `ChatPromptTemplate`s (`<export>/<message index>`). A
+`dynamicSystemPromptMiddleware` function sits in a closure it cannot read, so it is
+reported as a warning; declare such prompts with `definePrompt` to version them.
+
+The messages and tools also work with `createReactAgent({ llm, tools })` from
 `@langchain/langgraph/prebuilt`, or directly with `model.bindTools(tools)`.
 
 History pages are chronological; pass `beforeMessageId: history.nextPageToken`
@@ -61,6 +89,31 @@ conversation conversions use the existing per-agent cache, in bounded batches,
 stored as plain JSON (`id`, `role`, text content) rather than serialized LangChain
 classes. Files are hydrated afresh and are never stored as base64 in the cache;
 objectives/goals/tasks remain live projections rather than cached chat records.
+
+## The agent's tools
+
+`withTildeTools(ctx, tools, options?)` returns one `StructuredToolInterface[]` for
+`createAgent`, `createReactAgent` or `bindTools`: the current channel's tools, `ctx.agentTools`
+and `tools`, the agent's own LangChain tools. Those are published to Tilde for the invocation,
+so `tools.search` and `tools.schemas` describe them and a `tools.execute` naming one runs it here
+with the graph's config; each call is audited once with the model's call ID. Summary, display
+and annotations come from the tool's `metadata.tilde`, overridden by `options[name]`. LangChain
+tools have no output schema.
+
+```ts
+const tools = await withTildeTools(ctx, [
+  tool(async ({ sides }) => ({ roll: 1 + Math.floor(Math.random() * sides) }), {
+    name: "roll_dice",
+    description: "Roll a die.",
+    schema: z.object({ sides: z.number().int() }),
+    metadata: { tilde: { summary: "Rolled a die", display: "summary" } },
+  }),
+]);
+```
+
+Input rejected by the tool's schema, and a returned `ToolMessage` with status `error`, are
+audited as failed. Tools that read LangGraph-injected state can only run inside the graph, so a
+`tools.execute` naming one runs without that state.
 
 ## Channel tools
 

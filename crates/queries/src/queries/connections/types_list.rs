@@ -20,6 +20,12 @@ pub struct Record {
     pub success_path: Option<String>,
     pub credential_schema: Option<serde_json::Value>,
     pub inference_capable: bool,
+    pub tool_capable: bool,
+    pub mcp_url: Option<String>,
+    pub mcp_credential: Option<String>,
+    pub mcp_credential_name: Option<String>,
+    pub mcp_credential_prefix: String,
+    pub oauth_client: String,
 }
 pub struct RecordBorrowed<'a> {
     pub provider_id: &'a str,
@@ -40,6 +46,12 @@ pub struct RecordBorrowed<'a> {
     pub success_path: Option<&'a str>,
     pub credential_schema: Option<postgres_types::Json<&'a serde_json::value::RawValue>>,
     pub inference_capable: bool,
+    pub tool_capable: bool,
+    pub mcp_url: Option<&'a str>,
+    pub mcp_credential: Option<&'a str>,
+    pub mcp_credential_name: Option<&'a str>,
+    pub mcp_credential_prefix: &'a str,
+    pub oauth_client: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -62,6 +74,12 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             success_path,
             credential_schema,
             inference_capable,
+            tool_capable,
+            mcp_url,
+            mcp_credential,
+            mcp_credential_name,
+            mcp_credential_prefix,
+            oauth_client,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -83,6 +101,12 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             success_path: success_path.map(|v| v.into()),
             credential_schema: credential_schema.map(|v| serde_json::from_str(v.0.get()).unwrap()),
             inference_capable,
+            tool_capable,
+            mcp_url: mcp_url.map(|v| v.into()),
+            mcp_credential: mcp_credential.map(|v| v.into()),
+            mcp_credential_name: mcp_credential_name.map(|v| v.into()),
+            mcp_credential_prefix: mcp_credential_prefix.into(),
+            oauth_client: oauth_client.into(),
         }
     }
 }
@@ -155,7 +179,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable FROM connection_types WHERE provider_id=$1 ORDER BY type_id",
+        "SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client FROM connection_types WHERE provider_id=$1 ORDER BY type_id",
         None,
     )
 }
@@ -198,6 +222,12 @@ impl RunStmt {
                         success_path: row.try_get(15)?,
                         credential_schema: row.try_get(16)?,
                         inference_capable: row.try_get(17)?,
+                        tool_capable: row.try_get(18)?,
+                        mcp_url: row.try_get(19)?,
+                        mcp_credential: row.try_get(20)?,
+                        mcp_credential_name: row.try_get(21)?,
+                        mcp_credential_prefix: row.try_get(22)?,
+                        oauth_client: row.try_get(23)?,
                     })
                 },
             mapper: |it| Record::from(it),

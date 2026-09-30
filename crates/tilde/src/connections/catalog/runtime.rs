@@ -74,7 +74,7 @@ pub(crate) trait Runtime: Send + Sync {
         let state = service.callback_state(setup)?;
         Ok(Action::Redirect {
             url: oauth::authorization_url(
-                &self.oauth(service, typ)?,
+                &client_config(self.oauth(service, typ)?, &values)?,
                 &values,
                 &service.callback_url(setup)?,
                 state.expose_secret(),
@@ -103,6 +103,21 @@ pub(crate) trait Runtime: Send + Sync {
                     .await
             }
             Driver::OAuthCode => {
+                if typ.oauth().map(|o| o.client) == Some(OAuthClient::Dynamic) {
+                    let server = typ
+                        .mcp
+                        .as_ref()
+                        .map(|server| server.url.as_str())
+                        .ok_or_else(|| invalid("Dynamic OAuth needs an MCP server"))?;
+                    values.extend(
+                        crate::connections::dynamic_client::register(
+                            &service.http,
+                            server,
+                            &service.callback_url(setup)?,
+                        )
+                        .await?,
+                    );
+                }
                 values.insert("_pkce".into(), random_secret());
                 service.stage(setup, &values).await?;
                 service.transition(setup, "oauth_consent").await
@@ -111,7 +126,7 @@ pub(crate) trait Runtime: Send + Sync {
                 let token = oauth::exchange(
                     &service.http,
                     typ.driver(),
-                    &self.oauth(service, typ)?,
+                    &client_config(self.oauth(service, typ)?, &values)?,
                     &values,
                     None,
                     None,
@@ -136,7 +151,7 @@ pub(crate) trait Runtime: Send + Sync {
         let token = oauth::exchange(
             &service.http,
             Driver::OAuthCode,
-            &self.oauth(service, typ)?,
+            &client_config(self.oauth(service, typ)?, &values)?,
             &values,
             optional(parameters, "code"),
             Some(&service.callback_url(setup)?),
@@ -155,7 +170,7 @@ pub(crate) trait Runtime: Send + Sync {
         oauth::exchange(
             &service.http,
             typ.driver(),
-            &self.oauth(service, typ)?,
+            &client_config(self.oauth(service, typ)?, values)?,
             values,
             None,
             None,
@@ -165,6 +180,13 @@ pub(crate) trait Runtime: Send + Sync {
     }
 }
 
+/// One connection's OAuth configuration: a dynamic client's endpoints come from its setup.
+fn client_config(config: OAuth, values: &Values) -> Result<OAuth, Error> {
+    match config.client {
+        OAuthClient::Dynamic => crate::connections::dynamic_client::resolve(config, values),
+        _ => Ok(config),
+    }
+}
 pub(crate) struct Configured;
 #[async_trait::async_trait]
 impl Runtime for Configured {}

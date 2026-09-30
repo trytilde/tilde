@@ -1,0 +1,12 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/prompt.proto";
+
+// Prompts are registered with a deployment (management RegisterDeployment). Listing another
+// agent's prompts needs the agents.read capability; an agent's own need none.
+service PromptService {
+  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+// An empty agent id means the invoking agent.
+message ListPromptsRequest { string agent_id = 1; }
+message ListPromptsResponse { repeated tilde.types.v1.Prompt prompts = 1; }

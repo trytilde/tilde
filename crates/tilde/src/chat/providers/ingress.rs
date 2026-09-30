@@ -427,8 +427,8 @@ impl Chat {
                 "complete",
                 None::<Uuid>,
                 reply,
-                &(crate::telemetry::context::capture().0),
-                &(crate::telemetry::context::capture().1),
+                &(crate::telemetry::tracing::context::capture().0),
+                &(crate::telemetry::tracing::context::capture().1),
             )
             .await?;
             crate::chat::access::db::message_source_execute(&tx, message, identity).await?;

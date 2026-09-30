@@ -1,13 +1,4 @@
 // Remote HTTP development origins lack SubtleCrypto/randomUUID, but still expose getRandomValues.
-import { sha256 } from "@noble/hashes/sha2.js";
-
-export function pkceChallenge(verifier: string): string {
-  return btoa(String.fromCharCode(...sha256(new TextEncoder().encode(verifier))))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
-}
-
 export function randomUUID(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   bytes[6] = (bytes[6] & 0x0f) | 0x40;

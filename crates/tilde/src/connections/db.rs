@@ -88,6 +88,7 @@ fn connection_get_row(
         updated_at: r.updated_at,
         channel_capable: r.channel_capable,
         inference_capable: r.inference_capable,
+        tool_capable: r.tool_capable,
         associated_agents: tokio_postgres::types::Json(
             serde_json::from_value(r.associated_agents)
                 .map_err(crate::database::DbError::decode)?,
@@ -136,6 +137,7 @@ fn connection_list_row(
         updated_at: r.updated_at,
         channel_capable: r.channel_capable,
         inference_capable: r.inference_capable,
+        tool_capable: r.tool_capable,
         associated_agents: tokio_postgres::types::Json(
             serde_json::from_value(r.associated_agents)
                 .map_err(crate::database::DbError::decode)?,
@@ -148,21 +150,23 @@ pub async fn connection_list_all(
     p1: Option<chrono::DateTime<chrono::Utc>>,
     p2: Option<uuid::Uuid>,
     p3: i64,
-    p4: Option<uuid::Uuid>,
-    p5: Option<&str>,
-    caller: &crate::iam::authz::Access,
+    filter: &crate::connections::service::ConnectionFilter<'_>,
 ) -> DbResult<Vec<crate::connections::model::Connection>> {
     tilde_queries::queries::connections::connection_list::run()
         .bind(
             db,
-            &caller.admin,
-            &caller.user,
-            &caller.api_key,
-            &caller.groups,
             &p1,
             &p2,
-            &p4,
-            &p5,
+            &filter.agent_id,
+            &filter
+                .capability
+                .map(crate::connections::model::Capability::as_str),
+            &filter.search,
+            &filter.provider_id,
+            &filter.status,
+            &filter
+                .source
+                .map(crate::connections::catalog::ProviderSource::as_str),
             &p3,
         )
         .all()
@@ -351,9 +355,12 @@ pub async fn provider_insert_execute(
     p9: Option<&str>,
     p10: Option<&str>,
     p11: Option<&str>,
+    p12: Option<uuid::Uuid>,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::provider_insert::run()
-        .bind(db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11)
+        .bind(
+            db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12,
+        )
         .await?)
 }
 
@@ -361,14 +368,49 @@ pub use tilde_queries::queries::connections::provider_list::Record as ProviderLi
 
 pub async fn provider_list_all(
     db: &impl GenericClient,
-    p1: &str,
-    p2: Option<&str>,
-    p3: i64,
+    after: &str,
+    filter: &crate::connections::catalog::ProviderFilter<'_>,
+    limit: i64,
 ) -> DbResult<Vec<ProviderListRow>> {
     Ok(tilde_queries::queries::connections::provider_list::run()
-        .bind(db, &p1, &p2, &p3)
+        .bind(
+            db,
+            &after,
+            &filter.search,
+            &filter.category,
+            &filter
+                .capability
+                .map(crate::connections::model::Capability::as_str),
+            &filter
+                .source
+                .map(crate::connections::catalog::ProviderSource::as_str),
+            &limit,
+        )
         .all()
         .await?)
+}
+
+pub async fn provider_categories_all(
+    db: &impl GenericClient,
+    filter: &crate::connections::catalog::ProviderFilter<'_>,
+) -> DbResult<Vec<String>> {
+    Ok(
+        tilde_queries::queries::connections::provider_categories::run()
+            .bind(
+                db,
+                &filter
+                    .capability
+                    .map(crate::connections::model::Capability::as_str),
+                &filter
+                    .source
+                    .map(crate::connections::catalog::ProviderSource::as_str),
+            )
+            .all()
+            .await?
+            .into_iter()
+            .map(|row| row.category)
+            .collect(),
+    )
 }
 
 pub async fn provider_lock_execute(db: &impl GenericClient, p1: &str) -> DbResult<u64> {
@@ -743,11 +785,17 @@ pub async fn types_insert_execute(
     p16: Option<&str>,
     p17: Option<&serde_json::Value>,
     p18: bool,
+    p19: bool,
+    p20: Option<&str>,
+    p21: Option<&str>,
+    p22: Option<&str>,
+    p23: &str,
+    p24: &str,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::types_insert::run()
         .bind(
             db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12, &p13, &p14, &p15,
-            &p16, &p17, &p18,
+            &p16, &p17, &p18, &p19, &p20, &p21, &p22, &p23, &p24,
         )
         .await?)
 }

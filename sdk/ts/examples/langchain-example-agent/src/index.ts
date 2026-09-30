@@ -1,23 +1,16 @@
 import { connectAgent } from "@trytilde/sdk";
-import { ChatOpenAI } from "@langchain/openai";
 import { logger, flushLogs } from "./logger.js";
 import { respond } from "./agent.js";
 
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) throw new Error("OPENAI_API_KEY is required");
+// `tilde deploy` discovers the agent's system prompt and bundled tools from the entry's exports.
+export { agent } from "./agent.js";
+export { bundledTools } from "./bundled-tools.js";
 
-const model = new ChatOpenAI({
-  apiKey,
-  model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-  maxTokens: 600,
-  maxRetries: 0,
-  timeout: 60000,
-  modelKwargs: { store: false },
-});
 // Dials out with TILDE_GATEWAY_URL and TILDE_DEPLOYMENT_TOKEN; Tilde never calls this process.
+// Under `tilde deploy` (TILDE_DISCOVERY=1) this starts nothing.
 const connection = connectAgent({
   logging: "existing",
-  run: (ctx) => respond(ctx, model),
+  run: respond,
   onRegistered: (registration) =>
     logger.info({ deploymentId: registration.deploymentId }, "Example LangChain agent is ready"),
 });

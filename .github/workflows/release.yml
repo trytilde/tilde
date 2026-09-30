@@ -40,8 +40,106 @@ jobs:
   build:
     needs: version
     uses: ./.github/workflows/build.yml
-  draft:
+  # Public image on GHCR. A rerun leaves an already-pushed version alone.
+  container:
     needs: [version, changie, check, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve image name
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "IMAGE=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Skip a version that is already pushed
+        id: existing
+        run: |
+          if docker manifest inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve the major.minor tag
+        id: minor
+        run: echo "tag=${VERSION%.*}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+        if: steps.existing.outputs.pushed != 'true'
+      - uses: docker/build-push-action@v6
+        if: steps.existing.outputs.pushed != 'true'
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:${{ steps.minor.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.title=Tilde
+            org.opencontainers.image.description=Open-source Tilde agent registry and runtime harness
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke-test pushed image
+        run: test "$(docker run --rm "$IMAGE:$VERSION" --version)" = "tilde $VERSION"
+  # Publishes the tarballs Build packed and tested. npm refuses an existing version, so a
+  # rerun skips packages that already published.
+  npm:
+    needs: [version, changie, check, build]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: dist/npm
+      - name: Publish unpublished SDK packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for tarball in dist/npm/*.tgz; do
+            spec="$(tar -xOzf "$tarball" package/package.json | jq -r '.name + "@" + .version')"
+            if npm view "$spec" version > /dev/null 2>&1; then
+              echo "$spec is already published"
+            else
+              npm publish "$tarball" --access public --tag latest
+            fi
+          done
+  # PyPI trusted publishing: each project trusts this repository's release.yml, so no token
+  # is stored. Attestations need a public repository; enable them once this repository is public.
+  pypi:
+    needs: [version, changie, check, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-packages
+          path: dist/py
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/py
+          skip-existing: true
+          attestations: false
+  # The tag and release are created last, once the image and every package are published.
+  release:
+    needs: [version, container, npm, pypi]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -51,14 +149,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          pattern: tilde-*
-          path: dist/release
+          pattern: "*-packages"
+          path: dist/packages
           merge-multiple: true
-      - uses: actions/download-artifact@v4
-        with:
-          name: sdk-packages
-          path: dist/npm
-      - name: Create tag and draft release with artifacts
+      - name: Tag and publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.version.outputs.tag }}
@@ -69,84 +163,6 @@ jobs:
             git tag "$RELEASE_TAG" "$GITHUB_SHA"
             git push origin "$RELEASE_TAG"
           fi
-          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/release.json"; then
-            python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["isDraft"], "Release is already published"' "$RUNNER_TEMP/release.json"
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file ".changes/$RELEASE_TAG.md"
-          fi
-          gh release upload "$RELEASE_TAG" dist/release/* dist/npm/*.tgz --clobber
-  npm:
-    needs: [version, draft]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-      - run: pnpm --dir sdk/ts install --frozen-lockfile --ignore-scripts
-      - name: Publish all public SDK packages (already-published versions are skipped)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: task sdk:publish
-  container:
-    needs: [version, draft]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    permissions:
-      contents: read
-      packages: write
-    env:
-      IMAGE: ghcr.io/trytilde/tilde
-      VERSION: ${{ needs.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Resolve image tags
-        id: tags
-        run: |
-          {
-            echo 'list<<EOF'
-            echo "$IMAGE:$VERSION"
-            echo "$IMAGE:${VERSION%.*}"
-            echo "$IMAGE:latest"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.tags.outputs.list }}
-          labels: |
-            org.opencontainers.image.title=Tilde
-            org.opencontainers.image.description=Open-source Tilde agent registry and runtime harness
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ env.VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Smoke-test published image
-        run: test "$(docker run --rm "$IMAGE:$VERSION" --version)" = "tilde $VERSION"
-  publish-release:
-    needs: [version, npm, container]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - name: Publish completed GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.version.outputs.tag }}
-        run: gh release edit "$RELEASE_TAG" --draft=false
+          gh release view "$RELEASE_TAG" > /dev/null 2>&1 ||
+            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes-file ".changes/$RELEASE_TAG.md"
+          gh release upload "$RELEASE_TAG" dist/packages/* --clobber

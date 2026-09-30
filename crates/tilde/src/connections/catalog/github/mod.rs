@@ -4,19 +4,54 @@ use crate::connections::model::*;
 pub fn definition() -> Provider {
     Provider {
         account_name_label: Some("GitHub account".into()),
-        icon_url: Some("https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/github/default.svg".into()),
-        instructions: Some("Create a GitHub App or connect an existing installation to receive repository conversations.".into()),
+        icon_url: Some("/provider-icons/github.svg".into()),
+        instructions: Some("Connect a GitHub App installation to receive repository conversations and use GitHub tools, or a personal access token or OAuth app for tools only.".into()),
         id: "github".into(),
         name: "GitHub".into(),
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_DEVELOPER_TOOLS.into()],
-        connection_types: vec![ConnectionType {
-            id: "github_app".into(),
-            name: "GitHub App".into(),
-            credential_source: CredentialSource::Custom,
-            capabilities: vec![Capability::Channel],
-        }],
+        connection_types: vec![
+            // Tool calls use the installation token the connection refreshes for chat.
+            ConnectionType {
+                mcp: None,
+                id: "github_app".into(),
+                name: "GitHub App".into(),
+                credential_source: CredentialSource::Custom,
+                capabilities: vec![Capability::Channel, Capability::Tool],
+            },
+            ConnectionType {
+                mcp: None,
+                id: "pat".into(),
+                name: "Personal access token".into(),
+                credential_source: CredentialSource::Static {
+                    schema: serde_json::json!({"type":"object","properties":{"token":{"type":"string","title":"Personal access token","description":"A fine-grained or classic token from GitHub Developer settings, e.g. github_pat_...","minLength":1,"writeOnly":true}},"required":["token"],"additionalProperties":false}),
+                },
+                capabilities: vec![Capability::Tool],
+            },
+            ConnectionType {
+                mcp: None,
+                id: "oauth".into(),
+                name: "OAuth app".into(),
+                credential_source: CredentialSource::OAuth {
+                    grant: OAuthGrant::AuthorizationCode,
+                    configuration: github_oauth().into(),
+                    additional_schema: None,
+                },
+                capabilities: vec![Capability::Tool],
+            },
+        ],
     }
+}
+
+/// An OAuth app's user tokens do not expire; GitHub answers with a comma-separated scope.
+fn github_oauth() -> OAuth {
+    let mut config = OAuth::standard("https://github.com/login/oauth/access_token");
+    config.authorization_url = Some("https://github.com/login/oauth/authorize".into());
+    config.pkce = false;
+    config.scopes = ["repo", "read:org", "read:user", "user:email", "workflow"]
+        .map(str::to_owned)
+        .into();
+    config
 }
 
 use super::{Endpoints, url};

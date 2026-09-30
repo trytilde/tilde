@@ -1,0 +1,30 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+// How a prompt's template is written. Plain text has no variables; mustache is `{{var}}` with
+// `{{> section}}` partials (definePrompt, Handlebars-style framework templates); braces is `{var}`
+// (CrewAI YAML, Agno, Python format strings). A dynamic prompt is a function whose text exists
+// only when it runs: its template is the function's source, and calls reach it by stamp.
+enum PromptFormat { PROMPT_FORMAT_UNSPECIFIED = 0; PROMPT_FORMAT_PLAIN = 1; PROMPT_FORMAT_MUSTACHE = 2; PROMPT_FORMAT_BRACES = 3; PROMPT_FORMAT_DYNAMIC = 4; }
+// A named prompt an agent's code declares, registered when a deployment is. Versions are
+// immutable and content-addressed.
+message Prompt { string id = 1; string agent_id = 2; string name = 3; google.protobuf.Timestamp created_at = 4; PromptVersion latest = 6; }
+message PromptSection { string name = 1; string content = 2; string hash = 3; }
+message PromptVersion {
+  string id = 1; string prompt_id = 2; uint32 number = 3;
+  // Lowercase hex SHA-256 of the template, sections and config; the SDK stamps it on inference calls.
+  string hash = 4;
+  string template = 5; repeated PromptSection sections = 6;
+  // Model settings as the SDK serialised them (a JSON object).
+  string config = 7;
+  repeated string variables = 8;
+  google.protobuf.Timestamp created_at = 9;
+  // The deployment that first shipped the version.
+  string deployment_id = 10; string commit_sha = 11;
+  PromptFormat format = 12;
+  // Where the SDK found it, e.g. `src/mastra/index.ts#support.instructions` or `config/agents.yaml#researcher.goal`.
+  string origin = 13;
+}
+// Inference calls stamped with one version, from `inference_requests`.
+message PromptVersionUsage { string version_id = 1; int64 requests = 2; int64 input_tokens = 3; int64 output_tokens = 4; optional int64 cost_micros = 5; int64 average_latency_ms = 6; google.protobuf.Timestamp last_used_at = 7; }

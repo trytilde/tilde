@@ -1,9 +1,18 @@
 // This file was generated with `cornucopia`. Do not modify.
 
 #[derive(Debug)]
-pub struct RunParams<T1: crate::StringSql, T2: crate::StringSql> {
+pub struct RunParams<
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
+> {
     pub p1: T1,
     pub p2: Option<T2>,
+    pub p5: Option<T3>,
+    pub p4: Option<T4>,
+    pub p6: Option<T5>,
     pub p3: i64,
 }
 #[derive(Debug, Clone, PartialEq)]
@@ -105,7 +114,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT provider_id,name,kind,categories FROM connection_providers WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%') ORDER BY provider_id LIMIT $3",
+        "SELECT provider_id,name,kind,categories FROM connection_providers p WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%' OR instructions ILIKE '%'||$2||'%') AND ($3::TEXT IS NULL OR $3=ANY(categories)) AND ($4::TEXT IS NULL OR EXISTS(SELECT 1 FROM connection_types t WHERE t.provider_id=p.provider_id AND CASE $4 WHEN 'channel' THEN t.channel_capable WHEN 'inference' THEN t.inference_capable WHEN 'tool' THEN t.tool_capable END)) AND ($5::TEXT IS NULL OR provider_source(p.provider_id)=$5) ORDER BY provider_id LIMIT $6",
         None,
     )
 }
@@ -117,16 +126,29 @@ impl RunStmt {
         self.1 = Some(client.prepare(self.0).await?);
         Ok(self)
     }
-    pub fn bind<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql>(
+    pub fn bind<
+        'c,
+        'a,
+        's,
+        C: GenericClient,
+        T1: crate::StringSql,
+        T2: crate::StringSql,
+        T3: crate::StringSql,
+        T4: crate::StringSql,
+        T5: crate::StringSql,
+    >(
         &'s self,
         client: &'c C,
         p1: &'a T1,
         p2: &'a Option<T2>,
+        p5: &'a Option<T3>,
+        p4: &'a Option<T4>,
+        p6: &'a Option<T5>,
         p3: &'a i64,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 6> {
         RecordQuery {
             client,
-            params: [p1, p2, p3],
+            params: [p1, p2, p5, p4, p6, p3],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -142,21 +164,33 @@ impl RunStmt {
         }
     }
 }
-impl<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql>
+impl<
+    'c,
+    'a,
+    's,
+    C: GenericClient,
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
+>
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2>,
-        RecordQuery<'c, 'a, 's, C, Record, 3>,
+        RunParams<T1, T2, T3, T4, T5>,
+        RecordQuery<'c, 'a, 's, C, Record, 6>,
         C,
     > for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
-        self.bind(client, &params.p1, &params.p2, &params.p3)
+        params: &'a RunParams<T1, T2, T3, T4, T5>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 6> {
+        self.bind(
+            client, &params.p1, &params.p2, &params.p5, &params.p4, &params.p6, &params.p3,
+        )
     }
 }

@@ -13,6 +13,7 @@ import { Switch } from "./ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { TildeLoader } from "@/components/loading-screen";
 
 type AccessMode = "private" | "public" | "disabled";
 type ProviderRoute = {
@@ -278,11 +279,7 @@ export function AgentIam({ agentId, active = true }: { agentId: string; active?:
           Manage access through each connected chat provider.
         </p>
       </div>
-      {loading && (
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading access policies…
-        </p>
-      )}
+      {loading && <TildeLoader />}
       {error && (
         <div
           role="alert"
@@ -307,7 +304,7 @@ export function AgentIam({ agentId, active = true }: { agentId: string; active?:
       )}
       <div className="overflow-hidden rounded-xl border">
         <Table aria-label={view === "provider" ? "Chat provider access" : "User access"}>
-          <TableHeader className="bg-background">
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="h-11 px-5">Identity</TableHead>
               {view === "user" && <TableHead>Account</TableHead>}

@@ -30,6 +30,7 @@ async fn controls_cross_gateway_instances_keep_inputs_queued_and_remain_scoped_a
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Serverless".into(),

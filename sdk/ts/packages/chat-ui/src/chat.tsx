@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input } from "@trytilde/connection-ui";
-import type {
-  Message,
-  QueuedInput,
-  ToolCall,
-  User,
+import {
+  ToolDisplay,
+  type Message,
+  type QueuedInput,
+  type ToolCall,
+  type User,
 } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 import type { Session } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 import { ChatComposer, type ComposerAttachment } from "./composer.js";
@@ -596,15 +597,25 @@ function ChatWindow({
             <MarkdownText text={reasoning} />
           </details>
         )}
-        {Object.values(tools).map((tool) => (
-          <details key={tool.id} className="tc-tool">
-            <summary>
-              {tool.name} · {tool.status}
-            </summary>
-            <pre>{tool.inputJson}</pre>
-            <pre>{tool.outputJson || tool.error}</pre>
-          </details>
-        ))}
+        {/* The server already withholds hidden calls and summary-only detail; this only lays out
+            what arrives. */}
+        {Object.values(tools)
+          .filter((tool) => tool.display !== ToolDisplay.HIDDEN)
+          .map((tool) =>
+            tool.display === ToolDisplay.SUMMARY ? (
+              <p key={tool.id} className="tc-tool">
+                {tool.summary || tool.name} · {tool.status}
+              </p>
+            ) : (
+              <details key={tool.id} className="tc-tool">
+                <summary>
+                  {tool.summary || tool.name} · {tool.status}
+                </summary>
+                <pre>{tool.inputJson}</pre>
+                <pre>{tool.outputJson || tool.error}</pre>
+              </details>
+            ),
+          )}
         {typing && <p role="status">{typing} is typing…</p>}
       </div>
       {latest && (

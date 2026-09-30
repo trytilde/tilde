@@ -66,15 +66,16 @@ it("loads every catalog page and presents chat methods in pill menus", async () 
   rpc.listProviders.mockImplementation(async ({ pageToken }) =>
     pageToken
       ? { providers: [custom], nextPageToken: "" }
-      : {
-          providers: [whatsapp, create(ProviderSchema, { id: "not-chat", name: "Tools provider" })],
-          nextPageToken: "next",
-        },
+      : { providers: [whatsapp], nextPageToken: "next" },
   );
   render(<AgentConnections agentId="agent-1" />);
   const pill = await screen.findByRole("button", { name: "Custom chat" });
   expect(pill.className).toContain("rounded-full");
-  expect(screen.queryByRole("button", { name: "Tools provider" })).toBeNull();
+  // The server keeps only providers with a chat method.
+  expect(rpc.listProviders).toHaveBeenCalledWith(
+    { capability: Capability.CHANNEL, pageSize: 100, pageToken: "next" },
+    expect.anything(),
+  );
   fireEvent.click(pill);
   await screen.findByRole("menuitem", { name: "Use existing connection" });
   expect(screen.getByText("Or add new")).toBeTruthy();
@@ -135,24 +136,23 @@ it("starts the single method in an iframe and accepts completion only from that 
 
 it("selects an available connection from later pages for only the chosen provider", async () => {
   defaults();
+  // The server filters by provider; the first page of matches can still be empty.
   rpc.listConnections.mockImplementation(async ({ agentId, pageToken }) =>
     agentId
       ? { connections: [], nextPageToken: "" }
       : pageToken
         ? { connections: [connection], nextPageToken: "" }
-        : {
-            connections: [
-              { ...connection, id: "other", name: "Other provider", providerId: "custom" },
-            ],
-            nextPageToken: "more",
-          },
+        : { connections: [], nextPageToken: "more" },
   );
   rpc.assignCapability.mockResolvedValue({ connection });
   render(<AgentConnections agentId="agent-1" />);
   fireEvent.click(await screen.findByRole("button", { name: "WhatsApp" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Use existing connection" }));
   const select = await screen.findByRole("button", { name: /Support WhatsApp/ });
-  expect(screen.queryByText("Other provider")).toBeNull();
+  expect(rpc.listConnections).toHaveBeenCalledWith(
+    { capability: Capability.CHANNEL, providerId: "whatsapp", pageSize: 100, pageToken: "more" },
+    expect.anything(),
+  );
   fireEvent.click(select);
   await waitFor(() =>
     expect(rpc.assignCapability).toHaveBeenCalledWith({

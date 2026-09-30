@@ -105,8 +105,8 @@ impl Chat {
                 run,
                 thread,
                 agent,
-                &(crate::telemetry::context::capture().0),
-                &(crate::telemetry::context::capture().1),
+                &(crate::telemetry::tracing::context::capture().0),
+                &(crate::telemetry::tracing::context::capture().1),
                 deployment,
             )
             .await?;
@@ -172,8 +172,8 @@ impl Chat {
             run,
             row.thread_id,
             row.agent_id,
-            &(crate::telemetry::context::capture().0),
-            &(crate::telemetry::context::capture().1),
+            &(crate::telemetry::tracing::context::capture().0),
+            &(crate::telemetry::tracing::context::capture().1),
             deployment,
         )
         .await?;
@@ -431,6 +431,39 @@ impl Chat {
         drop(tx_client);
         Ok(())
     }
+    /// Queue `text` as an input of a live invocation without applying the agent's concurrency
+    /// policy: the invocation reads it, or it starts a fresh invocation once this one ends. For
+    /// deliveries that must never cancel the invocation, such as background tool results, which
+    /// are gateway-only like the tools that produce them. Conflict when the invocation has ended.
+    pub(crate) async fn queue_input(
+        &self,
+        invocation: Uuid,
+        input: Uuid,
+        text: &str,
+    ) -> Result<()> {
+        let mut tx_client = self.pg()?.get().await?;
+        let tx = tx_client.transaction().await?;
+        let row = crate::chat::db::invocation_endpoint_opt(&tx, invocation)
+            .await?
+            .ok_or(ChatError::NotFound)?;
+        super::access::lock_thread_route(&tx, row.thread_id).await?;
+        crate::chat::db::thread_lock_one(&tx, row.thread_id).await?;
+        if let Some(existing) = crate::chat::db::input_get_opt(&tx, invocation, input).await? {
+            return if existing.text == text {
+                Ok(())
+            } else {
+                Err(ChatError::Conflict)
+            };
+        }
+        let current = crate::chat::db::invocation_endpoint_one(&tx, invocation).await?;
+        if !["pending", "running"].contains(&current.status.as_str()) {
+            return Err(ChatError::Conflict);
+        }
+        crate::chat::db::input_create_execute(&tx, invocation, input, text).await?;
+        activity(self.pg()?, &tx, row.thread_id, "queue.updated", input, "").await?;
+        tx.commit().await?;
+        Ok(())
+    }
     /// Revoke callbacks immediately and persist cancellation; the execution observes cancellation on its control stream.
     pub async fn cancel_invocation(&self, invocation: Uuid) -> Result<()> {
         if let Some(local) = self.local() {
@@ -479,7 +512,7 @@ impl Chat {
             return Ok(None);
         }
         let token = deployments
-            .issue_ingress_token(agent, thread.map(|t| t.to_string()), Uuid::nil())
+            .issue_ingress_token(agent, thread.map(|t| t.to_string()))
             .await
             .map_err(|_| ChatError::Transport)?;
         let call = crate::proto::tilde::agent_event_ingress::v1::IngressCall {
@@ -636,8 +669,9 @@ impl Chat {
         drop(claim_client);
         // Off the wake path: the agent's first tool and credential reads are already in memory.
         tokio::spawn(self.clone().prime(scope.agent_id, scope.thread_id));
-        let parent = crate::telemetry::context::restore(&scope.traceparent, &scope.tracestate);
-        let cx = crate::telemetry::context::start(
+        let parent =
+            crate::telemetry::tracing::context::restore(&scope.traceparent, &scope.tracestate);
+        let cx = crate::telemetry::tracing::context::start(
             "tilde.invocation",
             SpanKind::Client,
             &parent,
@@ -650,12 +684,12 @@ impl Chat {
                 KeyValue::new("rpc.method", "Invoke"),
             ],
         );
-        let _end = crate::telemetry::context::EndOnDrop(cx.clone());
+        let _end = crate::telemetry::tracing::context::EndOnDrop(cx.clone());
         let result = async {
-            crate::telemetry::db::execution_context_execute(
+            crate::telemetry::tracing::db::execution_context_execute(
                 &self.pg()?.get().await?,
                 invocation,
-                &(crate::telemetry::context::capture().0),
+                &(crate::telemetry::tracing::context::capture().0),
             )
             .await?;
             let capability = self
@@ -670,6 +704,26 @@ impl Chat {
                 .await?;
             let messages = page.messages;
             let cached = page.cached_messages;
+            // Pushed so the agent updates its local skills by version instead of listing them.
+            // Without it (the lookup failed) the SDK lists them itself; an empty list would
+            // instead remove every skill it holds.
+            let state = match self
+                .skills()?
+                .for_agent(scope.agent_id, Some(invocation))
+                .await
+            {
+                Ok(skills) => Some(host::InvocationState {
+                    skills: skills
+                        .into_iter()
+                        .map(crate::skills::rpc::summary_wire)
+                        .collect(),
+                    ..Default::default()
+                }),
+                Err(error) => {
+                    tracing::warn!(%invocation, %error, "invocation skills not pushed");
+                    None
+                }
+            };
             let mut request = host::InvokeRequest {
                 agent_generation: scope.generation,
                 invocation_id: invocation.to_string(),
@@ -690,8 +744,9 @@ impl Chat {
                     .collect(),
                 thread: self.thread(scope.thread_id).await?.into(),
                 deployment_id: row.deployment_id.map(|d| d.to_string()).unwrap_or_default(),
-                traceparent: crate::telemetry::context::capture().0,
-                tracestate: crate::telemetry::context::capture().1,
+                traceparent: crate::telemetry::tracing::context::capture().0,
+                tracestate: crate::telemetry::tracing::context::capture().1,
+                state: state.into(),
                 ..Default::default()
             };
             self.wake(
@@ -918,6 +973,9 @@ impl Chat {
                     let _ = self.expire_messages().await;
                     let _ = self.expire_typing().await;
                     let _ = self.expire_tool_calls().await;
+                    if let Some(tools) = &self.tools {
+                        let _ = tools.hosts.expire().await;
+                    }
                     let _ = async { crate::chat::access::db::cleanup_execute(&pool.get().await?).await }.await;
                     continue;
                 }

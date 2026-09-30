@@ -22,24 +22,20 @@ impl Deployments {
         &self,
         agent: Uuid,
         thread: Option<String>,
-        principal: Uuid,
     ) -> Result<SecretString, Error> {
-        self.issue_token_for_identity(agent, thread, principal, None)
-            .await
+        self.issue_token_for_identity(agent, thread, None).await
     }
     pub(crate) async fn issue_identity_token(
         &self,
         agent: Uuid,
         user: Uuid,
     ) -> Result<SecretString, Error> {
-        self.issue_token_for_identity(agent, None, user, Some(user))
-            .await
+        self.issue_token_for_identity(agent, None, Some(user)).await
     }
     async fn issue_token_for_identity(
         &self,
         agent: Uuid,
         thread: Option<String>,
-        principal: Uuid,
         user_id: Option<Uuid>,
     ) -> Result<SecretString, Error> {
         let mut tx_client = self.pool.get().await?;
@@ -64,7 +60,7 @@ impl Deployments {
         let claims = IngressClaims {
             iss: "tilde:ingress".into(),
             aud: "tilde:public-event-ingress".into(),
-            sub: principal.to_string(),
+            sub: agent.to_string(),
             agent_id: agent,
             thread_id: thread.as_deref().map(id).transpose()?,
             exp: chrono::Utc::now().timestamp() + 900,

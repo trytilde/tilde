@@ -14,6 +14,9 @@ pub struct Record {
     pub error: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub summary: String,
+    pub detached: bool,
+    pub display: String,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
@@ -28,6 +31,9 @@ pub struct RecordBorrowed<'a> {
     pub error: &'a str,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub summary: &'a str,
+    pub detached: bool,
+    pub display: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -44,6 +50,9 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             error,
             created_at,
             updated_at,
+            summary,
+            detached,
+            display,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -59,6 +68,9 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             error: error.into(),
             created_at,
             updated_at,
+            summary: summary.into(),
+            detached,
+            display: display.into(),
         }
     }
 }
@@ -131,7 +143,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) ORDER BY t.thread_id,t.id LIMIT 100",
+        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) AND (NOT t.detached OR t.updated_at < NOW() - INTERVAL '1 hour') ORDER BY t.thread_id,t.id LIMIT 100",
         None,
     )
 }
@@ -167,6 +179,9 @@ impl RunStmt {
                         error: row.try_get(9)?,
                         created_at: row.try_get(10)?,
                         updated_at: row.try_get(11)?,
+                        summary: row.try_get(12)?,
+                        detached: row.try_get(13)?,
+                        display: row.try_get(14)?,
                     })
                 },
             mapper: |it| Record::from(it),

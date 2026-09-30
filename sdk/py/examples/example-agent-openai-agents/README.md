@@ -5,10 +5,14 @@ Run with `REGISTER_DEV_AGENTS=1 task dev`. The debug-only `tilde dev-agent` comm
 beside the other SDK examples. Set `DEV_AGENTS=py-openai-agents` to start only this one.
 
 A local development agent mirroring `sdk/ts/examples/vercel-ai-example-agent`, built on the Python SDK and the
-OpenAI Agents SDK (`openai-agents`). `main.py` configures the Tilde host and OpenAI client;
-`agent.py` generates replies with `Runner.run`. History, typed context conversion,
-attachments and reply routing are owned by the SDK through `ctx.message.history()`,
-`convert_to_openai_agents_messages` and `convert_to_openai_agents_tools(ctx.channel.current)`.
+OpenAI Agents SDK (`openai-agents`). `main.py` configures the Tilde host; `agent.py` defines
+the `Agent` once at module scope and per invocation runs it with
+`run_agent, run_config = await tilde_openai_agents(ctx, agent)`: the helper returns a clone
+carrying the current channel's tools (and the registry's skills as `list_skills` /
+`read_skill` tools plus a summary) and a `RunConfig` that checks cancellation, stamps dynamic
+instructions and adds steering input before every model call. History, typed context
+conversion, attachments and reply routing are owned by the SDK through
+`ctx.message.history()` and `convert_to_openai_agents_messages`.
 
 The model receives only `ctx.channel.current` tools and responds by calling them. Returned
 model text remains private; visible responses are provider tool actions. Attachments are
@@ -19,9 +23,19 @@ HTTP status, never upstream response bodies. OpenAI trace export is disabled.
 
 Environment:
 
-- `OPENAI_API_KEY`, `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (required; the token comes
+- `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (required; the token comes
   from registering a Gateway deployment for the agent). The host dials out to Tilde and
   exposes no endpoint.
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 
 Run from `sdk/py` with `uv run --package example-agent-openai-agents python examples/example-agent-openai-agents/main.py`.
+
+Model calls go through Tilde's inference gateway with `tilde.inference(TILDE_INFERENCE)`
+(default `default`, the alias the local registrar gives the example's OpenAI connection), so
+the process never holds a provider key; the client is built once and each request carries the
+running invocation's token.
+
+The instructions are registered with the deployment as
+`example-agent-openai-agents/instructions`. Preview them from this directory with
+`../../.venv/bin/python -m tilde deploy main.py --dry-run`; `tilde dev` does the same when it
+registers the example.

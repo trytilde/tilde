@@ -12,28 +12,9 @@ const rpc = vi.hoisted(() => ({
   listAgents: vi.fn(),
   getAgent: vi.fn(),
   updateAgent: vi.fn(),
-  listGroups: vi.fn(),
-  getGroup: vi.fn(),
-  listGroupMembers: vi.fn(),
-  listApiKeys: vi.fn(),
   listConnections: vi.fn(),
-  getAccess: vi.fn(),
-  listRoleAssignments: vi.fn(),
-  listRoles: vi.fn(),
 }));
-const auth = vi.hoisted(() => vi.fn());
-vi.mock("@/client", () => ({ agents: rpc, iam: rpc, apiKeys: rpc, connections: rpc }));
-// ResourceKind.AGENT = 1: these tests exercise the registry as a caller who may create agents.
-vi.mock("@/hooks/use-caller", () => ({
-  CallerProvider: ({ children }: { children: ReactNode }) => children,
-  useCaller: () => ({ userId: "user-1", admin: true, groupIds: [], creatable: [1] }),
-}));
-vi.mock("@/components/auth", () => ({
-  Auth: ({ children }: { children: ReactNode }) => {
-    auth();
-    return children;
-  },
-}));
+vi.mock("@/client", () => ({ agents: rpc, connections: rpc }));
 vi.mock("@/components/app-sidebar", () => ({ AppSidebar: () => null }));
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarTrigger: () => null,
@@ -54,14 +35,7 @@ beforeEach(() => {
   vi.stubGlobal("scrollTo", vi.fn());
   rpc.listAgents.mockResolvedValue({ agents: [ada], nextPageToken: "" });
   rpc.getAgent.mockResolvedValue({ agent: ada });
-  rpc.listGroups.mockResolvedValue({ groups: [] });
-  rpc.getGroup.mockResolvedValue({ group: { id: "local:ops", name: "Ops", source: 3 } });
-  rpc.listGroupMembers.mockResolvedValue({ members: [], nextPageToken: "" });
-  rpc.listApiKeys.mockResolvedValue({ apiKeys: [], nextPageToken: "" });
   rpc.listConnections.mockResolvedValue({ connections: [] });
-  rpc.getAccess.mockResolvedValue({ actions: [] });
-  rpc.listRoleAssignments.mockResolvedValue({ assignments: [] });
-  rpc.listRoles.mockResolvedValue({ roles: [] });
 });
 afterEach(() => {
   cleanup();
@@ -167,29 +141,21 @@ it("redirects the bare agent URL and shows a retryable missing-agent result", as
   await screen.findByRole("heading", { name: "Ada" });
 });
 
-it("keeps connection brokering outside the authenticated app routes", async () => {
+it("keeps connection brokering outside the dashboard layout", async () => {
   await open("/connections/broker/example-setup");
   await screen.findByText("Public setup example-setup");
-  expect(auth).not.toHaveBeenCalled();
+  expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
 });
 
 it("matches agent creation before the dynamic agent route", async () => {
   await open("/agent/new");
   await screen.findByRole("heading", { name: "Create agent" });
-  expect(auth).toHaveBeenCalled();
   expect(rpc.getAgent).not.toHaveBeenCalled();
 });
 
-it.each(["/connections", "/chat"])("no longer serves %s", async (path) => {
+it.each(["/connections", "/chat", "/auth/callback"])("no longer serves %s", async (path) => {
   await open(path);
   await screen.findByRole("heading", { name: "Page not found" });
-});
-
-it("returns from the auth callback to the registry", async () => {
-  const { router } = await open("/auth/callback");
-  await screen.findByRole("row", { name: "Edit Ada" });
-  expect(router.state.location.pathname).toBe("/");
-  expect(auth).toHaveBeenCalled();
 });
 
 it("offers navigation back to the registry for unknown URLs", async () => {
@@ -223,6 +189,9 @@ it("keeps the header tabs linked to their panels and supports keyboard navigatio
   ).toBe("tabpanel");
   capabilities.focus();
   fireEvent.keyDown(capabilities, { key: "ArrowRight" });
+  const inferenceTab = tabs.getByRole("tab", { name: "Inference" });
+  await waitFor(() => expect(document.activeElement).toBe(inferenceTab));
+  fireEvent.keyDown(inferenceTab, { key: "ArrowRight" });
   const chatTab = tabs.getByRole("tab", { name: "Chat providers" });
   await waitFor(() => expect(document.activeElement).toBe(chatTab));
   expect(router.state.location.pathname).toBe("/agent/agent-ada/capabilities");
@@ -236,24 +205,11 @@ it("keeps the header tabs linked to their panels and supports keyboard navigatio
   expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(selected.id);
 });
 
-it("names the section in the breadcrumb on every top-level page and its create pages", async () => {
-  for (const [path, section, current] of [
-    ["/api-keys", "API keys", undefined],
-    ["/api-keys/new", "API keys", "Create API key"],
-    ["/groups", "Groups", undefined],
-    ["/groups/local:ops", "Groups", "Ops"],
-    ["/agent/new", "Agent Registry", "Create agent"],
-  ] as const) {
-    await open(path);
-    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-    if (current) {
-      expect(within(breadcrumb).getByRole("link", { name: section })).toBeTruthy();
-      expect((await within(breadcrumb).findByText(current)).getAttribute("aria-current")).toBe(
-        "page",
-      );
-    } else {
-      expect(within(breadcrumb).getByText(section).getAttribute("aria-current")).toBe("page");
-    }
-    cleanup();
-  }
+it("names the section and the create page in the breadcrumb", async () => {
+  await open("/agent/new");
+  const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+  expect(within(breadcrumb).getByRole("link", { name: "Agent Registry" })).toBeTruthy();
+  expect((await within(breadcrumb).findByText("Create agent")).getAttribute("aria-current")).toBe(
+    "page",
+  );
 });

@@ -21,6 +21,7 @@ pub mod draft_put;
 pub mod parameters_insert;
 pub mod parameters_list;
 pub mod provider_backend;
+pub mod provider_categories;
 pub mod provider_clear_details;
 pub mod provider_get;
 pub mod provider_insert;

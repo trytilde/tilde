@@ -9,7 +9,6 @@ import {
   PlusIcon,
   SettingsIcon,
   SquareArrowOutUpRightIcon,
-  Trash2Icon,
 } from "lucide-react";
 import {
   Capability,
@@ -25,6 +24,7 @@ import {
   type Budget,
   type ConnectionUsage,
 } from "@trytilde/contracts/tilde/management/v1/inference_pb.js";
+import { RemoveButton } from "./remove-button";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { randomUUID } from "@/lib/browser-crypto";
+import { SkeletonLines } from "@/components/table-skeleton";
 
 type Setup = { title: string; url: string; connectionId: string };
 const methodsFor = (provider: Provider, capability: Capability) =>
@@ -57,14 +58,14 @@ const copy: Record<
 > = {
   [Capability.CHANNEL]: {
     section: "Chat providers",
-    loading: "Loading chat providers…",
+    loading: "Loading chat providers",
     none: "No chat providers available.",
     unassigned: "No chat providers assigned",
     existing: "Choose a connection whose chat capability is available.",
   },
   [Capability.INFERENCE]: {
     section: "Inference providers",
-    loading: "Loading inference providers…",
+    loading: "Loading inference providers",
     none: "No inference providers available.",
     unassigned: "No inference providers assigned",
     existing: "Choose an existing API key; several agents may share one.",
@@ -124,12 +125,10 @@ export function AgentConnections({
         let pageToken = "";
         do {
           const page = await connections.listProviders(
-            { pageSize: 100, pageToken },
+            { capability, pageSize: 100, pageToken },
             { signal: abort.signal },
           );
-          catalog.push(
-            ...page.providers.filter((provider) => methodsFor(provider, capability).length),
-          );
+          catalog.push(...page.providers);
           pageToken = page.nextPageToken;
         } while (pageToken);
         if (!abort.signal.aborted) setProviders(catalog);
@@ -222,14 +221,10 @@ export function AgentConnections({
           {error}
         </p>
       )}
-      {loading && (
-        <p role="status" className="text-sm text-muted-foreground">
-          {text.loading}
-        </p>
-      )}
+      {loading && <SkeletonLines label={text.loading} />}
       {capability === Capability.INFERENCE ? (
         <div className="flex justify-end">
-          <Button variant="outline" disabled={busy} onClick={() => setCatalogOpen(true)}>
+          <Button disabled={busy} onClick={() => setCatalogOpen(true)}>
             <PlusIcon />
             Add inference provider
           </Button>
@@ -512,7 +507,7 @@ export function AgentConnections({
   );
 }
 
-/** The API paginates across providers; load every page before declaring none available. */
+/** The server filters by provider; every page is loaded before declaring none available. */
 function ExistingConnections({
   provider,
   busy,
@@ -540,14 +535,13 @@ function ExistingConnections({
         let pageToken = "";
         do {
           const page = await connections.listConnections(
-            { capability, pageSize: 100, pageToken },
+            { capability, providerId: provider.id, pageSize: 100, pageToken },
             { signal: abort.signal },
           );
+          // The agent's own connections are few; they are left out here.
           matches.push(
             ...page.connections.filter(
-              (connection) =>
-                connection.providerId === provider.id &&
-                !assigned.some((current) => current.id === connection.id),
+              (connection) => !assigned.some((current) => current.id === connection.id),
             ),
           );
           pageToken = page.nextPageToken;
@@ -564,7 +558,7 @@ function ExistingConnections({
   return (
     <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
       {loading ? (
-        <p role="status">Loading connections…</p>
+        <SkeletonLines label="Loading connections" />
       ) : error ? (
         <>
           <p role="alert">{error}</p>
@@ -817,7 +811,7 @@ function ProviderConnectionsTable({
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table aria-label={copy[capability].section} className="table-fixed">
-        <TableHeader className="bg-background">
+        <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead className="h-11 w-14 px-5" />
             <TableHead className="h-11">Provider</TableHead>
@@ -920,13 +914,14 @@ function ProviderConnectionsTable({
                           <SettingsIcon />
                         </IconAction>
                       )}
-                      <IconAction
+                      <RemoveButton
+                        size="icon-xs"
                         label="Remove"
+                        title={`Remove ${connection.name} from this agent?`}
+                        description="The agent can no longer use this connection. The connection itself is kept and can be assigned again."
                         disabled={busy}
-                        onClick={() => void onRemove(connection)}
-                      >
-                        <Trash2Icon />
-                      </IconAction>
+                        onConfirm={() => onRemove(connection)}
+                      />
                     </span>
                   )}
                 </TableCell>

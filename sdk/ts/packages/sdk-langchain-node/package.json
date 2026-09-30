@@ -20,9 +20,11 @@
     "@trytilde/sdk": "workspace:*"
   },
   "devDependencies": {
-    "@langchain/core": "^1.2.11"
+    "@langchain/core": "^1.2.11",
+    "langchain": "^1.5.11"
   },
   "peerDependencies": {
-    "@langchain/core": "^1.2.11"
+    "@langchain/core": "^1.2.11",
+    "langchain": "^1.5.11"
   }
 }

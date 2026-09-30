@@ -2,12 +2,19 @@ use envconfig::Envconfig;
 use std::collections::HashMap;
 use tilde::config::Config;
 
+/// ClickHouse and the telemetry buckets every engine requires.
+const TELEMETRY: [(&str, &str); 4] = [
+    ("ENGINE_CLICKHOUSE_URL", "http://127.0.0.1:8123"),
+    ("ENGINE_LOGS_S3_BUCKET", "logs"),
+    ("ENGINE_TRACES_S3_BUCKET", "traces"),
+    ("ENGINE_METRICS_S3_BUCKET", "metrics"),
+];
+
 #[test]
 fn typed_environment_validates_before_initializing_encryption() {
-    let base = HashMap::from([
-        ("ENGINE_OIDC_ISSUER".into(), "https://issuer.example".into()),
-        ("ENGINE_OIDC_CLIENT_ID".into(), "client".into()),
-        ("ENGINE_OIDC_CLIENT_SECRET".into(), "test-secret".into()),
+    let mut base: HashMap<String, String> =
+        TELEMETRY.map(|(k, v)| (k.to_owned(), v.to_owned())).into();
+    base.extend([
         (
             "DATABASE_URL".into(),
             "postgres://fixture:password@localhost/fixture".into(),
@@ -23,6 +30,17 @@ fn typed_environment_validates_before_initializing_encryption() {
             .key_protection()
             .is_ok()
     );
+    // There is no telemetry opt-out: each piece refuses startup by name.
+    for (name, _) in TELEMETRY {
+        let mut values = base.clone();
+        values.remove(name);
+        let error = Config::init_from_hashmap(&values)
+            .unwrap()
+            .key_protection()
+            .err()
+            .expect("telemetry is required");
+        assert!(error.to_string().contains(name));
+    }
     for (name, value) in [
         ("WEB_PORT", "65536"),
         ("API_PORT", "not-a-port"),
@@ -71,38 +89,5 @@ fn typed_environment_validates_before_initializing_encryption() {
             .unwrap()
             .key_protection()
             .is_ok()
-    );
-}
-
-#[test]
-fn agent_facing_groups_do_not_require_oidc() {
-    let mut values = HashMap::from([
-        (
-            "DATABASE_URL".into(),
-            "postgres://engine@localhost/test".into(),
-        ),
-        (
-            "ENGINE_ENCRYPTION_KEY".into(),
-            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into(),
-        ),
-        ("ENGINE_SERVE".into(), "ingress,runtime,sidecar".into()),
-        ("ENGINE_WEB_ENABLED".into(), "false".into()),
-        ("WEB_PORT".into(), "0".into()),
-    ]);
-    assert!(
-        Config::init_from_hashmap(&values)
-            .unwrap()
-            .key_protection()
-            .is_ok()
-    );
-    values.insert("ENGINE_SERVE".into(), "all".into());
-    assert!(
-        Config::init_from_hashmap(&values)
-            .unwrap()
-            .key_protection()
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("ENGINE_OIDC_ISSUER")
     );
 }

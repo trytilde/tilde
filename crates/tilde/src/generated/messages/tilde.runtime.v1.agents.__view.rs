@@ -10,6 +10,8 @@ pub struct CreateAgentRequestView<'a> {
     pub id: &'a str,
     /// Field 2: `name`
     pub name: &'a str,
+    /// Field 8: `description`
+    pub description: &'a str,
     /// Field 6: `capabilities`
     pub capabilities: ::buffa::MessageFieldView<
         super::super::super::super::types::v1::__buffa::view::CapabilitiesView<'a>,
@@ -61,6 +63,13 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.description = ::buffa::types::borrow_str(&mut cur)?;
             }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -116,6 +125,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
         ::core::result::Result::Ok(super::super::CreateAgentRequest {
             id: self.id.to_string(),
             name: self.name.to_string(),
+            description: self.description.to_string(),
             capabilities: match self.capabilities.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -159,6 +169,9 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
+        if !self.description.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -190,6 +203,9 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
                 ::buffa::types::put_int32_field(7u32, val, buf);
             }
         }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.description, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -216,6 +232,9 @@ impl<'__a> ::serde::Serialize for CreateAgentRequestView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
             __map.serialize_entry("name", self.name)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
+            __map.serialize_entry("description", self.description)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.capabilities.as_option() {
@@ -334,6 +353,11 @@ impl CreateAgentRequestOwnedView {
     #[must_use]
     pub fn name(&self) -> &'_ str {
         self.0.reborrow().name
+    }
+    /// Field 8: `description`
+    #[must_use]
+    pub fn description(&self) -> &'_ str {
+        self.0.reborrow().description
     }
     /// Field 6: `capabilities`
     #[must_use]
@@ -1796,6 +1820,8 @@ pub struct UpdateAgentRequestView<'a> {
     pub id: &'a str,
     /// Field 2: `name`
     pub name: ::core::option::Option<&'a str>,
+    /// Field 7: `description`
+    pub description: ::core::option::Option<&'a str>,
     /// Present empty map clears grants; absence preserves them.
     ///
     /// Field 5: `capabilities`
@@ -1849,6 +1875,13 @@ impl<'a> ::buffa::MessageView<'a> for UpdateAgentRequestView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.name = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.description = Some(::buffa::types::borrow_str(&mut cur)?);
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -1904,6 +1937,7 @@ impl<'a> ::buffa::MessageView<'a> for UpdateAgentRequestView<'a> {
         ::core::result::Result::Ok(super::super::UpdateAgentRequest {
             id: self.id.to_string(),
             name: self.name.map(|s| s.to_string()),
+            description: self.description.map(|s| s.to_string()),
             capabilities: match self.capabilities.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -1944,6 +1978,9 @@ impl<'a> ::buffa::ViewEncode<'a> for UpdateAgentRequestView<'a> {
         if let Some(ref v) = self.concurrency_policy {
             size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
         }
+        if let Some(ref v) = self.description {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1972,6 +2009,9 @@ impl<'a> ::buffa::ViewEncode<'a> for UpdateAgentRequestView<'a> {
         if let Some(ref v) = self.concurrency_policy {
             ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
         }
+        if let Some(ref v) = self.description {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -1998,6 +2038,9 @@ impl<'__a> ::serde::Serialize for UpdateAgentRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.name {
             __map.serialize_entry("name", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.description {
+            __map.serialize_entry("description", __v)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.capabilities.as_option() {
@@ -2111,6 +2154,11 @@ impl UpdateAgentRequestOwnedView {
     #[must_use]
     pub fn name(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().name
+    }
+    /// Field 7: `description`
+    #[must_use]
+    pub fn description(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().description
     }
     /// Present empty map clears grants; absence preserves them.
     ///

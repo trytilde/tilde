@@ -22,6 +22,13 @@ pub struct CreateAgentRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
+    /// Field 8: `description`
+    #[serde(
+        rename = "description",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub description: ::buffa::alloc::string::String,
     /// Field 6: `capabilities`
     #[serde(
         rename = "capabilities",
@@ -50,6 +57,7 @@ impl ::core::fmt::Debug for CreateAgentRequest {
         f.debug_struct("CreateAgentRequest")
             .field("id", &self.id)
             .field("name", &self.name)
+            .field("description", &self.description)
             .field("capabilities", &self.capabilities)
             .field("concurrency_policy", &self.concurrency_policy)
             .finish()
@@ -102,6 +110,9 @@ impl ::buffa::Message for CreateAgentRequest {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
+        if !self.description.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -131,6 +142,9 @@ impl ::buffa::Message for CreateAgentRequest {
             if val != 0 {
                 ::buffa::types::put_int32_field(7u32, val, buf);
             }
+        }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.description, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -179,6 +193,13 @@ impl ::buffa::Message for CreateAgentRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.description, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -191,6 +212,7 @@ impl ::buffa::Message for CreateAgentRequest {
         self.name.clear();
         self.capabilities = ::buffa::MessageField::none();
         self.concurrency_policy = ::buffa::EnumValue::from(0);
+        self.description.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -957,6 +979,12 @@ pub struct UpdateAgentRequest {
     /// Field 2: `name`
     #[serde(rename = "name", skip_serializing_if = "::core::option::Option::is_none")]
     pub name: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `description`
+    #[serde(
+        rename = "description",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub description: ::core::option::Option<::buffa::alloc::string::String>,
     /// Present empty map clears grants; absence preserves them.
     ///
     /// Field 5: `capabilities`
@@ -987,6 +1015,7 @@ impl ::core::fmt::Debug for UpdateAgentRequest {
         f.debug_struct("UpdateAgentRequest")
             .field("id", &self.id)
             .field("name", &self.name)
+            .field("description", &self.description)
             .field("capabilities", &self.capabilities)
             .field("concurrency_policy", &self.concurrency_policy)
             .finish()
@@ -1008,6 +1037,16 @@ impl UpdateAgentRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.name = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::description`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_description(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.description = Some(value.into());
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -1060,6 +1099,9 @@ impl ::buffa::Message for UpdateAgentRequest {
         if let Some(ref v) = self.concurrency_policy {
             size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
         }
+        if let Some(ref v) = self.description {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1086,6 +1128,9 @@ impl ::buffa::Message for UpdateAgentRequest {
         }
         if let Some(ref v) = self.concurrency_policy {
             ::buffa::types::put_int32_field(6u32, v.to_i32(), buf);
+        }
+        if let Some(ref v) = self.description {
+            ::buffa::types::put_string_field(7u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1137,6 +1182,18 @@ impl ::buffa::Message for UpdateAgentRequest {
                     ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
                 );
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .description
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1149,6 +1206,7 @@ impl ::buffa::Message for UpdateAgentRequest {
         self.name = ::core::option::Option::None;
         self.capabilities = ::buffa::MessageField::none();
         self.concurrency_policy = ::core::option::Option::None;
+        self.description = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

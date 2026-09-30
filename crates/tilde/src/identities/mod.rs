@@ -37,14 +37,7 @@ impl Identities {
             .map_err(failure)?
             .ok_or_else(|| ConnectError::not_found("Identity not found"))
     }
-    /// `authorize` runs once the target chat provider is known and before anything is written.
-    pub async fn create(
-        &self,
-        request: wire::CreateIdentityRequest,
-        actor: &crate::iam::authz::Access,
-        authorize: impl AsyncFnOnce(Option<Uuid>) -> Result<()>,
-    ) -> Result<wire::Identity> {
-        let (user, key) = (actor.user, actor.api_key);
+    pub async fn create(&self, request: wire::CreateIdentityRequest) -> Result<wire::Identity> {
         let root = request
             .root_identity_id
             .as_deref()
@@ -99,7 +92,6 @@ impl Identities {
         } else {
             None
         };
-        authorize(connection).await?;
         let identity = if let Some(connection) = connection {
             crate::connections::db::connection_lock_execute(&tx, &connection.to_string())
                 .await
@@ -189,7 +181,7 @@ impl Identities {
             db::link(&tx, id, Some(root)).await.map_err(failure)?;
         }
         if request.skip_verification {
-            db::attest(&tx, id, user, key).await.map_err(failure)?;
+            db::attest(&tx, id).await.map_err(failure)?;
         }
         let result = Self::read(&tx, id).await?;
         tx.commit()

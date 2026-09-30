@@ -17,6 +17,7 @@ async fn create(agents: &Agents) -> Uuid {
     let id = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             capabilities: Default::default(),
             id,
@@ -175,6 +176,7 @@ async fn a_dialled_in_host_is_sampled_healthy_until_its_stream_closes() {
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await
@@ -317,5 +319,188 @@ async fn registry_metrics_count_sessions_and_measure_first_visible_reply() {
     assert_eq!(after[&agent].average_turns_per_thread, Some(0.5));
     let expected = (first - started).num_microseconds().unwrap() as f64 / 1000.0;
     assert!((after[&agent].average_response_ms.unwrap() - expected).abs() < 0.01);
+    db.close().await;
+}
+
+/// Descriptions are stored, patched and searched; registry filters apply before the keyset
+/// page so a filtered listing pages through every match and nothing else.
+#[tokio::test]
+async fn registry_search_covers_descriptions_and_health_filters_apply_before_paging() {
+    use tilde::agent::{AgentFilter, UpdateAgent};
+    let db = common::Database::new().await;
+    let encryption = Arc::new(
+        Encryption::initialize(&db.pool, common::seed(5))
+            .await
+            .unwrap(),
+    );
+    let agents = Agents::new(db.pool.clone(), encryption);
+    let mut ids = Vec::new();
+    for (name, description) in [
+        ("Alpha", "Triages Billing tickets"),
+        ("Beta", "Writes release notes"),
+        ("Gamma", "billing reconciliation"),
+        ("Delta", ""),
+        ("Epsilon", ""),
+    ] {
+        let id = Uuid::new_v4();
+        let created = agents
+            .create(CreateAgent {
+                description: format!("  {description} "),
+                concurrency_policy: Default::default(),
+                capabilities: Default::default(),
+                id,
+                name: name.into(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(created.description, description);
+        ids.push(id);
+    }
+    let [alpha, beta, gamma, delta, epsilon] = ids[..] else {
+        unreachable!()
+    };
+    // A create retry must carry the registration it retries, description included.
+    assert!(matches!(
+        agents
+            .create(CreateAgent {
+                description: "Something else".into(),
+                concurrency_policy: Default::default(),
+                capabilities: Default::default(),
+                id: alpha,
+                name: "Alpha".into(),
+            })
+            .await,
+        Err(tilde::error::Error::Conflict)
+    ));
+    let updated = agents
+        .update(UpdateAgent {
+            description: Some("Answers BILLING disputes".into()),
+            concurrency_policy: None,
+            capabilities: None,
+            id: beta,
+            name: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        (updated.name.as_str(), updated.description.as_str()),
+        ("Beta", "Answers BILLING disputes")
+    );
+    let renamed = agents
+        .update(UpdateAgent {
+            description: None,
+            concurrency_policy: None,
+            capabilities: None,
+            id: beta,
+            name: Some("Beta".into()),
+        })
+        .await
+        .unwrap();
+    assert_eq!(renamed.description, "Answers BILLING disputes");
+    assert!(
+        agents
+            .update(UpdateAgent {
+                description: Some("x".repeat(501)),
+                concurrency_policy: None,
+                capabilities: None,
+                id: beta,
+                name: None,
+            })
+            .await
+            .is_err()
+    );
+
+    let client = db.pool.get().await.unwrap();
+    let observe = async |id: Uuid, at: chrono::DateTime<Utc>, healthy: bool, degraded: bool| {
+        client
+            .execute(
+                include_str!("../../../queries/_tests/health_observation.sql"),
+                &[&id, &at, &healthy, &degraded],
+            )
+            .await
+            .unwrap();
+    };
+    let now = Utc::now();
+    // An older unhealthy sample must not win over the latest one.
+    observe(alpha, now - Duration::seconds(20), false, false).await;
+    observe(alpha, now, true, false).await;
+    observe(beta, now, true, true).await;
+    observe(gamma, now, false, false).await;
+    observe(delta, now - Duration::seconds(120), true, false).await;
+    agents.pause(epsilon).await.unwrap();
+
+    let list = async |filter: AgentFilter<'_>, size: u32, token: &str| {
+        let page = agents.list_filtered(size, token, &filter).await.unwrap();
+        (
+            page.agents.iter().map(|a| a.id).collect::<Vec<_>>(),
+            page.next_page_token,
+        )
+    };
+    let health = |status| AgentFilter {
+        health: Some(status),
+        ..Default::default()
+    };
+    assert_eq!(
+        list(health(AgentHealthStatus::Healthy), 10, "").await.0,
+        [alpha]
+    );
+    assert_eq!(
+        list(health(AgentHealthStatus::Degraded), 10, "").await.0,
+        [beta]
+    );
+    assert_eq!(
+        list(health(AgentHealthStatus::Unhealthy), 10, "").await.0,
+        [gamma]
+    );
+    assert_eq!(
+        list(health(AgentHealthStatus::Unknown), 10, "").await.0,
+        [epsilon, delta]
+    );
+    assert_eq!(
+        list(
+            AgentFilter {
+                paused: Some(false),
+                ..health(AgentHealthStatus::Unknown)
+            },
+            10,
+            ""
+        )
+        .await
+        .0,
+        [delta]
+    );
+    assert_eq!(
+        list(
+            AgentFilter {
+                paused: Some(true),
+                ..Default::default()
+            },
+            10,
+            ""
+        )
+        .await
+        .0,
+        [epsilon]
+    );
+    // Newest first; Beta only matches on its updated description.
+    let billing = || AgentFilter {
+        search: "billing",
+        ..Default::default()
+    };
+    let (first, token) = list(billing(), 2, "").await;
+    assert_eq!(first, [gamma, beta]);
+    let (second, last) = list(billing(), 2, &token).await;
+    assert_eq!((second, last.as_str()), (vec![alpha], ""));
+    let (unhealthy_billing, _) = list(
+        AgentFilter {
+            search: "billing",
+            health: Some(AgentHealthStatus::Unhealthy),
+            paused: None,
+        },
+        1,
+        "",
+    )
+    .await;
+    assert_eq!(unhealthy_billing, [gamma]);
     db.close().await;
 }

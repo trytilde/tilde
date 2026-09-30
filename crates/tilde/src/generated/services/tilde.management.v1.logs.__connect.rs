@@ -1,13 +1,3 @@
-///Shorthand for `OwnedView<GetLogsStatusRequestView<'static>>`.
-pub type OwnedGetLogsStatusRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusRequestView<'static>,
->;
-///Shorthand for `OwnedView<GetLogsStatusResponseView<'static>>`.
-pub type OwnedGetLogsStatusResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusResponseView<
-        'static,
-    >,
->;
 ///Shorthand for `OwnedView<GetLogMetricsRequestView<'static>>`.
 pub type OwnedGetLogMetricsRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::GetLogMetricsRequestView<'static>,
@@ -26,42 +16,6 @@ pub type OwnedListLogsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListLogsResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::ListLogsResponseView<'static>,
 >;
-impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetLogsStatusResponse>
-for crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetLogsStatusResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusResponseView<
-        'static,
-    >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetLogMetricsResponse>
 for crate::proto::tilde::management::v1::__buffa::view::GetLogMetricsResponseView<'_> {
     fn encode(
@@ -134,12 +88,6 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const LOGS_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.LogsService";
-/// Static [`Spec`](::connectrpc::Spec) for the `GetLogsStatus` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const LOGS_SERVICE_GET_LOGS_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.management.v1.LogsService/GetLogsStatus",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the `GetLogMetrics` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const LOGS_SERVICE_GET_LOG_METRICS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.LogsService/GetLogMetrics",
@@ -203,29 +151,6 @@ pub const LOGS_SERVICE_LIST_LOGS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait LogsService: Send + Sync + 'static {
-    /// Handle the GetLogsStatus RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn get_logs_status<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::management::v1::GetLogsStatusRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::management::v1::GetLogsStatusResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
     /// Handle the GetLogMetrics RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -304,35 +229,6 @@ impl<S: LogsService> LogsServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
-            .route_view_idempotent(
-                LOGS_SERVICE_SERVICE_NAME,
-                "GetLogsStatus",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::management::v1::GetLogsStatusRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_logs_status(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::management::v1::GetLogsStatusResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(LOGS_SERVICE_GET_LOGS_STATUS_SPEC)
             .route_view_idempotent(
                 LOGS_SERVICE_SERVICE_NAME,
                 "GetLogMetrics",
@@ -445,12 +341,6 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("tilde.management.v1.LogsService/")?;
         match method {
-            "GetLogsStatus" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
-                        .with_spec(LOGS_SERVICE_GET_LOGS_STATUS_SPEC),
-                )
-            }
             "GetLogMetrics" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -478,28 +368,6 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "GetLogsStatus" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::management::v1::GetLogsStatusRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::management::v1::GetLogsStatusRequest,
-                    >::from_parts(&req, &body);
-                    svc.get_logs_status(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::management::v1::GetLogsStatusResponse,
-                        >(format)
-                })
-            }
             "GetLogMetrics" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -611,7 +479,7 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = LogsServiceClient::new(conn, config);
-/// let response = client.get_logs_status(request).await?;
+/// let response = client.get_log_metrics(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -623,7 +491,7 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = LogsServiceClient::new(http, config);
-/// let response = client.get_logs_status(request).await?;
+/// let response = client.get_log_metrics(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -633,7 +501,7 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.get_logs_status(request).await?;
+/// let resp = client.get_log_metrics(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -641,7 +509,7 @@ impl<T: LogsService> ::connectrpc::Dispatcher for LogsServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.get_logs_status(request).await?.into_owned();
+/// let owned = client.get_log_metrics(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -671,51 +539,6 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
-    }
-    /// Call the GetLogsStatus RPC. Sends a request to /tilde.management.v1.LogsService/GetLogsStatus.
-    pub async fn get_logs_status(
-        &self,
-        request: crate::proto::tilde::management::v1::GetLogsStatusRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.get_logs_status_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the GetLogsStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_logs_status_with_options(
-        &self,
-        request: crate::proto::tilde::management::v1::GetLogsStatusRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::management::v1::__buffa::view::GetLogsStatusResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                LOGS_SERVICE_GET_LOGS_STATUS_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
     }
     /// Call the GetLogMetrics RPC. Sends a request to /tilde.management.v1.LogsService/GetLogMetrics.
     pub async fn get_log_metrics(

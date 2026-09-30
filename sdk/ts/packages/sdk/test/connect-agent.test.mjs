@@ -5,7 +5,13 @@ import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
-import { connectAgent, RuntimeChatService, RunService } from "../dist/index.js";
+import {
+  auditToolCall,
+  connectAgent,
+  RuntimeChatService,
+  RunService,
+  ToolDisplay,
+} from "../dist/index.js";
 import {
   InvocationControlService,
   InvocationCommandKind as Kind,
@@ -30,6 +36,10 @@ void test(
     const watches = [];
     const heartbeats = [];
     const reports = [];
+    const bundledRegistrations = [];
+    const toolReports = [];
+    const executions = [];
+    const serverToolCalls = [];
     const sessions = new Set();
     let port;
     const gateway = createServer(
@@ -81,7 +91,29 @@ void test(
           });
           router.service(RuntimeChatService, {
             async listTools() {
-              return { tools: [] };
+              return {
+                tools: [
+                  {
+                    name: "tools.execute",
+                    providerId: "tilde",
+                    description: "Call a tool found with tools.search.",
+                    inputSchemaJson: "{}",
+                  },
+                ],
+              };
+            },
+            async invokeTool(requests) {
+              for await (const frame of requests)
+                serverToolCalls.push([frame.name, JSON.parse(frame.inputJson)]);
+              return { outputJson: JSON.stringify({ routed: true }) };
+            },
+            async registerBundledTools(request) {
+              bundledRegistrations.push(request.tools);
+              return {};
+            },
+            async reportToolCall(request) {
+              toolReports.push(request.toolCall);
+              return {};
             },
           });
           router.service(InvocationControlService, {
@@ -116,6 +148,56 @@ void test(
       onRegistered: (registration) => registrations.push(registration),
       async run(ctx) {
         contexts.push(ctx);
+        // The agent's bundled tool, found by search elsewhere and run here through tools.execute.
+        // Framework adapters publish it with an executor that runs their audited native tool.
+        const readFile = {
+          name: "read_file",
+          description: "Read a file from the workspace.",
+          summary: "Read a file",
+          display: "summary",
+          inputSchema: { type: "object", properties: { path: { type: "string" } } },
+          outputSchema: { type: "object", properties: { text: { type: "string" } } },
+          annotations: { readOnly: true, destructive: false, idempotent: true, openWorld: false },
+          execute: (input, execution) => {
+            executions.push(execution);
+            return auditToolCall(
+              ctx,
+              {
+                ...execution,
+                name: "read_file",
+                input,
+                summary: "Read a file",
+                display: "summary",
+              },
+              async () => ({ text: `contents of ${input.path}` }),
+            );
+          },
+        };
+        await ctx.setBundledTools([readFile]);
+        await assert.rejects(
+          ctx.setBundledTools([{ ...readFile, name: "tools.run" }]),
+          /conflicts/,
+        );
+        await assert.rejects(ctx.setBundledTools([{ ...readFile, name: "stop" }]), /conflicts/);
+        // The framework already holds its native tool: the bundled tool is not offered again.
+        assert(!("read_file" in ctx.agentTools));
+        assert(!("read_file" in ctx.tools));
+        assert.deepEqual(
+          await ctx.tools["tools.execute"].execute(
+            { name: "read_file", input: { path: "a.txt" } },
+            { toolCallId: "call-1", frameworkContext: "framework state" },
+          ),
+          { text: "contents of a.txt" },
+        );
+        // Removing the last bundled tool drops its executor: tools.execute goes to Tilde.
+        await ctx.setBundledTools([]);
+        assert.deepEqual(
+          await ctx.tools["tools.execute"].execute(
+            { name: "read_file", input: { path: "b.txt" } },
+            { toolCallId: "call-2" },
+          ),
+          { routed: true },
+        );
         await ctx.reason("thinking");
         await ctx.reason(" harder");
       },
@@ -143,6 +225,34 @@ void test(
     assert.equal(contexts[0].invocationId, wake.invocationId);
     assert.equal(contexts[0].threadId, wake.threadId);
     assert.equal(contexts[0].objective, "Say hello");
+    // Registered on every invocation, then again with the agent's bundled tools, metadata
+    // included, and again without them. SDK helpers such as stop are not bundled tools.
+    assert.equal(bundledRegistrations.length, 3);
+    assert.deepEqual(bundledRegistrations[0], []);
+    assert.deepEqual(bundledRegistrations[2], []);
+    assert.deepEqual(serverToolCalls, [
+      ["tools.execute", { name: "read_file", input: { path: "b.txt" } }],
+    ]);
+    assert.deepEqual(
+      bundledRegistrations[1].map((t) => t.name),
+      ["read_file"],
+    );
+    const readFile = bundledRegistrations[1][0];
+    assert.equal(readFile.display, ToolDisplay.SUMMARY);
+    assert.equal(readFile.summary, "Read a file");
+    assert.deepEqual(JSON.parse(readFile.outputSchemaJson).properties.text, { type: "string" });
+    assert.equal(readFile.annotations.readOnly, true);
+    // The routed call reaches the executor with the framework's state and is audited once, as
+    // the bundled tool with its summary, not as Tilde's tools.execute.
+    assert.deepEqual(executions, [{ toolCallId: "call-1", frameworkContext: "framework state" }]);
+    assert.deepEqual(
+      toolReports.map((c) => [c.name, c.status, c.summary, c.display]),
+      [
+        ["read_file", "running", "Read a file", ToolDisplay.SUMMARY],
+        ["read_file", "completed", "Read a file", ToolDisplay.SUMMARY],
+      ],
+    );
+    assert.deepEqual(JSON.parse(toolReports[1].outputJson), { text: "contents of a.txt" });
     assert(reports.every((r) => r.invocationId === wake.invocationId));
     assert(reports.every((r) => r.authorization === `Bearer ${wake.capability}`));
     assert.deepEqual(

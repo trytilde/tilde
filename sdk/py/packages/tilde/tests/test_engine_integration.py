@@ -16,7 +16,6 @@ import uuid
 from pathlib import Path
 
 import pytest
-from oidc import Oidc, login_management
 
 from tilde import (
     AgentContext,
@@ -24,10 +23,12 @@ from tilde import (
     create_management_client,
     create_tilde_chat_client,
 )
+from tilde.management.v1.access_pb2 import ListChannelAccessRequest, SetChannelAccessRequest
 from tilde.management.v1.agents_pb2 import CreateAgentRequest
 from tilde.management.v1.deployments_pb2 import RegisterDeploymentRequest
 from tilde.management.v1.tilde_chat_pb2 import GetCredentialsRequest
 from tilde.provider.tilde.v1 import chat_pb2 as provider_chat
+from tilde.types.v1.access_pb2 import CHANNEL_ACCESS_MODE_PUBLIC
 from tilde.types.v1.agent_pb2 import (
     BINARY_PERMISSION_YES,
     TARGET_SELECTION_ALL,
@@ -43,10 +44,9 @@ if not os.environ.get("TEST_DATABASE_URL") or not binary.is_file():
     pytest.skip("requires scripts/with-postgres.sh and ENGINE_TEST_BINARY", allow_module_level=True)
 
 
-async def start_engine(oidc: Oidc) -> tuple[asyncio.subprocess.Process, str]:
+async def start_engine() -> tuple[asyncio.subprocess.Process, str]:
     env = {
         **os.environ,
-        **oidc.env,
         "DATABASE_URL": os.environ["TEST_DATABASE_URL"],
         "ENGINE_ENCRYPTION_BACKEND": "seed",
         "ENGINE_ENCRYPTION_KEY": base64.b64encode(secrets.token_bytes(32)).decode(),
@@ -100,9 +100,7 @@ async def test_python_host_serves_a_real_invocation(served):
 
 
 async def _exercise():
-    oidc = Oidc()
-    await oidc.start()
-    process, url = await start_engine(oidc)
+    process, url = await start_engine()
     connected = None
     try:
         seen: dict[str, object] = {}
@@ -136,8 +134,7 @@ async def _exercise():
             finally:
                 finished.set()
 
-        token = await login_management(url)
-        tilde = create_management_client(url, token)
+        tilde = create_management_client(url)
         agent = (
             await tilde.agents.create_agent(
                 CreateAgentRequest(
@@ -171,6 +168,18 @@ async def _exercise():
         # Management provisions credentials; chat operations use the Tilde chat provider.
         credentials = await tilde.tilde_chat.get_credentials(
             GetCredentialsRequest(agent_id=agent.id)
+        )
+        # The Tilde channel starts private; open it so the application's identities are admitted.
+        routes = (
+            await tilde.access.list_channel_access(ListChannelAccessRequest(agent_id=agent.id))
+        ).routes
+        tilde_route = next(route for route in routes if route.provider_id == "tilde")
+        await tilde.access.set_channel_access(
+            SetChannelAccessRequest(
+                agent_id=agent.id,
+                connection_id=tilde_route.connection_id,
+                mode=CHANNEL_ACCESS_MODE_PUBLIC,
+            )
         )
         chat = create_tilde_chat_client(
             url, agent.id, api_key=credentials.api_key, identity="alice"
@@ -226,4 +235,3 @@ async def _exercise():
             await connected.close()
         process.terminate()
         await asyncio.wait_for(process.wait(), 10)
-        await oidc.stop()

@@ -29,8 +29,8 @@ on `@trytilde/sdk`:
 import { createManagementClient, createTildeChatClient, management, BinaryPermission, TargetSelection } from '@trytilde/sdk';
 import { randomUUID } from 'node:crypto';
 
-// An OIDC management session or a management API key.
-const tilde = createManagementClient({ baseUrl: 'http://127.0.0.1:8080', accessToken: process.env.TILDE_ACCESS_TOKEN! });
+// Open-source Tilde needs no credential; on Tilde Cloud pass accessToken: process.env.TILDE_API_KEY.
+const tilde = createManagementClient({ baseUrl: 'http://127.0.0.1:8080' });
 const { agent } = await tilde.agents.createAgent({
   capabilities: {
     toolsInvoke: { mode: TargetSelection.SELECTED, ids: ['sendMessage'] },
@@ -144,7 +144,36 @@ Provider tool `execute(input, { toolCallId })` sends completed input over the
 client-streaming `tilde.runtime.v1.ChatService.InvokeTool` RPC. For incremental input, call
 `tool.stream(input, chunks, { toolCallId })`; its chunk format is declared by the
 provider's `chunkSchema`. Framework adapters must supply chunks explicitly:
-registering a local tool does not automatically stream model tokens.
+registering a bundled tool does not automatically stream model tokens.
+
+The agent's bundled tools are the tools it defines in its own code, written the framework's
+way (`tool()` from `ai`, `@langchain/core/tools` or `@openai/agents`, Mastra's `createTool`).
+Each framework adapter has one helper, `withTildeTools(ctx, tools, options?)`, returning the
+framework's own tool collection: the current channel's tools, `context.agentTools` (tool
+sources, Tilde's built-in tools such as `tools.search`, and personal tools) and the native
+tools wrapped for auditing. It publishes the native tools to Tilde for the invocation, so
+`tools.search`/`tools.schemas` describe them (with their summary, JSON schemas and annotations)
+and a `tools.execute` naming one runs it in this process. Every call is audited once, with the
+model's call ID and the tool's summary; `display` (`"full"`, `"summary"` or `"hidden"`) sets how
+calls show in end-user chats, while traces keep full detail. The agent's Tools tab shows the
+latest published set read-only. Tilde metadata comes from the framework's own metadata where it
+has one (see each adapter's README) and `options`, keyed by tool name, overrides it.
+
+```ts
+import { tool } from "ai";
+import { z } from "zod";
+import { withTildeTools } from "@trytilde/sdk-vercel-ai-node";
+
+const tools = await withTildeTools(context, {
+  read_file: tool({
+    description: "Read a file from the workspace.",
+    inputSchema: z.object({ path: z.string() }),
+    metadata: { tilde: { summary: "Read a file" } },
+    execute: async ({ path }) => ({ text: await readFile(path, "utf8") }),
+  }),
+});
+await generateText({ model, tools, messages });
+```
 
 ```ts
 const send = context.tools.sendMessage;
@@ -168,8 +197,7 @@ agent host and Tilde's runtime listener.
 The outbound `Watch` connection is authenticated by the deployment token. Each wake
 carries a signed five-minute connect token for callbacks, binding the invocation, agent,
 run, thread, participant and permissions. It remains valid until expiry; inactive
-invocations cannot renew it. Neither token appears in thread history. Management APIs
-use OIDC-derived user sessions.
+invocations cannot renew it. Neither token appears in thread history.
 
 ## Validation
 
@@ -184,13 +212,12 @@ This exercises actual Rust/Node ConnectRPC against disposable Postgres, includin
 partial streams, reasoning separation, scoped goals/tasks, dependencies,
 stop/resume, steering, cancellation and all three thread topologies.
 
-## IAM
+## Management access
 
-Management clients require a management API key or a bearer token obtained through the installation's
-OIDC login: `createManagementClient({baseUrl: managementUrl, accessToken})`. Users are
-authorized per resource through groups and grants (`client.iam`). A management API key is granted view or edit on selected
-agents and connections, or all of a kind, in the same way. The browser UI handles login and stores its token in
-local storage. `ManagementClient` has no chat service. Native conversation operations
+Open-source Tilde's management API and web UI are unauthenticated: put your own proxy in front
+of them. `accessToken` is therefore optional; it is sent as a bearer token when given, which
+Tilde Cloud requires (a management API key):
+`createManagementClient({baseUrl: managementUrl, accessToken})`. `ManagementClient` has no chat service. Native conversation operations
 use `createTildeChatClient` (also exported from `@trytilde/sdk/tilde-chat`) and the
 `tilde.provider.tilde.v1.ChatService` ConnectRPC contract, served at
 `/agents/{agentId}/tilde.provider.tilde.v1.ChatService/{method}` on ingress.
@@ -199,7 +226,7 @@ Application chat uses an agent-scoped API key from the Chat Providers → Tilde 
 to a canonical User within that agent; Tilde filters session lists/searches and checks
 membership on every operation. `CreateUser` with an identity scope resolves the caller,
 rather than allocating an unrelated identity. Keys can be rotated with
-`tilde.tildeChat.rotateCredentials`. Management login and runtime tokens do not authorize
+`tilde.tildeChat.rotateCredentials`. Management credentials and runtime tokens do not authorize
 provider calls. `baseUrlOverride` replaces the complete provider service base URL.
 
 `DeploymentService.IssueIngressToken` remains available to privileged operator/internal
@@ -448,6 +475,70 @@ or `channel.provider(providerId)`. `convertToAiSdkTools` in the Vercel adapter
 turns these provider descriptors into model tools and permits instruction overrides.
 There is no generic `message.reply` projection of returned model text.
 
+## Prompts and skills
+
+Prompts and skills ship with a deployment. `tilde deploy` (the `tilde` bin of
+`@trytilde/sdk`) imports the agent's entry module with `TILDE_DISCOVERY=1`, under which
+`connectAgent` and `createLambdaHandler` start nothing, and registers what its exports
+declare: `definePrompt`, `defineSkills` and `defineSkill` values, and framework objects an
+installed adapter recognises (`@trytilde/sdk-mastra-node` reads Mastra agents' instructions and
+skills, `@trytilde/sdk-vercel-ai-node` AI SDK `ToolLoopAgent` instructions). Exports are scanned
+one level into plain objects and arrays. An adapter may also export `discoverProject(dir)` for
+frameworks defined by files (Vercel's eve `agent/` folder), called for the entry's package root
+and the working directory.
+
+```ts
+export const triage = definePrompt("triage", {
+  template: "You triage requests for {{product}}.\n{{> tone}}",
+  sections: { tone: "Be direct and warm." },
+  config: { model: "gpt-5", temperature: 0.2 },
+});
+export const skills = defineSkills({ dir: new URL("../skills", import.meta.url) });
+export const refunds = defineSkill({ name: "refunds", description: "…", instructions: "…" });
+```
+
+```sh
+TOKEN=$(npx tilde deploy dist/index.js)             # TILDE_URL, TILDE_AGENT_ID (+ TILDE_API_KEY on Tilde Cloud)
+npx tilde deploy dist/index.js --dry-run            # the declarations as JSON; contacts nothing
+```
+
+Flags: `[ENTRY] --agent-id --url --api-key --target gateway|sidecar|lambda --function-arn
+--external-id --label --dry-run --json`. ENTRY defaults to package.json `main`. Point it at
+built JavaScript; a `.ts` entry only loads when Node's type stripping can run it as is. Text
+files up to 256 KiB travel inline, other skill files are uploaded first by digest. The
+same name with different content is an error; stdout carries only the token (`--json`
+prints `{deploymentId, token, created}`).
+
+In `run(ctx)`, `ctx.prompt(triage).render(vars)` (or `triage.render(vars)` inside an
+invocation) inlines sections, substitutes variables (a missing one throws) and marks the
+version active: this invocation's inference calls then carry `x-tilde-prompt:
+name@hash[, name@hash…]`, which the gateway strips and records. Pass `{ prompt }` to
+`ctx.inference(slug, …)` to stamp one prompt, or `{ prompt: null }` for none.
+
+Model clients built at module scope (framework agents) use `inference(slug)` from
+`@trytilde/sdk` in place of `ctx.inference(slug)`: its requests go through the invocation
+running when they are made, and fail outside one. `runWithContext(ctx, fn)` enters an
+invocation for tests and custom hosts.
+
+Skills are grouped into skill sources (a Tilde catalog group, a GitHub repository or an
+editor collection) and an agent is given whole sources, single skills, or the skills linked
+to a connection it holds. `ctx.skills.list()` returns each skill's name, source, description
+and files; `read(name, path?)` returns a text file inline or a short-lived `downloadUrl` for
+anything else (`source/name` when two sources share a name); `summary()` renders a block for
+a system prompt and `materialize(dir)` writes every skill under `dir/<name>/` for harnesses
+that load skills from disk. Each skill says whether the deployment shipped it (`deployed`, its
+files already beside the code). `directory()` keeps the others, those assigned in the registry
+that reach running deployments with no redeploy, in `$TILDE_SKILLS_DIR` (the OS temp directory by
+default) `/tilde-skills/<agent id>/`: the engine pushes the invocation's skills and versions with
+each wake, and only new and newer versions are downloaded and removed skills deleted; framework helpers hand it to the framework's
+own skills. For frameworks without skills, `tools()` returns `list_skills` and `read_skill` as
+Tilde tools to convert like channel tools, alongside `summary()` in the instructions. With `agents.read` these accept another agent's id. With
+`agents.edit_skills` an agent lists every source (`sources()`) and assigns or unassigns a
+source or skill (`assign({ source })`, `assign({ skill: "source/name" })`), itself included;
+with `skills.edit` on an editor source it writes skills into it (`write(source, name, files)`)
+and re-syncs git sources (`sync(source)`). `ctx.prompts.list(agentId?)` lists deployed
+prompt histories.
+
 ## Deployment execution types
 
 `RegisterDeployment` must specify `DeploymentTarget.GATEWAY`, `SIDECAR`, or `LAMBDA`.
@@ -463,7 +554,7 @@ registered deployment pin; routing edits do not move existing conversations.
 
 ### Management identities
 
-Use a server-side management key in the existing `accessToken` option. Provider IDs
+On Tilde Cloud, pass a server-side management key in the `accessToken` option. Provider IDs
 are `provider/account-name`, scoped to the supplied agent's chat assignments.
 
 ```ts
@@ -471,7 +562,7 @@ import { ManagementClient, management } from "@trytilde/sdk";
 
 const tilde = new ManagementClient({
   baseUrl: process.env.TILDE_URL!,
-  accessToken: process.env.TILDE_API_KEY!,
+  accessToken: process.env.TILDE_API_KEY, // Tilde Cloud only
 });
 
 const { identity } = await tilde.identities.createIdentity({
@@ -479,7 +570,7 @@ const { identity } = await tilde.identities.createIdentity({
   providerId: "agentmail/support",
   identityType: management.IdentityType.EMAIL,
   value: "dan@example.com",
-  skipVerification: true, // Record management attestation; does not grant agent access.
+  skipVerification: true, // Mark verified by management; does not grant agent access.
   createRoot: true,       // Optional; otherwise the root is absent by default.
 });
 

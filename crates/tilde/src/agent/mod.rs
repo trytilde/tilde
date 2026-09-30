@@ -35,6 +35,7 @@ pub struct Agent {
     pub capabilities: tokio_postgres::types::Json<crate::iam::capabilities::Capabilities>,
     pub id: Uuid,
     pub name: String,
+    pub description: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -44,12 +45,22 @@ pub struct CreateAgent {
     pub capabilities: crate::iam::capabilities::Capabilities,
     pub id: Uuid,
     pub name: String,
+    pub description: String,
 }
 pub struct UpdateAgent {
     pub concurrency_policy: Option<ConcurrencyPolicy>,
     pub capabilities: Option<crate::iam::capabilities::Capabilities>,
     pub id: Uuid,
     pub name: Option<String>,
+    pub description: Option<String>,
+}
+/// Server-side registry filters, applied before pagination.
+#[derive(Default)]
+pub struct AgentFilter<'a> {
+    /// Case-insensitive name or description substring, or an exact agent UUID.
+    pub search: &'a str,
+    pub health: Option<types::AgentHealthStatus>,
+    pub paused: Option<bool>,
 }
 pub struct AgentPage {
     pub agents: Vec<Agent>,
@@ -82,19 +93,12 @@ impl Agents {
     /// Caller-generated IDs make creation retryable without a second idempotency model.
     /// Retries must supply identical registration fields; conflicting
     /// input for an existing ID is rejected.
+    /// The agent row and its Tilde chat connection commit together: a failure leaves no agent
+    /// without its built-in channel.
     pub async fn create(&self, input: CreateAgent) -> Result<Agent, Error> {
-        self.create_as(input, None).await
-    }
-    /// The agent row, its system roles with the creator as owner, and the agent's Tilde chat
-    /// connection commit together: a failure leaves no ownerless agent and no agent without
-    /// its built-in channel.
-    pub async fn create_as(
-        &self,
-        input: CreateAgent,
-        creator: Option<&crate::iam::authz::Access>,
-    ) -> Result<Agent, Error> {
         input.capabilities.validate()?;
         let name = validate_name(&input.name)?;
+        let description = validate_description(&input.description)?;
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
         let inserted = crate::agent::db::create_opt(
@@ -104,16 +108,10 @@ impl Agents {
             input.concurrency_policy.as_str(),
             &(serde_json::to_value(&input.capabilities)
                 .map_err(|_| Error::Invalid("Invalid capabilities".into()))?),
+            &description,
         )
         .await?;
         if let Some(agent) = inserted {
-            // Engine-created agents (dev registration, sidecars) get their roles with no owner.
-            crate::iam::authz::create_roles(
-                &tx,
-                crate::iam::authz::Resource::agent(agent.id),
-                creator.unwrap_or(&crate::iam::authz::Access::system()),
-            )
-            .await?;
             crate::connections::catalog::tilde::create(
                 &tx,
                 &self.encryption,
@@ -131,6 +129,7 @@ impl Agents {
             .await?
             .ok_or(Error::NotFound)?;
         if current.name != name
+            || current.description != description
             || current.capabilities.0 != input.capabilities
             || current.concurrency_policy != input.concurrency_policy.as_str()
         {
@@ -144,6 +143,7 @@ impl Agents {
             capabilities: current.capabilities,
             id: current.id,
             name: current.name,
+            description: current.description,
             created_at: current.created_at,
             updated_at: current.updated_at,
         })
@@ -158,13 +158,8 @@ impl Agents {
 
     /// Bounded keyset pagination with timestamp/ID tie-breaking.
     pub async fn list(&self, page_size: u32, page_token: &str) -> Result<AgentPage, Error> {
-        self.list_filtered(
-            page_size,
-            page_token,
-            "",
-            &crate::iam::authz::Access::system(),
-        )
-        .await
+        self.list_filtered(page_size, page_token, &AgentFilter::default())
+            .await
     }
 
     /// Search is applied before pagination, so matches are not limited to the current page.
@@ -172,9 +167,16 @@ impl Agents {
         &self,
         page_size: u32,
         page_token: &str,
-        search: &str,
-        caller: &crate::iam::authz::Access,
+        filter: &AgentFilter<'_>,
     ) -> Result<AgentPage, Error> {
+        let health = match filter.health {
+            None | Some(types::AgentHealthStatus::Unspecified) => "",
+            Some(types::AgentHealthStatus::Healthy) => "healthy",
+            Some(types::AgentHealthStatus::Degraded) => "degraded",
+            Some(types::AgentHealthStatus::Unhealthy) => "unhealthy",
+            Some(types::AgentHealthStatus::Unknown) => "unknown",
+        };
+        let search = filter.search;
         if search.len() > 200 {
             return Err(Error::Invalid("Agent search is too long".into()));
         }
@@ -203,7 +205,9 @@ impl Agents {
             cursor.as_ref().map(|c| c.id),
             (size + 1) as i64,
             search.trim(),
-            caller,
+            health,
+            filter.paused,
+            Utc::now() - chrono::Duration::seconds(health::FRESH_SECS),
         )
         .await?;
         let more = agents.len() > size;
@@ -259,6 +263,11 @@ impl Agents {
             caps.validate()?;
         }
         let name = input.name.as_deref().map(validate_name).transpose()?;
+        let description = input
+            .description
+            .as_deref()
+            .map(validate_description)
+            .transpose()?;
         let updated = crate::agent::db::update_opt(
             &tx,
             input.id,
@@ -271,6 +280,7 @@ impl Agents {
                 .transpose()
                 .map_err(|_| Error::Invalid("Invalid capabilities".into()))?
                 .as_ref(),
+            description.as_deref(),
         )
         .await?
         .ok_or(Error::NotFound)?;
@@ -288,6 +298,15 @@ pub(crate) fn validate_name(name: &str) -> Result<String, Error> {
         ));
     }
     Ok(name.into())
+}
+fn validate_description(description: &str) -> Result<String, Error> {
+    let description = description.trim();
+    if description.chars().count() > 500 {
+        return Err(Error::Invalid(
+            "Agent description must be at most 500 characters".into(),
+        ));
+    }
+    Ok(description.into())
 }
 pub(crate) fn validate_endpoint(value: String) -> Result<String, Error> {
     if value.trim().is_empty() {

@@ -25,7 +25,24 @@ message ToolDefinition {
   string input_schema_json = 4;
   // Empty when this tool does not accept incremental input.
   string chunk_schema_json = 5;
+  // Empty when the provider does not describe its result.
+  string output_schema_json = 6;
+  ToolAnnotations annotations = 7;
+  // Short human-readable label shown in place of tool detail; empty falls back to the description.
+  string summary = 8;
+  // The call returns a ticket at once; its result arrives later as new input to the agent and
+  // can be read with `tools.result`.
+  bool detached = 9;
+  // How its calls appear in end-user chats (the Tilde chat stream); traces keep full detail.
+  ToolDisplay display = 10;
 }
+
+// How a tool call appears in end-user chats. FULL (and unspecified) shows its input and output,
+// SUMMARY only its summary and status, HIDDEN nothing. Admin traces always keep full detail.
+enum ToolDisplay { TOOL_DISPLAY_UNSPECIFIED = 0; TOOL_DISPLAY_FULL = 1; TOOL_DISPLAY_SUMMARY = 2; TOOL_DISPLAY_HIDDEN = 3; }
+
+// Hints, not guarantees: frameworks may use them to order, confirm or parallelise calls.
+message ToolAnnotations { bool read_only = 1; bool destructive = 2; bool idempotent = 3; bool open_world = 4; }
 
 message Typing { string participant_id = 1; bool typing = 2; google.protobuf.Timestamp expires_at = 3; }
 
@@ -35,6 +52,11 @@ message ToolCall {
  string id = 1; string name = 2; string provider_id = 3; string status = 4;
  string input_json = 5 [debug_redact = true]; string output_json = 6 [debug_redact = true];
  string error = 7; string input_delta = 8 [debug_redact = true];
+ // Set when the call starts; agent-local reports may supply their own.
+ string summary = 9;
+ bool detached = 10;
+ // Fixed when the call starts, like the summary.
+ ToolDisplay display = 11;
 }
 
 message ChannelBinding { string connection_id = 1; string provider_id = 2; string external_id = 3; }

@@ -8,8 +8,6 @@ license.workspace = true
 
 [features]
 default = []
-# Live services are opt-in; tests also stay ignored under --all-features.
-live-chat-tests = []
 embedded-web = ["dep:rust-embed", "dep:mime_guess"]
 
 [package.metadata.cargo-machete]
@@ -93,14 +91,7 @@ rust-embed = { version = "8.12", optional = true, features = [
 mime_guess = { version = "2", optional = true }
 
 [dev-dependencies]
+opentelemetry_sdk = { version = "0.32", features = ["trace", "testing"] }
 client-aws-config.workspace = true
 client-aws-sigv4.workspace = true
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-
-[[test]]
-name = "chat_providers_live"
-required-features = ["live-chat-tests"]
-
-[[test]]
-name = "chat_providers_two_way"
-required-features = ["live-chat-tests"]

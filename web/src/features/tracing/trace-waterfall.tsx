@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useWaterfallNavigation } from "./use-waterfall-navigation";
 import { observationKey } from "./records";
 import { number } from "./format";
+import { SkeletonLines } from "@/components/table-skeleton";
 
 /** Parent-first ordering keeps concurrent siblings on separate visual lanes. */
 function order(rows: Observation[]) {
@@ -191,7 +192,11 @@ export function TraceWaterfall({
   if (!spans.length)
     return (
       <div className="border-b p-4 text-xs text-muted-foreground">
-        {busy ? "Loading trace…" : "No timed observations recorded."}
+        {busy ? (
+          <SkeletonLines rows={4} label="Loading trace" />
+        ) : (
+          "No timed observations recorded."
+        )}
       </div>
     );
   return (

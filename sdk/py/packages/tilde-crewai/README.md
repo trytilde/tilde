@@ -5,21 +5,62 @@ CrewAI messages and channel tools to CrewAI tools, following Tilde's core/framew
 separation.
 
 ```python
+import tilde
 from crewai import LLM, Agent
-from tilde_crewai import convert_to_crewai_messages, convert_to_crewai_tools
+from crewai.project import CrewBase, agent
+from tilde_crewai import convert_to_crewai_messages, convert_to_crewai_tools, inference_interceptor
 
-history = await ctx.message.history()
-messages = await convert_to_crewai_messages(history.items, context=ctx)
-agent = Agent(
-    role="Support assistant",
-    goal="Respond using the current channel's tools.",
-    backstory="Returned model text is private; visible replies are channel tool calls.",
-    llm=LLM(model="openai/gpt-4o-mini"),
-    tools=convert_to_crewai_tools(ctx.channel.current),
-    max_iter=8,
+INFERENCE = tilde.inference("default")
+llm = LLM(
+    model="openai/gpt-4o-mini",
+    base_url=INFERENCE.base_url,
+    api_key=INFERENCE.api_key,
+    interceptor=inference_interceptor(INFERENCE),
 )
-await agent.kickoff_async(messages)
+
+
+@CrewBase
+class SupportCrew:
+    agents_config = "config/agents.yaml"  # role/goal/backstory, registered by `tilde deploy`
+
+    def __init__(self, tools):
+        self.tools = tools
+
+    @agent
+    def support(self) -> Agent:
+        return Agent(config=self.agents_config["support"], llm=llm, tools=self.tools, max_iter=8)
+
+
+async def run(ctx):
+    history = await ctx.message.history()
+    messages = await convert_to_crewai_messages(history.items, context=ctx)
+    await (
+        SupportCrew(convert_to_crewai_tools(ctx.channel.current)).support().kickoff_async(messages)
+    )
 ```
+
+## Deploy discovery, inference and steering
+
+This package registers a `tilde.discover` entry point, so `python -m tilde deploy` recognises
+`@CrewBase` classes (or instances) and reads their YAML raw, before CrewAI interpolates inputs:
+agent `role`/`goal`/`backstory` become prompts `agents/<key>/<field>` and task
+`description`/`expected_output` become `tasks/<key>/<field>`, in braces format when the text
+holds a `{variable}`, with origin `<yaml path>#<key>.<field>`. Skill search paths listed under
+an agent's `skills:` in the YAML are shipped too (resolved from the working directory, as CrewAI
+does); skills passed in code are not visible without instantiating, so declare them with
+`tilde.define_skills(...)` and pass `.path`. Agents built in code at module scope are reported
+as warnings.
+
+The LLM is built once at module scope: `inference_interceptor` stamps each request with the
+running invocation's token and prompt stamps and sends it to that invocation's gateway. Importing
+`tilde_crewai` registers a global `before_llm_call` hook that appends the invocation's newly
+steered input (`ctx.take_inputs()`) as user messages before each model call; outside an
+invocation it does nothing.
+
+Skills assigned to the agent in Tilde (not shipped with the deployment) reach running
+deployments through CrewAI's own skill discovery: give the per-invocation agent
+`skills=[SKILLS.path, Path(await ctx.skills.directory())]`. The directory holds one folder per
+registry skill, cached by version, so a skill assigned in the UI is used on the next invocation.
 
 Set `CREWAI_DISABLE_TELEMETRY=true` in the environment before `crewai` is imported to turn
 off CrewAI's anonymous telemetry. `OTEL_SDK_DISABLED=true` has the same effect but also
@@ -106,3 +147,34 @@ conflicts raise.
 The core SDK exposes typed callable tools on `ctx.channel.slack`, `github`, `agentmail`,
 `linq`, `whatsapp`, `telnyx_whatsapp`, and `native`. Use `ctx.channel.connections()` and
 `ctx.channel.for_connection(id)` when multiple connections use a provider.
+
+## Bundled tools
+
+The agent's own CrewAI tools join Tilde's with one call, on the invocation's event loop:
+
+```python
+from crewai.tools import tool
+from tilde import BundledOptions
+from tilde_crewai import with_tilde_tools
+
+
+@tool("roll_dice")
+def roll_dice(count: int = 1) -> list[int]:
+    """Roll six-sided dice."""
+    return [random.randint(1, 6) for _ in range(count)]
+
+
+tools = await with_tilde_tools(
+    ctx, [roll_dice], options={"roll_dice": BundledOptions(summary="Rolled dice")}
+)
+agent = Agent(role="Assistant", goal="Help", backstory="...", llm=llm, tools=tools)
+```
+
+`with_tilde_tools` returns the current channel's tools, `ctx.agent_tools` and a delegating tool
+per native tool that keeps its schemas, `result_as_answer`, usage limit, cache function and
+failure policy. The native tools are published to Tilde under the name CrewAI shows the model
+(`sanitize_tool_name`), so `tools.search` finds them and a `tools.execute` naming one runs it
+here. Every call is audited once on the event loop. CrewAI has no free metadata, so summaries
+come from `options`, keyed by the tool's own name. CrewAI never passes the model's tool-call id
+to tools, so direct calls are audited under a generated id; `tools.execute` calls are not counted
+towards the usage limit.

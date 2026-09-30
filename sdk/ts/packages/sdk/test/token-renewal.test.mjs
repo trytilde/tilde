@@ -35,6 +35,9 @@ test(
               reads.push(ctx.requestHeader.get("authorization"));
               return { tools: [] };
             },
+            async registerBundledTools() {
+              return {};
+            },
             async renewConnectToken(_, ctx) {
               renewals.push(ctx.requestHeader.get("authorization"));
               if (rejectRenewal) throw new ConnectError("Invocation stopped", Code.Unauthenticated);

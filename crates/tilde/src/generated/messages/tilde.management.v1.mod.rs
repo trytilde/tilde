@@ -2,14 +2,15 @@
 
 include!("tilde.management.v1.access.rs");
 include!("tilde.management.v1.agents.rs");
-include!("tilde.management.v1.api_keys.rs");
 include!("tilde.management.v1.connections.rs");
 include!("tilde.management.v1.deployments.rs");
-include!("tilde.management.v1.iam.rs");
 include!("tilde.management.v1.identities.rs");
 include!("tilde.management.v1.inference.rs");
 include!("tilde.management.v1.logs.rs");
+include!("tilde.management.v1.prompts.rs");
+include!("tilde.management.v1.skills.rs");
 include!("tilde.management.v1.tilde_chat.rs");
+include!("tilde.management.v1.tools.rs");
 include!("tilde.management.v1.tracing.rs");
 #[allow(
     non_camel_case_types,
@@ -30,15 +31,26 @@ pub mod __buffa {
         use super::*;
         include!("tilde.management.v1.access.__view.rs");
         include!("tilde.management.v1.agents.__view.rs");
-        include!("tilde.management.v1.api_keys.__view.rs");
         include!("tilde.management.v1.connections.__view.rs");
         include!("tilde.management.v1.deployments.__view.rs");
-        include!("tilde.management.v1.iam.__view.rs");
         include!("tilde.management.v1.identities.__view.rs");
         include!("tilde.management.v1.inference.__view.rs");
         include!("tilde.management.v1.logs.__view.rs");
+        include!("tilde.management.v1.prompts.__view.rs");
+        include!("tilde.management.v1.skills.__view.rs");
         include!("tilde.management.v1.tilde_chat.__view.rs");
+        include!("tilde.management.v1.tools.__view.rs");
         include!("tilde.management.v1.tracing.__view.rs");
+        pub mod oneof {
+            #[allow(unused_imports)]
+            use super::*;
+            include!("tilde.management.v1.deployments.__view_oneof.rs");
+        }
+    }
+    pub mod oneof {
+        #[allow(unused_imports)]
+        use super::*;
+        include!("tilde.management.v1.deployments.__oneof.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -68,13 +80,6 @@ pub mod __buffa {
         reg.register_json_any(super::__RESUME_AGENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPLOAD_AGENT_AVATAR_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPLOAD_AGENT_AVATAR_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__API_KEY_JSON_ANY);
-        reg.register_json_any(super::__CREATE_API_KEY_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CREATE_API_KEY_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_API_KEYS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_API_KEYS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_API_KEY_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_API_KEY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROVIDER_REQUEST_JSON_ANY);
@@ -100,6 +105,19 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_DEPLOYMENT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_DEPLOYMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__REGISTER_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_DECLARATIONS_JSON_ANY);
+        reg.register_json_any(super::__DECLARED_PROMPT_JSON_ANY);
+        reg.register_json_any(super::__DECLARED_TOOL_JSON_ANY);
+        reg.register_json_any(super::__DECLARED_SKILL_JSON_ANY);
+        reg.register_json_any(super::__DECLARED_SKILL_FILE_JSON_ANY);
+        reg.register_json_any(super::__MISSING_DEPLOYMENT_FILES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MISSING_DEPLOYMENT_FILES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_DEPLOYMENT_FILE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPLOAD_DEPLOYMENT_FILE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_CONTENTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_PROMPT_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_SKILL_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_CONTENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__REGISTER_DEPLOYMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__PROMOTE_DEPLOYMENT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__PROMOTE_DEPLOYMENT_RESPONSE_JSON_ANY);
@@ -112,39 +130,6 @@ pub mod __buffa {
         reg.register_json_any(super::__DEPLOYMENT_WEIGHT_JSON_ANY);
         reg.register_json_any(super::__SET_DEPLOYMENT_WEIGHTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_DEPLOYMENT_WEIGHTS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GROUP_JSON_ANY);
-        reg.register_json_any(super::__IAM_USER_JSON_ANY);
-        reg.register_json_any(super::__GROUP_MEMBER_JSON_ANY);
-        reg.register_json_any(super::__GET_CALLER_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_CALLER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_ACCESS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_ACCESS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_USERS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_USERS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_USER_SESSIONS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_USER_SESSIONS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__CREATE_GROUP_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__CREATE_GROUP_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_GROUPS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_GROUPS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_GROUP_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_GROUP_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__DELETE_GROUP_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__DELETE_GROUP_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_GROUP_MEMBERS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_GROUP_MEMBERS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__ADD_GROUP_MEMBER_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__ADD_GROUP_MEMBER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__REMOVE_GROUP_MEMBER_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REMOVE_GROUP_MEMBER_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_ROLES_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_ROLES_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_ROLE_ASSIGNMENTS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_ROLE_ASSIGNMENTS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__ASSIGN_ROLE_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__ASSIGN_ROLE_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_ROLE_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__REVOKE_ROLE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_JSON_ANY);
         reg.register_json_any(super::__ROOT_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__CREATE_IDENTITY_REQUEST_JSON_ANY);
@@ -174,8 +159,6 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_BUDGET_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_BUDGET_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DELETE_BUDGET_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_LOGS_STATUS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_LOGS_STATUS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LOG_FILTER_JSON_ANY);
         reg.register_json_any(super::__LIST_LOGS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LOG_ATTRIBUTE_JSON_ANY);
@@ -184,12 +167,101 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_LOG_METRICS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LOG_METRIC_BUCKET_JSON_ANY);
         reg.register_json_any(super::__GET_LOG_METRICS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_PROMPT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_PROMPT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_CATALOG_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CATALOG_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_CATALOG_GROUP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_CATALOG_GROUP_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILL_SOURCES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILL_SOURCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ENABLE_CATALOG_GROUP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ENABLE_CATALOG_GROUP_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ADD_GIT_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ADD_GIT_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_EDITOR_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_EDITOR_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SYNC_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SYNC_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_VERSION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_SKILL_VERSION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_SKILLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_SKILLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CONNECTION_SKILLS_JSON_ANY);
+        reg.register_json_any(super::__LINK_CONNECTION_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LINK_CONNECTION_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNLINK_CONNECTION_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNLINK_CONNECTION_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ASSIGN_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ASSIGN_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_SKILL_SOURCE_ENABLED_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_SKILL_SOURCE_ENABLED_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_SKILL_ENABLED_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_SKILL_ENABLED_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CREDENTIALS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_CREDENTIALS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ROTATE_CREDENTIALS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ROTATE_CREDENTIALS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_TRACING_STATUS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_TRACING_STATUS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TOOL_HOST_JSON_ANY);
+        reg.register_json_any(super::__LIST_TOOL_HOSTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_TOOL_HOSTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_TOOL_HOST_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_TOOL_HOST_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ROTATE_TOOL_HOST_TOKEN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ROTATE_TOOL_HOST_TOKEN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REFRESH_TOOL_HOST_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REFRESH_TOOL_HOST_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_TOOL_HOST_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_TOOL_HOST_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TOOL_SOURCE_JSON_ANY);
+        reg.register_json_any(super::__AGENT_TOOL_JSON_ANY);
+        reg.register_json_any(super::__PROVIDER_TOOL_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROVIDER_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROVIDER_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REFRESH_CONNECTION_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REFRESH_CONNECTION_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_TOOL_SOURCES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_TOOL_SOURCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ADD_TOOL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ADD_TOOL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_TOOL_MODE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_TOOL_MODE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_TOOL_MODE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_TOOL_MODE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_BUNDLED_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_BUNDLED_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_TOOL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_TOOL_SOURCE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_TOOL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_TOOL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_MCP_SERVER_HEALTH_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MCP_SERVER_HEALTH_JSON_ANY);
+        reg.register_json_any(super::__LIST_MCP_SERVER_HEALTH_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACE_OBJECT_URL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_TRACE_OBJECT_URL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__FILTER_CONDITION_JSON_ANY);
         reg.register_json_any(super::__OBSERVATION_FILTER_JSON_ANY);
         reg.register_json_any(super::__LIST_OBSERVATIONS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_TRACE_REQUEST_JSON_ANY);
@@ -310,34 +382,6 @@ pub use self::__buffa::view::UploadAgentAvatarResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::UploadAgentAvatarResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ApiKeyView;
-#[doc(inline)]
-pub use self::__buffa::view::ApiKeyOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateApiKeyRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateApiKeyRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateApiKeyResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateApiKeyResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListApiKeysRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListApiKeysRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListApiKeysResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListApiKeysResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeApiKeyRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeApiKeyRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeApiKeyResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeApiKeyResponseOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::ListProvidersRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListProvidersRequestOwnedView;
@@ -438,6 +482,58 @@ pub use self::__buffa::view::RegisterDeploymentRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::RegisterDeploymentRequestOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::DeploymentDeclarationsView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentDeclarationsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredPromptView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredPromptOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredToolView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredToolOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredSkillView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredSkillOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredSkillFileView;
+#[doc(inline)]
+pub use self::__buffa::view::DeclaredSkillFileOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MissingDeploymentFilesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MissingDeploymentFilesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MissingDeploymentFilesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MissingDeploymentFilesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadDeploymentFileRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadDeploymentFileRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadDeploymentFileResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UploadDeploymentFileResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentContentsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentContentsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentPromptView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentPromptOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentSkillView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentSkillOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentContentsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentContentsResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::RegisterDeploymentResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::RegisterDeploymentResponseOwnedView;
@@ -485,138 +581,6 @@ pub use self::__buffa::view::SetDeploymentWeightsRequestOwnedView;
 pub use self::__buffa::view::SetDeploymentWeightsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetDeploymentWeightsResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GroupView;
-#[doc(inline)]
-pub use self::__buffa::view::GroupOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::IamUserView;
-#[doc(inline)]
-pub use self::__buffa::view::IamUserOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GroupMemberView;
-#[doc(inline)]
-pub use self::__buffa::view::GroupMemberOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetCallerRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetCallerRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetCallerResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetCallerResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetAccessRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetAccessRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetAccessResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetAccessResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListUsersRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListUsersRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListUsersResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListUsersResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeUserSessionsRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeUserSessionsRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeUserSessionsResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeUserSessionsResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateGroupRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateGroupRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateGroupResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::CreateGroupResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupsRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupsRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupsResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupsResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetGroupRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetGroupRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetGroupResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetGroupResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::DeleteGroupRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::DeleteGroupRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::DeleteGroupResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::DeleteGroupResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupMembersRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupMembersRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupMembersResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListGroupMembersResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AddGroupMemberRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::AddGroupMemberRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AddGroupMemberResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::AddGroupMemberResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoveGroupMemberRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoveGroupMemberRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoveGroupMemberResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::RemoveGroupMemberResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRolesRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRolesRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRolesResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRolesResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRoleAssignmentsRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRoleAssignmentsRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRoleAssignmentsResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ListRoleAssignmentsResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AssignRoleRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::AssignRoleRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AssignRoleResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::AssignRoleResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeRoleRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeRoleRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeRoleResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::RevokeRoleResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::IdentityView;
 #[doc(inline)]
@@ -734,14 +698,6 @@ pub use self::__buffa::view::DeleteBudgetResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::DeleteBudgetResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetLogsStatusRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetLogsStatusRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetLogsStatusResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetLogsStatusResponseOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::LogFilterView;
 #[doc(inline)]
 pub use self::__buffa::view::LogFilterOwnedView;
@@ -774,6 +730,210 @@ pub use self::__buffa::view::GetLogMetricsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetLogMetricsResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::ListPromptsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPromptRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPromptRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPromptResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPromptResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListCatalogRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListCatalogRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListCatalogResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListCatalogResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCatalogGroupRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCatalogGroupRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCatalogGroupResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCatalogGroupResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EnableCatalogGroupRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::EnableCatalogGroupRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EnableCatalogGroupResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::EnableCatalogGroupResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AddGitSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AddGitSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AddGitSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AddGitSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateEditorSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateEditorSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateEditorSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateEditorSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillVersionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillVersionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillVersionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSkillVersionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentSkillsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentSkillsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentSkillsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentSkillsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionSkillsView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionSkillsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LinkConnectionSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::LinkConnectionSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LinkConnectionSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::LinkConnectionSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkConnectionSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkConnectionSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkConnectionSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkConnectionSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillSourceEnabledRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillSourceEnabledRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillSourceEnabledResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillSourceEnabledResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillEnabledRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillEnabledRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillEnabledResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSkillEnabledResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::GetCredentialsRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::GetCredentialsRequestOwnedView;
@@ -790,13 +950,165 @@ pub use self::__buffa::view::RotateCredentialsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::RotateCredentialsResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetTracingStatusRequestView;
+pub use self::__buffa::view::ToolHostView;
 #[doc(inline)]
-pub use self::__buffa::view::GetTracingStatusRequestOwnedView;
+pub use self::__buffa::view::ToolHostOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetTracingStatusResponseView;
+pub use self::__buffa::view::ListToolHostsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::GetTracingStatusResponseOwnedView;
+pub use self::__buffa::view::ListToolHostsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolHostsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolHostsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterToolHostRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterToolHostRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterToolHostResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterToolHostResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RotateToolHostTokenRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RotateToolHostTokenRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RotateToolHostTokenResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RotateToolHostTokenResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshToolHostRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshToolHostRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshToolHostResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshToolHostResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteToolHostRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteToolHostRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteToolHostResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteToolHostResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ToolSourceView;
+#[doc(inline)]
+pub use self::__buffa::view::ToolSourceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentToolView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentToolOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderToolView;
+#[doc(inline)]
+pub use self::__buffa::view::ProviderToolOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListProviderToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListProviderToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListProviderToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListProviderToolsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshConnectionToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshConnectionToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshConnectionToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RefreshConnectionToolsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolSourcesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolSourcesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolSourcesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListToolSourcesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AddToolSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AddToolSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AddToolSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AddToolSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetToolModeRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetToolModeRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetToolModeResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetToolModeResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetToolModeRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetToolModeRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetToolModeResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetToolModeResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListBundledToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListBundledToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListBundledToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListBundledToolsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveToolSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveToolSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveToolSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveToolSourceResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentToolRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentToolRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentToolResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentToolResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentToolRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentToolRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentToolResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentToolResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMcpServerHealthRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMcpServerHealthRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerHealthView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerHealthOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMcpServerHealthResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMcpServerHealthResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceObjectUrlRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceObjectUrlRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceObjectUrlResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTraceObjectUrlResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::FilterConditionView;
+#[doc(inline)]
+pub use self::__buffa::view::FilterConditionOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ObservationFilterView;
 #[doc(inline)]

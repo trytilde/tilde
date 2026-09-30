@@ -180,17 +180,24 @@ test("does not echo sensitive API error bodies or follow redirects", async (t) =
   }
 });
 
-test("invalid type, missing Lambda ARN, and missing credentials fail before registering", async (t) => {
+test("invalid type, missing Lambda ARN, and invalid rotation fail before registering", async (t) => {
   const server = await fixture(t, () => ({}));
   for (const overrides of [
     { INPUT_TYPE: "other" },
     { INPUT_TYPE: "lambda" },
-    { TILDE_API_KEY: "" },
     { "INPUT_ROTATE-EXISTING-TOKEN": "yes" },
   ]) {
     assert.equal((await run(t, server.url, overrides)).code, 1);
   }
   assert.equal(server.calls.length, 0);
+});
+
+test("without a management key (open-source Tilde) registration sends no authorization", async (t) => {
+  const server = await fixture(t, () => ({}));
+  const result = await run(t, server.url, { TILDE_API_KEY: "" });
+  assert.equal(result.code, 0, result.logs);
+  assert.equal(server.calls[0].headers.authorization, undefined);
+  assert.equal(result.outputs["deployment-token"], deploymentToken);
 });
 
 test("manual setup omits the token output on creation and idempotent retries", async (t) => {
@@ -224,4 +231,35 @@ test("manual setup rejects rotation and invalid output-token values before mutat
     assert.equal((await run(t, server.url, overrides)).code, 1);
   }
   assert.equal(server.calls.length, 0);
+});
+
+test("a deploy command registers instead of the action; its JSON result becomes the outputs", async (t) => {
+  const server = await fixture(t, () => ({}));
+  const dir = await mkdtemp(join(tmpdir(), "tilde-command-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const script = join(dir, "deploy.mjs");
+  // Stands in for `npx tilde deploy dist/index.js --json`.
+  await writeFile(
+    script,
+    `const e = process.env;
+process.stderr.write("tilde deploy: dist/index.js\\n");
+if (e.TILDE_URL !== ${JSON.stringify(server.url)} || e.TILDE_AGENT_ID !== ${JSON.stringify(agent)} || e.TILDE_API_KEY !== ${JSON.stringify(apiToken)} || e.GITHUB_RUN_ID !== "42") process.exit(3);
+process.stdout.write(JSON.stringify({ deploymentId: ${JSON.stringify(deployment)}, token: ${JSON.stringify(deploymentToken)}, created: true }) + "\\n");
+`,
+  );
+  const result = await run(t, server.url, {
+    INPUT_COMMAND: `${JSON.stringify(process.execPath)} ${JSON.stringify(script)}`,
+  });
+  assert.equal(result.code, 0, result.logs);
+  assert.equal(server.calls.length, 0);
+  assert.equal(result.outputs["deployment-id"], deployment);
+  assert.equal(result.outputs["deployment-token"], deploymentToken);
+  assert.equal(result.outputs.created, "true");
+  assert.ok(result.logs.includes("tilde deploy: dist/index.js"));
+
+  const failing = await run(t, server.url, {
+    INPUT_COMMAND: `${JSON.stringify(process.execPath)} -e "process.exit(2)"`,
+  });
+  assert.equal(failing.code, 1);
+  assert.ok(failing.logs.includes("command failed (exit 2)"));
 });

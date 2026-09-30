@@ -21,6 +21,7 @@ fn definition(provider: Provider) -> model::Provider {
         kind: model::ProviderKind::BuiltIn,
         categories: vec![CATEGORY_INFERENCE.into()],
         connection_types: vec![model::ConnectionType {
+            mcp: None,
             id: "api".into(),
             name: format!("{} API", provider.name()),
             credential_source: model::CredentialSource::Static {

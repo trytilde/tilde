@@ -12,7 +12,7 @@ import signal as os_signal
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from connectrpc.code import Code
 from connectrpc.errors import ConnectError
@@ -20,6 +20,7 @@ from google.protobuf.json_format import ParseDict
 from opentelemetry import context as otel_context
 
 from tilde._cancel import Cancellation, InvocationCancelled, StopLoop
+from tilde._invocation import current
 from tilde._transport import http_client
 from tilde.agent_host.v1.agent_pb2 import InvokeRequest
 from tilde.context import AgentContext
@@ -174,6 +175,8 @@ async def run_invocation(
 
     async def execution() -> None:
         nonlocal trace_failed, failure
+        # This task's context only: module-level tilde.inference(...) resolves this invocation.
+        current.set(context)
         try:
             await asyncio.shield(ready)
             await context.refresh_tools()
@@ -256,6 +259,22 @@ class ConnectedAgent:
         await self._watching
 
 
+def discovering() -> bool:
+    """``tilde deploy`` imports the entry module with ``TILDE_DISCOVERY=1``: hosts do nothing."""
+    return os.environ.get("TILDE_DISCOVERY") == "1"
+
+
+class _DiscoveryHost:
+    instance_id = ""
+    registration = None
+
+    async def close(self) -> None:
+        return None
+
+    async def wait(self) -> None:
+        return None
+
+
 def connect_agent(
     *,
     run: RunFn,
@@ -274,7 +293,10 @@ def connect_agent(
     ``TILDE_DEPLOYMENT_TOKEN``. Heartbeats every 3 seconds, carrying the result of ``ready``
     (not ready when it raises), and reconnects after 1 second whenever the stream ends, until
     ``close()``. The host exposes no inbound endpoint. Requires a running event loop.
+    Under ``TILDE_DISCOVERY=1`` it dials nothing and returns a host whose methods are no-ops.
     """
+    if discovering():
+        return cast(ConnectedAgent, _DiscoveryHost())
     gateway_url = gateway_url or os.environ.get("TILDE_GATEWAY_URL")
     deployment_token = deployment_token or os.environ.get("TILDE_DEPLOYMENT_TOKEN")
     if not gateway_url or not deployment_token:
@@ -397,6 +419,8 @@ def connect_agent(
 
 def run_connected_agent(**options: Any) -> None:
     """Blocking standalone host: ``connect_agent(**options)`` until SIGINT/SIGTERM, then close."""
+    if discovering():
+        return
 
     async def main() -> None:
         connected = connect_agent(**options)
@@ -424,6 +448,12 @@ def create_lambda_handler(
     there and logged rather than raised, so the platform does not retry an invocation that
     already ended.
     """
+    if discovering():
+
+        def unavailable(_event: Any, _context: Any = None) -> None:
+            raise RuntimeError("Lambda handlers do not run under TILDE_DISCOVERY=1")
+
+        return unavailable
     initialize_tracing(tracing == "existing")
     initialize_logging(logging == "existing", deployment_logging)
     options = InvocationOptions(

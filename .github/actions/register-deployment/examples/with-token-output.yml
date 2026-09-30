@@ -14,6 +14,7 @@ jobs:
         uses: ./.github/actions/register-deployment
         # External repos: trytilde/tilde/.github/actions/register-deployment@<full-commit-sha>
         env:
+          # Tilde Cloud only; open-source Tilde needs no key (an unset secret is empty).
           TILDE_API_KEY: ${{ secrets.TILDE_API_KEY }}
         with:
           url: ${{ vars.TILDE_URL }}

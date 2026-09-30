@@ -7,6 +7,10 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = ["trytilde", "openai-agents>=0.22,<1"]
 
+# `tilde deploy` reads module-level agents' instructions and skill folders through this.
+[project.entry-points."tilde.discover"]
+openai-agents = "tilde_openai_agents.discover:discover"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

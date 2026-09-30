@@ -857,7 +857,9 @@ impl ::serde::Serialize for WatchResponseOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
-/// Leases in the snapshot are the ones this instance holds.
+/// Leases in the snapshot are the ones this instance holds. `prompts` are the deployment's
+/// text-matchable prompt versions (immutable per deployment): the replica matches each
+/// inference request against them itself and ships only `name@hash`, so bodies stay local.
 #[derive(Clone, Default)]
 pub struct SnapshotView<'a> {
     /// Field 1: `configuration`
@@ -873,6 +875,11 @@ pub struct SnapshotView<'a> {
     pub token_signing_key: &'a str,
     /// Field 4: `deployment_id`
     pub deployment_id: &'a str,
+    /// Field 5: `prompts`
+    pub prompts: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::PromptPatternView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for SnapshotView<'a> {
@@ -882,6 +889,7 @@ impl<'a> ::core::fmt::Debug for SnapshotView<'a> {
             .field("leases", &self.leases)
             .field("token_signing_key", &::core::format_args!("[REDACTED]"))
             .field("deployment_id", &self.deployment_id)
+            .field("prompts", &self.prompts)
             .finish()
     }
 }
@@ -968,6 +976,26 @@ impl<'a> ::buffa::MessageView<'a> for SnapshotView<'a> {
                         )?,
                     );
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<
+                        super::super::__buffa::view::PromptPatternView,
+                    >(),
+                )?;
+                view.prompts
+                    .push(
+                        <super::super::__buffa::view::PromptPatternView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1006,6 +1034,11 @@ impl<'a> ::buffa::MessageView<'a> for SnapshotView<'a> {
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             token_signing_key: self.token_signing_key.to_string(),
             deployment_id: self.deployment_id.to_string(),
+            prompts: self
+                .prompts
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1042,6 +1075,14 @@ impl<'a> ::buffa::ViewEncode<'a> for SnapshotView<'a> {
             size
                 += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
         }
+        for v in &self.prompts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1074,6 +1115,14 @@ impl<'a> ::buffa::ViewEncode<'a> for SnapshotView<'a> {
         }
         if !self.deployment_id.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.deployment_id, buf);
+        }
+        for v in &self.prompts {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1109,6 +1158,9 @@ impl<'__a> ::serde::Serialize for SnapshotView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.deployment_id) {
             __map.serialize_entry("deploymentId", self.deployment_id)?;
+        }
+        if !self.prompts.is_empty() {
+            __map.serialize_entry("prompts", &*self.prompts)?;
         }
         __map.end()
     }
@@ -1225,6 +1277,13 @@ impl SnapshotOwnedView {
     pub fn deployment_id(&self) -> &'_ str {
         self.0.reborrow().deployment_id
     }
+    /// Field 5: `prompts`
+    #[must_use]
+    pub fn prompts(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::PromptPatternView<'_>> {
+        &self.0.reborrow().prompts
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<SnapshotView<'static>>>
 for SnapshotOwnedView {
@@ -1249,6 +1308,302 @@ impl ::buffa::HasMessageView for super::super::Snapshot {
     type ViewHandle = SnapshotOwnedView;
 }
 impl ::serde::Serialize for SnapshotOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// One prompt version's literal text segments, found in order within one message.
+#[derive(Clone, Debug, Default)]
+pub struct PromptPatternView<'a> {
+    /// Field 1: `name`
+    pub name: &'a str,
+    /// Field 2: `hash`
+    pub hash: &'a [u8],
+    /// Field 3: `segments`
+    pub segments: ::buffa::RepeatedView<'a, &'a str>,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for PromptPatternView<'a> {
+    type Owned = super::super::PromptPattern;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.hash = ::buffa::types::borrow_bytes(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                view.segments.push(__elem);
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::PromptPattern, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::PromptPattern, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::PromptPattern {
+            name: self.name.to_string(),
+            hash: (self.hash).to_vec(),
+            segments: self.segments.iter().map(|s| s.to_string()).collect(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for PromptPatternView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.hash.is_empty() {
+            size += 1u64 + ::buffa::types::bytes_encoded_len(&self.hash) as u64;
+        }
+        for v in &self.segments {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        if !self.hash.is_empty() {
+            ::buffa::types::put_shared_bytes_field(2u32, &self.hash, buf);
+        }
+        for v in &self.segments {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for PromptPatternView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+            __map.serialize_entry("name", self.name)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_bytes(self.hash) {
+            __map.serialize_entry("hash", &::buffa::json_helpers::BytesJson(self.hash))?;
+        }
+        if !self.segments.is_empty() {
+            __map.serialize_entry("segments", &*self.segments)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for PromptPatternView<'a> {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "PromptPattern";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.PromptPattern";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.PromptPattern";
+}
+::buffa::impl_default_view_instance!(PromptPatternView);
+::buffa::impl_view_reborrow!(PromptPatternView);
+/** Self-contained, `'static` owned view of a `PromptPattern` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PromptPatternView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PromptPatternView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct PromptPatternOwnedView(::buffa::OwnedView<PromptPatternView<'static>>);
+impl PromptPatternOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PromptPatternOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PromptPatternOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::PromptPattern,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PromptPatternOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`PromptPatternView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &PromptPatternView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::PromptPattern {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `name`
+    #[must_use]
+    pub fn name(&self) -> &'_ str {
+        self.0.reborrow().name
+    }
+    /// Field 2: `hash`
+    #[must_use]
+    pub fn hash(&self) -> &'_ [u8] {
+        self.0.reborrow().hash
+    }
+    /// Field 3: `segments`
+    #[must_use]
+    pub fn segments(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+        &self.0.reborrow().segments
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<PromptPatternView<'static>>>
+for PromptPatternOwnedView {
+    fn from(inner: ::buffa::OwnedView<PromptPatternView<'static>>) -> Self {
+        PromptPatternOwnedView(inner)
+    }
+}
+impl ::core::convert::From<PromptPatternOwnedView>
+for ::buffa::OwnedView<PromptPatternView<'static>> {
+    fn from(wrapper: PromptPatternOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<PromptPatternView<'static>>>
+for PromptPatternOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<PromptPatternView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::PromptPattern {
+    type View<'a> = PromptPatternView<'a>;
+    type ViewHandle = PromptPatternOwnedView;
+}
+impl ::serde::Serialize for PromptPatternOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,
@@ -4560,6 +4915,8 @@ impl ::serde::Serialize for UpstreamOwnedView {
     }
 }
 /// One forwarded inference call, parsed off the hot path by the replica; the gateway stores it.
+/// `prompts` are `name@hash` stamps from `x-tilde-prompt` plus versions the replica matched in the
+/// request text, resolved to versions by the gateway.
 #[derive(Clone, Debug, Default)]
 pub struct InferenceUsageView<'a> {
     /// Field 1: `id`
@@ -4606,6 +4963,8 @@ pub struct InferenceUsageView<'a> {
     pub cache_write_tokens: ::core::option::Option<i64>,
     /// Field 22: `units`
     pub units: ::core::option::Option<i64>,
+    /// Field 23: `prompts`
+    pub prompts: ::buffa::RepeatedView<'a, &'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for InferenceUsageView<'a> {
@@ -4790,6 +5149,17 @@ impl<'a> ::buffa::MessageView<'a> for InferenceUsageView<'a> {
                 )?;
                 view.units = Some(::buffa::types::decode_int64(&mut cur)?);
             }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                view.prompts.push(__elem);
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -4834,6 +5204,7 @@ impl<'a> ::buffa::MessageView<'a> for InferenceUsageView<'a> {
             usage: self.usage.to_string(),
             cache_write_tokens: self.cache_write_tokens,
             units: self.units,
+            prompts: self.prompts.iter().map(|s| s.to_string()).collect(),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -4915,6 +5286,9 @@ impl<'a> ::buffa::ViewEncode<'a> for InferenceUsageView<'a> {
         if let Some(v) = self.units {
             size += 2u64 + ::buffa::types::int64_encoded_len(v) as u64;
         }
+        for v in &self.prompts {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4991,6 +5365,9 @@ impl<'a> ::buffa::ViewEncode<'a> for InferenceUsageView<'a> {
         }
         if let Some(v) = self.units {
             ::buffa::types::put_int64_field(22u32, v, buf);
+        }
+        for v in &self.prompts {
+            ::buffa::types::put_string_field(23u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5118,6 +5495,9 @@ impl<'__a> ::serde::Serialize for InferenceUsageView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.units {
             __map.serialize_entry("units", &::buffa::json_helpers::ProtoJson(&__v))?;
+        }
+        if !self.prompts.is_empty() {
+            __map.serialize_entry("prompts", &*self.prompts)?;
         }
         __map.end()
     }
@@ -5321,6 +5701,11 @@ impl InferenceUsageOwnedView {
     #[must_use]
     pub fn units(&self) -> ::core::option::Option<i64> {
         self.0.reborrow().units
+    }
+    /// Field 23: `prompts`
+    #[must_use]
+    pub fn prompts(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+        &self.0.reborrow().prompts
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<InferenceUsageView<'static>>>
@@ -12855,10 +13240,6 @@ pub struct GetConfigurationResponseView<'a> {
     pub inference_blocked: bool,
     /// Field 8: `inference_blocked_identities`
     pub inference_blocked_identities: ::buffa::RepeatedView<'a, &'a str>,
-    /// Field 6: `logs_enabled`
-    pub logs_enabled: bool,
-    /// Field 5: `tracing_enabled`
-    pub tracing_enabled: bool,
     /// Field 1: `agent`
     pub agent: ::buffa::MessageFieldView<
         super::super::super::super::types::v1::__buffa::view::AgentView<'a>,
@@ -12906,20 +13287,6 @@ impl<'a> ::buffa::MessageView<'a> for GetConfigurationResponseView<'a> {
                     ::buffa::encoding::WireType::Varint,
                 )?;
                 view.inference_blocked = ::buffa::types::decode_bool(&mut cur)?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                view.logs_enabled = ::buffa::types::decode_bool(&mut cur)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                view.tracing_enabled = ::buffa::types::decode_bool(&mut cur)?;
             }
             1u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -13014,8 +13381,6 @@ impl<'a> ::buffa::MessageView<'a> for GetConfigurationResponseView<'a> {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
-            logs_enabled: self.logs_enabled,
-            tracing_enabled: self.tracing_enabled,
             agent: match self.agent.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -13063,12 +13428,6 @@ impl<'a> ::buffa::ViewEncode<'a> for GetConfigurationResponseView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.tracing_enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if self.logs_enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         if self.inference_blocked {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
@@ -13104,12 +13463,6 @@ impl<'a> ::buffa::ViewEncode<'a> for GetConfigurationResponseView<'a> {
                 buf,
             );
             v.write_to(__cache, buf);
-        }
-        if self.tracing_enabled {
-            ::buffa::types::put_bool_field(5u32, self.tracing_enabled, buf);
-        }
-        if self.logs_enabled {
-            ::buffa::types::put_bool_field(6u32, self.logs_enabled, buf);
         }
         if self.inference_blocked {
             ::buffa::types::put_bool_field(7u32, self.inference_blocked, buf);
@@ -13147,12 +13500,6 @@ impl<'__a> ::serde::Serialize for GetConfigurationResponseView<'__a> {
                     "inferenceBlockedIdentities",
                     &*self.inference_blocked_identities,
                 )?;
-        }
-        if self.logs_enabled {
-            __map.serialize_entry("logsEnabled", &self.logs_enabled)?;
-        }
-        if self.tracing_enabled {
-            __map.serialize_entry("tracingEnabled", &self.tracing_enabled)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.agent.as_option() {
@@ -13273,16 +13620,6 @@ impl GetConfigurationResponseOwnedView {
     #[must_use]
     pub fn inference_blocked_identities(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().inference_blocked_identities
-    }
-    /// Field 6: `logs_enabled`
-    #[must_use]
-    pub fn logs_enabled(&self) -> bool {
-        self.0.reborrow().logs_enabled
-    }
-    /// Field 5: `tracing_enabled`
-    #[must_use]
-    pub fn tracing_enabled(&self) -> bool {
-        self.0.reborrow().tracing_enabled
     }
     /// Field 1: `agent`
     #[must_use]

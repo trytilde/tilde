@@ -1,7 +1,6 @@
 mod common;
 use axum::{Router, body::Bytes, extract::State, routing::post};
 use common::{Database, seed};
-use envconfig::Envconfig;
 use opentelemetry_proto::tonic::{
     collector::logs::v1::ExportLogsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -10,7 +9,6 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use secrecy::ExposeSecret;
 use std::{
-    collections::HashMap,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -18,22 +16,12 @@ use std::{
     time::Duration,
 };
 use tilde::{
-    config::Config,
-    encryption::Encryption,
-    iam::tokens::Tokens,
-    logs::{Runtime, spool::Spool},
-    proto::tilde::management::v1 as pb,
+    encryption::Encryption, iam::tokens::Tokens, proto::tilde::management::v1 as pb,
+    telemetry::logs::Runtime,
 };
 use uuid::Uuid;
 fn id(n: u8) -> Uuid {
     Uuid::parse_str(&format!("00000000-0000-4000-8000-{n:012}")).unwrap()
-}
-fn config(path: &std::path::Path) -> Config {
-    Config::init_from_hashmap(&HashMap::from([
-        ("DATABASE_URL".into(), "postgres://unused".into()),
-        ("LOGS_QUEUE_DIR".into(), path.to_string_lossy().into_owned()),
-    ]))
-    .unwrap()
 }
 async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
     let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -77,31 +65,8 @@ fn payload(count: usize) -> ExportLogsServiceRequest {
         }],
     }
 }
-#[tokio::test]
-async fn disk_queue_is_bounded_recovers_and_resets_destination() {
-    let path = std::env::temp_dir().join(format!("tilde-logs-spool-{}", Uuid::new_v4()));
-    let lock = tilde::logs::spool::lock(&path).unwrap();
-    assert!(tilde::logs::spool::lock(&path).is_err());
-    let queue = Spool::open(&path, "external", "http://collector-a", 16).unwrap();
-    queue.accept(id(1).to_string(), vec![1; 8]).await.unwrap();
-    queue.accept(id(1).to_string(), vec![1; 8]).await.unwrap();
-    assert!(queue.accept(id(1).to_string(), vec![2; 9]).await.is_err());
-    drop(queue);
-    let queue = Spool::open(&path, "external", "http://collector-a", 16).unwrap();
-    let (key, bytes) = queue.next().await.unwrap().unwrap();
-    assert_eq!(bytes, vec![1; 8]);
-    queue.complete(key).await.unwrap();
-    assert!(queue.next().await.unwrap().is_none());
-    queue.accept(id(1).to_string(), vec![4; 8]).await.unwrap();
-    drop(queue);
-    let queue = Spool::open(&path, "external", "http://collector-b", 16).unwrap();
-    assert!(queue.next().await.unwrap().is_none());
-    drop(queue);
-    drop(lock);
-    std::fs::remove_dir_all(path).unwrap();
-}
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn disabled_logs_validate_and_authenticate_without_delivery() {
+async fn logs_validate_and_authenticate_before_delivery() {
     let db = Database::new().await;
     db.pool
         .get()
@@ -113,9 +78,14 @@ async fn disabled_logs_validate_and_authenticate_without_delivery() {
     let crypto = Arc::new(Encryption::initialize(&db.pool, seed(61)).await.unwrap());
     let tokens = Tokens::new(db.pool.clone(), crypto);
     let token = tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
-    let traces = tilde::telemetry::Runtime::start(db.pool.clone(), tokens, None);
-    let path = std::env::temp_dir().join(format!("tilde-logs-disabled-{}", Uuid::new_v4()));
-    let runtime = Runtime::start(db.pool.clone(), &config(&path)).unwrap();
+    let storage = common::Storage::load();
+    let (config, _) = common::clickhouse(&storage).await;
+    let traces = tilde::telemetry::tracing::Runtime::start(
+        db.pool.clone(),
+        tokens,
+        common::trace_delivery(&db.pool, &storage, &config),
+    );
+    let runtime = Runtime::start(db.pool.clone(), &config, common::bucket(&storage)).unwrap();
     let (url, server) = serve(runtime.router(&traces.tracing)).await;
     let client = reqwest::Client::new();
     assert_eq!(
@@ -156,11 +126,9 @@ async fn disabled_logs_validate_and_authenticate_without_delivery() {
             .status(),
         400
     );
-    assert_eq!(std::fs::read_dir(&path).unwrap().count(), 1);
     server.abort();
     runtime.shutdown().await;
     traces.shutdown().await;
-    std::fs::remove_dir_all(path).unwrap();
 }
 #[derive(Clone, Default)]
 struct Remote {
@@ -179,7 +147,7 @@ async fn remote(State(state): State<Remote>, body: Bytes) -> http::StatusCode {
     http::StatusCode::OK
 }
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-#[ignore = "requires LOGS_TEST_CLICKHOUSE_URL; task test:logs runs an isolated ClickHouse database"]
+#[ignore = "requires TEST_CLICKHOUSE_URL; task test:logs runs an isolated ClickHouse database"]
 async fn clickhouse_ingress_pagination_isolation_and_independent_replay() {
     let db = Database::new().await;
     db.pool
@@ -202,43 +170,27 @@ async fn clickhouse_ingress_pagination_isolation_and_independent_replay() {
     let crypto = Arc::new(Encryption::initialize(&db.pool, seed(62)).await.unwrap());
     let tokens = Tokens::new(db.pool.clone(), crypto);
     let token = tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
-    let traces = tilde::telemetry::Runtime::start(db.pool.clone(), tokens, None);
-    let path = std::env::temp_dir().join(format!("tilde-logs-live-{}", Uuid::new_v4()));
-    let mut config = config(&path);
-    config.logs_clickhouse_url = Some(std::env::var("LOGS_TEST_CLICKHOUSE_URL").unwrap());
-    config.logs_clickhouse_user =
-        std::env::var("LOGS_TEST_CLICKHOUSE_USER").unwrap_or("tilde".into());
-    config.logs_clickhouse_password = Some(
-        std::env::var("LOGS_TEST_CLICKHOUSE_PASSWORD")
-            .unwrap_or("tilde-logs-dev".into())
-            .parse()
-            .unwrap(),
+    let storage = common::Storage::load();
+    let objects = common::bucket(&storage);
+    let (mut config, _) = common::clickhouse(&storage).await;
+    let traces = tilde::telemetry::tracing::Runtime::start(
+        db.pool.clone(),
+        tokens,
+        common::trace_delivery(&db.pool, &storage, &config),
     );
-    config.logs_clickhouse_database = format!("logs_test_{}", Uuid::new_v4().simple());
     let client = reqwest::Client::new();
     let admin = |sql: String| {
         client
-            .post(config.logs_clickhouse_url.clone().unwrap())
+            .post(config.clickhouse_url.clone().unwrap())
             .basic_auth(
-                config.logs_clickhouse_user.clone(),
+                config.clickhouse_user.clone(),
                 config
-                    .logs_clickhouse_password
+                    .clickhouse_password
                     .as_ref()
                     .map(|p| p.0.expose_secret().to_owned()),
             )
             .body(sql)
     };
-    assert!(
-        admin(format!(
-            "CREATE DATABASE {}",
-            config.logs_clickhouse_database
-        ))
-        .send()
-        .await
-        .unwrap()
-        .status()
-        .is_success()
-    );
     let state = Remote::default();
     state.down.store(true, Ordering::SeqCst);
     let (external, remote_server) = serve(
@@ -248,7 +200,7 @@ async fn clickhouse_ingress_pagination_isolation_and_independent_replay() {
     )
     .await;
     config.logs_otlp_endpoint = Some(format!("{external}/v1/logs"));
-    let runtime = Runtime::start(db.pool.clone(), &config).unwrap();
+    let runtime = Runtime::start(db.pool.clone(), &config, objects.clone()).unwrap();
     let (url, server) = serve(runtime.router(&traces.tracing)).await;
     let mut sample = payload(101);
     sample.resource_logs[0].scope_logs[0].log_records[0].severity_number = 9;
@@ -520,7 +472,8 @@ async fn clickhouse_ingress_pagination_isolation_and_independent_replay() {
     server.abort();
     runtime.shutdown().await;
     state.down.store(false, Ordering::SeqCst);
-    let restarted = Runtime::start(db.pool.clone(), &config).unwrap();
+    // A fresh process, as another replica would be, delivers what the first left queued.
+    let restarted = Runtime::start(db.pool.clone(), &config, objects).unwrap();
     tokio::time::timeout(Duration::from_secs(20), async {
         while state.requests.lock().unwrap().is_empty() {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -733,12 +686,11 @@ async fn clickhouse_ingress_pagination_isolation_and_independent_replay() {
     restarted.shutdown().await;
     traces.shutdown().await;
     assert!(
-        admin(format!("DROP DATABASE {}", config.logs_clickhouse_database))
+        admin(format!("DROP DATABASE {}", config.clickhouse_database))
             .send()
             .await
             .unwrap()
             .status()
             .is_success()
     );
-    std::fs::remove_dir_all(path).unwrap();
 }

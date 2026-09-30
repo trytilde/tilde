@@ -11,8 +11,6 @@ pub struct Record {
     pub root_identity_id: Option<uuid::Uuid>,
     pub verified_at: Option<chrono::DateTime<chrono::Utc>>,
     pub attested_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub attested_by_user_id: Option<uuid::Uuid>,
-    pub attested_by_api_key_id: Option<uuid::Uuid>,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
@@ -24,8 +22,6 @@ pub struct RecordBorrowed<'a> {
     pub root_identity_id: Option<uuid::Uuid>,
     pub verified_at: Option<chrono::DateTime<chrono::Utc>>,
     pub attested_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub attested_by_user_id: Option<uuid::Uuid>,
-    pub attested_by_api_key_id: Option<uuid::Uuid>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -39,8 +35,6 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             root_identity_id,
             verified_at,
             attested_at,
-            attested_by_user_id,
-            attested_by_api_key_id,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -53,8 +47,6 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             root_identity_id,
             verified_at,
             attested_at,
-            attested_by_user_id,
-            attested_by_api_key_id,
         }
     }
 }
@@ -127,7 +119,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT u.id,u.name,COALESCE(c.provider_id,'tilde') AS provider_id,i.connection_id, COALESCE(i.identity_type,'username') AS identity_type,COALESCE(i.value,n.value,u.id::TEXT) AS value, u.root_identity_id,i.verified_at,u.attested_at,u.attested_by_user_id,u.attested_by_api_key_id FROM chat_users u LEFT JOIN chat_channel_identities i ON i.id=u.id LEFT JOIN connections c ON c.id=i.connection_id LEFT JOIN chat_native_identities n ON n.id=u.id WHERE u.id=$1",
+        "SELECT u.id,u.name,COALESCE(c.provider_id,'tilde') AS provider_id,i.connection_id, COALESCE(i.identity_type,'username') AS identity_type,COALESCE(i.value,n.value,u.id::TEXT) AS value, u.root_identity_id,i.verified_at,u.attested_at FROM chat_users u LEFT JOIN chat_channel_identities i ON i.id=u.id LEFT JOIN connections c ON c.id=i.connection_id LEFT JOIN chat_native_identities n ON n.id=u.id WHERE u.id=$1",
         None,
     )
 }
@@ -161,8 +153,6 @@ impl RunStmt {
                         root_identity_id: row.try_get(6)?,
                         verified_at: row.try_get(7)?,
                         attested_at: row.try_get(8)?,
-                        attested_by_user_id: row.try_get(9)?,
-                        attested_by_api_key_id: row.try_get(10)?,
                     })
                 },
             mapper: |it| Record::from(it),

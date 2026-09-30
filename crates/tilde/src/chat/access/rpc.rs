@@ -39,17 +39,11 @@ fn size(value: u32) -> u32 {
 impl AgentAccessService for Management {
     async fn list_channel_access<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::ListChannelAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::ListChannelAccessResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(request.agent_id)?),
-            crate::iam::authz::Action::View,
-        )
-        .await?;
         let (routes, next_page_token) = self
             .0
             .service
@@ -67,17 +61,11 @@ impl AgentAccessService for Management {
     }
     async fn set_channel_access<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::SetChannelAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetChannelAccessResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(request.agent_id)?),
-            crate::iam::authz::Action::Edit,
-        )
-        .await?;
         let mode = match request.mode.to_i32() {
             1 => types::ChannelAccessMode::Private,
             2 => types::ChannelAccessMode::Public,
@@ -92,17 +80,11 @@ impl AgentAccessService for Management {
     }
     async fn list_channel_identities<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::ListChannelIdentitiesRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::ListChannelIdentitiesResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(request.agent_id)?),
-            crate::iam::authz::Action::View,
-        )
-        .await?;
         let body = request.to_owned_message();
         let (identities, next_page_token) = self
             .0
@@ -122,17 +104,11 @@ impl AgentAccessService for Management {
     }
     async fn set_identity_access<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::SetIdentityAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetIdentityAccessResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(request.agent_id)?),
-            crate::iam::authz::Action::Edit,
-        )
-        .await?;
         self.0
             .service
             .set_allowed(
@@ -146,17 +122,11 @@ impl AgentAccessService for Management {
     }
     async fn request_identity_verification<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::RequestIdentityVerificationRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RequestIdentityVerificationResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(request.agent_id)?),
-            crate::iam::authz::Action::Edit,
-        )
-        .await?;
         let body = request.to_owned_message();
         let (verification_id, status) = self
             .0

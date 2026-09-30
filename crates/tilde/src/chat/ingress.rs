@@ -105,46 +105,6 @@ impl Chat {
         ))
     }
 
-    pub async fn list_ingress_threads(
-        &self,
-        agent: Option<Uuid>,
-        after: &str,
-        limit: u32,
-    ) -> Result<(Vec<types::Thread>, String)> {
-        let size = if limit == 0 { 30 } else { limit.min(100) };
-        if let Some(local) = self.local() {
-            if agent.is_some_and(|id| id != local.agent_id) {
-                return Err(ChatError::Denied);
-            }
-            return local.list_threads(after, size as usize).await;
-        }
-        let cursor = if after.is_empty() {
-            None
-        } else {
-            Some(id(after)?)
-        };
-        let mut rows = crate::chat::db::threads_list_all(
-            &self.pg()?.get().await?,
-            agent,
-            cursor,
-            i64::from(size) + 1,
-        )
-        .await?;
-        let more = rows.len() > size as usize;
-        if more {
-            rows.pop();
-        }
-        let next = if more {
-            rows.last().map(|r| r.id.to_string()).unwrap_or_default()
-        } else {
-            String::new()
-        };
-        let mut threads = vec![];
-        for r in rows {
-            threads.push(self.thread(r.id).await?);
-        }
-        Ok((threads, next))
-    }
     pub async fn ingress_activity(
         &self,
         thread: Uuid,

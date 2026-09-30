@@ -57,6 +57,7 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Connected".into(),
@@ -85,6 +86,7 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await
@@ -117,6 +119,25 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
     let instances = deployments.instances(agent).await.unwrap();
     assert_eq!(instances.len(), 1);
     assert!(instances[0].ready && instances[0].deployment_id == deployment.id);
+    // A registry skill the agent has, pushed with the wake so the host need not list it.
+    let skills = tilde::skills::Skills::new(db.pool.clone());
+    let source = skills.create_editor("Playbooks").await.unwrap();
+    let (_, written) = skills
+        .write(
+            source,
+            "refunds",
+            vec![tilde::skills::Upload::Data {
+                path: "SKILL.md".into(),
+                data: b"---\nname: refunds\ndescription: Refund within policy\n---\n".to_vec(),
+                executable: false,
+            }],
+            "",
+            true,
+        )
+        .await
+        .unwrap();
+    skills.assign_source(agent, source).await.unwrap();
+    skills.enable_source(agent, source, true).await.unwrap();
     // Work for the agent wakes the connected host over its open stream.
     let thread = chat
         .create_thread(CreateThread {
@@ -158,6 +179,13 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
     assert_eq!(wake.deployment_id, deployment.id);
     assert!(!wake.command_id.is_empty() && !wake.capability.is_empty());
     assert_eq!(wake.callback_url, base);
+    let pushed = &wake.state.skills;
+    assert_eq!(pushed.len(), 1);
+    assert_eq!(
+        (pushed[0].name.as_str(), pushed[0].version_id.as_str()),
+        ("refunds", written.version.to_string().as_str())
+    );
+    assert!(!pushed[0].deployed && pushed[0].files[0].path == "SKILL.md");
     // The host reports with the invocation capability; the gateway never needed the
     // wake call's response.
     let execution = client(&base, &wake.capability);
@@ -252,6 +280,7 @@ async fn a_connected_host_is_woken_over_its_stream_and_reports_back() {
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await

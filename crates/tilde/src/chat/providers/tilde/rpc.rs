@@ -4,6 +4,7 @@ use super::{
 };
 use crate::chat::{Chat, id};
 use crate::proto::tilde::provider::tilde::v1 as wire;
+use crate::proto::tilde::types::v1 as types;
 use connectrpc::{
     ConnectError, RequestContext, Response, ServiceRequest, ServiceResult, ServiceStream,
 };
@@ -20,6 +21,24 @@ pub(crate) fn router(chat: Chat) -> axum::Router {
     ))
 }
 use crate::services::tilde::provider::tilde::v1::ChatService;
+
+/// An activity as end users see it: a hidden tool call not at all, a summary-only one without
+/// its input, output or error. Traces and management views keep the full call.
+fn for_end_user(mut activity: types::Activity) -> Option<types::Activity> {
+    if let Some(types::activity::Detail::ToolCall(tool)) = &mut activity.detail {
+        match tool.display.as_known() {
+            Some(types::ToolDisplay::TOOL_DISPLAY_HIDDEN) => return None,
+            Some(types::ToolDisplay::TOOL_DISPLAY_SUMMARY) => {
+                tool.input_json.clear();
+                tool.output_json.clear();
+                tool.input_delta.clear();
+                tool.error.clear();
+            }
+            _ => {}
+        }
+    }
+    Some(activity)
+}
 
 impl ChatService for Rpc {
     async fn search_messages<'a>(
@@ -152,6 +171,7 @@ impl ChatService for Rpc {
                 .events
                 .into_iter()
                 .filter(|event| event.sequence <= sequence)
+                .filter_map(for_end_user)
                 .collect()
         } else {
             vec![]
@@ -346,7 +366,7 @@ impl ChatService for Rpc {
             .ingress_activity(id(r.thread_id)?, r.after_cursor, r.limit)
             .await?;
         Response::ok(wire::ListActivityResponse {
-            events,
+            events: events.into_iter().filter_map(for_end_user).collect(),
             next_cursor,
             has_more,
             ..Default::default()
@@ -569,6 +589,7 @@ impl ChatService for Rpc {
                 if chrono::Utc::now().timestamp()>=claims.exp {Err(ConnectError::unauthenticated("Provider credential expired"))?;}
                 member(&chat,&claims,thread).await?;
                 let (activity,cursor)=value?;
+                let Some(activity)=for_end_user(activity) else {continue};
                 yield wire::WatchThreadResponse{activity:activity.into(),cursor,..Default::default()};
             }
         })

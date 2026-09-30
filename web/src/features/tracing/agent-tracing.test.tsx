@@ -14,14 +14,24 @@ import {
   ObservationSchema,
   TraceSessionSummarySchema,
   ObservationMetricBucketSchema,
-  TracingState,
 } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+/** Whether a server filter carries the condition. */
+function has(
+  filter: { conditions?: { column: string; operator: string; values: string[] }[] } | undefined,
+  column: string,
+  operator: string,
+  value: string,
+) {
+  return (filter?.conditions ?? []).some(
+    (c) => c.column === column && c.operator === operator && c.values.includes(value),
+  );
+}
 const rpc = vi.hoisted(() => ({
-  getTracingStatus: vi.fn(),
   getObservationMetrics: vi.fn(),
   listObservations: vi.fn(),
   getTrace: vi.fn(),
   getSession: vi.fn(),
+  getTraceObjectUrl: vi.fn(),
 }));
 vi.mock("@/client", () => ({ traces: rpc }));
 afterEach(() => {
@@ -103,9 +113,6 @@ const observation = create(ObservationSchema, {
   totalTokens: 12,
   costUsd: 0.001,
   latencySeconds: 1,
-  traceUrl: "https://langfuse.example/project/p/traces/trace-1",
-  observationUrl: "https://langfuse.example/project/p/traces/trace-1?observation=span-1",
-  sessionUrl: "https://langfuse.example/project/p/sessions/session-1",
 });
 const second = create(ObservationSchema, {
   ...observation,
@@ -118,11 +125,6 @@ const second = create(ObservationSchema, {
   latencySeconds: 0.5,
   output: "Tool result",
 });
-const ready = () =>
-  rpc.getTracingStatus.mockResolvedValue({
-    state: TracingState.READY,
-    projectUrl: "https://langfuse.example/project/p",
-  });
 const page = (observations = [observation], nextCursor = "") => ({
   observations,
   sessions: [],
@@ -130,24 +132,62 @@ const page = (observations = [observation], nextCursor = "") => ({
   partial: !!nextCursor,
 });
 
-it("disables search while tracing is unavailable but leaves refresh available", async () => {
-  rpc.getTracingStatus.mockResolvedValue({
-    state: TracingState.DISABLED,
-    message: "Tracing is not configured",
-    projectUrl: "",
-  });
-  mount();
-  await screen.findByText("Tracing is not configured");
+it("renders a shared link whose where expression is malformed instead of failing", async () => {
+  rpc.listObservations.mockResolvedValue(page());
+  expect(parseSearch({ where: "level:" }).where).toBeUndefined();
+  expect(parseSearch({ where: 'name:"open' }).where).toBeUndefined();
+  expect(parseSearch({ where: "latency:>2 -level:DEBUG" }).where).toBe("latency:>2 -level:DEBUG");
+  mount("/tracing?where=level%3A&model=gpt-4o-mini");
+  await screen.findByRole("row", { name: "Inspect Recipe model" });
   expect(
     (screen.getByRole("combobox", { name: "Search traces" }) as HTMLInputElement).disabled,
-  ).toBe(true);
-  expect((screen.getByRole("button", { name: "Refresh" }) as HTMLButtonElement).disabled).toBe(
-    false,
+  ).toBe(false);
+  expect(has(rpc.listObservations.mock.lastCall?.[0].filter, "model", "=", "gpt-4o-mini")).toBe(
+    true,
   );
-  expect(rpc.listObservations).not.toHaveBeenCalled();
+  expect(rpc.listObservations.mock.lastCall?.[0].filter.conditions).toHaveLength(1);
+});
+it("resolves a cooperating agent's media under that agent's id, not the viewer's", async () => {
+  rpc.listObservations.mockResolvedValue(page());
+  const id = "a".repeat(64);
+  const other = create(ObservationSchema, {
+    ...second,
+    agentId: "agent-two",
+    output: JSON.stringify({
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: `see @@@tildeMedia:type=image/png|id=${id}|source=base64_data_uri@@@`,
+        },
+      ],
+    }),
+  });
+  rpc.getTrace.mockResolvedValue(page([{ ...observation, agentId: "agent-one" }, other]));
+  rpc.getTraceObjectUrl.mockResolvedValue({ url: "https://objects.test/signed", expiresIn: 600 });
+  mount();
+  fireEvent.click(await screen.findByRole("row", { name: "Inspect Recipe model" }));
+  const sheet = await screen.findByRole("dialog");
+  await within(sheet).findByText("Make a recipe");
+  const plot = await waitFor(() => {
+    const plot = sheet.querySelector<HTMLElement>('[data-slot="waterfall-plot"]');
+    expect(plot).not.toBeNull();
+    return plot!;
+  });
+  const rowHeight = parseFloat(plot.style.height) / 2;
+  fireEvent.click(plot, { detail: 1, clientX: 790, clientY: 1.5 * rowHeight });
+  fireEvent.click(within(sheet).getByRole("tab", { name: "Output" }));
+  await waitFor(() =>
+    expect(rpc.getTraceObjectUrl).toHaveBeenCalledWith(
+      { agentId: "agent-two", key: `media/agent-two/${id}` },
+      expect.anything(),
+    ),
+  );
+  await waitFor(() =>
+    expect(sheet.querySelector('img[src="https://objects.test/signed"]')).not.toBeNull(),
+  );
 });
 it("suggests fields and values, applies searches to the server, and preserves invalid drafts", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   const router = mount();
   await screen.findByRole("row", { name: "Inspect Recipe model" });
@@ -163,11 +203,13 @@ it("suggests fields and values, applies searches to the server, and preserves in
   fireEvent.click(await screen.findByRole("option", { name: /^ERROR/ }));
   fireEvent.submit(input.closest("form")!);
   await waitFor(() => expect(router.state.location.search.level).toBe("ERROR"));
-  expect(rpc.listObservations.mock.lastCall?.[0].filter.level).toBe("ERROR");
+  expect(has(rpc.listObservations.mock.lastCall?.[0].filter, "level", "=", "ERROR")).toBe(true);
   fireEvent.change(input, { target: { value: 'model:gpt-4o-mini input:"lasagna recipe"' } });
   fireEvent.submit(input.closest("form")!);
   await waitFor(() =>
-    expect(rpc.listObservations.mock.lastCall?.[0].filter.inputSearch).toBe("lasagna recipe"),
+    expect(
+      has(rpc.listObservations.mock.lastCall?.[0].filter, "input", "contains", "lasagna recipe"),
+    ).toBe(true),
   );
   const calls = rpc.listObservations.mock.calls.length;
   fireEvent.change(input, { target: { value: 'input:"unfinished' } });
@@ -190,11 +232,37 @@ it("suggests fields and values, applies searches to the server, and preserves in
   fireEvent.change(input, { target: { value: 'name:"Tool step"' } });
   fireEvent.submit(input.closest("form")!);
   await waitFor(() =>
-    expect(rpc.listObservations.mock.lastCall?.[0].filter.name).toBe("Tool step"),
+    expect(
+      has(rpc.listObservations.mock.lastCall?.[0].filter, "name", "contains", "Tool step"),
+    ).toBe(true),
+  );
+  // Filter operators travel in `where`: numbers, negation, any-of and span attributes.
+  fireEvent.change(input, {
+    target: { value: "latency:>2 -level:DEBUG type:GENERATION|TOOL gen_ai.tool.name:search" },
+  });
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() =>
+    expect(router.state.location.search.where).toBe(
+      "latency:>2 -level:DEBUG type:GENERATION|TOOL gen_ai.tool.name:search",
+    ),
+  );
+  // The earlier name chip stays applied alongside the new terms.
+  const sent = rpc.listObservations.mock.lastCall?.[0].filter.conditions;
+  expect(sent).toHaveLength(5);
+  expect(sent).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ column: "latency", operator: ">", values: ["2"] }),
+      expect.objectContaining({ column: "level", operator: "none of", values: ["DEBUG"] }),
+      expect.objectContaining({
+        column: "type",
+        operator: "any of",
+        values: ["GENERATION", "TOOL"],
+      }),
+      expect.objectContaining({ column: "metadata", key: "gen_ai.tool.name", operator: "=" }),
+    ]),
   );
 });
 it("applies calendar and time changes immediately and keeps invalid ranges off the server", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   mount("/tracing?range=custom&from=2026-09-10T10:00:00Z&to=2026-09-11T10:00:00Z");
   await screen.findByRole("row", { name: "Inspect Recipe model" });
@@ -224,7 +292,6 @@ it("applies calendar and time changes immediately and keeps invalid ranges off t
   );
 });
 it("loads cursor pages on scroll, preserves earlier rows, and resets on filter changes", async () => {
-  ready();
   rpc.listObservations.mockImplementation(async ({ cursor }) =>
     cursor ? page([second]) : page([observation], "page-two"),
   );
@@ -241,13 +308,10 @@ it("loads cursor pages on scroll, preserves earlier rows, and resets on filter c
   fireEvent.click(screen.getByRole("tab", { name: "Errors" }));
   await waitFor(() => expect(router.state.location.search.preset).toBe("errors"));
   await waitFor(() => expect(screen.queryByRole("row", { name: "Inspect Tool step" })).toBeNull());
-  expect(rpc.listObservations.mock.lastCall?.[0]).toMatchObject({
-    cursor: "",
-    filter: { level: "ERROR" },
-  });
+  expect(rpc.listObservations.mock.lastCall?.[0].cursor).toBe("");
+  expect(has(rpc.listObservations.mock.lastCall?.[0].filter, "level", "=", "ERROR")).toBe(true);
 });
 it("uses latest trace metadata for session facts while deduplicating paged trace metrics", async () => {
-  ready();
   const details = create(TraceSessionSummarySchema, {
     id: "session-1",
     providerId: "whatsapp",
@@ -308,7 +372,6 @@ it("uses latest trace metadata for session facts while deduplicating paged trace
 });
 
 it("discards an old scrolling response when the query changes", async () => {
-  ready();
   let resolveOld!: (value: unknown) => void;
   let signal: AbortSignal | undefined;
   rpc.listObservations.mockImplementation(({ cursor, filter }, options) => {
@@ -319,7 +382,7 @@ it("discards an old scrolling response when the query changes", async () => {
       });
     }
     return Promise.resolve(
-      filter.level === "ERROR" ? page([second]) : page([observation], "page-two"),
+      has(filter, "level", "=", "ERROR") ? page([second]) : page([observation], "page-two"),
     );
   });
   mount();
@@ -335,7 +398,6 @@ it("discards an old scrolling response when the query changes", async () => {
   expect(screen.queryByRole("row", { name: "Inspect Recipe model" })).toBeNull();
 });
 it("opens a right-side sheet with a selectable waterfall and formatted detail tabs", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   const extraSpans = Array.from({ length: 43 }, (_, index) =>
     create(ObservationSchema, {
@@ -513,12 +575,11 @@ it("opens a right-side sheet with a selectable waterfall and formatted detail ta
     within(within(sheet).getByRole("tabpanel", { name: "Metadata" })).getByText("trace-1"),
   ).toBeTruthy();
   expect(within(sheet).queryByText(/TTFT/)).toBeNull();
-  const link = within(sheet).getByRole("link", { name: "Open trace in Langfuse" });
-  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  // Traces are Tilde's own; nothing links out to another product.
+  expect(within(sheet).queryByRole("link")).toBeNull();
 });
 
 it("charts full-range counts and latency, marks error buckets, and brushes the same server filters", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   const buckets = [200, 100, 0, 20].map((count, index) =>
     create(ObservationMetricBucketSchema, {
@@ -565,8 +626,10 @@ it("charts full-range counts and latency, marks error buckets, and brushes the s
     expect(rpc.listObservations.mock.lastCall?.[0].filter).toMatchObject({
       fromTime: from,
       toTime: to,
-      name: "model",
-      model: "gpt-4o-mini",
+      conditions: [
+        expect.objectContaining({ column: "name", operator: "contains", values: ["model"] }),
+        expect.objectContaining({ column: "model", operator: "=", values: ["gpt-4o-mini"] }),
+      ],
     }),
   );
   // The chart keeps its data and axis while the table applies the highlighted range.
@@ -618,7 +681,6 @@ it("charts full-range counts and latency, marks error buckets, and brushes the s
   });
 });
 it("cancels activity range selection with Escape and ignores old metrics after filters change", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   let resolveOld!: (value: unknown) => void;
   let oldSignal: AbortSignal | undefined;
@@ -671,7 +733,6 @@ it("cancels activity range selection with Escape and ignores old metrics after f
 });
 
 it("opens sessions as read-only chat with reasoning and tool results, and drills into individual traces", async () => {
-  ready();
   rpc.listObservations.mockResolvedValue(page());
   const captured = create(ObservationSchema, {
     ...observation,

@@ -1,32 +1,35 @@
 syntax = "proto3";
 package tilde.management.v1;
 
-// Read-only observability. Langfuse credentials never cross this API boundary.
+// Read-only observability over Tilde's span store. Storage credentials never cross this API boundary.
 service TracingService {
-  rpc GetTracingStatus(GetTracingStatusRequest) returns (GetTracingStatusResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc ListObservations(ListObservationsRequest) returns (ListObservationsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc GetObservationMetrics(GetObservationMetricsRequest) returns (GetObservationMetricsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc GetTrace(GetTraceRequest) returns (GetTraceResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // A short-lived URL for media (`@@@tildeMedia:...|id=<id>|...@@@` in a payload) or a full
+  // payload (`tilde.observation.input_ref` / `output_ref` attribute) of the agent's observations.
+  rpc GetTraceObjectUrl(GetTraceObjectUrlRequest) returns (GetTraceObjectUrlResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
 }
-enum TracingState { TRACING_STATE_UNSPECIFIED = 0; TRACING_STATE_DISABLED = 1; TRACING_STATE_READY = 2; TRACING_STATE_UNAVAILABLE = 3; }
-message GetTracingStatusRequest { string agent_id = 1; }
-message GetTracingStatusResponse { TracingState state = 1; string message = 2; string project_url = 3; }
+message GetTraceObjectUrlRequest { string agent_id = 1; string key = 2; }
+message GetTraceObjectUrlResponse { string url = 1; uint32 expires_in = 2; }
+// Observation filters: conditions on named columns, all of which must hold.
+// String columns (name, type, level, model, session_id, invocation_id, status_message,
+// input, output) take =, contains, does not contain, starts with, ends with, any of, none of.
+// Number columns (latency, total_tokens, input_tokens, output_tokens, total_cost,
+// time_to_first_token) take =, >, <, >=, <=. `metadata` names a span attribute in `key` and
+// takes the string operators, or the number operators when the attribute is numeric.
+message FilterCondition { string column = 1; string operator = 2; repeated string values = 3; string key = 4; }
 message ObservationFilter {
   string from_time = 1;
   string to_time = 2;
-  string name = 3;
-  string type = 4;
-  string level = 5;
-  string model = 6;
-  string session_id = 7;
-  string invocation_id = 8;
-  string input_search = 9;
-  string output_search = 10;
+  reserved 3 to 11;
+  reserved "name", "type", "level", "model", "session_id", "invocation_id", "input_search", "output_search", "attributes";
+  repeated FilterCondition conditions = 12;
 }
-message ListObservationsRequest { string agent_id = 1; ObservationFilter filter = 2; string cursor = 3; bool refresh = 4; bool include_session_details = 5; }
-message GetTraceRequest { string agent_id = 1; string trace_id = 2; string cursor = 3; bool refresh = 4; }
-message GetSessionRequest { string agent_id = 1; string session_id = 2; ObservationFilter filter = 3; string cursor = 4; bool refresh = 5; }
+message ListObservationsRequest { string agent_id = 1; ObservationFilter filter = 2; string cursor = 3; reserved 4; reserved "refresh"; bool include_session_details = 5; }
+message GetTraceRequest { string agent_id = 1; string trace_id = 2; string cursor = 3; reserved 4; reserved "refresh"; }
+message GetSessionRequest { string agent_id = 1; string session_id = 2; ObservationFilter filter = 3; string cursor = 4; reserved 5; reserved "refresh"; }
 message TraceAttribute { string key = 1; string value = 2; }
 message Observation {
   string id = 1; string trace_id = 2; string parent_id = 3;
@@ -38,9 +41,12 @@ message Observation {
   optional double cost_usd = 18;
   string session_id = 19; string user_id = 20; string environment = 21;
   repeated string tags = 22; repeated TraceAttribute attributes = 23;
-  string observation_url = 24; string trace_url = 25; string session_url = 26;
+  reserved 24, 25, 26;
+  reserved "observation_url", "trace_url", "session_url";
   string invocation_id = 27;
   string updated_time = 28;
+  // The span's owner; a whole trace includes gateway and cooperating agents' spans.
+  string agent_id = 29;
 }
 // Session facts are the newest captured metadata among the returned traces;
 // identity values are resolved for display.
@@ -51,7 +57,8 @@ message TraceSessionSummary {
   optional double total_tokens = 5;
   optional double cost_usd = 6;
   uint32 error_count = 7;
-  string session_url = 8;
+  reserved 8;
+  reserved "session_url";
   string provider_id = 9;
   string provider_name = 10;
   string provider_icon_url = 11;
@@ -68,7 +75,7 @@ message GetTraceResponse { repeated Observation observations = 1; string next_cu
 message GetSessionResponse { repeated Observation observations = 1; string next_cursor = 2; bool partial = 3; }
 
 // Full filtered range, independent of the observation table's cursor pages.
-message GetObservationMetricsRequest { string agent_id = 1; ObservationFilter filter = 2; bool refresh = 3; }
+message GetObservationMetricsRequest { string agent_id = 1; ObservationFilter filter = 2; reserved 3; reserved "refresh"; }
 message ObservationMetricBucket {
   string start_time = 1;
   string end_time = 2;

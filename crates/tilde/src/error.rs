@@ -17,10 +17,17 @@ pub enum Error {
     Invalid(String),
     #[error("Provider authorization was rejected; reconnect the connection")]
     ConnectionAuthorizationRequired,
+    /// A tool host refused an instance's credentials at the end of setup. The message is the
+    /// host's own, written for the person entering them.
+    #[error("{0}")]
+    CredentialsRejected(String),
     #[error("agent not found")]
     NotFound,
     #[error("agent ID already exists with different creation parameters")]
     Conflict,
+    /// A concurrent write changed what this one was based on; the caller reloads and retries.
+    #[error("{0}")]
+    Stale(String),
     #[error("database operation failed")]
     Database(#[from] crate::database::DbError),
     #[error("database migration failed")]
@@ -50,11 +57,14 @@ impl From<Error> for connectrpc::ConnectError {
             Error::ConnectionAuthorizationRequired => Self::failed_precondition(
                 "Provider authorization was rejected; reconnect the connection",
             ),
-            Error::Invalid(message) => Self::invalid_argument(message),
+            Error::Invalid(message) | Error::CredentialsRejected(message) => {
+                Self::invalid_argument(message)
+            }
             Error::NotFound => Self::not_found("Agent not found"),
             Error::Conflict => {
                 Self::already_exists("Agent ID already exists with different parameters")
             }
+            Error::Stale(message) => Self::aborted(message),
             other => {
                 tracing::error!(error = ?other, "engine operation failed");
                 Self::internal("Engine operation failed")

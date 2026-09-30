@@ -13,12 +13,13 @@ pub fn definition() -> Provider {
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_CHAT.into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: "whatsapp".into(),
             name: "Telnyx WhatsApp".into(),
             credential_source: CredentialSource::Static {
                 schema: serde_json::json!({"type": "object", "additionalProperties": false, "properties": {"api_key": {"type": "string", "title": "API key", "minLength": 1, "writeOnly": true}, "phone_number": {"type": "string", "title": "Sending phone number", "minLength": 1, "pattern": "^\\+[0-9]{7,15}$"}, "messaging_profile_id": {"type": "string", "title": "Messaging profile ID", "minLength": 1}, "public_key": {"type": "string", "title": "Ed25519 public key", "minLength": 1}}, "required": ["api_key", "phone_number", "messaging_profile_id", "public_key"]}),
             },
-            capabilities: vec![Capability::Channel],
+            capabilities: vec![Capability::Channel, Capability::Tool],
         }],
     }
 }

@@ -88,7 +88,6 @@ pub mod thread_create;
 pub mod thread_detail;
 pub mod thread_get;
 pub mod thread_lock;
-pub mod threads_list;
 pub mod tilde;
 pub mod tool_get;
 pub mod tool_interrupted;

@@ -126,8 +126,8 @@ impl Runtime {
             owner_instance_id: self.instance_id.to_string(),
             generation: epoch,
             status: "pending".into(),
-            traceparent: crate::telemetry::context::capture().0,
-            tracestate: crate::telemetry::context::capture().1,
+            traceparent: crate::telemetry::tracing::context::capture().0,
+            tracestate: crate::telemetry::tracing::context::capture().1,
             objective: run.objective.clone(),
             ..Default::default()
         };
@@ -795,7 +795,7 @@ impl Runtime {
         use opentelemetry::trace::{FutureExt, TraceContextExt};
         let key = id(&invoke.invocation_id)?;
         let thread = id(&command.thread_id)?;
-        let (mut v, tracing_enabled) = {
+        let mut v = {
             let mut t = shared.lock().await;
             let mut invocation = t
                 .invocations
@@ -813,27 +813,24 @@ impl Runtime {
             invocation.status = "running".into();
             invocation.lease_expires_at = now() + 30_000;
             t.invocations.insert(key, invocation.clone());
-            (invocation, self.configuration()?.tracing_enabled)
+            self.configuration()?;
+            invocation
         };
-        let cx = if tracing_enabled {
-            crate::telemetry::context::start(
-                "tilde.invocation",
-                opentelemetry::trace::SpanKind::Client,
-                &crate::telemetry::context::restore(&v.traceparent, &v.tracestate),
-                vec![
-                    opentelemetry::KeyValue::new("tilde.agent.id", self.agent_id.to_string()),
-                    opentelemetry::KeyValue::new("tilde.thread.id", v.thread_id.clone()),
-                    opentelemetry::KeyValue::new("tilde.invocation.id", v.id.clone()),
-                    opentelemetry::KeyValue::new("tilde.run.id", v.run_id.clone()),
-                ],
-            )
-        } else {
-            opentelemetry::Context::new()
-        };
-        let _end = crate::telemetry::context::EndOnDrop(cx.clone());
+        let cx = crate::telemetry::tracing::context::start(
+            "tilde.invocation",
+            opentelemetry::trace::SpanKind::Client,
+            &crate::telemetry::tracing::context::restore(&v.traceparent, &v.tracestate),
+            vec![
+                opentelemetry::KeyValue::new("tilde.agent.id", self.agent_id.to_string()),
+                opentelemetry::KeyValue::new("tilde.thread.id", v.thread_id.clone()),
+                opentelemetry::KeyValue::new("tilde.invocation.id", v.id.clone()),
+                opentelemetry::KeyValue::new("tilde.run.id", v.run_id.clone()),
+            ],
+        );
+        let _end = crate::telemetry::tracing::context::EndOnDrop(cx.clone());
         {
             let _guard = cx.clone().attach();
-            let parent = crate::telemetry::context::capture();
+            let parent = crate::telemetry::tracing::context::capture();
             v.traceparent = parent.0;
             v.tracestate = parent.1;
         }

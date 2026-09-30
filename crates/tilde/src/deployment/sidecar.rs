@@ -222,6 +222,11 @@ pub async fn start(options: Options) -> Result<Sidecar> {
             },
         ));
         runtime.configure(configuration);
+        // A deployment's prompts never change, so reconnect snapshots need not replace them.
+        let _ = runtime
+            .state
+            .prompts
+            .set(std::mem::take(&mut snapshot.prompts));
         for lease in std::mem::take(&mut snapshot.leases) {
             runtime.apply_lease(lease).await?;
         }
@@ -326,12 +331,26 @@ impl Node {
     pub(crate) fn token_hash(&self) -> &[u8; 32] {
         &self.token_hash
     }
+    /// A node around an already configured runtime, for tests of the runtime listener.
+    #[cfg(test)]
+    pub(crate) fn for_tests(runtime: Arc<Runtime>, deployment_id: &str, token: &str) -> Self {
+        Self {
+            gateway: runtime.gateway.clone(),
+            runtime,
+            deployment_id: deployment_id.into(),
+            token_hash: sha2::Sha256::digest(token.as_bytes()).into(),
+        }
+    }
     pub fn runtime_router(&self) -> Router {
-        crate::chat::rpc::runtime::router(Chat::from_sidecar(self.runtime.clone()))
-            .route(
-                "/tilde.runtime.v1.AgentService/{*method}",
+        let mut router =
+            crate::chat::rpc::runtime::router(Chat::from_sidecar(self.runtime.clone()));
+        for service in super::relay::RELAYED_SERVICES {
+            router = router.route(
+                &format!("/{service}{{*method}}"),
                 axum::routing::any(registry_relay).with_state(self.clone()),
-            )
+            );
+        }
+        router
             .merge(crate::inference::router(self.runtime.inference()))
             .layer(middleware::from_fn_with_state(self.clone(), runtime_guard))
             .layer(middleware::from_fn_with_state(

@@ -5,7 +5,6 @@ import { PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { HealthBadge, HealthHistory, responseTime } from "@/components/agent-health";
 import { Button } from "@/components/ui/button";
-import { AgentShare } from "@/components/agent-share";
 import {
   Table,
   TableBody,
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableSkeletonRows } from "@/components/table-skeleton";
 
 const features = tableFeatures({});
 const columnHelper = createColumnHelper<typeof features, Agent>();
@@ -26,6 +26,7 @@ export function DataTable({
   onPause,
   onResume,
   busy,
+  empty,
 }: {
   data: Agent[];
   loading: boolean;
@@ -35,6 +36,8 @@ export function DataTable({
   onPause: (agent: Agent) => void;
   onResume: (agent: Agent) => void;
   busy: boolean;
+  /** Shown instead of the first-run prompt when filters exclude every agent. */
+  empty?: string;
 }) {
   const columns = useMemo(
     () =>
@@ -44,7 +47,17 @@ export function DataTable({
           cell: ({ row }) => (
             <div className="flex items-center gap-2">
               <AgentAvatar agent={row.original} animated />
-              <span className="font-medium">{row.original.name}</span>
+              <span className="grid min-w-0">
+                <span className="font-medium">{row.original.name}</span>
+                {row.original.description && (
+                  <span
+                    className="max-w-80 truncate text-xs text-muted-foreground"
+                    title={row.original.description}
+                  >
+                    {row.original.description}
+                  </span>
+                )}
+              </span>
               {row.original.paused && (
                 <span className="rounded bg-muted px-2 py-0.5 text-xs">Paused</span>
               )}
@@ -59,7 +72,7 @@ export function DataTable({
               Health · 12 hours
             </span>
           ),
-          cell: ({ row }) => <HealthHistory metrics={row.original.metrics} />,
+          cell: ({ row }) => <HealthHistory hours={row.original.metrics?.healthHistory} />,
         }),
         columnHelper.display({
           id: "threads",
@@ -107,10 +120,6 @@ export function DataTable({
           header: () => <span className="sr-only">Actions</span>,
           cell: ({ row }) => (
             <div className="flex justify-end gap-1">
-              {/* The popover lives in the row, so its clicks must not open the agent. */}
-              <span onClick={(event) => event.stopPropagation()}>
-                <AgentShare agentId={row.original.id} variant="ghost" size="icon" />
-              </span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -191,17 +200,17 @@ export function DataTable({
                 ))}
               </TableRow>
             ))
+          ) : loading ? (
+            <TableSkeletonRows columns={columns.length} label="Loading agents" />
           ) : (
             <TableRow>
               <TableCell
                 colSpan={columns.length}
                 className="h-44 text-center text-muted-foreground"
               >
-                {loading
-                  ? "Loading agents…"
-                  : loaded
-                    ? "No agents yet. Create your first agent to get started."
-                    : "Unable to load agents."}
+                {loaded
+                  ? (empty ?? "No agents yet. Create your first agent to get started.")
+                  : "Unable to load agents."}
               </TableCell>
             </TableRow>
           )}

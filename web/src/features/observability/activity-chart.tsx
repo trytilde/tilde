@@ -8,6 +8,7 @@ export type ActivityBucket = {
   averageLatencySeconds?: number;
 };
 import { date, duration, number } from "../tracing/format";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Shared histogram/brush UI; callers own the scoped metrics request. */
 export function ActivityChart({
@@ -126,9 +127,7 @@ export function ActivityChart({
         <span className="mr-auto truncate">
           {selection
             ? `${date(new Date(selection.start).toISOString())} → ${date(new Date(selection.end).toISOString())}`
-            : busy
-              ? "Loading activity…"
-              : ""}
+            : busy && <span className="sr-only">Loading activity</span>}
         </span>
         <span className="shrink-0">
           <i className="mr-1 inline-block size-2 bg-primary/50" />
@@ -154,230 +153,240 @@ export function ActivityChart({
           </Button>
         </div>
       ) : (
-        <svg
-          role="group"
-          tabIndex={0}
-          aria-label={
-            showLatency ? "Observation count and average latency over time" : "Log count over time"
-          }
-          className="block w-full touch-none select-none"
-          style={{ cursor: busy ? "default" : "crosshair" }}
-          width={width}
-          height={102}
-          onPointerDown={(event) => {
-            if (busy || event.button !== 0 || !buckets.length) return;
-            const time = timeAt(event.clientX, event.currentTarget);
-            const edge = (event.target as Element)
-              .closest("[data-range-edge]")
-              ?.getAttribute("data-range-edge");
-            drag.current =
-              selection && (edge === "start" || edge === "end")
-                ? { ...selection, edge }
-                : { start: time, end: time, edge: "new" };
-            setSelection({ start: drag.current.start, end: drag.current.end });
-            event.currentTarget.setPointerCapture?.(event.pointerId);
-          }}
-          onPointerMove={(event) => {
-            const time = timeAt(event.clientX, event.currentTarget);
-            setHovered(indexAt(time));
-            if (drag.current) {
-              setSelection(resize(time));
+        <>
+          {busy && (
+            <Skeleton
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-3 top-8 bottom-3"
+            />
+          )}
+          <svg
+            role="group"
+            tabIndex={0}
+            aria-label={
+              showLatency
+                ? "Observation count and average latency over time"
+                : "Log count over time"
             }
-          }}
-          onPointerUp={(event) => {
-            const range = drag.current;
-            if (!range) return;
-            const next = resize(timeAt(event.clientX, event.currentTarget));
-            drag.current = null;
-            setSelection(null);
-            if (event.currentTarget.hasPointerCapture?.(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            if (range.edge === "new" && x(next.end) - x(next.start) < 4) {
-              const bucket = buckets[indexAt(next.start)];
-              if (bucket) applyBucket(bucket);
-            } else commit(next.start, next.end);
-          }}
-          onPointerCancel={() => {
-            drag.current = null;
-            setSelection(null);
-          }}
-          onPointerLeave={() => {
-            if (!drag.current) setHovered(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
+            className="block w-full touch-none select-none"
+            style={{ cursor: busy ? "default" : "crosshair" }}
+            width={width}
+            height={102}
+            onPointerDown={(event) => {
+              if (busy || event.button !== 0 || !buckets.length) return;
+              const time = timeAt(event.clientX, event.currentTarget);
+              const edge = (event.target as Element)
+                .closest("[data-range-edge]")
+                ?.getAttribute("data-range-edge");
+              drag.current =
+                selection && (edge === "start" || edge === "end")
+                  ? { ...selection, edge }
+                  : { start: time, end: time, edge: "new" };
+              setSelection({ start: drag.current.start, end: drag.current.end });
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const time = timeAt(event.clientX, event.currentTarget);
+              setHovered(indexAt(time));
+              if (drag.current) {
+                setSelection(resize(time));
+              }
+            }}
+            onPointerUp={(event) => {
+              const range = drag.current;
+              if (!range) return;
+              const next = resize(timeAt(event.clientX, event.currentTarget));
               drag.current = null;
               setSelection(null);
-            }
-          }}
-        >
-          {[0, 0.5, 1].map((ratio) => (
-            <g key={ratio} aria-hidden="true">
-              <line
-                x1={left}
-                x2={right}
-                y1={bottom - ratio * (bottom - top)}
-                y2={bottom - ratio * (bottom - top)}
-                stroke="var(--border)"
-                strokeDasharray="2 3"
-              />
-              <text
-                x={left - 6}
-                y={bottom - ratio * (bottom - top) + 3}
-                textAnchor="end"
-                fill="var(--muted-foreground)"
-                fontSize={9}
-              >
-                {number(Math.ceil(countMax * ratio))}
-              </text>
-              {showLatency && (
+              if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              if (range.edge === "new" && x(next.end) - x(next.start) < 4) {
+                const bucket = buckets[indexAt(next.start)];
+                if (bucket) applyBucket(bucket);
+              } else commit(next.start, next.end);
+            }}
+            onPointerCancel={() => {
+              drag.current = null;
+              setSelection(null);
+            }}
+            onPointerLeave={() => {
+              if (!drag.current) setHovered(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                drag.current = null;
+                setSelection(null);
+              }
+            }}
+          >
+            {[0, 0.5, 1].map((ratio) => (
+              <g key={ratio} aria-hidden="true">
+                <line
+                  x1={left}
+                  x2={right}
+                  y1={bottom - ratio * (bottom - top)}
+                  y2={bottom - ratio * (bottom - top)}
+                  stroke="var(--border)"
+                  strokeDasharray="2 3"
+                />
                 <text
-                  x={right + 6}
+                  x={left - 6}
                   y={bottom - ratio * (bottom - top) + 3}
+                  textAnchor="end"
                   fill="var(--muted-foreground)"
                   fontSize={9}
                 >
-                  {duration(latencyMax * ratio)}
+                  {number(Math.ceil(countMax * ratio))}
                 </text>
-              )}
-            </g>
-          ))}
-          {!busy &&
-            buckets.map((bucket, index) => {
-              const start = x(Date.parse(bucket.startTime)),
-                end = x(Date.parse(bucket.endTime));
-              const h = (Number(bucket.count) / countMax) * (bottom - top);
-              return (
-                <g key={bucket.startTime}>
-                  <title>{`${date(bucket.startTime)} · ${number(Number(bucket.count))} ${kind === "Log" ? "logs" : "observations"} · ${number(Number(bucket.errorCount))} errors${showLatency ? ` · ${duration(bucket.averageLatencySeconds)} s` : ""}`}</title>
-                  <rect
-                    data-slot="activity-bar"
-                    data-errors={bucket.errorCount > 0n}
-                    x={start + 1}
-                    y={bottom - h}
-                    width={Math.max(1, end - start - 2)}
-                    height={h}
-                    fill={bucket.errorCount > 0n ? "var(--destructive)" : "var(--primary)"}
-                    opacity={hovered === index ? 0.8 : 0.5}
-                  />
-                  <rect
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${date(bucket.startTime)}: ${number(Number(bucket.count))} ${kind === "Log" ? "logs" : "observations"}, ${number(Number(bucket.errorCount))} errors${showLatency ? `, average latency ${duration(bucket.averageLatencySeconds)} seconds` : ""}. Filter to this interval.`}
-                    x={start}
-                    y={top}
-                    width={Math.max(1, end - start)}
-                    height={bottom - top}
-                    fill="transparent"
-                    onFocus={() => setHovered(index)}
-                    onBlur={() => setHovered(null)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        applyBucket(bucket);
-                      }
-                    }}
-                  />
-                </g>
-              );
-            })}
-          {showLatency && (
-            <>
-              <path
-                data-slot="activity-latency"
-                d={path}
-                fill="none"
-                stroke="var(--color-orange-500)"
-                strokeWidth={1.5}
-                className="pointer-events-none"
-              />
-              {points.map((p) => (
-                <circle
-                  key={p.key}
-                  cx={p.x}
-                  cy={p.y}
-                  r={2}
-                  fill="var(--color-orange-500)"
+                {showLatency && (
+                  <text
+                    x={right + 6}
+                    y={bottom - ratio * (bottom - top) + 3}
+                    fill="var(--muted-foreground)"
+                    fontSize={9}
+                  >
+                    {duration(latencyMax * ratio)}
+                  </text>
+                )}
+              </g>
+            ))}
+            {!busy &&
+              buckets.map((bucket, index) => {
+                const start = x(Date.parse(bucket.startTime)),
+                  end = x(Date.parse(bucket.endTime));
+                const h = (Number(bucket.count) / countMax) * (bottom - top);
+                return (
+                  <g key={bucket.startTime}>
+                    <title>{`${date(bucket.startTime)} · ${number(Number(bucket.count))} ${kind === "Log" ? "logs" : "observations"} · ${number(Number(bucket.errorCount))} errors${showLatency ? ` · ${duration(bucket.averageLatencySeconds)} s` : ""}`}</title>
+                    <rect
+                      data-slot="activity-bar"
+                      data-errors={bucket.errorCount > 0n}
+                      x={start + 1}
+                      y={bottom - h}
+                      width={Math.max(1, end - start - 2)}
+                      height={h}
+                      fill={bucket.errorCount > 0n ? "var(--destructive)" : "var(--primary)"}
+                      opacity={hovered === index ? 0.8 : 0.5}
+                    />
+                    <rect
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${date(bucket.startTime)}: ${number(Number(bucket.count))} ${kind === "Log" ? "logs" : "observations"}, ${number(Number(bucket.errorCount))} errors${showLatency ? `, average latency ${duration(bucket.averageLatencySeconds)} seconds` : ""}. Filter to this interval.`}
+                      x={start}
+                      y={top}
+                      width={Math.max(1, end - start)}
+                      height={bottom - top}
+                      fill="transparent"
+                      onFocus={() => setHovered(index)}
+                      onBlur={() => setHovered(null)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          applyBucket(bucket);
+                        }
+                      }}
+                    />
+                  </g>
+                );
+              })}
+            {showLatency && (
+              <>
+                <path
+                  data-slot="activity-latency"
+                  d={path}
+                  fill="none"
+                  stroke="var(--color-orange-500)"
+                  strokeWidth={1.5}
                   className="pointer-events-none"
                 />
-              ))}
-            </>
-          )}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <text
-              key={ratio}
-              x={left + ratio * (right - left)}
-              y={95}
-              textAnchor={ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"}
-              fill="var(--muted-foreground)"
-              fontSize={9}
-            >
-              {date(new Date(from + (to - from) * ratio).toISOString()).slice(0, 14)}
-            </text>
-          ))}
-          {selection && (
-            <g>
-              <rect
-                data-slot="activity-selection"
-                x={x(selection.start)}
-                y={top}
-                width={Math.max(1, x(selection.end) - x(selection.start))}
-                height={bottom - top}
-                fill="var(--primary)"
-                fillOpacity={0.12}
-                stroke="var(--primary)"
-                strokeWidth={1}
-                className="pointer-events-none"
-              />
-              {(["start", "end"] as const).map((edge) => (
-                <g
-                  key={edge}
-                  data-range-edge={edge}
-                  role="slider"
-                  tabIndex={0}
-                  aria-label={edge === "start" ? "Selected range start" : "Selected range end"}
-                  aria-valuemin={from}
-                  aria-valuemax={to}
-                  aria-valuenow={selection[edge]}
-                  aria-valuetext={date(new Date(selection[edge]).toISOString())}
-                  className="cursor-ew-resize outline-none focus-visible:stroke-ring"
-                  onKeyDown={(event) => {
-                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const value =
-                      event.key === "Home"
-                        ? from
-                        : event.key === "End"
-                          ? to
-                          : selection[edge] +
-                            ((event.key === "ArrowLeft" ? -1 : 1) * (to - from)) / 100;
-                    if (edge === "start")
-                      commit(Math.max(from, Math.min(selection.end - 1, value)), selection.end);
-                    else
-                      commit(selection.start, Math.min(to, Math.max(selection.start + 1, value)));
-                  }}
-                >
-                  <rect
-                    x={x(selection[edge]) - 7}
-                    y={top - 2}
-                    width={14}
-                    height={bottom - top + 4}
-                    fill="transparent"
+                {points.map((p) => (
+                  <circle
+                    key={p.key}
+                    cx={p.x}
+                    cy={p.y}
+                    r={2}
+                    fill="var(--color-orange-500)"
+                    className="pointer-events-none"
                   />
-                  <rect
-                    x={x(selection[edge]) - 2}
-                    y={top}
-                    width={4}
-                    height={bottom - top}
-                    rx={1}
-                    fill="var(--primary)"
-                  />
-                </g>
-              ))}
-            </g>
-          )}
-        </svg>
+                ))}
+              </>
+            )}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+              <text
+                key={ratio}
+                x={left + ratio * (right - left)}
+                y={95}
+                textAnchor={ratio === 0 ? "start" : ratio === 1 ? "end" : "middle"}
+                fill="var(--muted-foreground)"
+                fontSize={9}
+              >
+                {date(new Date(from + (to - from) * ratio).toISOString()).slice(0, 14)}
+              </text>
+            ))}
+            {selection && (
+              <g>
+                <rect
+                  data-slot="activity-selection"
+                  x={x(selection.start)}
+                  y={top}
+                  width={Math.max(1, x(selection.end) - x(selection.start))}
+                  height={bottom - top}
+                  fill="var(--primary)"
+                  fillOpacity={0.12}
+                  stroke="var(--primary)"
+                  strokeWidth={1}
+                  className="pointer-events-none"
+                />
+                {(["start", "end"] as const).map((edge) => (
+                  <g
+                    key={edge}
+                    data-range-edge={edge}
+                    role="slider"
+                    tabIndex={0}
+                    aria-label={edge === "start" ? "Selected range start" : "Selected range end"}
+                    aria-valuemin={from}
+                    aria-valuemax={to}
+                    aria-valuenow={selection[edge]}
+                    aria-valuetext={date(new Date(selection[edge]).toISOString())}
+                    className="cursor-ew-resize outline-none focus-visible:stroke-ring"
+                    onKeyDown={(event) => {
+                      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const value =
+                        event.key === "Home"
+                          ? from
+                          : event.key === "End"
+                            ? to
+                            : selection[edge] +
+                              ((event.key === "ArrowLeft" ? -1 : 1) * (to - from)) / 100;
+                      if (edge === "start")
+                        commit(Math.max(from, Math.min(selection.end - 1, value)), selection.end);
+                      else
+                        commit(selection.start, Math.min(to, Math.max(selection.start + 1, value)));
+                    }}
+                  >
+                    <rect
+                      x={x(selection[edge]) - 7}
+                      y={top - 2}
+                      width={14}
+                      height={bottom - top + 4}
+                      fill="transparent"
+                    />
+                    <rect
+                      x={x(selection[edge]) - 2}
+                      y={top}
+                      width={4}
+                      height={bottom - top}
+                      rx={1}
+                      fill="var(--primary)"
+                    />
+                  </g>
+                ))}
+              </g>
+            )}
+          </svg>
+        </>
       )}
     </div>
   );

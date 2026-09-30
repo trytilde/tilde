@@ -24,8 +24,6 @@ message Identity {
  optional string root_identity_id = 7;
  google.protobuf.Timestamp verified_at = 8;
  google.protobuf.Timestamp attested_at = 9;
- optional string attested_by_user_id = 10;
- optional string attested_by_api_key_id = 11;
 }
 message RootIdentity { string id = 1; google.protobuf.Timestamp created_at = 2; }
 message CreateIdentityRequest {

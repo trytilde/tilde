@@ -45,7 +45,6 @@ impl Agents {
             crate::connections::db::tilde_delete_execute(&tx, tilde.id).await?;
         }
         crate::agent::db::delete_execute(&tx, id).await?;
-        crate::iam::db::roles_purge(&tx, crate::iam::authz::Resource::agent(id)).await?;
         tx.commit().await?;
         drop(tx_client);
         Ok(())

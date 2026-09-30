@@ -97,6 +97,11 @@ async fn dev_registration_is_reused_and_the_sdk_agent_dials_in_with_a_rotated_to
                 .env("ENGINE_SERVE", "runtime")
                 .env("ENGINE_WEB_ENABLED", "false")
                 .env("ENGINE_RUNTIME_PUBLIC_URL", &gateway)
+                // Required at startup; dev-agent never reads telemetry, so none is running.
+                .env("ENGINE_CLICKHOUSE_URL", "http://127.0.0.1:9")
+                .env("ENGINE_LOGS_S3_BUCKET", "unused-logs")
+                .env("ENGINE_TRACES_S3_BUCKET", "unused-traces")
+                .env("ENGINE_METRICS_S3_BUCKET", "unused-metrics")
                 .env("DEV_AGENTS", "vercel-ai")
                 .env("OPENAI_API_KEY", "fixture-unused-key")
                 .stdout(std::process::Stdio::piped())

@@ -1,3 +1,6 @@
+import { condition } from "./filter-query";
+import { tokens } from "../observability/query";
+
 export const ranges = {
   "15m": 15 * 60_000,
   "1h": 3600_000,
@@ -22,7 +25,10 @@ export type TraceSearch = {
   trace?: string;
   observation?: string;
   inspectSession?: string;
+  /** Every other term of the query, verbatim: operators, negations, numbers and attributes. */
+  where?: string;
 };
+
 export function parseSearch(raw: Record<string, unknown>): TraceSearch {
   const values = Object.fromEntries(
     [
@@ -41,10 +47,24 @@ export function parseSearch(raw: Record<string, unknown>): TraceSearch {
       "trace",
       "observation",
       "inspectSession",
+      "where",
     ].flatMap((key) => (typeof raw[key] === "string" && raw[key] ? [[key, raw[key]]] : [])),
   );
   if (values.range && values.range !== "custom" && !(values.range in ranges)) delete values.range;
   for (const key of ["from", "to"])
     if (values[key] && !Number.isFinite(Date.parse(values[key]))) delete values[key];
+  // A shared link with a malformed expression must not break rendering: every term of
+  // `where` has to be a condition the server accepts, otherwise the expression is dropped.
+  if (values.where && !validWhere(values.where)) delete values.where;
   return values;
+}
+function validWhere(where: string) {
+  const scanned = tokens(where);
+  if (scanned.unfinished) return false;
+  try {
+    scanned.items.forEach((token) => condition(token.text));
+    return true;
+  } catch {
+    return false;
+  }
 }

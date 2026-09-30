@@ -1,6 +1,5 @@
 use super::*;
 use crate::connections::{model as m, service::Connections};
-use crate::iam::authz::{self, Action, Resource};
 use crate::proto::tilde::management::v1 as management;
 use connectrpc::{Encodable, RequestContext, Response, ServiceRequest, ServiceResult};
 use secrecy::SecretString;
@@ -8,14 +7,6 @@ use std::sync::Arc;
 use uuid::Uuid;
 struct Rpc(Connections);
 use crate::services::tilde::management::v1::ConnectionsService;
-/// Connections carry no roles; attaching one changes the agent, so that is what is checked.
-async fn authorize_assignment(
-    ctx: &RequestContext,
-    assignment: &m::Assignment,
-) -> Result<(), connectrpc::ConnectError> {
-    authz::require(ctx, Resource::agent(assignment.agent_id), Action::Edit).await?;
-    Ok(())
-}
 pub fn router(connections: Connections) -> axum::Router {
     crate::rpc::mount(
         connectrpc::Router::new().add_service(Arc::new(Rpc(connections))),
@@ -26,7 +17,7 @@ use base64::Engine;
 impl ConnectionsService for Rpc {
     async fn assign_capability<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::AssignCapabilityRequest>,
     ) -> ServiceResult<impl Encodable<management::AssignCapabilityResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -36,12 +27,10 @@ impl ConnectionsService for Rpc {
                 .into_option()
                 .ok_or_else(|| m::invalid("Assignment required"))?,
         )?;
-        authorize_assignment(&ctx, &assignment).await?;
+        let connection = id(&request.connection_id)?;
         Response::ok(management::AssignCapabilityResponse {
             connection: connection_wire(
-                self.0
-                    .assign(id(&request.connection_id)?, &assignment)
-                    .await?,
+                self.0.assign(connection, &assignment).await?,
                 &self.0.public_event_ingress_url,
             )
             .into(),
@@ -50,7 +39,7 @@ impl ConnectionsService for Rpc {
     }
     async fn unassign_capability<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::UnassignCapabilityRequest>,
     ) -> ServiceResult<impl Encodable<management::UnassignCapabilityResponse> + Send + use<'a>>
     {
@@ -61,7 +50,6 @@ impl ConnectionsService for Rpc {
                 .into_option()
                 .ok_or_else(|| m::invalid("Assignment required"))?,
         )?;
-        authorize_assignment(&ctx, &assignment).await?;
         Response::ok(management::UnassignCapabilityResponse {
             connection: connection_wire(
                 self.0
@@ -79,17 +67,23 @@ impl ConnectionsService for Rpc {
         request: ServiceRequest<'_, management::ListProvidersRequest>,
     ) -> ServiceResult<impl Encodable<management::ListProvidersResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
+        let filter = crate::connections::catalog::ProviderFilter {
+            search: crate::rpc::search(request.search.as_deref())?,
+            capability: request
+                .capability
+                .map(super::capability_model)
+                .transpose()?,
+            category: request.category.as_deref().filter(|c| !c.is_empty()),
+            source: provider_source(request.source)?,
+        };
         let (providers, next) = self
             .0
-            .providers(
-                &request.page_token,
-                request.search.as_deref(),
-                request.page_size,
-            )
+            .providers(&request.page_token, &filter, request.page_size)
             .await?;
         Response::ok(management::ListProvidersResponse {
             providers: providers.into_iter().map(provider_wire).collect(),
             next_page_token: next,
+            categories: self.0.provider_categories(&filter).await?,
             ..Default::default()
         })
     }
@@ -105,11 +99,9 @@ impl ConnectionsService for Rpc {
     }
     async fn register_provider<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::RegisterProviderRequest>,
     ) -> ServiceResult<impl Encodable<management::RegisterProviderResponse> + Send + use<'a>> {
-        authz::require_user(&ctx)?;
-        authz::require_admin(&ctx)?;
         let request = request.to_owned_message();
         let provider = provider_model(
             request
@@ -129,10 +121,9 @@ impl ConnectionsService for Rpc {
     }
     async fn start_connection<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::StartConnectionRequest>,
     ) -> ServiceResult<impl Encodable<management::StartConnectionResponse> + Send + use<'a>> {
-        authz::caller(&ctx)?;
         let request = request.to_owned_message();
         let target = if request.id.is_empty() {
             Uuid::new_v4()
@@ -144,9 +135,7 @@ impl ConnectionsService for Rpc {
             .into_iter()
             .map(assignment_model)
             .collect::<Result<Vec<_>, _>>()?;
-        for assignment in &assignments {
-            authorize_assignment(&ctx, assignment).await?;
-        }
+        // Starting again with an existing id resumes that connection's setup.
         let started = self
             .0
             .start(
@@ -166,22 +155,22 @@ impl ConnectionsService for Rpc {
     }
     async fn get_connection<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::GetConnectionRequest>,
     ) -> ServiceResult<impl Encodable<management::GetConnectionResponse> + Send + use<'a>> {
-        authz::caller(&ctx)?;
+        let connection = self
+            .0
+            .get(id(request.id)?)
+            .await
+            .map_err(|_| connectrpc::ConnectError::not_found("Not found"))?;
         Response::ok(management::GetConnectionResponse {
-            connection: connection_wire(
-                self.0.get(id(request.id)?).await?,
-                &self.0.public_event_ingress_url,
-            )
-            .into(),
+            connection: connection_wire(connection, &self.0.public_event_ingress_url).into(),
             ..Default::default()
         })
     }
     async fn list_connections<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::ListConnectionsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListConnectionsResponse> + Send + use<'a>> {
         let after = if request.page_token.is_empty() {
@@ -200,15 +189,20 @@ impl ConnectionsService for Rpc {
         };
         let (connections, next) = self
             .0
-            .list_as(
+            .list_filtered(
                 after,
                 request.page_size,
-                request.agent_id.map(id).transpose()?,
-                request
-                    .capability
-                    .map(super::capability_model)
-                    .transpose()?,
-                authz::caller(&ctx)?,
+                &crate::connections::service::ConnectionFilter {
+                    agent_id: request.agent_id.map(id).transpose()?,
+                    capability: request
+                        .capability
+                        .map(super::capability_model)
+                        .transpose()?,
+                    search: crate::rpc::search(request.search)?,
+                    provider_id: request.provider_id.filter(|p| !p.is_empty()),
+                    status: request.status.filter(|s| !s.is_empty()),
+                    source: provider_source(request.source)?,
+                },
             )
             .await?;
         let next = next
@@ -230,11 +224,11 @@ impl ConnectionsService for Rpc {
     }
     async fn reconnect<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::ReconnectRequest>,
     ) -> ServiceResult<impl Encodable<management::ReconnectResponse> + Send + use<'a>> {
-        authz::caller(&ctx)?;
-        let started = self.0.reconnect(id(request.id)?).await?;
+        let target = id(request.id)?;
+        let started = self.0.reconnect(target).await?;
         Response::ok(management::ReconnectResponse {
             connection: connection_wire(started.connection, &self.0.public_event_ingress_url)
                 .into(),
@@ -244,11 +238,25 @@ impl ConnectionsService for Rpc {
     }
     async fn disconnect<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         request: ServiceRequest<'_, management::DisconnectRequest>,
     ) -> ServiceResult<impl Encodable<management::DisconnectResponse> + Send + use<'a>> {
-        authz::caller(&ctx)?;
-        self.0.disconnect(id(request.id)?).await?;
+        let target = id(request.id)?;
+        self.0.disconnect(target).await?;
         Response::ok(management::DisconnectResponse::default())
     }
+}
+
+fn provider_source(
+    source: Option<buffa::EnumValue<management::ProviderSource>>,
+) -> Result<Option<crate::connections::catalog::ProviderSource>, crate::error::Error> {
+    use crate::connections::catalog::ProviderSource as Source;
+    Ok(match source {
+        None => None,
+        Some(s) if s == management::ProviderSource::Unspecified => None,
+        Some(s) if s == management::ProviderSource::Catalog => Some(Source::Catalog),
+        Some(s) if s == management::ProviderSource::McpServer => Some(Source::McpServer),
+        Some(s) if s == management::ProviderSource::ToolHost => Some(Source::ToolHost),
+        Some(_) => return Err(m::invalid("Unknown provider source")),
+    })
 }

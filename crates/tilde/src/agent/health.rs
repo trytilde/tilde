@@ -1,4 +1,5 @@
-//! Persisted runtime readiness, 12 hourly history buckets, and registry statistics.
+//! Persisted runtime readiness, 12 hourly history buckets, and registry statistics. The same
+//! sweep samples tool host availability for the remote servers' history.
 //! One bounded Tokio task polls every 30s. A transaction advisory lock serializes active
 //! sweeps across replicas; cancellation rolls back the sampling transaction.
 use crate::database::Pool;
@@ -8,6 +9,8 @@ use chrono::{DateTime, Utc};
 use std::{collections::HashMap, time::Duration};
 
 const INTERVAL: Duration = Duration::from_secs(30);
+/// A sample older than this reads as unknown, in metrics and in the registry health filter.
+pub const FRESH_SECS: i64 = 90;
 
 #[derive(Clone)]
 pub struct AgentHealth {
@@ -21,7 +24,10 @@ impl AgentHealth {
 
     /// Remove expired observations on startup and hourly thereafter.
     pub async fn cleanup(&self) -> Result<u64, Error> {
-        Ok(crate::agent::db::health_cleanup_execute(&self.pool.get().await?, Utc::now()).await?)
+        let client = self.pool.get().await?;
+        crate::tools::db::host_health_cleanup_execute(&client, Utc::now()).await?;
+        crate::tools::db::mcp_health_cleanup_execute(&client, Utc::now()).await?;
+        Ok(crate::agent::db::health_cleanup_execute(&client, Utc::now()).await?)
     }
 
     /// Record a deployment-health sample even when the agent has no live deployment.
@@ -31,7 +37,10 @@ impl AgentHealth {
         if !crate::agent::db::health_lock_one(&tx).await?.acquired {
             return Ok(());
         }
-        crate::agent::db::health_sample_execute(&tx, Utc::now()).await?;
+        let now = Utc::now();
+        crate::agent::db::health_sample_execute(&tx, now).await?;
+        crate::tools::db::host_health_sample_execute(&tx, now, crate::tools::hosts::LIVENESS_SECS)
+            .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -81,7 +90,7 @@ pub async fn metrics(
     let mut result = HashMap::with_capacity(rows.len());
     for row in rows {
         let status = match (row.healthy, row.checked_at) {
-            (Some(healthy), Some(at)) if now - at <= chrono::Duration::seconds(90) => {
+            (Some(healthy), Some(at)) if now - at <= chrono::Duration::seconds(FRESH_SECS) => {
                 if row.degraded == Some(true) {
                     types::AgentHealthStatus::Degraded
                 } else if healthy {

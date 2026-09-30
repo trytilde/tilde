@@ -600,6 +600,8 @@ pub struct OAuthConfigurationView<'a> {
         'a,
         super::super::__buffa::view::OAuthResultFieldView<'a>,
     >,
+    /// Field 15: `client`
+    pub client: ::buffa::EnumValue<super::super::OAuthClient>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for OAuthConfigurationView<'a> {
@@ -701,6 +703,15 @@ impl<'a> ::buffa::MessageView<'a> for OAuthConfigurationView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.success_path = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.client = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -817,6 +828,7 @@ impl<'a> ::buffa::MessageView<'a> for OAuthConfigurationView<'a> {
                 .iter()
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            client: self.client,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -897,6 +909,12 @@ impl<'a> ::buffa::ViewEncode<'a> for OAuthConfigurationView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        {
+            let val = self.client.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -968,6 +986,12 @@ impl<'a> ::buffa::ViewEncode<'a> for OAuthConfigurationView<'a> {
             );
             v.write_to(__cache, buf);
         }
+        {
+            let val = self.client.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(15u32, val, buf);
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -1036,6 +1060,9 @@ impl<'__a> ::serde::Serialize for OAuthConfigurationView<'__a> {
         }
         if !self.result_fields.is_empty() {
             __map.serialize_entry("resultFields", &*self.result_fields)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.client) {
+            __map.serialize_entry("client", &self.client)?;
         }
         __map.end()
     }
@@ -1213,6 +1240,11 @@ impl OAuthConfigurationOwnedView {
     > {
         &self.0.reborrow().result_fields
     }
+    /// Field 15: `client`
+    #[must_use]
+    pub fn client(&self) -> ::buffa::EnumValue<super::super::OAuthClient> {
+        self.0.reborrow().client
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<OAuthConfigurationView<'static>>>
 for OAuthConfigurationOwnedView {
@@ -1244,6 +1276,333 @@ impl ::serde::Serialize for OAuthConfigurationOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// The MCP server at `url` that serves a connection type's tools. The credential says how the
+/// connection's secret reaches the server: BEARER sends the OAuth access token (or `api_key`) as
+/// a bearer token, HEADER sends `prefix + api_key` in the header `name`, QUERY sends `api_key` as
+/// the query parameter `name`.
+#[derive(Clone, Debug, Default)]
+pub struct McpServerView<'a> {
+    /// Field 1: `url`
+    pub url: &'a str,
+    /// Field 2: `credential`
+    pub credential: ::buffa::EnumValue<super::super::McpCredential>,
+    /// Field 3: `name`
+    pub name: ::core::option::Option<&'a str>,
+    /// Field 4: `prefix`
+    pub prefix: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for McpServerView<'a> {
+    type Owned = super::super::McpServer;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.url = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.credential = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.prefix = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::McpServer, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::McpServer, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::McpServer {
+            url: self.url.to_string(),
+            credential: self.credential,
+            name: self.name.map(|s| s.to_string()),
+            prefix: self.prefix.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for McpServerView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        {
+            let val = self.credential.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if let Some(ref v) = self.name {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if !self.prefix.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.prefix) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        {
+            let val = self.credential.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.name {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if !self.prefix.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.prefix, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for McpServerView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
+            __map.serialize_entry("url", self.url)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.credential) {
+            __map.serialize_entry("credential", &self.credential)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.name {
+            __map.serialize_entry("name", __v)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.prefix) {
+            __map.serialize_entry("prefix", self.prefix)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for McpServerView<'a> {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "McpServer";
+    const FULL_NAME: &'static str = "tilde.types.v1.McpServer";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.McpServer";
+}
+::buffa::impl_default_view_instance!(McpServerView);
+::buffa::impl_view_reborrow!(McpServerView);
+/** Self-contained, `'static` owned view of a `McpServer` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`McpServerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`McpServerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct McpServerOwnedView(::buffa::OwnedView<McpServerView<'static>>);
+impl McpServerOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::McpServer,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`McpServerView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &McpServerView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::McpServer {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `url`
+    #[must_use]
+    pub fn url(&self) -> &'_ str {
+        self.0.reborrow().url
+    }
+    /// Field 2: `credential`
+    #[must_use]
+    pub fn credential(&self) -> ::buffa::EnumValue<super::super::McpCredential> {
+        self.0.reborrow().credential
+    }
+    /// Field 3: `name`
+    #[must_use]
+    pub fn name(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().name
+    }
+    /// Field 4: `prefix`
+    #[must_use]
+    pub fn prefix(&self) -> &'_ str {
+        self.0.reborrow().prefix
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<McpServerView<'static>>>
+for McpServerOwnedView {
+    fn from(inner: ::buffa::OwnedView<McpServerView<'static>>) -> Self {
+        McpServerOwnedView(inner)
+    }
+}
+impl ::core::convert::From<McpServerOwnedView>
+for ::buffa::OwnedView<McpServerView<'static>> {
+    fn from(wrapper: McpServerOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<McpServerView<'static>>>
+for McpServerOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<McpServerView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::McpServer {
+    type View<'a> = McpServerView<'a>;
+    type ViewHandle = McpServerOwnedView;
+}
+impl ::serde::Serialize for McpServerOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
 #[derive(Clone, Debug, Default)]
 pub struct ConnectionTypeView<'a> {
     /// Field 1: `id`
@@ -1254,6 +1613,12 @@ pub struct ConnectionTypeView<'a> {
     pub capabilities: ::buffa::RepeatedView<
         'a,
         ::buffa::EnumValue<super::super::Capability>,
+    >,
+    /// Set when the type's tools are served by an MCP server rather than built into Tilde.
+    ///
+    /// Field 15: `mcp_server`
+    pub mcp_server: ::buffa::MessageFieldView<
+        super::super::__buffa::view::McpServerView<'a>,
     >,
     pub credential_source: ::core::option::Option<
         super::super::__buffa::view::oneof::connection_type::CredentialSource<'a>,
@@ -1301,6 +1666,27 @@ impl<'a> ::buffa::MessageView<'a> for ConnectionTypeView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.mcp_server.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.mcp_server = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::McpServerView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
             }
             4u32 => {
                 if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
@@ -1449,6 +1835,15 @@ impl<'a> ::buffa::MessageView<'a> for ConnectionTypeView<'a> {
             id: self.id.to_string(),
             name: self.name.to_string(),
             capabilities: self.capabilities.to_vec(),
+            mcp_server: match self.mcp_server.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::McpServer,
+                        ::buffa::Inline<super::super::McpServer>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
             credential_source: match self.credential_source.as_ref() {
                 ::core::option::Option::Some(v) => {
                     ::core::option::Option::Some(
@@ -1544,6 +1939,14 @@ impl<'a> ::buffa::ViewEncode<'a> for ConnectionTypeView<'a> {
                 }
             }
         }
+        if self.mcp_server.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.mcp_server.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1606,6 +2009,14 @@ impl<'a> ::buffa::ViewEncode<'a> for ConnectionTypeView<'a> {
                 }
             }
         }
+        if self.mcp_server.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.mcp_server.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -1639,6 +2050,11 @@ impl<'__a> ::serde::Serialize for ConnectionTypeView<'__a> {
                     "capabilities",
                     &::buffa::json_helpers::EnumSeqJson(&self.capabilities),
                 )?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.mcp_server.as_option() {
+                __map.serialize_entry("mcpServer", __v)?;
+            }
         }
         if let ::core::option::Option::Some(ref __ov) = self.credential_source {
             match __ov {
@@ -1768,6 +2184,15 @@ impl ConnectionTypeOwnedView {
         &self,
     ) -> &::buffa::RepeatedView<'_, ::buffa::EnumValue<super::super::Capability>> {
         &self.0.reborrow().capabilities
+    }
+    /// Set when the type's tools are served by an MCP server rather than built into Tilde.
+    ///
+    /// Field 15: `mcp_server`
+    #[must_use]
+    pub fn mcp_server(
+        &self,
+    ) -> &::buffa::MessageFieldView<super::super::__buffa::view::McpServerView<'_>> {
+        &self.0.reborrow().mcp_server
     }
     /// Oneof `credential_source`.
     #[must_use]

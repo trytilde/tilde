@@ -459,6 +459,12 @@ async fn forward(
         provider: upstream.provider,
         kind,
         path: rest,
+        prompts: parts
+            .headers
+            .get("x-tilde-prompt")
+            .and_then(|v| v.to_str().ok())
+            .map(audit::prompt_stamps)
+            .unwrap_or_default(),
         status: 0,
         started,
         first_byte: None,

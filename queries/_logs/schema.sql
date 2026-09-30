@@ -19,5 +19,4 @@ CREATE TABLE IF NOT EXISTS otel_logs (
 ) ENGINE = ReplacingMergeTree
 PARTITION BY toDate(Timestamp)
 ORDER BY (AgentId, Timestamp, LogId)
-TTL toDateTime(Timestamp) + INTERVAL 7 DAY DELETE
 SETTINGS index_granularity = 8192

@@ -6,10 +6,7 @@ import ipaddress
 import os
 from urllib.parse import urlsplit, urlunsplit
 
-spec = importlib.util.spec_from_file_location("dev_langfuse", Path(__file__).with_name("dev-langfuse.py"))
-langfuse = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(langfuse)
-env = langfuse.configure(os.environ)
+env = dict(os.environ)
 spec = importlib.util.spec_from_file_location("dev_logs", Path(__file__).with_name("dev-logs.py"))
 logs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(logs)
@@ -48,8 +45,7 @@ if not ip.is_loopback:
     for key in [
         "ENGINE_PUBLIC_URL", "ENGINE_INGRESS_PUBLIC_URL", "ENGINE_RUNTIME_PUBLIC_URL",
         "ENGINE_CONNECTION_SETUP_PUBLIC_URL", "ENGINE_CONNECTION_UI_DEV_URL",
-        "ENGINE_DEV_URL", "ENGINE_OIDC_ISSUER", "DEX_DEV_ISSUER",
-        "DEX_DEV_WEB_CALLBACK", "DEX_DEV_API_CALLBACK",
+        "ENGINE_DEV_URL",
         "ENGINE_S3_ENDPOINT", "ENGINE_S3_PUBLIC_ENDPOINT",
     ]:
         if env.get(key):

@@ -11,12 +11,13 @@ pub fn definition() -> Provider {
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_EMAIL.into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: "inbox".into(),
             name: "AgentMail inbox".into(),
             credential_source: CredentialSource::Static {
                 schema: serde_json::json!({"type": "object", "additionalProperties": false, "properties": {"inbox_id": {"type": "string", "title": "Inbox ID", "minLength": 1}, "api_key": {"type": "string", "title": "API key", "minLength": 1, "writeOnly": true}, "webhook_secret": {"type": "string", "title": "Webhook signing secret", "minLength": 1, "writeOnly": true}}, "required": ["inbox_id", "api_key", "webhook_secret"]}),
             },
-            capabilities: vec![Capability::Channel],
+            capabilities: vec![Capability::Channel, Capability::Tool],
         }],
     }
 }

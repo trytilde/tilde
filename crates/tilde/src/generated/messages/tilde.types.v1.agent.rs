@@ -721,6 +721,15 @@ pub struct Agent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
+    /// Free-text summary shown under the name; at most 500 characters.
+    ///
+    /// Field 14: `description`
+    #[serde(
+        rename = "description",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub description: ::buffa::alloc::string::String,
     /// Field 5: `created_at`
     #[serde(
         rename = "createdAt",
@@ -766,6 +775,7 @@ impl ::core::fmt::Debug for Agent {
             .field("paused", &self.paused)
             .field("id", &self.id)
             .field("name", &self.name)
+            .field("description", &self.description)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("metrics", &self.metrics)
@@ -865,6 +875,9 @@ impl ::buffa::Message for Agent {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
+        if !self.description.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -927,6 +940,9 @@ impl ::buffa::Message for Agent {
             if val != 0 {
                 ::buffa::types::put_int32_field(13u32, val, buf);
             }
+        }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.description, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1034,6 +1050,13 @@ impl ::buffa::Message for Agent {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.description, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1052,6 +1075,7 @@ impl ::buffa::Message for Agent {
         self.avatar_seed.clear();
         self.avatar_url = ::core::option::Option::None;
         self.concurrency_policy = ::buffa::EnumValue::from(0);
+        self.description.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1703,6 +1727,55 @@ pub struct Capabilities {
         TargetPermission,
         ::buffa::Inline<TargetPermission>,
     >,
+    /// Fine-grained half of updating an agent: assign its skills.
+    ///
+    /// Field 14: `agents_edit_skills`
+    #[serde(
+        rename = "agentsEditSkills",
+        alias = "agents_edit_skills",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_edit_skills: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Write skills into the targeted editor skill sources and sync targeted git sources.
+    ///
+    /// Field 15: `skills_edit`
+    #[serde(
+        rename = "skillsEdit",
+        alias = "skills_edit",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub skills_edit: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// See the targeted skill sources and assign their skills (with agents_edit_skills on the
+    /// receiving agent); skills_edit implies it.
+    ///
+    /// Field 16: `skills_read`
+    #[serde(
+        rename = "skillsRead",
+        alias = "skills_read",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub skills_read: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
+    /// Tools on the conversing user's own connections. SELECTED ids are provider IDs.
+    ///
+    /// Field 17: `tools_personal`
+    #[serde(
+        rename = "toolsPersonal",
+        alias = "tools_personal",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub tools_personal: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1721,6 +1794,10 @@ impl ::core::fmt::Debug for Capabilities {
             .field("work_write", &self.work_write)
             .field("run_update", &self.run_update)
             .field("tools_invoke", &self.tools_invoke)
+            .field("agents_edit_skills", &self.agents_edit_skills)
+            .field("skills_edit", &self.skills_edit)
+            .field("skills_read", &self.skills_read)
+            .field("tools_personal", &self.tools_personal)
             .finish()
     }
 }
@@ -1829,6 +1906,38 @@ impl ::buffa::Message for Capabilities {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.agents_edit_skills.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_edit_skills.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.skills_edit.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.skills_edit.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.skills_read.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.skills_read.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.tools_personal.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.tools_personal.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1916,6 +2025,38 @@ impl ::buffa::Message for Capabilities {
                 buf,
             );
             self.tools_invoke.write_to(__cache, buf);
+        }
+        if self.agents_edit_skills.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                14u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_edit_skills.write_to(__cache, buf);
+        }
+        if self.skills_edit.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.skills_edit.write_to(__cache, buf);
+        }
+        if self.skills_read.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                16u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.skills_read.write_to(__cache, buf);
+        }
+        if self.tools_personal.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                17u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.tools_personal.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2041,6 +2182,50 @@ impl ::buffa::Message for Capabilities {
                     ctx,
                 )?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_edit_skills.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.skills_edit.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.skills_read.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.tools_personal.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2060,6 +2245,10 @@ impl ::buffa::Message for Capabilities {
         self.work_write = ::buffa::EnumValue::from(0);
         self.run_update = ::buffa::EnumValue::from(0);
         self.tools_invoke = ::buffa::MessageField::none();
+        self.agents_edit_skills = ::buffa::MessageField::none();
+        self.skills_edit = ::buffa::MessageField::none();
+        self.skills_read = ::buffa::MessageField::none();
+        self.tools_personal = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2103,7 +2292,7 @@ pub struct TargetPermission {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub mode: ::buffa::EnumValue<TargetSelection>,
-    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    /// Allowed only with SELECTED: agent UUIDs, catalog tool names for tools_invoke, or provider IDs for tools_personal.
     ///
     /// Field 2: `ids`
     #[serde(

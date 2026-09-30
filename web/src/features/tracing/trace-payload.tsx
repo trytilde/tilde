@@ -1,11 +1,18 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FullPayload, WithMedia, hasMedia } from "./media";
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
-function Text({ text }: { text: string }) {
+function Text({ text, agentId }: { text: string; agentId?: string }) {
+  if (agentId && hasMedia(text))
+    return (
+      <div className="trace-prose text-xs leading-relaxed">
+        <WithMedia agentId={agentId} text={text} />
+      </div>
+    );
   return (
     <div className="trace-prose text-xs leading-relaxed">
       <ReactMarkdown
@@ -33,8 +40,16 @@ function Text({ text }: { text: string }) {
 /** Recognize conversation/tool payloads; retain all other fields as compact,
  * collapsible key/value records. Raw JSON stays available for exact inspection.
  */
-function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
-  if (typeof value === "string") return <Text text={value} />;
+function Value({
+  value,
+  depth = 0,
+  agentId,
+}: {
+  value: unknown;
+  depth?: number;
+  agentId?: string;
+}) {
+  if (typeof value === "string") return <Text text={value} agentId={agentId} />;
   if (value === null || typeof value !== "object")
     return <span className="font-mono text-[11px]">{JSON.stringify(value) ?? "—"}</span>;
   if (depth >= 8)
@@ -46,7 +61,7 @@ function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
       <div className="divide-y">
         {value.map((item, index) => (
           <div key={index} className="py-2 first:pt-0 last:pb-0">
-            <Value value={item} depth={depth + 1} />
+            <Value value={item} depth={depth + 1} agentId={agentId} />
           </div>
         ))}
       </div>
@@ -60,8 +75,10 @@ function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
         <span className="w-fit rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
           {value.role}
         </span>
-        <Value value={value.content} depth={depth + 1} />
-        {Object.keys(extra).length > 0 && <Value value={extra} depth={depth + 1} />}
+        <Value value={value.content} depth={depth + 1} agentId={agentId} />
+        {Object.keys(extra).length > 0 && (
+          <Value value={extra} depth={depth + 1} agentId={agentId} />
+        )}
       </div>
     );
   }
@@ -71,13 +88,15 @@ function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
     typeof value.text === "string" &&
     Object.keys(value).every((key) => ["type", "text"].includes(key))
   )
-    return <Text text={value.text} />;
+    return <Text text={value.text} agentId={agentId} />;
   if (record(value) && Array.isArray(value.messages)) {
     const extra = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "messages"));
     return (
       <div className="grid gap-2">
-        <Value value={value.messages} depth={depth + 1} />
-        {Object.keys(extra).length > 0 && <Value value={extra} depth={depth + 1} />}
+        <Value value={value.messages} depth={depth + 1} agentId={agentId} />
+        {Object.keys(extra).length > 0 && (
+          <Value value={extra} depth={depth + 1} agentId={agentId} />
+        )}
       </div>
     );
   }
@@ -98,11 +117,11 @@ function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
                     : `${Object.keys(child).length} fields`}
                 </summary>
                 <div className="pt-1">
-                  <Value value={child} depth={depth + 1} />
+                  <Value value={child} depth={depth + 1} agentId={agentId} />
                 </div>
               </details>
             ) : (
-              <Value value={child} depth={depth + 1} />
+              <Value value={child} depth={depth + 1} agentId={agentId} />
             )}
           </dd>
         </div>
@@ -110,8 +129,20 @@ function Value({ value, depth = 0 }: { value: unknown; depth?: number }) {
     </dl>
   );
 }
-export function TracePayload({ text }: { text: string }) {
+export function TracePayload({
+  text: stored,
+  agentId,
+  reference,
+}: {
+  text: string;
+  /** Needed to resolve media tokens and full payloads. */
+  agentId?: string;
+  /** The bucket key of the full payload when the span holds only a prefix. */
+  reference?: string;
+}) {
   const [mode, setMode] = useState("formatted");
+  const [full, setFull] = useState("");
+  const text = full || stored;
   const large = text.length > 200_000;
   let parsed: unknown = text;
   if (!large) {
@@ -137,6 +168,9 @@ export function TracePayload({ text }: { text: string }) {
           </TabsTrigger>
         </TabsList>
       </Tabs>
+      {reference && agentId && !full && (
+        <FullPayload agentId={agentId} reference={reference} onLoaded={setFull} />
+      )}
       {!text || parsed === null ? (
         <p className="text-xs text-muted-foreground">Not recorded</p>
       ) : large ? (
@@ -153,7 +187,7 @@ export function TracePayload({ text }: { text: string }) {
           {typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2)}
         </pre>
       ) : (
-        <Value value={parsed} />
+        <Value value={parsed} agentId={agentId} />
       )}
     </div>
   );

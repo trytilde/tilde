@@ -54,7 +54,8 @@ jobs:
             Prepare the shared Rust and SDK release version and changelog.
 
             Validated manifest versions and refreshed Cargo/pnpm lockfiles.
-            After CI passes and this PR is merged, run the Release workflow on the default branch.
+            Merging this PR changes VERSION on the default branch, which runs the Release
+            workflow: the GHCR image, npm and PyPI packages, then the tag and GitHub release.
           add-paths: |
             .changes/
             CHANGELOG.md

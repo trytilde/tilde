@@ -27,10 +27,6 @@ export default defineConfig({
     port: Number(process.env.WEB_PORT ?? 5173),
     strictPort: true,
     proxy: {
-      "^/auth/(login|exchange|session|logout)$": {
-        target: process.env.ENGINE_DEV_URL ?? "http://127.0.0.1:8080",
-        changeOrigin: true,
-      },
       "^/tilde\\.(management|setup)\\.": {
         target: process.env.ENGINE_DEV_URL ?? "http://127.0.0.1:8080",
         changeOrigin: true,

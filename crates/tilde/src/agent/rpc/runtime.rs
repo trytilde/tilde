@@ -56,6 +56,7 @@ impl AgentService for Rpc {
                 id: target,
                 capabilities: caps,
                 name: body.name,
+                description: body.description,
             })
             .await?;
         Response::ok(runtime_pb::CreateAgentResponse {
@@ -145,6 +146,7 @@ impl AgentService for Rpc {
                     capabilities: caps,
                     id: id(&body.id)?,
                     name: body.name,
+                    description: body.description,
                 },
                 Some(&authority.capabilities),
             )

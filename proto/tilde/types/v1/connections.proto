@@ -2,7 +2,9 @@ syntax = "proto3";
 package tilde.types.v1;
 import "google/protobuf/timestamp.proto";
 
-enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; }
+// Skills: the agent receives the skills linked to the connection. Every connection offers it.
+// Tool: the connection serves tools; granted by adding it to an agent as a tool source.
+enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; CAPABILITY_SKILLS = 3; CAPABILITY_TOOL = 4; }
 
 enum ClientAuthentication { CLIENT_AUTHENTICATION_UNSPECIFIED = 0; CLIENT_AUTHENTICATION_BODY = 1; CLIENT_AUTHENTICATION_BASIC = 2; CLIENT_AUTHENTICATION_NONE = 3; }
 
@@ -25,6 +27,23 @@ message OAuthConfiguration {
   string scope_path = 12;
   optional string success_path = 13;
   repeated OAuthResultField result_fields = 14;
+  OAuthClient client = 15;
+}
+
+// Where the OAuth client comes from. FORM (and unspecified): the person setting up enters the
+// client ID and secret of their own app.
+// DYNAMIC: registered with the server at setup (OAuth dynamic client registration), with the
+// authorization and token endpoints discovered from it; only MCP-backed types can use it.
+enum OAuthClient { O_AUTH_CLIENT_UNSPECIFIED = 0; O_AUTH_CLIENT_FORM = 1; O_AUTH_CLIENT_DYNAMIC = 3; }
+
+// The MCP server at `url` that serves a connection type's tools. The credential says how the
+// connection's secret reaches the server: BEARER sends the OAuth access token (or `api_key`) as
+// a bearer token, HEADER sends `prefix + api_key` in the header `name`, QUERY sends `api_key` as
+// the query parameter `name`.
+message McpServer { string url = 1; McpCredential credential = 2; optional string name = 3; string prefix = 4; }
+enum McpCredential {
+  MCP_CREDENTIAL_UNSPECIFIED = 0; MCP_CREDENTIAL_NONE = 1; MCP_CREDENTIAL_BEARER = 2;
+  MCP_CREDENTIAL_HEADER = 3; MCP_CREDENTIAL_QUERY = 4; reserved 5;
 }
 
 message ConnectionType {
@@ -36,6 +55,8 @@ message ConnectionType {
   CustomCredentialSource custom = 14;
  }
  reserved 8,9,10,11,12;
+ // Set when the type's tools are served by an MCP server rather than built into Tilde.
+ optional McpServer mcp_server = 15;
 }
 
 message StaticCredentialSource { reserved 1; string schema_json = 2; }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
@@ -16,11 +17,21 @@ from google.protobuf.json_format import ParseDict
 from opentelemetry import propagate
 
 from tilde._cancel import Cancellation, StopLoop
-from tilde._tools import Tool, ToolCatalog, as_object, as_string, tool_id
+from tilde._inference import Inference, bound_inference
+from tilde._tools import (
+    Tool,
+    ToolAnnotations,
+    ToolCatalog,
+    as_object,
+    as_string,
+    tool_id,
+)
+from tilde._tools import ToolDisplay as ToolDisplayName
 from tilde._transport import http_client
 from tilde.agent_host.v1.agent_pb2 import InvokeRequest
-from tilde.channels import Channels
+from tilde.channels import _CHANNEL, Channels, ChannelTool
 from tilde.messages import MessageClient
+from tilde.prompts import PromptDefinition
 from tilde.run.v1 import run_pb2
 from tilde.run.v1.run_connect import RunServiceClient
 from tilde.runtime.v1 import agents_pb2, chat_pb2, controls_pb2
@@ -28,9 +39,28 @@ from tilde.runtime.v1.agents_connect import AgentServiceClient
 from tilde.runtime.v1.cache_pb2 import CachedAgentRepresentation
 from tilde.runtime.v1.chat_connect import ChatServiceClient
 from tilde.runtime.v1.controls_connect import InvocationControlServiceClient
+from tilde.runtime.v1.skills_connect import SkillServiceClient
+from tilde.skills import SkillsClient
+from tilde.types.v1 import chat_pb2 as types_pb2
 from tilde.types.v1.agent_pb2 import Agent, Capabilities
-from tilde.types.v1.chat_pb2 import Attachment, Goal, Message, Participant, Run, Task, ToolCall
+from tilde.types.v1.chat_pb2 import (
+    Attachment,
+    Goal,
+    Message,
+    Participant,
+    Run,
+    Task,
+    ToolCall,
+    ToolDefinition,
+)
 
+_DISPLAY = {
+    "full": types_pb2.TOOL_DISPLAY_FULL,
+    "summary": types_pb2.TOOL_DISPLAY_SUMMARY,
+    "hidden": types_pb2.TOOL_DISPLAY_HIDDEN,
+}
+# The name the model sees; never a Tilde tool name such as ``tools.search``.
+_BUNDLED_NAME = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 log = logging.getLogger("tilde")
 
 GoalStatus = Literal["active", "completed", "failed", "canceled"]
@@ -199,8 +229,10 @@ class AgentContext:
         self._controls = InvocationControlServiceClient(base, http_client=self._client)
         self._runs = RunServiceClient(base, http_client=self._client)
         self._steering: list[SteeringInput] = []
+        self._prompts: dict[str, str] = {}
         self._accepted: dict[str, str] = {}
         self._provider_tool_names: set[str] = set()
+        self._bundled: ToolCatalog = {}
         self._reports: asyncio.Queue[tuple[ReportEvent, asyncio.Future[None]] | None] = (
             asyncio.Queue()
         )
@@ -213,7 +245,13 @@ class AgentContext:
         self.tasks = _Tasks(self)
         self.agents = _Agents(self, AgentServiceClient(base, http_client=self._client))
         self.attachments = _Attachments(self)
-        self.tools: ToolCatalog = self._local_tools()
+        self.skills = SkillsClient(
+            SkillServiceClient(base, http_client=self._client),
+            self._rpc,
+            request.agent_id,
+            list(request.state.skills) if request.HasField("state") else None,
+        )
+        self.tools: ToolCatalog = self._sdk_tools()
         self.message = MessageClient(self)
         channel = (
             request.thread.channel
@@ -263,6 +301,32 @@ class AgentContext:
     def trace_authorization(self) -> str:
         """Internal exporter callback: always the latest renewed token."""
         return self._authorization
+
+    def inference(self, slug: str) -> Inference:
+        """Route a provider SDK through Tilde's inference gateway.
+
+        ``slug`` is the connection's ``provider/account`` name (``"openai/prod"``) or an alias
+        this agent was given for it (``"default"``). Pass ``base_url``, ``api_key`` and
+        ``async_client()`` to an OpenAI-compatible client; each request then carries the
+        current invocation token, so renewals apply to long-running loops.
+        """
+        return bound_inference(
+            self.callback_url, slug, lambda: self._authorization, self.prompt_stamps
+        )
+
+    # ----- prompts --------------------------------------------------------------------------
+    def prompt(self, definition: PromptDefinition) -> PromptDefinition:
+        """Mark a ``define_prompt`` prompt active: later inference calls carry its stamp."""
+        self.activate_prompt(definition.name, definition.hash)
+        return definition
+
+    def activate_prompt(self, name: str, hash: str) -> None:
+        """Stamp later inference calls with a prompt version; adapters call it for dynamic ones."""
+        self._prompts[name] = f"{name}@{hash}"
+
+    def prompt_stamps(self) -> str:
+        """The ``x-tilde-prompt`` value: every active prompt's ``name@hash``."""
+        return ", ".join(self._prompts.values())
 
     async def _renew_tokens(self) -> None:
         # Connect tokens last five minutes; renew with one minute left for the RPC.
@@ -330,8 +394,14 @@ class AgentContext:
         output: Any = None,
         error: str = "",
         input_delta: str = "",
+        summary: str = "",
+        display: ToolDisplayName = "full",
     ) -> None:
-        """Audit local framework tools; provider tools invoked through Tilde are audited already."""
+        """Audit framework tools run in this process; Tilde audits the provider tools it runs.
+
+        ``summary`` is the call's short transcript label and ``display`` how it shows in
+        end-user chats, both fixed by its first report.
+        """
         call = ToolCall(
             id=tool_id(self.invocation_id, tool_call_id, name),
             name=name,
@@ -340,6 +410,8 @@ class AgentContext:
             output_json="" if output is None else json.dumps(output),
             error=error,
             input_delta=input_delta,
+            summary=summary,
+            display=_DISPLAY[display],
         )
         await self._session.report_tool_call(
             chat_pb2.ReportToolCallRequest(tool_call=call), **self._rpc()
@@ -354,7 +426,7 @@ class AgentContext:
         )
 
     # ----- tools ----------------------------------------------------------------------------
-    def _local_tools(self) -> ToolCatalog:
+    def _sdk_tools(self) -> ToolCatalog:
         def tool(
             description: str,
             properties: dict[str, Any],
@@ -464,7 +536,7 @@ class AgentContext:
         }
 
     async def refresh_tools(self) -> None:
-        """Refresh server-authored descriptors before exposing local tools to the framework."""
+        """Refresh server-authored descriptors before exposing tools to the framework."""
         response = await self._session.list_tools(chat_pb2.ListToolsRequest(), **self._rpc())
         incoming: dict[str, Tool] = {}
         for definition in response.tools:
@@ -481,6 +553,11 @@ class AgentContext:
             )
 
             def execute(input: Any, call: str, *, _name: str = name) -> Awaitable[Any]:
+                # A tool found by search may be one this process runs itself.
+                if _name == "tools.execute" and isinstance(input, dict):
+                    bundled = self._bundled.get(str(input.get("name")))
+                    if bundled is not None:
+                        return bundled.execute(input.get("input") or {}, tool_call_id=call)
                 return self._invoke_provider_tool(_name, input, None, call)
 
             stream = None
@@ -498,6 +575,23 @@ class AgentContext:
                 provider_id=definition.provider_id,
                 chunk_schema=chunk_schema,
                 _stream=stream,
+                output_schema=(
+                    json.loads(definition.output_schema_json)
+                    if definition.output_schema_json
+                    else None
+                ),
+                summary=definition.summary or None,
+                annotations=(
+                    ToolAnnotations(
+                        read_only=definition.annotations.read_only,
+                        destructive=definition.annotations.destructive,
+                        idempotent=definition.annotations.idempotent,
+                        open_world=definition.annotations.open_world,
+                    )
+                    if definition.HasField("annotations")
+                    else None
+                ),
+                background=definition.detached,
             )
         for name in self._provider_tool_names:
             self.tools.pop(name, None)
@@ -505,6 +599,111 @@ class AgentContext:
         for name, wrapper in incoming.items():
             self.tools[name] = wrapper
             self._provider_tool_names.add(name)
+        await self._register_bundled_tools()
+
+    async def _set_bundled_tools(self, tools: ToolCatalog) -> None:
+        """Internal, called by the adapters' ``with_tilde_tools``: replace and publish the
+        agent's bundled tools, its own framework tools run in this process.
+
+        ``tools.search``/``tools.schemas`` describe them and a ``tools.execute`` naming one runs
+        its ``execute`` here. Core never audits them: the adapter audits every call, direct or
+        routed, through :meth:`_run_audited` or :meth:`_report_bundled`.
+        """
+        for name in tools:
+            if not _BUNDLED_NAME.match(name) or name in self.tools:
+                raise ValueError(f"Bundled tool {name} conflicts with another tool or is invalid")
+        self._bundled = dict(tools)
+        await self._register_bundled_tools()
+
+    async def _report_bundled(
+        self,
+        name: str,
+        tool_call_id: str,
+        status: ToolCallStatus,
+        *,
+        input: Any = None,
+        output: Any = None,
+        error: str = "",
+    ) -> None:
+        """Audit one call of a bundled tool with its summary and display."""
+        tool = self._bundled.get(name)
+        await self.report_tool_call(
+            tool_call_id=tool_call_id,
+            name=name,
+            status=status,
+            input=_jsonable({} if input is None else input),
+            output=None if output is None else _jsonable(output),
+            error=error[:2048],
+            summary=(tool.summary or "") if tool else "",
+            display=tool.display if tool else "full",
+        )
+
+    async def _run_audited(
+        self, name: str, tool_call_id: str, input: Any, run: Callable[[], Awaitable[Any]]
+    ) -> Any:
+        """Run one bundled tool call between its running and completed/failed reports.
+
+        Cancellation passes through unreported: a stopped invocation cannot report, and Tilde
+        settles calls left running.
+        """
+        await self._report_bundled(name, tool_call_id, "running", input=input)
+        try:
+            output = await run()
+        except Exception as error:
+            await self._report_bundled(name, tool_call_id, "failed", error=str(error))
+            raise
+        await self._report_bundled(name, tool_call_id, "completed", output=output)
+        return output
+
+    async def _register_bundled_tools(self) -> None:
+        # Sent on every invocation, empty until an adapter publishes the agent's tools.
+        definitions = []
+        for name, tool in self._bundled.items():
+            hints = tool.annotations
+            definitions.append(
+                ToolDefinition(
+                    name=name,
+                    description=tool.description,
+                    summary=tool.summary or "",
+                    input_schema_json=json.dumps(tool.input_schema),
+                    output_schema_json=json.dumps(tool.output_schema) if tool.output_schema else "",
+                    annotations=(
+                        types_pb2.ToolAnnotations(
+                            read_only=hints.read_only,
+                            destructive=hints.destructive,
+                            idempotent=hints.idempotent,
+                            open_world=hints.open_world,
+                        )
+                        if hints
+                        else None
+                    ),
+                    display=_DISPLAY[tool.display],
+                )
+            )
+        await self._session.register_bundled_tools(
+            chat_pb2.RegisterBundledToolsRequest(tools=definitions), **self._rpc()
+        )
+
+    @property
+    def agent_tools(self) -> dict[str, ChannelTool]:
+        """Everything Tilde gives the agent besides messaging: its tool sources, Tilde's built-in
+        tools (``tools.search``, ``agents.*``, ``thread.*``, ...) and personal tools, ready for the
+        framework adapters. Bundled tools are not included; ``with_tilde_tools`` adds them."""
+        tools = {}
+        for name, tool in self.tools.items():
+            channel = tool.provider_id == "native" or _CHANNEL.match(name) is not None
+            if name in self._provider_tool_names and not channel:
+                tools[name] = ChannelTool(name, tool, self.tools, tool.description)
+        return tools
+
+    def tool_source(self, slug: str) -> ToolCatalog:
+        """The tools the agent uses from one of its sources, keyed by tool name."""
+        prefix = f"{slug}."
+        return {
+            name[len(prefix) :]: self.tools[name]
+            for name in self._provider_tool_names
+            if name.startswith(prefix)
+        }
 
     async def _invoke_provider_tool(
         self, name: str, input: Any, chunks: AsyncIterable[Any] | None, tool_call_id: str
@@ -791,6 +990,14 @@ def _encode(value: Any) -> str:
         return json.dumps(value)
     except (TypeError, ValueError) as error:
         raise ValueError("Tool inputs must be JSON values") from error
+
+
+def _jsonable(value: Any) -> Any:
+    # Framework tools return arbitrary objects; audits carry JSON, falling back to text.
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _json(message: Any) -> Any:

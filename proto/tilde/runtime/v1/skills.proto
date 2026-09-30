@@ -1,0 +1,44 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/skill.proto";
+
+// The skills an agent is given: every skill of its assigned sources plus single skills, at
+// their latest version. Listing returns names, descriptions and paths so an agent loads a
+// skill's files only when it needs them. A skill is addressed as `name`, or `source/name`
+// when two assigned sources share a name. Another agent's skills need agents.read on it;
+// assigning needs agents.edit_skills on the target (itself included) and skills.read (or
+// skills.edit) on the skill's source; writing skills into a source or syncing it needs
+// skills.edit on the source.
+service SkillService {
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ReadSkillFile(ReadSkillFileRequest) returns (ReadSkillFileResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // The skill sources the agent holds skills.read or skills.edit on, with their skills.
+  rpc ListSkillSources(ListSkillSourcesRequest) returns (ListSkillSourcesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc AssignSkill(AssignSkillRequest) returns (AssignSkillResponse);
+  rpc UnassignSkill(UnassignSkillRequest) returns (UnassignSkillResponse);
+  rpc WriteSkill(WriteSkillRequest) returns (WriteSkillResponse);
+  rpc SyncSkillSource(SyncSkillSourceRequest) returns (SyncSkillSourceResponse);
+}
+message SkillFileInfo { string path = 1; string media_type = 2; int64 size_bytes = 3; bool executable = 4; }
+// `deployed`: shipped by the invocation's deployment, so its files already sit beside the code;
+// the rest are assigned through the registry and delivered at runtime.
+message SkillSummary { string name = 1; string source = 2; string description = 3; string version_id = 4; repeated SkillFileInfo files = 5; bool deployed = 6; }
+// An empty agent id means the invoking agent.
+message ListSkillsRequest { string agent_id = 1; }
+message ListSkillsResponse { repeated SkillSummary skills = 1; }
+message ReadSkillFileRequest { string name = 1; string path = 2; string agent_id = 3; }
+// Text files return `content`; other files a short-lived `download_url`.
+message ReadSkillFileResponse { string content = 1; string download_url = 2; string media_type = 3; }
+message ListSkillSourcesRequest {}
+message SourceSummary { string slug = 1; string name = 2; tilde.types.v1.SkillSourceKind kind = 3; repeated SkillSummary skills = 4; }
+message ListSkillSourcesResponse { repeated SourceSummary sources = 1; }
+// Exactly one of `source` (a slug: assign every skill of it) and `skill` (`source/name`).
+message AssignSkillRequest { string agent_id = 1; string source = 2; string skill = 3; }
+message AssignSkillResponse {}
+message UnassignSkillRequest { string agent_id = 1; string source = 2; string skill = 3; }
+message UnassignSkillResponse {}
+// Create or revise a skill in an editor source; identical files keep the current version.
+message WriteSkillRequest { string source = 1; string name = 2; repeated tilde.types.v1.SkillFile files = 3; string message = 4; }
+message WriteSkillResponse { string version_id = 1; uint32 number = 2; bool created = 3; }
+message SyncSkillSourceRequest { string source = 1; }
+message SyncSkillSourceResponse { string commit_sha = 1; string sync_error = 2; }

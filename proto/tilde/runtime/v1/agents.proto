@@ -21,7 +21,7 @@ message CreateAgentRequest {
   string id = 1;
   string name = 2;
   reserved 3;
-  reserved "description";
+  string description = 8;
   reserved 4, 5;
   reserved "endpoint_url", "webhook_signing_key";
   tilde.types.v1.Capabilities capabilities = 6;
@@ -48,7 +48,7 @@ message UpdateAgentRequest {
   string id = 1;
   optional string name = 2;
   reserved 3;
-  reserved "description";
+  optional string description = 7;
   reserved 4;
   reserved "endpoint_url";
   // Present empty map clears grants; absence preserves them.

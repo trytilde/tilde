@@ -8,6 +8,7 @@ pub mod gateway;
 mod hydrate;
 pub mod local_run;
 pub mod logs;
+pub mod metrics;
 pub mod project;
 pub mod provider_events;
 pub mod public;
@@ -17,14 +18,16 @@ pub mod routing;
 pub mod rpc;
 pub mod run;
 pub mod runtime;
-mod secrets;
+pub(crate) mod secrets;
 pub(crate) use secrets::random_secret;
 pub mod sidecar;
 pub mod telemetry;
 pub mod tokens;
 pub mod wake;
 use crate::database::{Pool, Transaction};
-use crate::proto::tilde::{agent_event_ingress::v1 as wire, types::v1 as types};
+use crate::proto::tilde::{
+    agent_event_ingress::v1 as wire, management::v1 as management, types::v1 as types,
+};
 use crate::{
     agent::Agents,
     chat::Chat,
@@ -60,9 +63,11 @@ pub struct Deployments {
     pub(crate) encryption: Arc<Encryption>,
     pub(crate) agents: Agents,
     pub(crate) connections: Connections,
-    pub(crate) logs: Option<crate::logs::Delivery>,
-    pub(crate) telemetry: Option<crate::telemetry::delivery::Queue>,
+    pub(crate) logs: Option<crate::telemetry::logs::Delivery>,
+    pub(crate) telemetry: Option<crate::telemetry::tracing::delivery::Queue>,
+    pub(crate) metrics: Option<crate::telemetry::metrics::Delivery>,
     pub(crate) channels: Arc<Channels>,
+    pub(crate) skills: Option<crate::skills::Skills>,
 }
 impl Deployments {
     pub fn new(
@@ -77,23 +82,40 @@ impl Deployments {
             agents,
             connections,
             telemetry: None,
+            metrics: None,
             logs: None,
             channels: Arc::default(),
+            skills: None,
         }
     }
-    pub fn with_logs(mut self, logs: crate::logs::Delivery) -> Self {
+    pub fn with_logs(mut self, logs: crate::telemetry::logs::Delivery) -> Self {
         self.logs = Some(logs);
         self
     }
-    pub fn with_telemetry(mut self, queue: crate::telemetry::delivery::Queue) -> Self {
+    pub fn with_metrics(mut self, delivery: crate::telemetry::metrics::Delivery) -> Self {
+        self.metrics = Some(delivery);
+        self
+    }
+    pub fn with_skills(mut self, skills: crate::skills::Skills) -> Self {
+        self.skills = Some(skills);
+        self
+    }
+    pub fn with_telemetry(mut self, queue: crate::telemetry::tracing::delivery::Queue) -> Self {
         self.telemetry = Some(queue);
         self
+    }
+    /// The configured skills service, or one without object storage (text files only).
+    pub(crate) fn skills(&self) -> crate::skills::Skills {
+        self.skills
+            .clone()
+            .unwrap_or_else(|| crate::skills::Skills::new(self.pool.clone()))
     }
     pub(crate) fn chat(&self) -> Chat {
         Chat::new(self.pool.clone(), self.encryption.clone(), String::new())
             .with_connections(self.connections.clone())
             .with_deployments(self.clone())
             .with_objects(self.agents.object_store().cloned())
+            .with_skills(self.skills.clone())
     }
     pub async fn get(&self, agent: Uuid) -> Result<types::Deployment, Error> {
         let row = crate::deployment::db::get_opt(&self.pool.get().await?, agent)
@@ -300,9 +322,12 @@ impl Deployments {
         crate::deployment::db::secrets_init_execute(tx, agent, &(sealed)).await?;
         Ok(())
     }
-    /// Register a deployment. Idempotent on `external_id`: a repeat returns the
-    /// existing record and no token. Latest prefers the new deployment once it is
-    /// available: Lambda immediately, Gateway/Sidecar after a ready connection arrives.
+    /// Register a deployment with the prompts, skills and bundled tools its code declares. Idempotent on
+    /// `external_id`: a repeat returns the existing record and no token, and ignores the
+    /// declarations, since a deployment's contents never change. Declarations are validated
+    /// and skill files stored before one transaction records the deployment and its contents.
+    /// Latest prefers the new deployment once it is available: Lambda immediately,
+    /// Gateway/Sidecar after a ready connection arrives.
     pub async fn register_deployment(
         &self,
         agent: Uuid,
@@ -354,6 +379,24 @@ impl Deployments {
         let commit_message = short(r.commit_message, "Commit message")?;
         let branch = short(r.branch, "Branch")?;
         let commit_author = short(r.commit_author, "Commit author")?;
+        if let Some(external) = &external
+            && let Some(existing) = crate::deployment::db::deployment_external_opt(
+                &self.pool.get().await?,
+                agent,
+                external,
+            )
+            .await?
+        {
+            return Ok((self.deployment(agent, existing.id).await?, None, false));
+        }
+        let prompts = declared_prompts(r.declarations.prompts)?;
+        if r.declarations.skills.len() > MAX_DECLARED {
+            return Err(Error::Invalid(
+                "A deployment declares at most 1024 skills".into(),
+            ));
+        }
+        let tools = declared_tools(r.declarations.tools)?;
+        let skills = self.skills().prepare(r.declarations.skills).await?;
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
         let current = crate::deployment::db::lock_opt(&tx, agent)
@@ -387,6 +430,9 @@ impl Deployments {
             commit_author.as_deref(),
         )
         .await?;
+        crate::prompts::register(&tx, agent, id, &prompts).await?;
+        crate::skills::Skills::register_code(&tx, agent, id, &skills).await?;
+        crate::tools::register_declared(&tx, id, &tools).await?;
         self.ensure_secrets(&tx, agent).await?;
         if current.routing == "latest" || current.serving_deployment_id.is_none() {
             self.promote_in(&tx, agent, id).await?;
@@ -394,6 +440,48 @@ impl Deployments {
         tx.commit().await?;
         drop(tx_client);
         Ok((self.deployment(agent, id).await?, Some(token), true))
+    }
+    /// The prompt and skill versions and the bundled tools a deployment shipped.
+    pub async fn contents(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+    ) -> Result<management::GetDeploymentContentsResponse, Error> {
+        let client = self.pool.get().await?;
+        crate::deployment::db::deployment_get_opt(&client, deployment, agent)
+            .await?
+            .ok_or(Error::NotFound)?;
+        let tools = crate::tools::declared(&client, deployment).await?;
+        drop(client);
+        let prompts = crate::prompts::Prompts::new(self.pool.clone())
+            .for_deployment(deployment)
+            .await?
+            .into_iter()
+            .map(|(prompt, name, version)| management::DeploymentPrompt {
+                prompt_id: prompt.to_string(),
+                name,
+                version: crate::prompts::rpc::version_wire(version).into(),
+                ..Default::default()
+            })
+            .collect();
+        let skills = self.skills().for_deployment(deployment).await?;
+        Ok(management::GetDeploymentContentsResponse {
+            prompts,
+            skills: skills
+                .into_iter()
+                .map(|s| management::DeploymentSkill {
+                    skill_id: s.skill_id.to_string(),
+                    name: s.name,
+                    version_id: s.version_id.to_string(),
+                    number: s.number.max(0) as u32,
+                    description: s.description,
+                    origin: s.origin,
+                    ..Default::default()
+                })
+                .collect(),
+            tools,
+            ..Default::default()
+        })
     }
     pub async fn promote(&self, agent: Uuid, deployment: Uuid) -> Result<types::Deployment, Error> {
         let mut tx_client = self.pool.get().await?;
@@ -689,6 +777,11 @@ impl Deployments {
             leases,
             token_signing_key: self.signing_key(agent).await?.expose_secret().into(),
             deployment_id: deployment.to_string(),
+            prompts: crate::inference::audit::prompt_patterns(
+                crate::prompts::Prompts::new(self.pool.clone())
+                    .for_deployment(deployment)
+                    .await?,
+            ),
             ..Default::default()
         })
     }
@@ -724,8 +817,6 @@ impl Deployments {
                 .iter()
                 .map(|id| id.to_string())
                 .collect(),
-            logs_enabled: self.logs.as_ref().is_some_and(|logs| logs.enabled()),
-            tracing_enabled: self.telemetry.as_ref().is_some_and(|queue| queue.enabled()),
             agent: crate::agent::rpc::project(&self.agents, self.agents.get(agent).await?)
                 .await?
                 .into(),
@@ -1248,6 +1339,59 @@ pub struct RegisterDeployment {
     pub commit_message: Option<String>,
     pub branch: Option<String>,
     pub commit_author: Option<String>,
+    /// Prompts, skills and bundled tools the agent's code declares (`tilde deploy`).
+    pub declarations: management::DeploymentDeclarations,
+}
+const MAX_DECLARED: usize = 1024;
+/// Validate declared bundled tools as an invocation's registered ones are.
+fn declared_tools(
+    declared: Vec<management::DeclaredTool>,
+) -> Result<Vec<(types::ToolDefinition, String)>, Error> {
+    let (tools, origins): (Vec<_>, Vec<_>) = declared
+        .into_iter()
+        .map(|t| {
+            let tool = types::ToolDefinition {
+                name: t.name,
+                description: t.description,
+                summary: t.summary,
+                input_schema_json: t.input_schema_json,
+                output_schema_json: t.output_schema_json,
+                annotations: t.annotations,
+                display: t.display,
+                ..Default::default()
+            };
+            (tool, t.origin)
+        })
+        .unzip();
+    if !crate::tools::bundled_valid(&tools) {
+        return Err(Error::Invalid(crate::tools::BUNDLED_INVALID.into()));
+    }
+    Ok(tools.into_iter().zip(origins).collect())
+}
+/// Validate declared prompts; the same content found twice under one name is declared once.
+fn declared_prompts(
+    declared: Vec<management::DeclaredPrompt>,
+) -> Result<Vec<crate::prompts::Declared>, Error> {
+    if declared.len() > MAX_DECLARED {
+        return Err(Error::Invalid(
+            "A deployment declares at most 1024 prompts".into(),
+        ));
+    }
+    let mut prompts: Vec<crate::prompts::Declared> = Vec::new();
+    for p in declared {
+        let p = crate::prompts::Declared::new(p)?;
+        match prompts.iter().find(|q| q.name == p.name) {
+            Some(q) if q.hash == p.hash => {}
+            Some(_) => {
+                return Err(Error::Invalid(format!(
+                    "Two different prompts are named {}",
+                    p.name
+                )));
+            }
+            None => prompts.push(p),
+        }
+    }
+    Ok(prompts)
 }
 struct DeploymentRow {
     id: Uuid,

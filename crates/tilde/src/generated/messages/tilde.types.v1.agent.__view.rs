@@ -21,6 +21,10 @@ pub struct AgentView<'a> {
     pub id: &'a str,
     /// Field 2: `name`
     pub name: &'a str,
+    /// Free-text summary shown under the name; at most 500 characters.
+    ///
+    /// Field 14: `description`
+    pub description: &'a str,
     /// Field 5: `created_at`
     pub created_at: ::buffa::MessageFieldView<
         ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
@@ -110,6 +114,13 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.description = ::buffa::types::borrow_str(&mut cur)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -223,6 +234,7 @@ impl<'a> ::buffa::MessageView<'a> for AgentView<'a> {
             paused: self.paused,
             id: self.id.to_string(),
             name: self.name.to_string(),
+            description: self.description.to_string(),
             created_at: match self.created_at.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -323,6 +335,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
                 size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
             }
         }
+        if !self.description.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -387,6 +402,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentView<'a> {
                 ::buffa::types::put_int32_field(13u32, val, buf);
             }
         }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.description, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -427,6 +445,9 @@ impl<'__a> ::serde::Serialize for AgentView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
             __map.serialize_entry("name", self.name)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.description) {
+            __map.serialize_entry("description", self.description)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.created_at.as_option() {
@@ -572,6 +593,13 @@ impl AgentOwnedView {
     #[must_use]
     pub fn name(&self) -> &'_ str {
         self.0.reborrow().name
+    }
+    /// Free-text summary shown under the name; at most 500 characters.
+    ///
+    /// Field 14: `description`
+    #[must_use]
+    pub fn description(&self) -> &'_ str {
+        self.0.reborrow().description
     }
     /// Field 5: `created_at`
     #[must_use]
@@ -1506,6 +1534,31 @@ pub struct CapabilitiesView<'a> {
     pub tools_invoke: ::buffa::MessageFieldView<
         super::super::__buffa::view::TargetPermissionView<'a>,
     >,
+    /// Fine-grained half of updating an agent: assign its skills.
+    ///
+    /// Field 14: `agents_edit_skills`
+    pub agents_edit_skills: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Write skills into the targeted editor skill sources and sync targeted git sources.
+    ///
+    /// Field 15: `skills_edit`
+    pub skills_edit: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// See the targeted skill sources and assign their skills (with agents_edit_skills on the
+    /// receiving agent); skills_edit implies it.
+    ///
+    /// Field 16: `skills_read`
+    pub skills_read: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
+    /// Tools on the conversing user's own connections. SELECTED ids are provider IDs.
+    ///
+    /// Field 17: `tools_personal`
+    pub tools_personal: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
@@ -1707,6 +1760,90 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
                     }
                 }
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_edit_skills.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_edit_skills = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.skills_edit.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.skills_edit = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.skills_read.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.skills_read = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.tools_personal.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.tools_personal = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1780,6 +1917,42 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
             work_write: self.work_write,
             run_update: self.run_update,
             tools_invoke: match self.tools_invoke.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_edit_skills: match self.agents_edit_skills.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            skills_edit: match self.skills_edit.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            skills_read: match self.skills_read.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            tools_personal: match self.tools_personal.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
                         super::super::TargetPermission,
@@ -1877,6 +2050,38 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.agents_edit_skills.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_edit_skills.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.skills_edit.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.skills_edit.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.skills_read.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.skills_read.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.tools_personal.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.tools_personal.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1966,6 +2171,38 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
             );
             self.tools_invoke.write_to(__cache, buf);
         }
+        if self.agents_edit_skills.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                14u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_edit_skills.write_to(__cache, buf);
+        }
+        if self.skills_edit.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.skills_edit.write_to(__cache, buf);
+        }
+        if self.skills_read.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                16u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.skills_read.write_to(__cache, buf);
+        }
+        if self.tools_personal.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                17u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.tools_personal.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -2033,6 +2270,29 @@ impl<'__a> ::serde::Serialize for CapabilitiesView<'__a> {
         {
             if let ::core::option::Option::Some(__v) = self.tools_invoke.as_option() {
                 __map.serialize_entry("toolsInvoke", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self
+                .agents_edit_skills
+                .as_option()
+            {
+                __map.serialize_entry("agentsEditSkills", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.skills_edit.as_option() {
+                __map.serialize_entry("skillsEdit", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.skills_read.as_option() {
+                __map.serialize_entry("skillsRead", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.tools_personal.as_option() {
+                __map.serialize_entry("toolsPersonal", __v)?;
             }
         }
         __map.end()
@@ -2205,6 +2465,51 @@ impl CapabilitiesOwnedView {
     > {
         &self.0.reborrow().tools_invoke
     }
+    /// Fine-grained half of updating an agent: assign its skills.
+    ///
+    /// Field 14: `agents_edit_skills`
+    #[must_use]
+    pub fn agents_edit_skills(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_edit_skills
+    }
+    /// Write skills into the targeted editor skill sources and sync targeted git sources.
+    ///
+    /// Field 15: `skills_edit`
+    #[must_use]
+    pub fn skills_edit(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().skills_edit
+    }
+    /// See the targeted skill sources and assign their skills (with agents_edit_skills on the
+    /// receiving agent); skills_edit implies it.
+    ///
+    /// Field 16: `skills_read`
+    #[must_use]
+    pub fn skills_read(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().skills_read
+    }
+    /// Tools on the conversing user's own connections. SELECTED ids are provider IDs.
+    ///
+    /// Field 17: `tools_personal`
+    #[must_use]
+    pub fn tools_personal(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().tools_personal
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<CapabilitiesView<'static>>>
 for CapabilitiesOwnedView {
@@ -2240,7 +2545,7 @@ impl ::serde::Serialize for CapabilitiesOwnedView {
 pub struct TargetPermissionView<'a> {
     /// Field 1: `mode`
     pub mode: ::buffa::EnumValue<super::super::TargetSelection>,
-    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    /// Allowed only with SELECTED: agent UUIDs, catalog tool names for tools_invoke, or provider IDs for tools_personal.
     ///
     /// Field 2: `ids`
     pub ids: ::buffa::RepeatedView<'a, &'a str>,
@@ -2483,7 +2788,7 @@ impl TargetPermissionOwnedView {
     pub fn mode(&self) -> ::buffa::EnumValue<super::super::TargetSelection> {
         self.0.reborrow().mode
     }
-    /// Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+    /// Allowed only with SELECTED: agent UUIDs, catalog tool names for tools_invoke, or provider IDs for tools_personal.
     ///
     /// Field 2: `ids`
     #[must_use]

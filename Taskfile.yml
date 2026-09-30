@@ -1,7 +1,7 @@
 version: "3"
 output: interleaved
 
-dotenv: [".env.local", ".env.secrets", ".env", ".env.example"]
+dotenv: [".env.local", ".env", ".env.example"]
 
 tasks:
   default:
@@ -39,6 +39,7 @@ tasks:
 
   test:sdk:py:integration:
     desc: Python agent host against the real Tilde runtime and disposable Postgres
+    dotenv: [".env.test.local", ".env.test"]
     cmds:
       - task: generate:py
       - cargo build --bin tilde
@@ -59,7 +60,7 @@ tasks:
   test:session-metadata:
     desc: Verify session metadata through trace delivery and session reads
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test session_metadata --test langfuse
+      - scripts/with-postgres.sh cargo test -p tilde --test session_metadata --test trace_store
 
   test:deployment-action:
     desc: Test the standalone GitHub deployment action
@@ -108,13 +109,12 @@ tasks:
     vars:
       INGRESS_URL: '{{if eq (.NGROK_ENABLED | default "false") "true"}}https://{{.NGROK_DOMAIN}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:{{.API_PORT | default "8080"}}{{end}}'
       DEV_ADDRESS: '{{.ADDRESS | default "127.0.0.1"}}'
-      DEV_ISSUER: '{{if and .ENGINE_OIDC_ISSUER (ne .ENGINE_OIDC_ISSUER "http://127.0.0.1:5556")}}{{.ENGINE_OIDC_ISSUER}}{{else}}http://{{.ADDRESS | default "127.0.0.1"}}:5556{{end}}'
       PUBLIC_PORT: '{{if eq (.ENGINE_WEB_ENABLED | default "true") "false"}}{{.API_PORT | default "8080"}}{{else}}{{.WEB_PORT | default "5173"}}{{end}}'
     env:
-      TILDE_LOCAL_LOGS: '{{if or .LOGS_CLICKHOUSE_URL (eq (.DEV_LOGS_ENABLED | default "1") "0")}}0{{else}}1{{end}}'
-      LOGS_CLICKHOUSE_URL: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_URL}}{{else if ne (.DEV_LOGS_ENABLED | default "1") "0"}}http://127.0.0.1:{{.LOGS_CLICKHOUSE_PORT | default "18123"}}{{end}}'
-      LOGS_CLICKHOUSE_USER: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_USER | default "default"}}{{else}}{{.LOGS_CLICKHOUSE_USER | default "tilde"}}{{end}}'
-      LOGS_CLICKHOUSE_PASSWORD: '{{if .LOGS_CLICKHOUSE_URL}}{{.LOGS_CLICKHOUSE_PASSWORD | default ""}}{{else}}{{.LOGS_CLICKHOUSE_PASSWORD | default "tilde-logs-dev"}}{{end}}'
+      TILDE_LOCAL_CLICKHOUSE: "{{if .ENGINE_CLICKHOUSE_URL}}0{{else}}1{{end}}"
+      ENGINE_CLICKHOUSE_URL: '{{if .ENGINE_CLICKHOUSE_URL}}{{.ENGINE_CLICKHOUSE_URL}}{{else}}http://127.0.0.1:{{.ENGINE_CLICKHOUSE_PORT | default "18123"}}{{end}}'
+      ENGINE_CLICKHOUSE_USER: '{{if .ENGINE_CLICKHOUSE_URL}}{{.ENGINE_CLICKHOUSE_USER | default "default"}}{{else}}{{.ENGINE_CLICKHOUSE_USER | default "tilde"}}{{end}}'
+      ENGINE_CLICKHOUSE_PASSWORD: '{{if .ENGINE_CLICKHOUSE_URL}}{{.ENGINE_CLICKHOUSE_PASSWORD | default ""}}{{else}}{{.ENGINE_CLICKHOUSE_PASSWORD | default "tilde-logs-dev"}}{{end}}'
       NGROK_ENABLED: '{{.NGROK_ENABLED | default "false"}}'
       NGROK_DOMAIN: '{{.NGROK_DOMAIN | default ""}}'
       ADDRESS: "{{.DEV_ADDRESS}}"
@@ -122,9 +122,6 @@ tasks:
       ENGINE_S3_ENDPOINT: '{{if and .ENGINE_S3_ENDPOINT (ne .ENGINE_S3_ENDPOINT "http://127.0.0.1:19000")}}{{.ENGINE_S3_ENDPOINT}}{{else}}http://{{.DEV_ADDRESS}}:{{.MINIO_PORT | default "19000"}}{{end}}'
 
       ENGINE_ALLOW_NETWORK: '{{if .ADDRESS}}true{{else}}{{.ENGINE_ALLOW_NETWORK | default "false"}}{{end}}'
-      DEX_DEV_ISSUER: "{{.DEV_ISSUER}}"
-      DEX_DEV_WEB_CALLBACK: 'http://{{.DEV_ADDRESS}}:{{.WEB_PORT | default "5173"}}/auth/callback'
-      DEX_DEV_API_CALLBACK: 'http://{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}}/auth/callback'
       ENGINE_CONNECTION_UI_DEV_URL: 'http://{{.DEV_ADDRESS}}:{{.CONNECTION_UI_PORT | default "5174"}}'
       CONNECTION_UI_PORT: '{{.CONNECTION_UI_PORT | default "5174"}}'
       ENGINE_CONNECTION_SETUP_PUBLIC_URL: '{{.ENGINE_CONNECTION_SETUP_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
@@ -139,10 +136,6 @@ tasks:
       ENGINE_RUNTIME_PUBLIC_URL: '{{.ENGINE_RUNTIME_PUBLIC_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
       ENGINE_WEB_ORIGINS: 'http://{{.DEV_ADDRESS}}:{{.WEB_PORT | default "5173"}},http://{{.DEV_ADDRESS}}:{{.API_PORT | default "8080"}},http://{{.DEV_ADDRESS}}:{{.CONNECTION_UI_PORT | default "5174"}},http://localhost:{{.WEB_PORT | default "5173"}}'
       ENGINE_DEV_URL: '{{.ENGINE_DEV_URL | default (printf "http://%s:%s" .DEV_ADDRESS (.API_PORT | default "8080"))}}'
-      ENGINE_OIDC_ISSUER: "{{.DEV_ISSUER}}"
-      ENGINE_OIDC_CLIENT_ID: '{{.ENGINE_OIDC_CLIENT_ID | default "tilde-dev"}}'
-      ENGINE_OIDC_CLIENT_SECRET: '{{.ENGINE_OIDC_CLIENT_SECRET | default "tilde-local-dev-secret"}}'
-      ENGINE_OIDC_ALLOW_HTTP: '{{.ENGINE_OIDC_ALLOW_HTTP | default "true"}}'
     cmds:
       - bash scripts/dev-ngrok.sh --check
       - python3 scripts/run-dev-agent.py --check
@@ -151,12 +144,7 @@ tasks:
       - bash scripts/dev-api.sh check-config
       - task: dev:postgres
       - task: dev:s3
-      - task: dev:langfuse
       - task: dev:logs
-      - |
-        if [ "$ENGINE_MANAGEMENT_ENABLED" = true ] && [ "$ENGINE_OIDC_ISSUER" = "http://$ADDRESS:5556" ]; then
-          POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-unused-dev-compose}" docker compose --profile dev up -d dex
-        fi
       - task --parallel --failfast --output interleaved dev:api dev:web dev:connection-ui dev:ngrok dev:example-agent
 
   test:logs:
@@ -164,10 +152,12 @@ tasks:
     cmds:
       - python3 scripts/test-dev-logs.py
       - docker compose --profile logs up -d --wait logs-clickhouse
+      - task: dev:s3
       - >-
-        LOGS_TEST_CLICKHOUSE_URL="http://127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}"
-        LOGS_TEST_CLICKHOUSE_USER="${LOGS_CLICKHOUSE_USER:-tilde}"
-        LOGS_TEST_CLICKHOUSE_PASSWORD="${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
+        TEST_CLICKHOUSE_URL="http://127.0.0.1:${ENGINE_CLICKHOUSE_PORT:-18123}"
+        TEST_CLICKHOUSE_USER="${ENGINE_CLICKHOUSE_USER:-tilde}"
+        TEST_CLICKHOUSE_PASSWORD="${ENGINE_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
+        TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
         scripts/with-postgres.sh cargo test -p tilde --test logs -- --include-ignored
       - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
 
@@ -175,18 +165,6 @@ tasks:
     desc: Start local ClickHouse log storage when enabled
     cmds:
       - python3 scripts/dev-logs.py
-
-  test:logs:
-    desc: Exercise log ingestion, ClickHouse reads, and independent forwarding
-    cmds:
-      - python3 scripts/test-dev-logs.py
-      - docker compose --profile logs up -d --wait logs-clickhouse
-      - >-
-        LOGS_TEST_CLICKHOUSE_URL="http://127.0.0.1:${LOGS_CLICKHOUSE_PORT:-18123}"
-        LOGS_TEST_CLICKHOUSE_USER="${LOGS_CLICKHOUSE_USER:-tilde}"
-        LOGS_TEST_CLICKHOUSE_PASSWORD="${LOGS_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
-        scripts/with-postgres.sh cargo test -p tilde --test logs -- --include-ignored
-      - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
 
   dev:postgres:
     desc: Start loopback Postgres when using the default local development database
@@ -199,7 +177,7 @@ tasks:
         esac
 
   dev:s3:
-    desc: Start local MinIO and create the private avatar bucket
+    desc: Start local MinIO and create every bucket the engine and its tests expect
     cmds:
       - |
         case "$ENGINE_S3_ENDPOINT" in
@@ -253,20 +231,6 @@ tasks:
     cmds:
       - 'if [ "$ENGINE_WEB_ENABLED" != false ]; then pnpm --dir web exec vite; fi'
 
-  secrets:load:
-    desc: Decrypt SOPS development and chat credentials into private dotenv files
-    aliases: [sops:decrypt]
-    silent: true
-    cmds:
-      - python3 scripts/load-secrets.py
-
-  secrets:edit:
-    desc: Edit the encrypted secret document with SOPS, then refresh dotenv files
-    interactive: true
-    cmds:
-      - sops secrets.enc.yaml
-      - task: secrets:load
-
   test:avatars:
     desc: Verify agent uploads against local MinIO and disposable Postgres
     cmds:
@@ -275,44 +239,33 @@ tasks:
 
   test:chat:
     desc: Test all six chat providers against local HTTP fixtures and disposable Postgres
-    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    dotenv: [".env.test.local", ".env.test"]
     cmds:
       - scripts/with-postgres.sh cargo test -p tilde --test chat_connections_audit --test chat_tools
 
-  test:chat:accounts:
-    desc: Read-only checks of all six configured provider accounts (requires secrets:load)
-    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
-    cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --features live-chat-tests --test chat_providers_live -- --ignored {{.CLI_ARGS}}
-
-  test:chat:live:
-    desc: Real two-way provider messages and captured webhooks (phone tests need a replying recipient)
-    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
-    cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --features live-chat-tests --test chat_providers_two_way -- --ignored --nocapture --test-threads=1 {{.CLI_ARGS}}
-
   test:
     desc: Run Rust and generated-client tests with disposable Postgres
-    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    dotenv: [".env.test.local", ".env.test"]
     cmds:
       - task: generate
       - task: dev:s3
       - scripts/with-postgres.sh task test:run
 
   test:run:
-    dotenv: [".env.test.local", ".env.secrets.test", ".env.test"]
+    dotenv: [".env.test.local", ".env.test"]
     requires:
       vars: [TEST_DATABASE_URL]
     env:
       ENGINE_TEST_BINARY: '{{if hasPrefix "/" (.CARGO_TARGET_DIR | default "target")}}{{.CARGO_TARGET_DIR}}{{else}}{{.ROOT_DIR}}/{{.CARGO_TARGET_DIR | default "target"}}{{end}}/debug/tilde'
     cmds:
       - task: dev:s3
+      - docker compose --profile logs up -d --wait logs-clickhouse
       - python3 scripts/test-env.py
       - node scripts/test-dev-services.mjs
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
-      - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs
+      - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk/test/prompts.test.mjs sdk/ts/packages/sdk/test/deploy.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs sdk/ts/examples/langchain-example-agent/test/*.test.mjs sdk/ts/examples/openai-agents-example-agent/test/*.test.mjs
       - task: test:sdk:py
       - pnpm --dir sdk/ts exec tsc --noEmit --strict --skipLibCheck --target ES2023 --module NodeNext packages/sdk/test/channel-types.ts
       - cargo test --workspace
@@ -324,6 +277,7 @@ tasks:
       - node --test sdk/ts/packages/sdk/test/agent-lifecycle.test.mjs
       - scripts/with-postgres.sh pnpm --dir sdk/ts test
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/concurrency.integration.mjs
+      - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/tool-host.integration.mjs
       - scripts/with-postgres.sh node sdk/ts/packages/sdk-vercel-ai-node/test/attachments.integration.mjs
       - task: build:chat
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
@@ -397,24 +351,18 @@ tasks:
       - uv lock --project sdk/py
       - task: version:check
 
-  release:archive:
-    desc: Smoke-test and archive the native release binary with a SHA-256 checksum
-    cmds:
-      - scripts/release-archive.sh
-
   sdk:pack:
-    desc: Build and pack public SDK packages into dist/npm
+    desc: Build and pack public npm SDK packages into dist/npm
     cmds:
       - task: version:check
       - task: build:chat
       - scripts/sdk-pack.sh
 
-  sdk:publish:
-    desc: Build and publish unpublished public SDK versions to npm (append -- --dry-run to preview)
+  sdk:py:pack:
+    desc: Build sdists and wheels for the Python SDK packages (not the examples) into dist/py
     cmds:
       - task: version:check
-      - task: build:chat
-      - pnpm --dir sdk/ts -r publish --access public --no-git-checks --tag latest {{.CLI_ARGS}}
+      - for package in sdk/py/packages/*/; do uv build --quiet --out-dir dist/py "$package"; done
 
   agent:example:
     desc: Run the example agent; it dials in with TILDE_GATEWAY_URL and TILDE_DEPLOYMENT_TOKEN
@@ -438,7 +386,7 @@ tasks:
       - pnpm --dir sdk/ts/examples/langsmith-agent exec tsc -p tsconfig.json
 
   agent:langsmith:
-    desc: Generate a recipe trace in LangSmith using the OpenAI key from SOPS
+    desc: Generate a recipe trace in LangSmith (needs OPENAI_API_KEY and LANGSMITH_API_KEY)
     dotenv: [".env.langsmith"]
     cmds:
       - task: agent:langsmith:build
@@ -451,14 +399,13 @@ tasks:
       - task: agent:langsmith:build
       - python3 scripts/run-langsmith-agent.py --serve
 
-  dev:langfuse:
-    desc: Start and initialize the local Langfuse stack selected by task dev
+  test:traces:
+    desc: Exercise span storage, scoped reads and the stateless delivery queue against ClickHouse and MinIO
     cmds:
-      - python3 scripts/dev-langfuse.py
-
-  test:langfuse:
-    desc: Test Langfuse delivery, scoped reads, native viewer and dev bootstrap
-    cmds:
-      - python3 scripts/test-dev-langfuse.py
-      - scripts/with-postgres.sh cargo test -p tilde --test langfuse
+      - docker compose --profile logs up -d --wait logs-clickhouse
+      - task: dev:s3
+      - >-
+        TEST_CLICKHOUSE_URL="http://127.0.0.1:${ENGINE_CLICKHOUSE_PORT:-18123}"
+        TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
+        scripts/with-postgres.sh cargo test -p tilde --test trace_store --test session_metadata --test tracing --test metrics
       - pnpm --dir web exec vitest run src/features/tracing/agent-tracing.test.tsx

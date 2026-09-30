@@ -77,20 +77,6 @@ pub struct Identity {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
-    /// Field 10: `attested_by_user_id`
-    #[serde(
-        rename = "attestedByUserId",
-        alias = "attested_by_user_id",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub attested_by_user_id: ::core::option::Option<::buffa::alloc::string::String>,
-    /// Field 11: `attested_by_api_key_id`
-    #[serde(
-        rename = "attestedByApiKeyId",
-        alias = "attested_by_api_key_id",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub attested_by_api_key_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -107,8 +93,6 @@ impl ::core::fmt::Debug for Identity {
             .field("root_identity_id", &self.root_identity_id)
             .field("verified_at", &self.verified_at)
             .field("attested_at", &self.attested_at)
-            .field("attested_by_user_id", &self.attested_by_user_id)
-            .field("attested_by_api_key_id", &self.attested_by_api_key_id)
             .finish()
     }
 }
@@ -138,26 +122,6 @@ impl Identity {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.root_identity_id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::attested_by_user_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_attested_by_user_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.attested_by_user_id = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::attested_by_api_key_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_attested_by_api_key_id(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.attested_by_api_key_id = Some(value.into());
         self
     }
 }
@@ -221,12 +185,6 @@ impl ::buffa::Message for Identity {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if let Some(ref v) = self.attested_by_user_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        if let Some(ref v) = self.attested_by_api_key_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -276,12 +234,6 @@ impl ::buffa::Message for Identity {
                 buf,
             );
             self.attested_at.write_to(__cache, buf);
-        }
-        if let Some(ref v) = self.attested_by_user_id {
-            ::buffa::types::put_string_field(10u32, v, buf);
-        }
-        if let Some(ref v) = self.attested_by_api_key_id {
-            ::buffa::types::put_string_field(11u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -379,30 +331,6 @@ impl ::buffa::Message for Identity {
                     ctx,
                 )?;
             }
-            10u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .attested_by_user_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
-            11u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self
-                        .attested_by_api_key_id
-                        .get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -420,8 +348,6 @@ impl ::buffa::Message for Identity {
         self.root_identity_id = ::core::option::Option::None;
         self.verified_at = ::buffa::MessageField::none();
         self.attested_at = ::buffa::MessageField::none();
-        self.attested_by_user_id = ::core::option::Option::None;
-        self.attested_by_api_key_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

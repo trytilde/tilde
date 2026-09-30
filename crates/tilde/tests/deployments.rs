@@ -44,6 +44,7 @@ impl Fx {
         let agent = Uuid::new_v4();
         agents
             .create(CreateAgent {
+                description: String::new(),
                 concurrency_policy: Default::default(),
                 id: agent,
                 name: "Deployed".into(),
@@ -119,6 +120,7 @@ impl Fx {
             commit_message: Some("Ship the agent".into()),
             branch: Some("main".into()),
             commit_author: Some("ada".into()),
+            declarations: Default::default(),
         }
     }
     async fn serving(&self) -> Option<String> {
@@ -320,6 +322,7 @@ async fn lambda_deployments_serve_gateway_agents_and_weighted_routing_guards_ret
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await

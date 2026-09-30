@@ -14,10 +14,9 @@ omits both fields and uses the username type. An existing identity is reused.
 Linking an identity attached elsewhere fails. Unlinking requires its expected root.
 Association writes lock the chat user, with sorted locks for batch operations.
 
-`skip_verification` records management attestation and its principal separately
-from provider verification. It permits an explicit channel allow grant; it never
-creates one. All management users and API keys can attest in the current role-free
-model. Provider verification remains in `AgentAccessService`.
+`skip_verification` records management attestation (`attested_at`) separately from
+provider verification. It permits an explicit channel allow grant; it never creates
+one. Provider verification remains in `AgentAccessService`.
 
 Do preserve identity and participant IDs when grouping. Do keep SQL in `queries/`.
 Do not route by root, merge histories, copy grants, or infer common ownership from

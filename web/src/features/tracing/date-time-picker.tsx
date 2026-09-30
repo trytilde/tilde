@@ -13,13 +13,11 @@ export function TraceDateTimePicker({
   onChange,
   label,
   timezone,
-  disabled,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
   timezone: string;
-  disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const day = value.slice(0, 10);
@@ -33,7 +31,6 @@ export function TraceDateTimePicker({
             <Button
               type="button"
               variant="outline"
-              disabled={disabled}
               aria-label={`${label} date (${timezone})`}
               className="h-[26px] w-[100px] justify-between gap-1 px-2 text-[11px] font-normal"
             >
@@ -67,7 +64,6 @@ export function TraceDateTimePicker({
         step="1"
         lang="en-GB"
         value={time}
-        disabled={disabled}
         aria-label={`${label} time (${timezone})`}
         onChange={(event) => onChange(`${day}T${event.currentTarget.value}`)}
         className="h-[26px] w-[100px] min-w-0 appearance-none bg-background px-2 text-[11px] [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"

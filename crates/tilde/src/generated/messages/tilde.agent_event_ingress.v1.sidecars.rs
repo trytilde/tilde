@@ -7,6 +7,7 @@ pub enum TelemetryKind {
     TELEMETRY_KIND_UNSPECIFIED = 0i32,
     TELEMETRY_KIND_TRACES = 1i32,
     TELEMETRY_KIND_LOGS = 2i32,
+    TELEMETRY_KIND_METRICS = 3i32,
 }
 impl TelemetryKind {
     ///Idiomatic alias for [`Self::TELEMETRY_KIND_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -18,6 +19,9 @@ impl TelemetryKind {
     ///Idiomatic alias for [`Self::TELEMETRY_KIND_LOGS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Logs: Self = Self::TELEMETRY_KIND_LOGS;
+    ///Idiomatic alias for [`Self::TELEMETRY_KIND_METRICS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Metrics: Self = Self::TELEMETRY_KIND_METRICS;
 }
 impl ::core::default::Default for TelemetryKind {
     fn default() -> Self {
@@ -116,6 +120,7 @@ impl ::buffa::Enumeration for TelemetryKind {
             0i32 => ::core::option::Option::Some(Self::TELEMETRY_KIND_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::TELEMETRY_KIND_TRACES),
             2i32 => ::core::option::Option::Some(Self::TELEMETRY_KIND_LOGS),
+            3i32 => ::core::option::Option::Some(Self::TELEMETRY_KIND_METRICS),
             _ => ::core::option::Option::None,
         }
     }
@@ -127,6 +132,7 @@ impl ::buffa::Enumeration for TelemetryKind {
             Self::TELEMETRY_KIND_UNSPECIFIED => "TELEMETRY_KIND_UNSPECIFIED",
             Self::TELEMETRY_KIND_TRACES => "TELEMETRY_KIND_TRACES",
             Self::TELEMETRY_KIND_LOGS => "TELEMETRY_KIND_LOGS",
+            Self::TELEMETRY_KIND_METRICS => "TELEMETRY_KIND_METRICS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -140,6 +146,9 @@ impl ::buffa::Enumeration for TelemetryKind {
             "TELEMETRY_KIND_LOGS" => {
                 ::core::option::Option::Some(Self::TELEMETRY_KIND_LOGS)
             }
+            "TELEMETRY_KIND_METRICS" => {
+                ::core::option::Option::Some(Self::TELEMETRY_KIND_METRICS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -148,6 +157,7 @@ impl ::buffa::Enumeration for TelemetryKind {
             Self::TELEMETRY_KIND_UNSPECIFIED,
             Self::TELEMETRY_KIND_TRACES,
             Self::TELEMETRY_KIND_LOGS,
+            Self::TELEMETRY_KIND_METRICS,
         ]
     }
 }
@@ -779,7 +789,9 @@ pub mod watch_response {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::watch_response::Frame as FrameView;
 }
-/// Leases in the snapshot are the ones this instance holds.
+/// Leases in the snapshot are the ones this instance holds. `prompts` are the deployment's
+/// text-matchable prompt versions (immutable per deployment): the replica matches each
+/// inference request against them itself and ships only `name@hash`, so bodies stay local.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -816,6 +828,13 @@ pub struct Snapshot {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub deployment_id: ::buffa::alloc::string::String,
+    /// Field 5: `prompts`
+    #[serde(
+        rename = "prompts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub prompts: ::buffa::alloc::vec::Vec<PromptPattern>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -827,6 +846,7 @@ impl ::core::fmt::Debug for Snapshot {
             .field("leases", &self.leases)
             .field("token_signing_key", &::core::format_args!("[REDACTED]"))
             .field("deployment_id", &self.deployment_id)
+            .field("prompts", &self.prompts)
             .finish()
     }
 }
@@ -882,6 +902,14 @@ impl ::buffa::Message for Snapshot {
             size
                 += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
         }
+        for v in &self.prompts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -913,6 +941,14 @@ impl ::buffa::Message for Snapshot {
         }
         if !self.deployment_id.is_empty() {
             ::buffa::types::put_string_field(4u32, &self.deployment_id, buf);
+        }
+        for v in &self.prompts {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -964,6 +1000,18 @@ impl ::buffa::Message for Snapshot {
                 )?;
                 ::buffa::types::merge_string(&mut self.deployment_id, buf)?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.prompts.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -976,6 +1024,7 @@ impl ::buffa::Message for Snapshot {
         self.leases.clear();
         self.token_signing_key.clear();
         self.deployment_id.clear();
+        self.prompts.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1006,6 +1055,181 @@ pub const __SNAPSHOT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::t
     type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.Snapshot",
     to_json: ::buffa::type_registry::any_to_json::<Snapshot>,
     from_json: ::buffa::type_registry::any_from_json::<Snapshot>,
+    is_wkt: false,
+};
+/// One prompt version's literal text segments, found in order within one message.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PromptPattern {
+    /// Field 1: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 2: `hash`
+    #[serde(
+        rename = "hash",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub hash: ::buffa::alloc::vec::Vec<u8>,
+    /// Field 3: `segments`
+    #[serde(
+        rename = "segments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub segments: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PromptPattern {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PromptPattern")
+            .field("name", &self.name)
+            .field("hash", &self.hash)
+            .field("segments", &self.segments)
+            .finish()
+    }
+}
+impl PromptPattern {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.PromptPattern";
+}
+::buffa::impl_default_instance!(PromptPattern);
+impl ::buffa::MessageName for PromptPattern {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "PromptPattern";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.PromptPattern";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.PromptPattern";
+}
+impl ::buffa::Message for PromptPattern {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.hash.is_empty() {
+            size += 1u64 + ::buffa::types::bytes_encoded_len(&self.hash) as u64;
+        }
+        for v in &self.segments {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        if !self.hash.is_empty() {
+            ::buffa::types::put_shared_bytes_field(2u32, &self.hash, buf);
+        }
+        for v in &self.segments {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.hash, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.segments.push(__elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.name.clear();
+        self.hash.clear();
+        self.segments.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PromptPattern {
+    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.PromptPattern";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PromptPattern {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PROMPT_PATTERN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.PromptPattern",
+    to_json: ::buffa::type_registry::any_to_json::<PromptPattern>,
+    from_json: ::buffa::type_registry::any_from_json::<PromptPattern>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -3216,6 +3440,8 @@ pub mod upstream {
     pub use super::__buffa::view::oneof::upstream::Frame as FrameView;
 }
 /// One forwarded inference call, parsed off the hot path by the replica; the gateway stores it.
+/// `prompts` are `name@hash` stamps from `x-tilde-prompt` plus versions the replica matched in the
+/// request text, resolved to versions by the gateway.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3389,6 +3615,13 @@ pub struct InferenceUsage {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub units: ::core::option::Option<i64>,
+    /// Field 23: `prompts`
+    #[serde(
+        rename = "prompts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub prompts: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3418,6 +3651,7 @@ impl ::core::fmt::Debug for InferenceUsage {
             .field("usage", &self.usage)
             .field("cache_write_tokens", &self.cache_write_tokens)
             .field("units", &self.units)
+            .field("prompts", &self.prompts)
             .finish()
     }
 }
@@ -3562,6 +3796,9 @@ impl ::buffa::Message for InferenceUsage {
         if let Some(v) = self.units {
             size += 2u64 + ::buffa::types::int64_encoded_len(v) as u64;
         }
+        for v in &self.prompts {
+            size += 2u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3637,6 +3874,9 @@ impl ::buffa::Message for InferenceUsage {
         }
         if let Some(v) = self.units {
             ::buffa::types::put_int64_field(22u32, v, buf);
+        }
+        for v in &self.prompts {
+            ::buffa::types::put_string_field(23u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3817,6 +4057,17 @@ impl ::buffa::Message for InferenceUsage {
                     ::buffa::types::decode_int64(buf)?,
                 );
             }
+            23u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.prompts.push(__elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3847,6 +4098,7 @@ impl ::buffa::Message for InferenceUsage {
         self.usage.clear();
         self.cache_write_tokens = ::core::option::Option::None;
         self.units = ::core::option::Option::None;
+        self.prompts.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8289,22 +8541,6 @@ pub struct GetConfigurationResponse {
     pub inference_blocked_identities: ::buffa::alloc::vec::Vec<
         ::buffa::alloc::string::String,
     >,
-    /// Field 6: `logs_enabled`
-    #[serde(
-        rename = "logsEnabled",
-        alias = "logs_enabled",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub logs_enabled: bool,
-    /// Field 5: `tracing_enabled`
-    #[serde(
-        rename = "tracingEnabled",
-        alias = "tracing_enabled",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub tracing_enabled: bool,
     /// Field 1: `agent`
     #[serde(
         rename = "agent",
@@ -8338,8 +8574,6 @@ impl ::core::fmt::Debug for GetConfigurationResponse {
         f.debug_struct("GetConfigurationResponse")
             .field("inference_blocked", &self.inference_blocked)
             .field("inference_blocked_identities", &self.inference_blocked_identities)
-            .field("logs_enabled", &self.logs_enabled)
-            .field("tracing_enabled", &self.tracing_enabled)
             .field("agent", &self.agent)
             .field("agent_generation", &self.agent_generation)
             .field("connections", &self.connections)
@@ -8394,12 +8628,6 @@ impl ::buffa::Message for GetConfigurationResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if self.tracing_enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
-        if self.logs_enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         if self.inference_blocked {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
@@ -8434,12 +8662,6 @@ impl ::buffa::Message for GetConfigurationResponse {
                 buf,
             );
             v.write_to(__cache, buf);
-        }
-        if self.tracing_enabled {
-            ::buffa::types::put_bool_field(5u32, self.tracing_enabled, buf);
-        }
-        if self.logs_enabled {
-            ::buffa::types::put_bool_field(6u32, self.logs_enabled, buf);
         }
         if self.inference_blocked {
             ::buffa::types::put_bool_field(7u32, self.inference_blocked, buf);
@@ -8490,20 +8712,6 @@ impl ::buffa::Message for GetConfigurationResponse {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.connections.push(elem);
             }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.tracing_enabled = ::buffa::types::decode_bool(buf)?;
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.logs_enabled = ::buffa::types::decode_bool(buf)?;
-            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -8533,8 +8741,6 @@ impl ::buffa::Message for GetConfigurationResponse {
         self.agent = ::buffa::MessageField::none();
         self.agent_generation = 0i64;
         self.connections.clear();
-        self.tracing_enabled = false;
-        self.logs_enabled = false;
         self.inference_blocked = false;
         self.inference_blocked_identities.clear();
         self.__buffa_unknown_fields.clear();

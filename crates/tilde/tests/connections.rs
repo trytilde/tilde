@@ -14,7 +14,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tilde::{
-    connections::{catalog::Endpoints, model::*, service::Connections},
+    connections::{
+        catalog::{Endpoints, ProviderFilter},
+        model::*,
+        service::Connections,
+    },
     encryption::Encryption,
 };
 use uuid::Uuid;
@@ -60,6 +64,7 @@ fn custom(id: &str, driver: Driver, oauth: Option<OAuth>) -> Provider {
         kind: ProviderKind::Configured,
         categories: vec!["other".into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: "account".into(),
             name: "Account".into(),
             capabilities: vec![],
@@ -596,11 +601,15 @@ async fn github_and_slack_apps_use_the_broker_and_type_scoped_channel_capability
     .unwrap();
     service.seed().await.unwrap();
     let github = service.provider("github").await.unwrap();
-    assert_eq!(github.connection_types.len(), 1);
-    assert_eq!(github.connection_types[0].driver(), Driver::Custom);
+    let app = github
+        .connection_types
+        .iter()
+        .find(|t| t.id == "github_app")
+        .unwrap();
+    assert_eq!(app.driver(), Driver::Custom);
     assert_eq!(
-        github.connection_types[0].capabilities,
-        vec![Capability::Channel]
+        app.capabilities,
+        vec![Capability::Channel, Capability::Tool]
     );
     let id = Uuid::new_v4();
     let start = service
@@ -878,11 +887,8 @@ async fn generated_client_and_native_callback_use_the_same_durable_broker() {
     )
     .unwrap();
     service.seed().await.unwrap();
-    let router = common::unguarded(
-        tilde::connections::rpc::management::router(service.clone()),
-        &db.pool,
-    )
-    .merge(tilde::connections::rpc::setup::router(service));
+    let router = tilde::connections::rpc::management::router(service.clone())
+        .merge(tilde::connections::rpc::setup::router(service));
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let script = std::path::Path::new(file!())
         .parent()
@@ -927,18 +933,22 @@ async fn a_thousand_runtime_definitions_are_persisted_and_paginated_without_new_
         };
         service.register_provider(definition, None).await.unwrap();
     }
-    let (first, next) = service
-        .providers("", Some("Large runtime catalog"), 100)
-        .await
-        .unwrap();
+    let large = ProviderFilter {
+        search: Some("Large runtime catalog"),
+        ..Default::default()
+    };
+    let (first, next) = service.providers("", &large, 100).await.unwrap();
     assert_eq!(first.len(), 100);
     assert_eq!(next, "custom/catalog-0099");
-    let (second, next) = service.providers(&next, None, 100).await.unwrap();
+    let (second, next) = service
+        .providers(&next, &ProviderFilter::default(), 100)
+        .await
+        .unwrap();
     assert_eq!(second[0].id, "custom/catalog-0100");
     assert_eq!(next, "custom/catalog-0199");
     // The migration-seeded built-in Tilde provider sorts after the custom ones.
     let (last, next) = service
-        .providers("custom/catalog-0999", Some("Large runtime catalog"), 100)
+        .providers("custom/catalog-0999", &large, 100)
         .await
         .unwrap();
     assert_eq!(last.len(), 1);
@@ -1114,16 +1124,13 @@ async fn remote_provider_sdk_drafts_callbacks_assets_and_cancel_are_end_to_end()
         "https://ingress.example".into(),
     )
     .unwrap();
-    let router = common::unguarded(
-        tilde::connections::rpc::management::router(service.clone()),
-        &db.pool,
-    )
-    .merge(tilde::connections::rpc::setup::router(service.clone()))
-    .merge(tilde::connections::assets::router(None, Some(service.clone())).unwrap())
-    .layer(axum::middleware::from_fn_with_state(
-        tilde::network::Boundary::new(address, false, vec![]).unwrap(),
-        tilde::network::guard,
-    ));
+    let router = tilde::connections::rpc::management::router(service.clone())
+        .merge(tilde::connections::rpc::setup::router(service.clone()))
+        .merge(tilde::connections::assets::router(None, Some(service.clone())).unwrap())
+        .layer(axum::middleware::from_fn_with_state(
+            tilde::network::Boundary::new(address, false, vec![]).unwrap(),
+            tilde::network::guard,
+        ));
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../web/scripts/test-remote-connections.mjs");
@@ -1358,6 +1365,7 @@ async fn provider_methods_round_trip_as_independent_credential_sources() {
     let mut oauth = OAuth::standard("https://example.com/token");
     oauth.authorization_url = Some("https://example.com/authorize".into());
     provider.connection_types.push(ConnectionType {
+        mcp: None,
         id: "oauth".into(),
         name: "Sign in with OAuth".into(),
         capabilities: vec![],
@@ -1632,6 +1640,7 @@ async fn account_name_bindings_share_projection_validation_and_encrypted_staging
     for owner in owners {
         agents
             .create(tilde::agent::CreateAgent {
+                description: String::new(),
                 concurrency_policy: Default::default(),
                 id: owner,
                 name: "Channel owner".into(),

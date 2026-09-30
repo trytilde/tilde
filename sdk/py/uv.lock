@@ -52,6 +52,7 @@ members = [
     "example-agent-langchain",
     "example-agent-openai-agents",
     "example-agent-pydantic-ai",
+    "example-tool-server",
     "tilde-py-workspace",
     "trytilde",
     "trytilde-agno",
@@ -1035,6 +1036,17 @@ requires-dist = [
     { name = "trytilde", editable = "packages/tilde" },
     { name = "trytilde-pydantic-ai", editable = "packages/tilde-pydantic-ai" },
 ]
+
+[[package]]
+name = "example-tool-server"
+version = "0.1.0"
+source = { virtual = "examples/example-tool-server" }
+dependencies = [
+    { name = "trytilde" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "trytilde", editable = "packages/tilde" }]
 
 [[package]]
 name = "fastapi"
@@ -5231,7 +5243,6 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
-    { name = "cryptography" },
     { name = "fastapi" },
     { name = "grpcio-tools" },
     { name = "hatchling" },
@@ -5247,7 +5258,6 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "cryptography", specifier = ">=43" },
     { name = "fastapi", specifier = ">=0.120" },
     { name = "grpcio-tools", specifier = ">=1.84" },
     { name = "hatchling", specifier = ">=1.27" },
@@ -5349,10 +5359,13 @@ version = "3.0.0"
 source = { editable = "packages/tilde" }
 dependencies = [
     { name = "connectrpc" },
+    { name = "httpx" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-common" },
     { name = "opentelemetry-sdk" },
     { name = "protobuf" },
+    { name = "pydantic", version = "2.12.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
+    { name = "pydantic", version = "2.13.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-22-trytilde-openai-agents' or extra == 'project-27-example-agent-openai-agents'" },
     { name = "pyqwest" },
 ]
 
@@ -5365,10 +5378,12 @@ fastapi = [
 requires-dist = [
     { name = "connectrpc", specifier = ">=0.12,<1" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "opentelemetry-api", specifier = ">=1.30" },
     { name = "opentelemetry-exporter-otlp-proto-common", specifier = ">=1.30" },
     { name = "opentelemetry-sdk", specifier = ">=1.30" },
     { name = "protobuf", specifier = ">=5.29" },
+    { name = "pydantic", specifier = ">=2.7" },
     { name = "pyqwest", specifier = ">=0.5" },
 ]
 provides-extras = ["fastapi"]
@@ -5394,12 +5409,14 @@ version = "3.0.0"
 source = { editable = "packages/tilde-crewai" }
 dependencies = [
     { name = "crewai", marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
+    { name = "pyyaml", marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
     { name = "trytilde", marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "crewai", specifier = ">=1.15,<2" },
+    { name = "pyyaml", specifier = ">=6" },
     { name = "trytilde", editable = "packages/tilde" },
 ]
 
@@ -5408,13 +5425,17 @@ name = "trytilde-langchain"
 version = "3.0.0"
 source = { editable = "packages/tilde-langchain" }
 dependencies = [
+    { name = "langchain" },
     { name = "langchain-core" },
+    { name = "langgraph" },
     { name = "trytilde" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "langchain", specifier = ">=1,<2" },
     { name = "langchain-core", specifier = ">=1,<2" },
+    { name = "langgraph", specifier = ">=1,<2" },
     { name = "trytilde", editable = "packages/tilde" },
 ]
 

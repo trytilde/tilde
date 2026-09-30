@@ -19,8 +19,18 @@ breaking:
     - proto/tilde/ingress/v1/chat.proto
   # AgentService (Invoke/Healthz) was deliberately retired: hosts only dial in through
   # RunService.Watch. InvokeRequest stays in that file and stays checked.
+  # GetLogsStatus and GetTracingStatus were deliberately retired: ClickHouse is required, so
+  # there is no storage state to report.
   ignore_only:
     MESSAGE_NO_DELETE:
       - proto/tilde/agent_host/v1/agent.proto
+      - proto/tilde/management/v1/logs.proto
+      - proto/tilde/management/v1/tracing.proto
+    ENUM_NO_DELETE:
+      - proto/tilde/management/v1/logs.proto
+      - proto/tilde/management/v1/tracing.proto
+    RPC_NO_DELETE:
+      - proto/tilde/management/v1/logs.proto
+      - proto/tilde/management/v1/tracing.proto
     SERVICE_NO_DELETE:
       - proto/tilde/agent_host/v1/agent.proto

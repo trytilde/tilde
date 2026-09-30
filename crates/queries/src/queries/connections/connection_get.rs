@@ -14,6 +14,7 @@ pub struct Record {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub channel_capable: bool,
     pub inference_capable: bool,
+    pub tool_capable: bool,
     pub associated_agents: serde_json::Value,
 }
 pub struct RecordBorrowed<'a> {
@@ -29,6 +30,7 @@ pub struct RecordBorrowed<'a> {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub channel_capable: bool,
     pub inference_capable: bool,
+    pub tool_capable: bool,
     pub associated_agents: postgres_types::Json<&'a serde_json::value::RawValue>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
@@ -46,6 +48,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             updated_at,
             channel_capable,
             inference_capable,
+            tool_capable,
             associated_agents,
         }: RecordBorrowed<'a>,
     ) -> Self {
@@ -62,6 +65,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             updated_at,
             channel_capable,
             inference_capable,
+            tool_capable,
             associated_agents: serde_json::from_str(associated_agents.0.get()).unwrap(),
         }
     }
@@ -135,7 +139,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT c.id,c.name,c.provider_id,c.type_id,c.status,c.account_label,c.token_expires_at,c.credential_version,c.created_at,c.updated_at,t.channel_capable,t.inference_capable, COALESCE((SELECT jsonb_agg(jsonb_build_object('capability',ca.capability,'id',a.id,'name',a.name,'alias',ca.alias) ORDER BY ca.capability,a.id) FROM connection_agents ca JOIN agents a ON a.id=ca.agent_id WHERE ca.connection_id=c.id),'[]'::jsonb) AS associated_agents FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) WHERE c.id=$1",
+        "SELECT c.id,c.name,c.provider_id,c.type_id,c.status,c.account_label,c.token_expires_at,c.credential_version,c.created_at,c.updated_at,t.channel_capable,t.inference_capable,t.tool_capable, COALESCE((SELECT jsonb_agg(jsonb_build_object('capability',ca.capability,'id',a.id,'name',a.name,'alias',ca.alias) ORDER BY ca.capability,a.id) FROM connection_agents ca JOIN agents a ON a.id=ca.agent_id WHERE ca.connection_id=c.id),'[]'::jsonb) AS associated_agents FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) WHERE c.id=$1",
         None,
     )
 }
@@ -172,7 +176,8 @@ impl RunStmt {
                         updated_at: row.try_get(9)?,
                         channel_capable: row.try_get(10)?,
                         inference_capable: row.try_get(11)?,
-                        associated_agents: row.try_get(12)?,
+                        tool_capable: row.try_get(12)?,
+                        associated_agents: row.try_get(13)?,
                     })
                 },
             mapper: |it| Record::from(it),

@@ -109,22 +109,7 @@ pub(crate) async fn download(
             "Invalid Meta attachment origin",
         ));
     }
-    let addresses = tokio::net::lookup_host((host, url.port_or_known_default().unwrap_or(443)))
-        .await
-        .map_err(|_| ConnectError::unavailable("Attachment host lookup failed"))?
-        .collect::<Vec<SocketAddr>>();
-    if addresses.is_empty() || addresses.iter().any(|a| !public(a.ip())) {
-        return Err(ConnectError::permission_denied(
-            "Attachment cannot access a private address",
-        ));
-    }
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .resolve_to_addrs(host, &addresses)
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|_| ConnectError::internal("Attachment transport failed"))?;
+    let client = public_client(&url, std::time::Duration::from_secs(30)).await?;
     let mut request = client.get(url);
     if let Some(token) = authorization {
         request = request.bearer_auth(token);
@@ -150,6 +135,33 @@ pub(crate) async fn download(
         bytes.extend_from_slice(&chunk);
     }
     Ok(bytes)
+}
+
+/// A client that can reach only the public addresses `url`'s host resolved to just now: DNS is
+/// pinned against rebinding, proxies and redirects are off.
+pub(crate) async fn public_client(
+    url: &url::Url,
+    timeout: std::time::Duration,
+) -> ToolResult<reqwest::Client> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| ConnectError::invalid_argument("URL has no host"))?;
+    let addresses = tokio::net::lookup_host((host, url.port_or_known_default().unwrap_or(443)))
+        .await
+        .map_err(|_| ConnectError::unavailable("Host lookup failed"))?
+        .collect::<Vec<SocketAddr>>();
+    if addresses.is_empty() || addresses.iter().any(|a| !public(a.ip())) {
+        return Err(ConnectError::permission_denied(
+            "Private addresses cannot be reached",
+        ));
+    }
+    reqwest::Client::builder()
+        .no_proxy()
+        .resolve_to_addrs(host, &addresses)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(timeout)
+        .build()
+        .map_err(|_| ConnectError::internal("Transport failed"))
 }
 
 fn public(ip: IpAddr) -> bool {

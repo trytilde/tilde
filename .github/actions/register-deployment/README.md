@@ -20,10 +20,14 @@ pinned remote reference shown in each example once the action is published.
 
 ## Workflow
 
-Create a management API key in Tilde and store it as the GitHub Actions secret
-`TILDE_API_KEY`. Configure repository/environment variables `TILDE_URL` (the management
-API address) and `TILDE_AGENT_ID`. The runner must be able to reach that address; a
-private Tailscale address needs a runner with access to your tailnet.
+Configure repository/environment variables `TILDE_URL` (the management API address) and
+`TILDE_AGENT_ID`. The runner must be able to reach that address; a private Tailscale address
+needs a runner with access to your tailnet.
+
+Open-source Tilde's management API takes no credential: it is unauthenticated and secured by
+the proxy you put in front of it, so leave `TILDE_API_KEY` unset (or pass whatever your proxy
+expects as a bearer token). Tilde Cloud requires a management API key: create one in Tilde
+Cloud and store it as the GitHub Actions secret `TILDE_API_KEY`.
 
 ```yaml
 permissions:
@@ -38,7 +42,7 @@ steps:
     # From another repository, after publishing this change:
     # uses: trytilde/tilde/.github/actions/register-deployment@<full-commit-sha>
     env:
-      TILDE_API_KEY: ${{ secrets.TILDE_API_KEY }}
+      TILDE_API_KEY: ${{ secrets.TILDE_API_KEY }} # Tilde Cloud only
       TILDE_URL: ${{ vars.TILDE_URL }}
       TILDE_AGENT_ID: ${{ vars.TILDE_AGENT_ID }}
     with:
@@ -47,15 +51,20 @@ steps:
 
 An explicit `with.api-token` overrides `TILDE_API_KEY`. An action cannot look up a
 repository secret itself: the caller must pass `${{ secrets.TILDE_API_KEY }}` using
-an input or `env`. `GITHUB_TOKEN` authenticates GitHub, not Tilde. Grant the key
-**Edit** on the agent it deploys, from that agent's Access tab or when creating the key.
-Use HTTPS when the API is reachable over a public network.
+an input or `env`. `GITHUB_TOKEN` authenticates GitHub, not Tilde. Use HTTPS when the API
+is reachable over a public network.
 
 The action also accepts `url`, `ui-url`, `agent-id`, `type`, `function-arn`,
 `external-id`, `label`, `repository`, `commit-sha`, `branch`, and
 `rotate-existing-token`, and `output-token` (defaults to `true`); see [action.yml](action.yml). For a separate frontend URL,
 set `ui-url` or `TILDE_UI_URL` so the summary links to the browser-facing service.
 Lambda requires `function-arn`; deploy the immutable function version before registering.
+
+To ship the prompts and skills your code declares, set `command` to
+`npx tilde deploy dist/index.js --json` (after installing and building). The action runs it
+with `TILDE_URL`, `TILDE_AGENT_ID` and (when given) `TILDE_API_KEY` set and GitHub metadata in the
+environment, uses its JSON result instead of registering itself, and produces the same
+outputs. Put `--target`, `--function-arn`, `--label` or `--external-id` in the command.
 
 Repository, branch/tag and commit default to GitHub context. Push event metadata adds
 the commit message and author only when it matches the deployed SHA. `external-id`
@@ -90,8 +99,8 @@ Set `output-token: 'false'` to prevent the action from exporting a token. Regist
 still generates one server-side, but the action discards it. This mode can be retried
 without rotating credentials and cannot be combined with `rotate-existing-token: 'true'`.
 
-The job summary contains an authenticated link to the deployment table and its deployment
-ID, **not a secret-bearing retrieval URL**. Sign in to Tilde, locate the deployment,
+The job summary contains a link to the deployment table and its deployment ID, **not a
+secret-bearing retrieval URL**. Open Tilde, locate the deployment,
 choose **Rotate token**, confirm, and copy the newly issued token directly into your
 runtime configuration. Do this before starting the runtime with that token. Rotation
 invalidates the CI-issued token; rotating an already used deployment requires updating

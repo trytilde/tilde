@@ -1,13 +1,16 @@
+import { AgentTools } from "./agent-tools";
 import { AgentLogs } from "@/features/logs/agent-logs";
 import { AgentTracing } from "@/features/tracing/agent-tracing";
 import { DashboardActions, DashboardNavigation } from "./dashboard-breadcrumbs";
 import { InlineSaving, type InlineSavingState } from "./inline-saving";
 import { AgentDeployment } from "@/components/agent-deployment";
 import { AgentIam } from "@/components/agent-iam";
-import { AgentShare } from "@/components/agent-share";
 import { AgentAvatar } from "./agent-avatar";
 import { AgentTargetPicker } from "./agent-target-picker";
 import { AgentConnections } from "./agent-connections";
+import { AgentPrompts } from "./agent-prompts";
+import { AgentSkills } from "./agent-skills";
+import { SkillSourcePicker } from "./skill-source-picker";
 import { Capability } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { randomUUID } from "@/lib/browser-crypto";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -36,7 +39,11 @@ type TargetKey =
   | "agentsDelete"
   | "agentsInvoke"
   | "agentsGrantCapabilities"
-  | "toolsInvoke";
+  | "agentsEditSkills"
+  | "skillsRead"
+  | "skillsEdit"
+  | "toolsInvoke"
+  | "toolsPersonal";
 type CapabilityOption = { label: string; description: string } & (
   | { key: BinaryKey; targeted: false }
   | { key: TargetKey; targeted: true }
@@ -79,6 +86,24 @@ const capabilityOptions: readonly CapabilityOption[] = [
     description: "Manage the permissions assigned to other agents.",
   },
   {
+    key: "agentsEditSkills",
+    label: "Edit skills",
+    targeted: true,
+    description: "Assign and unassign skills on agents, itself included.",
+  },
+  {
+    key: "skillsRead",
+    label: "Read skill sources",
+    targeted: true,
+    description: "See these skill sources and assign their skills.",
+  },
+  {
+    key: "skillsEdit",
+    label: "Edit skill sources",
+    targeted: true,
+    description: "Write skills into editor skill sources and sync git sources.",
+  },
+  {
     key: "threadRead",
     label: "Read current thread",
     targeted: false,
@@ -108,23 +133,34 @@ const capabilityOptions: readonly CapabilityOption[] = [
     targeted: true,
     description: "Call tools exposed by connected providers.",
   },
+  {
+    key: "toolsPersonal",
+    label: "Use personal tools",
+    targeted: true,
+    description:
+      "Use accounts a person connects for themselves, only while serving that person. Selected targets are provider IDs.",
+  },
 ];
 
 export type AgentTab =
   | "capabilities"
   | "chat-providers"
+  | "tools"
   | "inference"
   | "iam"
   | "deployment"
   | "sessions"
   | "tracing"
-  | "logs";
+  | "logs"
+  | "prompts"
+  | "skills";
 
 export function AgentEditor({
   agent,
   onClose,
   onSaved,
   tab,
+  promptOpen,
   onTabChange,
   onNameSaved,
   onAvatarSaved,
@@ -132,6 +168,8 @@ export function AgentEditor({
 }: {
   agent: Agent | null;
   tab?: AgentTab;
+  /** A prompt is open on the Prompts tab, which then fills the page. */
+  promptOpen?: boolean;
   onTabChange?: (tab: AgentTab) => void;
   onNameSaved?: (name: string) => void;
   onAvatarSaved?: (avatarUrl: string | undefined) => void;
@@ -227,6 +265,7 @@ export function AgentEditor({
     }
   }
   const [name, setName] = useState(agent?.name ?? "");
+  const [description, setDescription] = useState(agent?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const id = useRef(agent?.id ?? randomUUID());
@@ -272,7 +311,7 @@ export function AgentEditor({
     else if (metadataSaved.current) onSaved(false);
     else onClose();
   };
-  async function saveMetadata(field: "name", value: string) {
+  async function saveMetadata(field: "name" | "description", value: string) {
     if (!agent) return;
     setMetadataSaving(true);
     try {
@@ -281,6 +320,8 @@ export function AgentEditor({
         const savedName = response.agent?.name ?? value.trim();
         setName(savedName);
         onNameSaved?.(savedName);
+      } else {
+        setDescription(response.agent?.description ?? value.trim());
       }
       metadataSaved.current = true;
     } finally {
@@ -301,6 +342,7 @@ export function AgentEditor({
             capabilities,
             id: id.current,
             name,
+            description,
           });
           created = response.agent ?? null;
           if (!created) throw new Error("Agent creation returned no agent.");
@@ -379,12 +421,25 @@ export function AgentEditor({
               </div>
               {option.targeted &&
                 mode === TargetSelection.SELECTED &&
-                (option.key === "toolsInvoke" ? (
+                (option.key === "toolsInvoke" || option.key === "toolsPersonal" ? (
                   <ToolTargetsInput
                     label={label}
+                    placeholder={
+                      option.key === "toolsPersonal"
+                        ? "Provider IDs, separated by commas"
+                        : "Tool names, separated by commas"
+                    }
                     ids={capabilities[option.key]?.ids ?? []}
                     disabled={locked}
                     onCommit={(ids) => changeCapability(option, TargetSelection.SELECTED, ids)}
+                  />
+                ) : option.key === "skillsRead" || option.key === "skillsEdit" ? (
+                  // Targets are skill source ids, not agents.
+                  <SkillSourcePicker
+                    label={label}
+                    value={capabilities[option.key]?.ids ?? []}
+                    disabled={locked}
+                    onConfirm={(ids) => changeCapability(option, TargetSelection.SELECTED, ids)}
                   />
                 ) : (
                   <AgentTargetPicker
@@ -528,6 +583,11 @@ export function AgentEditor({
                 disabled={saving || metadataSaving}
                 onSave={(value) => saveMetadata("name", value)}
               />
+              <InlineDescription
+                value={description}
+                disabled={saving || metadataSaving}
+                onSave={(value) => saveMetadata("description", value)}
+              />
             </>
           ) : (
             <>
@@ -543,6 +603,16 @@ export function AgentEditor({
                 autoFocus
                 placeholder="Agent name"
                 className="h-11 border-transparent bg-transparent p-0 text-3xl font-semibold shadow-none md:text-3xl"
+              />
+              <Input
+                form="agent-settings"
+                aria-label="Agent description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={500}
+                disabled={locked}
+                placeholder="Add a description"
+                className="-mt-2 h-7 border-transparent bg-transparent p-0 text-sm text-muted-foreground shadow-none md:text-sm"
               />
             </>
           )}
@@ -560,10 +630,15 @@ export function AgentEditor({
       )}
     </header>
   );
+  // These tabs run edge to edge and lay out their own padding.
+  // An open prompt fills the page like the skill editor it mirrors.
+  const fullWidth =
+    ["sessions", "tracing", "logs", "deployment", "tools"].includes(tab ?? "") ||
+    (tab === "prompts" && promptOpen);
   return (
     <section
       className={
-        tab === "sessions" || tab === "tracing" || tab === "logs" || tab === "deployment"
+        fullWidth
           ? "flex min-h-0 flex-1 flex-col overflow-hidden"
           : "flex flex-1 flex-col px-4 py-6 lg:px-8"
       }
@@ -571,24 +646,17 @@ export function AgentEditor({
     >
       <div
         className={
-          tab === "sessions" || tab === "tracing" || tab === "logs" || tab === "deployment"
-            ? "flex min-h-0 w-full flex-1 flex-col"
-            : "mx-auto grid w-full max-w-6xl gap-8"
+          fullWidth ? "flex min-h-0 w-full flex-1 flex-col" : "mx-auto grid w-full max-w-6xl gap-8"
         }
       >
         {agent ? (
           <Tabs
-            className={
-              tab === "sessions" || tab === "tracing" || tab === "logs" || tab === "deployment"
-                ? "min-h-0 flex-1 gap-0"
-                : undefined
-            }
+            className={fullWidth ? "min-h-0 flex-1 gap-0" : undefined}
             defaultValue="capabilities"
             value={tab}
             onValueChange={(value) => onTabChange?.(value as AgentTab)}
           >
             <DashboardActions>
-              <AgentShare agentId={agent.id} />
               {onPausedChange && (
                 <Button
                   type="button"
@@ -607,6 +675,9 @@ export function AgentEditor({
                   <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
                   <TabsTrigger value="inference">Inference</TabsTrigger>
                   <TabsTrigger value="chat-providers">Chat providers</TabsTrigger>
+                  <TabsTrigger value="prompts">Prompts</TabsTrigger>
+                  <TabsTrigger value="skills">Skills</TabsTrigger>
+                  <TabsTrigger value="tools">Tools</TabsTrigger>
                   <TabsTrigger value="iam">IAM</TabsTrigger>
                   <TabsTrigger value="sessions">Sessions</TabsTrigger>
                   <TabsTrigger value="tracing">Tracing</TabsTrigger>
@@ -621,6 +692,9 @@ export function AgentEditor({
             </TabsContent>
             <TabsContent value="chat-providers" keepMounted>
               <AgentConnections agentId={agent.id} />
+            </TabsContent>
+            <TabsContent value="tools" className="flex min-h-0 flex-1 flex-col">
+              {tab === "tools" && <AgentTools agentId={agent.id} />}
             </TabsContent>
             <TabsContent value="inference" keepMounted>
               <AgentConnections agentId={agent.id} capability={Capability.INFERENCE} />
@@ -639,6 +713,12 @@ export function AgentEditor({
             </TabsContent>
             <TabsContent value="iam" keepMounted>
               <AgentIam key={agent.id} agentId={agent.id} active={tab === "iam"} />
+            </TabsContent>
+            <TabsContent value="prompts" className={promptOpen ? "flex min-h-0 flex-1" : undefined}>
+              {tab === "prompts" && <AgentPrompts agentId={agent.id} />}
+            </TabsContent>
+            <TabsContent value="skills">
+              {tab === "skills" && <AgentSkills agentId={agent.id} />}
             </TabsContent>
           </Tabs>
         ) : (
@@ -745,14 +825,110 @@ function InlineAgentField({
   );
 }
 
+/** A muted subtitle under the name: Enter or blur saves, Escape restores the saved text. */
+function InlineDescription({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: string;
+  disabled: boolean;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const form = useForm<{ value: string }>({ defaultValues: { value } });
+  const cancelled = useRef(false);
+  const error = form.formState.errors.value?.message;
+  const submit = form.handleSubmit(async ({ value: next }) => {
+    if (next.trim() === value) {
+      setEditing(false);
+      return;
+    }
+    try {
+      await onSave(next);
+      setEditing(false);
+    } catch (error) {
+      form.setError("value", {
+        message: error instanceof Error ? error.message : "Unable to save the description.",
+      });
+    }
+  });
+  function edit() {
+    if (disabled) return;
+    cancelled.current = false;
+    form.reset({ value });
+    setEditing(true);
+  }
+  if (editing) {
+    const registration = form.register("value");
+    return (
+      <form onSubmit={submit} className="-mt-2 min-w-0">
+        <Input
+          aria-label="Agent description"
+          aria-invalid={!!error}
+          aria-describedby={error ? "agent-description-error" : undefined}
+          autoFocus
+          maxLength={500}
+          placeholder="Add a description"
+          disabled={disabled || form.formState.isSubmitting}
+          className="h-7 border-transparent bg-transparent p-0 text-sm text-muted-foreground shadow-none focus-visible:border-transparent focus-visible:ring-0 md:text-sm dark:bg-transparent"
+          {...registration}
+          onBlur={(event) => {
+            void registration.onBlur(event);
+            // Enter disables the field while saving, which blurs it; save once.
+            if (!cancelled.current && !form.formState.isSubmitting) void submit();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              cancelled.current = true;
+              form.reset({ value });
+              setEditing(false);
+            }
+          }}
+        />
+        {error && (
+          <p id="agent-description-error" role="alert" className="mt-1 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </form>
+    );
+  }
+  return (
+    <p className="-mt-2 min-w-0 text-sm break-words text-muted-foreground">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={edit}
+        className={`cursor-text text-left hover:text-foreground disabled:cursor-default ${value ? "" : "text-muted-foreground/70 italic"}`}
+      >
+        {value || "Add a description"}
+      </button>
+      <button
+        type="button"
+        aria-label="Edit agent description"
+        title="Edit agent description"
+        disabled={disabled}
+        onClick={edit}
+        className="ml-1 inline cursor-pointer align-baseline text-muted-foreground hover:text-foreground"
+      >
+        <PencilIcon className="inline size-3 align-[-1px]" />
+      </button>
+    </p>
+  );
+}
+
 /** Text tool targets commit on blur or Enter; partial comma-separated edits never reach the API. */
 function ToolTargetsInput({
   label,
+  placeholder,
   ids,
   disabled,
   onCommit,
 }: {
   label: string;
+  placeholder: string;
   ids: string[];
   disabled: boolean;
   onCommit: (ids: string[]) => Promise<void>;
@@ -763,7 +939,7 @@ function ToolTargetsInput({
     <Input
       className="col-span-full"
       aria-label={`${label} targets`}
-      placeholder="Tool names, separated by commas"
+      placeholder={placeholder}
       value={text}
       disabled={disabled}
       onChange={(event) => setText(event.target.value)}

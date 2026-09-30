@@ -1,0 +1,133 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+import "tilde/types/v1/agent.proto";
+import "tilde/types/v1/chat.proto";
+
+// An agent's tools. An agent uses tools from sources: a tool-capable connection (including an
+// instance of a tool host's provider) or a tool host that needs no credentials. For each source
+// the agent picks the tools it uses; they are offered as `{source slug}.{tool name}`, and the
+// agent's tools_invoke capability still filters those names. Connections and tool hosts hold
+// credentials and describe their tools; which tools an agent gets is the agent's configuration.
+service ToolService {
+  rpc ListProviderTools(ListProviderToolsRequest) returns (ListProviderToolsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // MCP-served connections only: asks the server for its tools and replaces the stored snapshot.
+  rpc RefreshConnectionTools(RefreshConnectionToolsRequest) returns (RefreshConnectionToolsResponse);
+  rpc ListToolSources(ListToolSourcesRequest) returns (ListToolSourcesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc AddToolSource(AddToolSourceRequest) returns (AddToolSourceResponse);
+  rpc RemoveToolSource(RemoveToolSourceRequest) returns (RemoveToolSourceResponse);
+  rpc SetAgentTool(SetAgentToolRequest) returns (SetAgentToolResponse);
+  rpc RemoveAgentTool(RemoveAgentToolRequest) returns (RemoveAgentToolResponse);
+  // Whether the agent's tools are listed or found by search; one setting for all of them.
+  rpc GetToolMode(GetToolModeRequest) returns (GetToolModeResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc SetToolMode(SetToolModeRequest) returns (SetToolModeResponse);
+  // The agent's bundled tools: those it ships in its code and runs in its process, as registered
+  // by its latest invocation that registered any. Read-only; they are configured in code.
+  rpc ListBundledTools(ListBundledToolsRequest) returns (ListBundledToolsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Twelve hourly reachability buckets of MCP servers added by URL, as tool hosts have.
+  rpc ListMcpServerHealth(ListMcpServerHealthRequest) returns (ListMcpServerHealthResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+// Tool hosts are customer-hosted tool backends. A connected host dials in with the token issued
+// here; a Lambda host is named by its function ARN and invoked with the gateway's AWS credentials.
+service ToolHostRegistryService {
+  rpc ListToolHosts(ListToolHostsRequest) returns (ListToolHostsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc RegisterToolHost(RegisterToolHostRequest) returns (RegisterToolHostResponse);
+  rpc RotateToolHostToken(RotateToolHostTokenRequest) returns (RotateToolHostTokenResponse);
+  // Lambda only: asks the function for its tools and replaces the stored definitions.
+  rpc RefreshToolHost(RefreshToolHostRequest) returns (RefreshToolHostResponse);
+  rpc DeleteToolHost(DeleteToolHostRequest) returns (DeleteToolHostResponse);
+}
+enum ToolHostType { TOOL_HOST_TYPE_UNSPECIFIED = 0; TOOL_HOST_TYPE_CONNECTED = 1; TOOL_HOST_TYPE_LAMBDA = 2; }
+message ToolHost {
+  string id = 1; string name = 2; ToolHostType type = 3; optional string function_arn = 4;
+  // Connected hosts: a Watch stream was open within the liveness window. Lambda is always available.
+  bool available = 5; repeated ProviderTool tools = 6;
+  // Set when the host published a provider: its tools are then used through connections of
+  // that provider (instances) rather than through the host itself.
+  optional string provider_id = 7;
+  // Hourly availability samples for the last 12 hours, oldest first.
+  repeated tilde.types.v1.AgentHealthHour health_history = 8;
+  // Names of the provider's credential methods; empty when the host needs no credentials.
+  repeated string auth_methods = 9;
+}
+// `search` matches the name case-insensitively; `with_provider` keeps only hosts that publish a
+// provider (true) or only those that do not (false).
+message ListToolHostsRequest { optional string search = 1; optional bool with_provider = 2; }
+message ListToolHostsResponse { repeated ToolHost tool_hosts = 1; }
+message RegisterToolHostRequest { string name = 1; ToolHostType type = 2; optional string function_arn = 3; }
+// `token` is set once, for connected hosts only; only its digest is stored.
+message RegisterToolHostResponse { ToolHost tool_host = 1; optional string token = 2 [debug_redact = true]; }
+message RotateToolHostTokenRequest { string id = 1; }
+message RotateToolHostTokenResponse { string token = 1 [debug_redact = true]; }
+message RefreshToolHostRequest { string id = 1; }
+message RefreshToolHostResponse { ToolHost tool_host = 1; }
+message DeleteToolHostRequest { string id = 1; }
+message DeleteToolHostResponse {}
+// One agent's use of one source. Exactly one of connection_id and tool_host_id is set. The slug,
+// derived from the source's name when it is added, prefixes the catalog names of its tools.
+message ToolSource {
+  string id = 1; string agent_id = 2; optional string connection_id = 3; optional string tool_host_id = 4;
+  string slug = 5; repeated AgentTool tools = 7;
+}
+// How an agent is offered all of its tools. DIRECT lists them in its catalog. DYNAMIC keeps them
+// out of it: the agent finds them with tools.search and calls them through tools.execute.
+enum ToolMode { TOOL_MODE_UNSPECIFIED = 0; TOOL_MODE_DIRECT = 1; TOOL_MODE_DYNAMIC = 2; }
+// A tool the agent uses from its source. `name` is the tool's name made catalog-safe.
+message AgentTool {
+  string tool_name = 1; string name = 2;
+  // Long-running: the agent gets a ticket at once and the result later.
+  bool is_async = 3;
+  // This agent's own summary and description, replacing the tool's; empty keeps the tool's.
+  string summary = 4; string description = 5;
+  tilde.types.v1.ToolDisplay display = 6;
+}
+// A tool a tool-capable connection or tool host offers.
+message ProviderTool { string name = 1; string description = 2; string input_schema_json = 3; string output_schema_json = 4; string summary = 5; }
+// A connection's tools, with `tool_host_id` instead a tool host's, or with `provider_id` the
+// tools a catalog provider offers before any connection: its built-in tools, its tool host's, or
+// an MCP server's advertised list (the connected server's own list replaces it once a connection
+// is ready). `search` matches a tool's name or description case-insensitively.
+message ListProviderToolsRequest { string connection_id = 1; optional string provider_id = 2; optional string tool_host_id = 3; optional string search = 4; }
+message ListProviderToolsResponse { repeated ProviderTool tools = 1; }
+message RefreshConnectionToolsRequest { string connection_id = 1; }
+// `changed` is false when the server described the same tools as before.
+message RefreshConnectionToolsResponse { repeated ProviderTool tools = 1; bool changed = 2; }
+// Exactly one filter: an agent's sources, or the agents using a connection or tool host.
+message ListToolSourcesRequest { optional string agent_id = 1; optional string connection_id = 2; optional string tool_host_id = 3; }
+message ListToolSourcesResponse { repeated ToolSource sources = 1; }
+// Exactly one of connection_id and tool_host_id; an agent uses each at most once. `tool_names`
+// are the tools the agent starts with.
+message AddToolSourceRequest {
+  string agent_id = 1; optional string connection_id = 2; optional string tool_host_id = 3;
+  repeated string tool_names = 5;
+}
+message AddToolSourceResponse { ToolSource source = 1; }
+message GetToolModeRequest { string agent_id = 1; }
+message GetToolModeResponse { ToolMode mode = 1; }
+// Unspecified mode means DIRECT.
+message SetToolModeRequest { string agent_id = 1; ToolMode mode = 2; }
+message SetToolModeResponse { ToolMode mode = 1; }
+message ListBundledToolsRequest { string agent_id = 1; }
+// Empty, without an invocation, when no invocation of the agent has registered bundled tools.
+message ListBundledToolsResponse {
+  repeated tilde.types.v1.ToolDefinition tools = 1;
+  optional string invocation_id = 2;
+  // When that invocation started.
+  optional google.protobuf.Timestamp registered_at = 3;
+  optional string deployment_id = 4;
+}
+message RemoveToolSourceRequest { string id = 1; }
+message RemoveToolSourceResponse {}
+// Adds the tool, or updates it when the agent already uses it.
+// Sets every setting of one of the agent's tools, adding it if the agent does not use it yet.
+message SetAgentToolRequest {
+  string source_id = 1; string tool_name = 2; bool is_async = 3;
+  string summary = 4; string description = 5; tilde.types.v1.ToolDisplay display = 6;
+}
+message SetAgentToolResponse { ToolSource source = 1; }
+message RemoveAgentToolRequest { string source_id = 1; string tool_name = 2; }
+message RemoveAgentToolResponse { ToolSource source = 1; }
+// `provider_ids` name registered MCP providers; each server's buckets are oldest first.
+message ListMcpServerHealthRequest { repeated string provider_ids = 1; }
+message McpServerHealth { string provider_id = 1; repeated tilde.types.v1.AgentHealthHour health_history = 2; }
+message ListMcpServerHealthResponse { repeated McpServerHealth servers = 1; }

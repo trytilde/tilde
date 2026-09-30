@@ -40,17 +40,15 @@ pub fn normalized(
         request.resource_logs,
         Some(RequestContext::Http(headers)),
     );
-    crate::logs::ingress::validate(&message)
+    crate::telemetry::logs::ingress::validate(&message)
         .map_err(|_| Error::Invalid("Invalid OTLP logs".into()))?;
-    crate::logs::ingress::prepare(&mut message).map_err(|_| Error::Denied)?;
+    crate::telemetry::logs::ingress::prepare(&mut message).map_err(|_| Error::Denied)?;
     Ok(ExportLogsServiceRequest {
         resource_logs: message.payload,
     })
 }
 pub fn relay(runtime: &Runtime, request: ExportLogsServiceRequest) -> Result<()> {
-    if !runtime.configuration()?.logs_enabled {
-        return Ok(());
-    }
+    runtime.configuration()?;
     let payload = request.encode_to_vec();
     if payload.len() > 8 * 1024 * 1024 {
         return Err(ChatError::Invalid("Log batch is too large".into()));
@@ -68,12 +66,12 @@ pub fn relay(runtime: &Runtime, request: ExportLogsServiceRequest) -> Result<()>
 }
 pub fn router(node: Node) -> axum::Router {
     let (sender, mut receiver, _task) =
-        crate::logs::pipeline(tokio_util::sync::CancellationToken::new());
+        crate::telemetry::logs::pipeline(tokio_util::sync::CancellationToken::new());
     let runtime = node.runtime.clone();
     tokio::spawn(async move {
         while let Some(batch) = receiver.next().await {
             for mut message in batch {
-                let result = match crate::logs::ingress::prepare(&mut message) {
+                let result = match crate::telemetry::logs::ingress::prepare(&mut message) {
                     Ok(_) => relay(
                         &runtime,
                         ExportLogsServiceRequest {
@@ -102,11 +100,11 @@ pub fn router(node: Node) -> axum::Router {
             }
         }
     });
-    crate::logs::receiver(sender, true)
+    crate::telemetry::logs::receiver(sender)
 }
 /// Verify a homogeneous log scope, then re-stamp authenticated ownership for delivery.
 pub(crate) async fn accept(
-    delivery: &crate::logs::Delivery,
+    delivery: &crate::telemetry::logs::Delivery,
     agent: Uuid,
     deployment: Uuid,
     request: ExportLogsServiceRequest,
@@ -149,9 +147,9 @@ pub(crate) async fn accept(
             request.resource_logs,
             Some(RequestContext::Http(headers)),
         );
-        crate::logs::ingress::validate(&message)
+        crate::telemetry::logs::ingress::validate(&message)
             .map_err(|_| Error::Invalid("Invalid OTLP logs".into()))?;
-        crate::logs::ingress::prepare(&mut message).map_err(|_| Error::Denied)?;
+        crate::telemetry::logs::ingress::prepare(&mut message).map_err(|_| Error::Denied)?;
         return delivery
             .accept(
                 agent.to_string(),

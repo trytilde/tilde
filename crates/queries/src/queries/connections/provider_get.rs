@@ -11,6 +11,7 @@ pub struct Record {
     pub categories: Vec<String>,
     pub remote_endpoint: Option<String>,
     pub remote_ui_url: Option<String>,
+    pub tool_host_id: Option<uuid::Uuid>,
 }
 pub struct RecordBorrowed<'a> {
     pub provider_id: &'a str,
@@ -22,6 +23,7 @@ pub struct RecordBorrowed<'a> {
     pub categories: crate::ArrayIterator<'a, &'a str>,
     pub remote_endpoint: Option<&'a str>,
     pub remote_ui_url: Option<&'a str>,
+    pub tool_host_id: Option<uuid::Uuid>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -35,6 +37,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             categories,
             remote_endpoint,
             remote_ui_url,
+            tool_host_id,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -47,6 +50,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             categories: categories.map(|v| v.into()).collect(),
             remote_endpoint: remote_endpoint.map(|v| v.into()),
             remote_ui_url: remote_ui_url.map(|v| v.into()),
+            tool_host_id,
         }
     }
 }
@@ -119,7 +123,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT provider_id,name,account_name_label,icon_url,instructions,kind,categories,remote_endpoint,remote_ui_url FROM connection_providers WHERE provider_id=$1",
+        "SELECT provider_id,name,account_name_label,icon_url,instructions,kind,categories,remote_endpoint,remote_ui_url,tool_host_id FROM connection_providers WHERE provider_id=$1",
         None,
     )
 }
@@ -153,6 +157,7 @@ impl RunStmt {
                         categories: row.try_get(6)?,
                         remote_endpoint: row.try_get(7)?,
                         remote_ui_url: row.try_get(8)?,
+                        tool_host_id: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),

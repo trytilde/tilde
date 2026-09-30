@@ -15,9 +15,21 @@ service ConnectionsService {
   rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
 }
 
-message ListProvidersRequest { uint32 page_size = 1; string page_token = 2; optional string search = 3; }
+// Every filter applies before pagination. `search` matches the name, id or instructions
+// case-insensitively; `capability` keeps providers with a method offering it.
+message ListProvidersRequest {
+  uint32 page_size = 1; string page_token = 2; optional string search = 3;
+  optional tilde.types.v1.Capability capability = 4; optional string category = 5; optional ProviderSource source = 6;
+}
 
-message ListProvidersResponse { repeated tilde.types.v1.Provider providers = 1; string next_page_token = 2; }
+// CATALOG: providers neither added as an MCP server by URL nor published by a tool host.
+// MCP_SERVER: registered providers whose every method is served over MCP, not published by a tool host.
+// TOOL_HOST: providers a tool host published.
+enum ProviderSource { PROVIDER_SOURCE_UNSPECIFIED = 0; PROVIDER_SOURCE_CATALOG = 1; PROVIDER_SOURCE_MCP_SERVER = 2; PROVIDER_SOURCE_TOOL_HOST = 3; }
+
+// `categories`: every category of the providers matching `capability` and `source`, ignoring the
+// search, category and page, for a category menu.
+message ListProvidersResponse { repeated tilde.types.v1.Provider providers = 1; string next_page_token = 2; repeated string categories = 3; }
 
 message GetProviderRequest { string id = 1; }
 
@@ -36,7 +48,11 @@ message GetConnectionRequest { string id = 1; }
 message GetConnectionResponse { tilde.types.v1.Connection connection = 1; }
 
 message ListConnectionsRequest { uint32 page_size = 1; string page_token = 2; optional string agent_id = 3; // With agent_id: only assignments of this capability. Alone: connections whose type offers it (channel: still unassigned).
-  optional tilde.types.v1.Capability capability = 4; }
+  optional tilde.types.v1.Capability capability = 4;
+  // Applied before pagination. `search` matches the name, account label or provider name case-insensitively.
+  optional string search = 5; optional string provider_id = 6; optional string status = 7;
+  // Only connections of providers from this source.
+  optional ProviderSource source = 8; }
 
 message ListConnectionsResponse { repeated tilde.types.v1.Connection connections = 1; string next_page_token = 2; }
 

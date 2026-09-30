@@ -1,4 +1,4 @@
-// Real action process -> management API key guard -> deployment service -> PostgreSQL.
+// Real action process -> unauthenticated OSS management API -> deployment service -> PostgreSQL.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -7,11 +7,9 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startOidc, loginManagement } from "../../../scripts/test-oidc.mjs";
 
 assert.ok(process.env.TEST_DATABASE_URL, "Run with scripts/with-postgres.sh");
 const scratch = await mkdtemp(join(tmpdir(), "tilde-action-integration-"));
-const oidc = await startOidc();
 let server;
 try {
   server = spawn(
@@ -27,7 +25,12 @@ try {
         ENGINE_SERVE: "all",
         LOGS_QUEUE_DIR: join(scratch, "logs"),
         RUST_LOG: "tilde=info",
-        ...oidc.env,
+        // ClickHouse and the telemetry buckets are required to start the engine.
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(
+            ([key]) => key.startsWith("ENGINE_CLICKHOUSE_") || /^ENGINE_(\w+_)?S3_/.test(key),
+          ),
+        ),
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -51,20 +54,18 @@ try {
     });
     server.once("exit", () => {
       clearTimeout(timer);
-      reject(new Error("API exited before ready"));
+      reject(new Error(`API exited before ready:\n${logs}`));
     });
   });
-  const session = await loginManagement(url);
-  async function rpc(service, method, body, credential = session) {
+  async function rpc(service, method, body) {
     const result = await fetch(`${url}/tilde.management.v1.${service}/${method}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${credential}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     assert.equal(result.status, 200, `${method} failed`);
     return result.json();
   }
-  const { secret } = await rpc("ApiKeysService", "CreateApiKey", { name: "Action fixture" });
   const agentId = randomUUID();
   await rpc("AgentService", "CreateAgent", {
     id: agentId,
@@ -78,7 +79,6 @@ try {
       env: {
         PATH: process.env.PATH,
         TILDE_URL: url,
-        TILDE_API_KEY: secret,
         TILDE_AGENT_ID: agentId,
         GITHUB_OUTPUT: outputFile,
         GITHUB_STEP_SUMMARY: summaryFile,
@@ -105,18 +105,18 @@ try {
     );
     const summary = await readFile(summaryFile, "utf8");
     const visible = logs.replace(/^::add-mask::.*\n/gm, "");
-    for (const credential of [secret, outputs["deployment-token"]].filter(Boolean)) {
+    for (const credential of [outputs["deployment-token"]].filter(Boolean)) {
       assert.ok(
         !visible.includes(credential) && !summary.includes(credential),
         "Credential escaped the masking protocol",
       );
     }
-    return { code, outputs };
+    return { code, outputs, logs: visible };
   }
   const first = await action();
-  assert.equal(first.code, 0, "First registration succeeds");
+  assert.equal(first.code, 0, `First registration succeeds:\n${first.logs}`);
   assert.ok(first.outputs["deployment-token"], "New registration returns a token");
-  const snapshot = await rpc("DeploymentService", "GetDeployment", { agentId }, secret);
+  const snapshot = await rpc("DeploymentService", "GetDeployment", { agentId });
   assert.equal(snapshot.deployments.length, 1);
   assert.equal(snapshot.deployments[0].id, first.outputs["deployment-id"]);
   assert.equal(snapshot.deployments[0].source, "DEPLOYMENT_SOURCE_CI");
@@ -138,7 +138,7 @@ try {
     "Explicit rotation replaces the credential",
   );
   console.log(
-    "PASS: action registration, management API key authentication, idempotent retry, explicit rotation and masked handoff against real Tilde/PostgreSQL.",
+    "PASS: action registration without a management credential, idempotent retry, explicit rotation and masked handoff against real Tilde/PostgreSQL.",
   );
 } finally {
   if (server && server.exitCode === null) {
@@ -148,6 +148,5 @@ try {
     await closed;
     clearTimeout(timer);
   }
-  await oidc.stop();
   await rm(scratch, { recursive: true, force: true });
 }

@@ -5,7 +5,11 @@ description = "Tilde adapter for LangChain and LangGraph: typed context to LangC
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["trytilde", "langchain-core>=1,<2"]
+dependencies = ["trytilde", "langchain-core>=1,<2", "langchain>=1,<2", "langgraph>=1,<2"]
+
+# `tilde deploy` reads create_agent graphs, dynamic prompts and prompt templates through this.
+[project.entry-points."tilde.discover"]
+langchain = "tilde_langchain.discover:discover"
 
 [build-system]
 requires = ["hatchling"]

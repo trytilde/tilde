@@ -9,14 +9,14 @@ import { tokens, type SearchSuggestion } from "./query";
 /** A keyboard-accessible query editor over the existing URL/server filter contract. */
 export function FilterSearchInput({
   canonical,
-  disabled,
+  disabled = false,
   onApply,
   validate,
   suggest,
   label,
 }: {
   canonical: string;
-  disabled: boolean;
+  disabled?: boolean;
   onApply: (query: string) => void;
   validate: (query: string) => unknown;
   suggest: (query: string, caret: number) => SearchSuggestion[];

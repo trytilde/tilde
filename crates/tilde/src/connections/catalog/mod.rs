@@ -14,7 +14,7 @@ pub mod tilde;
 pub mod whatsapp;
 
 pub fn builtins() -> Vec<Provider> {
-    vec![
+    let mut providers: Vec<Provider> = vec![
         github::definition(),
         slack::definition(),
         agentmail::definition(),
@@ -25,16 +25,40 @@ pub fn builtins() -> Vec<Provider> {
     ]
     .into_iter()
     .chain(inference::definitions())
-    .collect()
+    .chain([
+        crate::tools::providers::tavily::definition(),
+        crate::tools::providers::google::mail::definition(),
+        crate::tools::providers::google::calendar::definition(),
+        crate::tools::providers::google::drive::definition(),
+        crate::tools::providers::google::docs::definition(),
+        crate::tools::providers::google::sheets::definition(),
+        crate::tools::providers::google::search_console::definition(),
+        crate::tools::providers::google::analytics::definition(),
+        crate::tools::providers::sentry::definition(),
+        crate::tools::providers::posthog::definition(),
+        crate::tools::providers::firecrawl::definition(),
+        crate::tools::providers::stripe::definition(),
+        crate::tools::providers::payload::definition(),
+        crate::tools::providers::e2b::definition(),
+        crate::tools::providers::aws::definition(),
+        crate::tools::providers::modal::definition(),
+    ])
+    .collect();
+    crate::tools::mcp_catalog::extend(&mut providers);
+    providers
 }
 
 /// Register or replace a configured/remote definition atomically. Clients cannot replace built-in entries; startup reconciles shipped definitions.
+/// A registered definition declares no capability without an adapter. Two adapters exist: a tool
+/// host publishing its provider (`tool_host`, which stays that host's alone), and an MCP server,
+/// so a type naming one may declare the tool capability.
 pub async fn register(
     pool: &Pool,
     provider: Provider,
     builtin: bool,
     remote_authorization: Option<Vec<u8>>,
     remote_authorization_id: Option<uuid::Uuid>,
+    tool_host: Option<uuid::Uuid>,
 ) -> Result<Provider, Error> {
     provider.validate()?;
     if !builtin
@@ -46,10 +70,12 @@ pub async fn register(
         ));
     }
     if !builtin
-        && provider
-            .connection_types
-            .iter()
-            .any(|typ| !typ.capabilities.is_empty())
+        && provider.connection_types.iter().any(|typ| {
+            let adapted = tool_host.is_some() || typ.mcp.is_some();
+            !adapted && !typ.capabilities.is_empty()
+                || adapted && typ.capabilities != [Capability::Tool]
+                || tool_host.is_some() && typ.mcp.is_some()
+        })
     {
         return Err(invalid(
             "Capabilities require an installed adapter; a custom credential definition alone cannot provide one",
@@ -58,13 +84,18 @@ pub async fn register(
     let mut tx_client = pool.get().await?;
     let tx = tx_client.transaction().await?;
     crate::connections::db::provider_lock_execute(&tx, &(provider.id)).await?;
-    let current = crate::connections::db::provider_get_opt(&tx, &(provider.id)).await?;
-    if let Some(current) = current
-        && (current.kind == "built_in") != builtin
-    {
-        return Err(invalid(
-            "Built-in providers cannot be replaced by registered providers",
-        ));
+    if let Some(current) = crate::connections::db::provider_get_opt(&tx, &(provider.id)).await? {
+        if (current.kind == "built_in") != builtin {
+            return Err(invalid(
+                "Built-in providers cannot be replaced by registered providers",
+            ));
+        }
+        if current.tool_host_id != tool_host {
+            return Err(invalid(match tool_host {
+                Some(_) => "Another provider already uses this ID",
+                None => "This provider belongs to a tool host, which publishes its definition",
+            }));
+        }
     }
     crate::connections::db::provider_insert_execute(
         &tx,
@@ -85,6 +116,7 @@ pub async fn register(
         provider.icon_url.as_deref(),
         provider.instructions.as_deref(),
         provider.account_name_label.as_deref(),
+        tool_host,
     )
     .await?;
     crate::connections::db::provider_clear_details_execute(&tx, &(provider.id)).await?;
@@ -118,6 +150,15 @@ pub async fn register(
                 _ => None,
             },
             typ.capabilities.contains(&Capability::Inference),
+            typ.capabilities.contains(&Capability::Tool),
+            typ.mcp.as_ref().map(|server| server.url.as_str()),
+            typ.mcp.as_ref().map(|server| server.credential.as_str()),
+            typ.mcp.as_ref().and_then(|server| server.credential.name()),
+            typ.mcp
+                .as_ref()
+                .map(|server| server.credential.prefix())
+                .unwrap_or(""),
+            typ.oauth().map(|o| o.client).unwrap_or_default().as_str(),
         )
         .await?;
         for field in &oauth.result_fields {
@@ -160,7 +201,9 @@ pub async fn register(
 }
 pub async fn seed(pool: &Pool) -> Result<(), Error> {
     for provider in builtins() {
-        register(pool, provider, true, None, None).await?;
+        if !provider.connection_types.is_empty() {
+            register(pool, provider, true, None, None, None).await?;
+        }
     }
     Ok(())
 }
@@ -211,6 +254,8 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
                 scope_path: row.scope_path,
                 success_path: row.success_path,
                 result_fields,
+                client: OAuthClient::parse(&row.oauth_client)?,
+                host_published: head.tool_host_id.is_some(),
             })
         } else {
             None
@@ -222,6 +267,7 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
             capabilities: [
                 (row.channel_capable, Capability::Channel),
                 (row.inference_capable, Capability::Inference),
+                (row.tool_capable, Capability::Tool),
             ]
             .into_iter()
             .filter_map(|(capable, cap)| capable.then_some(cap))
@@ -231,6 +277,22 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
                 row.credential_schema,
                 oauth,
             )?,
+            mcp: row
+                .mcp_credential
+                .map(|kind| {
+                    Ok::<_, Error>(McpServer {
+                        url: row
+                            .mcp_url
+                            .clone()
+                            .ok_or_else(|| invalid("MCP server URL missing"))?,
+                        credential: McpCredential::from_storage(
+                            &kind,
+                            row.mcp_credential_name,
+                            row.mcp_credential_prefix,
+                        )?,
+                    })
+                })
+                .transpose()?,
         });
     }
     let provider = Provider {
@@ -257,17 +319,42 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
     drop(snapshot_client);
     Ok(provider)
 }
+/// Which providers a list returns; every filter applies in SQL before the page.
+#[derive(Default)]
+pub struct ProviderFilter<'a> {
+    pub search: Option<&'a str>,
+    pub capability: Option<Capability>,
+    pub category: Option<&'a str>,
+    pub source: Option<ProviderSource>,
+}
+/// `Catalog` leaves out MCP servers added by URL and providers published by tool hosts;
+/// `McpServer` keeps only the former.
+#[derive(Clone, Copy)]
+pub enum ProviderSource {
+    Catalog,
+    McpServer,
+    ToolHost,
+}
+impl ProviderSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Catalog => "catalog",
+            Self::McpServer => "mcp_server",
+            Self::ToolHost => "tool_host",
+        }
+    }
+}
 pub async fn list(
     pool: &Pool,
     after: &str,
-    search: Option<&str>,
+    filter: &ProviderFilter<'_>,
     size: u32,
 ) -> Result<(Vec<Provider>, String), Error> {
     let size = if size == 0 { 50 } else { size.min(100) };
     let mut rows = crate::connections::db::provider_list_all(
         &pool.get().await?,
         after,
-        search,
+        filter,
         i64::from(size) + 1,
     )
     .await?;

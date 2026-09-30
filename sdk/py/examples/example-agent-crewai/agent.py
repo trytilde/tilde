@@ -1,28 +1,63 @@
-"""Reply generation: Tilde history -> CrewAI messages, channel tools -> CrewAI tools."""
+"""The CrewAI crew: YAML-configured agent, module-level LLM, per-invocation Tilde and bundled
+tools and registry skills."""
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 
-from crewai import Agent
-from crewai.llms.base_llm import BaseLLM
+from bundled_tools import TOOLS
+from crewai import LLM, Agent
+from crewai.project import CrewBase, agent
+from crewai.tools import BaseTool
 
+import tilde
 from tilde import AgentContext
-from tilde_crewai import convert_to_crewai_messages, convert_to_crewai_tools
+from tilde_crewai import convert_to_crewai_messages, inference_interceptor, with_tilde_tools
 
 log = logging.getLogger("example-agent-crewai")
-
-ROLE = "Example Agent 1, a helpful local development assistant"
-GOAL = "Use the current channel tools to respond to the latest message, concisely and helpfully."
-BACKSTORY = (
-    "Model text is private and is not delivered to the user. Choose the appropriate provider "
-    "tool using its instructions and conversation references. Use the supplied attachments "
-    "when answering."
-)
 MAX_ITERATIONS = 8
 TIMEOUT_SECONDS = 60
 
+# The inference connection this agent was given; the gateway holds its provider key. Built once:
+# each request resolves the invocation running it.
+INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
+llm = LLM(
+    model=f"openai/{os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')}",
+    base_url=INFERENCE.base_url,
+    api_key=INFERENCE.api_key,
+    interceptor=inference_interceptor(INFERENCE),
+    max_retries=0,
+    max_tokens=600,
+)
+# Shipped with the deployment by `tilde deploy`; CrewAI discovers the folders at runtime.
+SKILLS = tilde.define_skills("skills")
 
-async def respond(ctx: AgentContext, llm: BaseLLM) -> None:
+
+@CrewBase
+class ExampleCrew:
+    """One instance per invocation: the Tilde tools and registry skills belong to it."""
+
+    agents_config = "config/agents.yaml"
+    tasks_config = "config/tasks.yaml"
+
+    def __init__(self, tools: list[BaseTool], registry_skills: Path) -> None:
+        self.tools = tools
+        self.registry_skills = registry_skills
+
+    @agent
+    def responder(self) -> Agent:
+        return Agent(
+            config=self.agents_config["responder"],  # type: ignore[index]
+            llm=llm,
+            tools=self.tools,
+            # Skills assigned in Tilde reach the next invocation without a redeploy.
+            skills=[SKILLS.path, self.registry_skills],
+            max_iter=MAX_ITERATIONS,
+        )
+
+
+async def respond(ctx: AgentContext) -> None:
     """Visible responses are explicit provider tool calls; a text-only result sends nothing."""
     log.info("Agent invocation started")
     stage = "history"
@@ -34,15 +69,10 @@ async def respond(ctx: AgentContext, llm: BaseLLM) -> None:
             log.info("No context to respond to")
             return
         stage = "inference"
-        agent = Agent(
-            role=ROLE,
-            goal=GOAL,
-            backstory=BACKSTORY,
-            llm=llm,
-            tools=convert_to_crewai_tools(ctx.channel.current),
-            max_iter=MAX_ITERATIONS,
-        )
-        await asyncio.wait_for(agent.kickoff_async(messages), timeout=TIMEOUT_SECONDS)
+        tools = await with_tilde_tools(ctx, TOOLS.tools, options=TOOLS.options)
+        registry_skills = Path(await ctx.skills.directory())
+        responder = ExampleCrew(tools, registry_skills).responder()
+        await asyncio.wait_for(responder.kickoff_async(messages), timeout=TIMEOUT_SECONDS)
         log.info("Agent invocation completed")
     except Exception as error:
         if ctx.cancelled:

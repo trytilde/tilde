@@ -1,0 +1,14 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/prompt.proto";
+
+// Read-only view of the prompts an agent's code has registered, with usage per version.
+service PromptService {
+  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetPrompt(GetPromptRequest) returns (GetPromptResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+message ListPromptsRequest { string agent_id = 1; }
+message ListPromptsResponse { repeated tilde.types.v1.Prompt prompts = 1; }
+message GetPromptRequest { string id = 1; }
+// Versions newest first, with the usage recorded against each.
+message GetPromptResponse { tilde.types.v1.Prompt prompt = 1; repeated tilde.types.v1.PromptVersion versions = 2; repeated tilde.types.v1.PromptVersionUsage usage = 3; }

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
@@ -17,7 +18,8 @@
     "@trytilde/sdk": "workspace:*",
     "@trytilde/sdk-mastra-node": "workspace:*",
     "ai": "^6.0.280",
-    "pino": "10.3.1"
+    "pino": "10.3.1",
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "@types/node": "24.3.0",

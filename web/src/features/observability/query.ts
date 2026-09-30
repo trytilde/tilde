@@ -41,4 +41,9 @@ export function unquote(value: string) {
   }
   throw new Error('Close the quoted value and escape embedded quotes with \\".');
 }
-export const quote = (value: string) => (/[\s:"\\]/.test(value) ? JSON.stringify(value) : value);
+/**
+ * Quote a literal whenever the query syntax would otherwise read it as structure: whitespace,
+ * `:`, quotes, `*` wildcards, `|` alternatives, or a leading comparison or group character.
+ */
+export const quote = (value: string) =>
+  /[\s:"\\*|]/.test(value) || /^[=()<>]/.test(value) ? JSON.stringify(value) : value;

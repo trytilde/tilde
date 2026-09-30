@@ -1,0 +1,61 @@
+syntax = "proto3";
+package tilde.types.v1;
+import "google/protobuf/timestamp.proto";
+
+// Catalog: a group compiled into the engine. Git: a repository synced through the GitHub API.
+// Editor: a collection authored in the UI (or by agents holding skills.edit on it). Bundled: an
+// agent's own skills, registered with its deployments and read-only.
+enum SkillSourceKind { SKILL_SOURCE_KIND_UNSPECIFIED = 0; SKILL_SOURCE_KIND_CATALOG = 1; SKILL_SOURCE_KIND_GIT = 2; SKILL_SOURCE_KIND_EDITOR = 3; SKILL_SOURCE_KIND_BUNDLED = 4; }
+// A group of skills. Agents are assigned a whole
+// source, which includes every skill a later sync adds, or single skills from it.
+message SkillSource {
+  string id = 1; string slug = 2; string name = 3; SkillSourceKind kind = 4;
+  string catalog_group = 5;
+  string repository_url = 6; string git_ref = 7; string git_path = 8;
+  // Git only: the commit the current skills came from, and the last sync attempt's outcome.
+  string commit_sha = 9; string sync_error = 11;
+  uint32 skill_count = 12;
+  google.protobuf.Timestamp created_at = 14;
+  // Agents given the whole group, directly or through a ready
+  // connection's skills capability. Set by ListSkillSources.
+  repeated string agent_ids = 16;
+}
+// Text files carry `content`. Other files (and uploads) carry `data`; reads return a
+// short-lived `download_url` for them instead. On writes, `keep` reuses the current version's
+// file at `path` (content and executable bit) so unchanged assets need not be re-sent.
+message SkillFile {
+  string path = 1; string content = 2; bytes data = 3; string media_type = 4; int64 size_bytes = 5;
+  string sha256 = 6; bool executable = 7; string download_url = 8;
+  bool keep = 9;
+  // Set on reads: the file is UTF-8 text held inline in `content`.
+  bool text = 10;
+  // With `keep`: the current version's path the file comes from, when renamed or moved.
+  string keep_path = 11;
+}
+// One immutable revision of a skill's files.
+message SkillVersion {
+  string id = 1; string skill_id = 2; uint32 number = 3; string description = 5;
+  google.protobuf.Timestamp created_at = 7; repeated SkillFile files = 8;
+  string commit_sha = 9;
+}
+message Skill {
+  string id = 1; string source_id = 2; string source_name = 4;
+  SkillSourceKind source_kind = 5; string name = 6;
+  google.protobuf.Timestamp created_at = 7;
+  SkillVersion latest = 10;
+  // Agents given this skill: through its whole group, the skill
+  // itself, or a ready connection's skills capability. Set by ListSkills.
+  repeated string agent_ids = 11;
+}
+// A catalog entry: a group built into Tilde (skills listed up front) or a managed provider, a
+// trusted GitHub repository whose skills ListCatalog lists once enabled and synced, and
+// GetCatalogGroup previews live before then. `source_id` is set once enabled. `category`
+// sections the catalog page.
+message CatalogGroup {
+  string id = 1; string name = 2; string description = 3; repeated CatalogSkill skills = 4; string source_id = 5;
+  string category = 6; string icon_url = 7;
+  // Managed providers only: the repository and branch their skills sync from.
+  string repository_url = 8; string branch = 9;
+}
+// `path` is the skill's directory in its repository (a built-in's catalog directory).
+message CatalogSkill { string name = 1; string description = 2; string path = 3; }

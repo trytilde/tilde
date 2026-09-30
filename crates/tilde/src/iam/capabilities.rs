@@ -18,6 +18,16 @@ pub enum Capability {
     AgentsInvoke,
     #[serde(rename = "agents.grant_capabilities")]
     AgentsGrant,
+    /// Assign and unassign skills on the targeted agents, itself included.
+    #[serde(rename = "agents.edit_skills")]
+    AgentsEditSkills,
+    /// See and assign the skills of the targeted sources. Targets are skill source ids.
+    #[serde(rename = "skills.read")]
+    SkillsRead,
+    /// Write skills into the targeted editor skill sources and sync targeted git sources; implies
+    /// `skills.read` on them. Targets are skill source ids.
+    #[serde(rename = "skills.edit")]
+    SkillsEdit,
     #[serde(rename = "thread.read")]
     ThreadRead,
     #[serde(rename = "work.read")]
@@ -28,6 +38,9 @@ pub enum Capability {
     RunUpdate,
     #[serde(rename = "tools.invoke")]
     ToolsInvoke,
+    /// Use of the conversing user's own tool connections; targets are provider IDs.
+    #[serde(rename = "tools.personal")]
+    ToolsPersonal,
 }
 impl Capability {
     /// Targeted actions select agents or tools; all other actions are yes/no permissions.
@@ -163,7 +176,7 @@ impl Capabilities {
                 for id in ids {
                     if id.is_empty()
                         || id.len() > 128
-                        || (*action != Capability::ToolsInvoke
+                        || (!matches!(action, Capability::ToolsInvoke | Capability::ToolsPersonal)
                             && uuid::Uuid::parse_str(id).is_err())
                     {
                         return Err(Error::Invalid("Invalid capability target ID".into()));
@@ -207,7 +220,11 @@ impl Capabilities {
             (Capability::AgentsDelete, value.agents_delete),
             (Capability::AgentsInvoke, value.agents_invoke),
             (Capability::AgentsGrant, value.agents_grant_capabilities),
+            (Capability::AgentsEditSkills, value.agents_edit_skills),
+            (Capability::SkillsRead, value.skills_read),
+            (Capability::SkillsEdit, value.skills_edit),
             (Capability::ToolsInvoke, value.tools_invoke),
+            (Capability::ToolsPersonal, value.tools_personal),
         ] {
             let Some(permission) = permission.into_option() else {
                 continue;
@@ -266,11 +283,15 @@ impl Capabilities {
             agents_delete: target(Capability::AgentsDelete),
             agents_invoke: target(Capability::AgentsInvoke),
             agents_grant_capabilities: target(Capability::AgentsGrant),
+            agents_edit_skills: target(Capability::AgentsEditSkills),
+            skills_read: target(Capability::SkillsRead),
+            skills_edit: target(Capability::SkillsEdit),
             thread_read: binary(Capability::ThreadRead),
             work_read: binary(Capability::WorkRead),
             work_write: binary(Capability::WorkWrite),
             run_update: binary(Capability::RunUpdate),
             tools_invoke: target(Capability::ToolsInvoke),
+            tools_personal: target(Capability::ToolsPersonal),
             ..Default::default()
         }
     }

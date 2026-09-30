@@ -11,6 +11,18 @@ import {
   DeploymentTarget,
   SidecarFailureMode,
 } from "@trytilde/contracts/tilde/types/v1/deployment_pb.js";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
+import {
+  DeploymentPromptSchema,
+  DeclaredToolSchema,
+  DeploymentSkillSchema,
+} from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
+import { PromptFormat, PromptVersionSchema } from "@trytilde/contracts/tilde/types/v1/prompt_pb.js";
 import { AgentDeployment, commitUrl } from "./agent-deployment";
 
 const rpc = vi.hoisted(() => ({
@@ -21,6 +33,7 @@ const rpc = vi.hoisted(() => ({
   promoteDeployment: vi.fn(),
   retireDeployment: vi.fn(),
   issueDeploymentToken: vi.fn(),
+  getDeploymentContents: vi.fn(),
 }));
 vi.mock("@/client", () => ({ deployments: rpc }));
 afterEach(() => {
@@ -486,4 +499,73 @@ it("requires confirmation for retirement and preserves the dialog on failure", a
     agentId: "agent-1",
     deploymentId: "dep-2",
   });
+});
+
+it("opens the prompts, skills and tools a deployment shipped", async () => {
+  rpc.getDeployment.mockResolvedValue({
+    deployment: settings,
+    deployments: [servingDeployment, candidate],
+    instances: [instance],
+  });
+  rpc.getDeploymentContents.mockResolvedValue({
+    prompts: [
+      create(DeploymentPromptSchema, {
+        promptId: "p1",
+        name: "support/instructions",
+        version: create(PromptVersionSchema, {
+          id: "pv-3",
+          number: 3,
+          format: PromptFormat.DYNAMIC,
+          origin: "src/mastra/index.ts#support.instructions",
+        }),
+      }),
+    ],
+    skills: [
+      create(DeploymentSkillSchema, {
+        skillId: "s1",
+        name: "refunds",
+        versionId: "sv-1",
+        number: 1,
+        description: "Issue refunds within policy.",
+        origin: "src/mastra/skills/refunds",
+      }),
+    ],
+    tools: [
+      create(DeclaredToolSchema, {
+        name: "roll_dice",
+        description: "Roll dice and add them up.",
+        summary: "Rolled dice",
+        origin: "src/index.ts#bundledTools.tools.roll_dice",
+      }),
+    ],
+  });
+  const root = createRootRoute({ component: () => <AgentDeployment agentId="agent-1" /> });
+  render(
+    <RouterProvider
+      router={createRouter({
+        routeTree: root,
+        history: createMemoryHistory({ initialEntries: ["/"] }),
+      })}
+    />,
+  );
+  const row = await screen.findByRole("row", { name: "Deployment Ship the onboarding flow" });
+  fireEvent.click(within(row).getByRole("button", { name: "Ship the onboarding flow" }));
+  const prompts = await screen.findByRole("list", { name: "Deployment prompts" });
+  expect(rpc.getDeploymentContents).toHaveBeenCalledWith(
+    { agentId: "agent-1", deploymentId: "dep-1" },
+    expect.anything(),
+  );
+  const link = within(prompts).getByRole("link", { name: "support/instructions" });
+  expect(link.getAttribute("href")).toBe("/agent/agent-1/prompts?prompt=p1");
+  expect(within(prompts).getByText("v3")).toBeTruthy();
+  expect(within(prompts).getByText("Dynamic")).toBeTruthy();
+  expect(within(prompts).getByText("src/mastra/index.ts#support.instructions")).toBeTruthy();
+  const skills = screen.getByRole("list", { name: "Deployment skills" });
+  expect(within(skills).getByText("refunds")).toBeTruthy();
+  expect(within(skills).getByText("Issue refunds within policy.")).toBeTruthy();
+  expect(within(skills).getByText("src/mastra/skills/refunds")).toBeTruthy();
+  const tools = screen.getByRole("list", { name: "Deployment tools" });
+  expect(within(tools).getByText("roll_dice")).toBeTruthy();
+  expect(within(tools).getByText("Rolled dice")).toBeTruthy();
+  expect(within(tools).getByText("src/index.ts#bundledTools.tools.roll_dice")).toBeTruthy();
 });

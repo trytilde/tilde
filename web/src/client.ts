@@ -1,60 +1,35 @@
-import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
-import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
-import { authInterceptor } from "@/auth";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
 import { AgentService } from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
-export const agents = createClient(
-  AgentService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-export const agentAccess = createClient(
-  AgentAccessService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-export const connections = createClient(
-  ConnectionsService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
+import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
 import { DeploymentService } from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
-export const deployments = createClient(
-  DeploymentService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
-export const traces = createClient(
-  TracingService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
-export const logs = createClient(
-  LogsService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-import { ApiKeysService } from "@trytilde/contracts/tilde/management/v1/api_keys_pb.js";
 import { InferenceService } from "@trytilde/contracts/tilde/management/v1/inference_pb.js";
-export const apiKeys = createClient(
-  ApiKeysService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-
-export const inference = createClient(
-  InferenceService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
+import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
+import { PromptService } from "@trytilde/contracts/tilde/management/v1/prompts_pb.js";
+import { SkillService } from "@trytilde/contracts/tilde/management/v1/skills_pb.js";
 import { TildeChatProviderService } from "@trytilde/contracts/tilde/management/v1/tilde_chat_pb.js";
-export const tildeChat = createClient(
-  TildeChatProviderService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
-import { IamService } from "@trytilde/contracts/tilde/management/v1/iam_pb.js";
-export const iam = createClient(
-  IamService,
-  createConnectTransport({ baseUrl: window.location.origin, interceptors: [authInterceptor] }),
-);
+import {
+  ToolHostRegistryService,
+  ToolService,
+} from "@trytilde/contracts/tilde/management/v1/tools_pb.js";
+import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+import { ConnectionSetupService } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
+
+// The management API is unauthenticated; operators put their own proxy in front of it.
+const transport = createConnectTransport({ baseUrl: window.location.origin });
+
+export const agents = createClient(AgentService, transport);
+export const agentAccess = createClient(AgentAccessService, transport);
+export const connections = createClient(ConnectionsService, transport);
+export const deployments = createClient(DeploymentService, transport);
+export const traces = createClient(TracingService, transport);
+export const logs = createClient(LogsService, transport);
+export const inference = createClient(InferenceService, transport);
+export const tildeChat = createClient(TildeChatProviderService, transport);
+export const prompts = createClient(PromptService, transport);
+export const skills = createClient(SkillService, transport);
+export const tools = createClient(ToolService, transport);
+export const toolHosts = createClient(ToolHostRegistryService, transport);
+// Setup calls authenticate with each setup's own token.
+export const connectionSetup = createClient(ConnectionSetupService, transport);

@@ -1,20 +1,20 @@
 // This file was generated with `cornucopia`. Do not modify.
 
 #[derive(Debug)]
-pub struct RunParams<T1: crate::StringSql, T2: crate::StringSql, T3: crate::ArraySql<Item = T2>> {
+pub struct RunParams<T1: crate::StringSql, T2: crate::StringSql> {
+    pub fresh_after: chrono::DateTime<chrono::Utc>,
+    pub health: T1,
     pub p1: Option<chrono::DateTime<chrono::Utc>>,
     pub p2: Option<uuid::Uuid>,
-    pub p4: T1,
-    pub is_admin: bool,
-    pub caller_user: Option<uuid::Uuid>,
-    pub caller_key: Option<uuid::Uuid>,
-    pub caller_groups: T3,
+    pub p4: T2,
+    pub paused: Option<bool>,
     pub p3: i64,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub id: uuid::Uuid,
     pub name: String,
+    pub description: String,
     pub concurrency_policy: String,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<String>,
@@ -26,6 +26,7 @@ pub struct Record {
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub name: &'a str,
+    pub description: &'a str,
     pub concurrency_policy: &'a str,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<&'a str>,
@@ -39,6 +40,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         RecordBorrowed {
             id,
             name,
+            description,
             concurrency_policy,
             avatar_seed,
             avatar_key,
@@ -51,6 +53,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         Self {
             id,
             name: name.into(),
+            description: description.into(),
             concurrency_policy: concurrency_policy.into(),
             avatar_seed,
             avatar_key: avatar_key.map(|v| v.into()),
@@ -130,7 +133,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id, name, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities FROM agents WHERE deleted_at IS NULL AND ($1::TIMESTAMPTZ IS NULL OR (created_at, id) < ($1, $2)) AND ($3 = '' OR strpos(lower(name), lower($3)) > 0 OR id::text = $3) AND iam_held('agent', id, ARRAY['view']::TEXT[], $4, $5, $6, $7::TEXT[]) ORDER BY created_at DESC, id DESC LIMIT $8",
+        "SELECT a.id, a.name, a.description, a.concurrency_policy AS concurrency_policy, a.avatar_seed, a.avatar_key, a.paused, a.created_at, a.updated_at, a.capabilities AS capabilities FROM agents a LEFT JOIN LATERAL ( SELECT h.healthy, h.degraded FROM agent_health h WHERE h.agent_id = a.id AND h.sidecar_event_id IS NULL AND h.checked_at >= $1 ORDER BY h.checked_at DESC, h.id DESC LIMIT 1 ) latest ON $2 <> '' WHERE a.deleted_at IS NULL AND ($3::TIMESTAMPTZ IS NULL OR (a.created_at, a.id) < ($3, $4)) AND ($5 = '' OR strpos(lower(a.name), lower($5)) > 0 OR strpos(lower(a.description), lower($5)) > 0 OR a.id::text = $5) AND ($6::BOOLEAN IS NULL OR a.paused = $6) AND ($2 = '' OR $2 = CASE WHEN latest.healthy IS NULL THEN 'unknown' WHEN latest.degraded THEN 'degraded' WHEN latest.healthy THEN 'healthy' ELSE 'unhealthy' END) ORDER BY a.created_at DESC, a.id DESC LIMIT $7",
         None,
     )
 }
@@ -142,38 +145,20 @@ impl RunStmt {
         self.1 = Some(client.prepare(self.0).await?);
         Ok(self)
     }
-    pub fn bind<
-        'c,
-        'a,
-        's,
-        C: GenericClient,
-        T1: crate::StringSql,
-        T2: crate::StringSql,
-        T3: crate::ArraySql<Item = T2>,
-    >(
+    pub fn bind<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql>(
         &'s self,
         client: &'c C,
+        fresh_after: &'a chrono::DateTime<chrono::Utc>,
+        health: &'a T1,
         p1: &'a Option<chrono::DateTime<chrono::Utc>>,
         p2: &'a Option<uuid::Uuid>,
-        p4: &'a T1,
-        is_admin: &'a bool,
-        caller_user: &'a Option<uuid::Uuid>,
-        caller_key: &'a Option<uuid::Uuid>,
-        caller_groups: &'a T3,
+        p4: &'a T2,
+        paused: &'a Option<bool>,
         p3: &'a i64,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 8> {
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 7> {
         RecordQuery {
             client,
-            params: [
-                p1,
-                p2,
-                p4,
-                is_admin,
-                caller_user,
-                caller_key,
-                caller_groups,
-                p3,
-            ],
+            params: [fresh_after, health, p1, p2, p4, paused, p3],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -181,51 +166,43 @@ impl RunStmt {
                     Ok(RecordBorrowed {
                         id: row.try_get(0)?,
                         name: row.try_get(1)?,
-                        concurrency_policy: row.try_get(2)?,
-                        avatar_seed: row.try_get(3)?,
-                        avatar_key: row.try_get(4)?,
-                        paused: row.try_get(5)?,
-                        created_at: row.try_get(6)?,
-                        updated_at: row.try_get(7)?,
-                        capabilities: row.try_get(8)?,
+                        description: row.try_get(2)?,
+                        concurrency_policy: row.try_get(3)?,
+                        avatar_seed: row.try_get(4)?,
+                        avatar_key: row.try_get(5)?,
+                        paused: row.try_get(6)?,
+                        created_at: row.try_get(7)?,
+                        updated_at: row.try_get(8)?,
+                        capabilities: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),
         }
     }
 }
-impl<
-    'c,
-    'a,
-    's,
-    C: GenericClient,
-    T1: crate::StringSql,
-    T2: crate::StringSql,
-    T3: crate::ArraySql<Item = T2>,
->
+impl<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql>
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2, T3>,
-        RecordQuery<'c, 'a, 's, C, Record, 8>,
+        RunParams<T1, T2>,
+        RecordQuery<'c, 'a, 's, C, Record, 7>,
         C,
     > for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2, T3>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 8> {
+        params: &'a RunParams<T1, T2>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 7> {
         self.bind(
             client,
+            &params.fresh_after,
+            &params.health,
             &params.p1,
             &params.p2,
             &params.p4,
-            &params.is_admin,
-            &params.caller_user,
-            &params.caller_key,
-            &params.caller_groups,
+            &params.paused,
             &params.p3,
         )
     }

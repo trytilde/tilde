@@ -25,7 +25,7 @@ Local integration changes:
   remains waiting forever in a zero-span batch.
 - Drain pending sends, partial batches and queued messages on shutdown.
 
-Application-level token authorization and bounded collector forwarding are implemented in crates/tilde/src/tracing. Keep those policies
+Application-level token authorization and bounded collector forwarding are implemented in crates/tilde/src/telemetry/tracing. Keep those policies
 out of the fork. Upgrade by comparing these files against the pinned upstream
 revision and running the tracing integration tests before changing the revision.
 

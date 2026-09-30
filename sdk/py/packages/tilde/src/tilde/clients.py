@@ -11,7 +11,6 @@ from tilde._transport import http_client
 from tilde.chat_proxy import identity_header
 from tilde.management.v1.access_connect import AgentAccessServiceClient
 from tilde.management.v1.agents_connect import AgentServiceClient as ManagementAgentServiceClient
-from tilde.management.v1.api_keys_connect import ApiKeysServiceClient
 from tilde.management.v1.connections_connect import ConnectionsServiceClient
 from tilde.management.v1.deployments_connect import DeploymentServiceClient
 from tilde.management.v1.identities_connect import IdentitiesServiceClient
@@ -55,13 +54,16 @@ def _clients(base_url: str, access_token: str | None, *services: type[T]) -> lis
 
 
 class ManagementClient:
-    """Requires a bearer token from the installation's OIDC login; Tilde has no API keys."""
+    """Management API clients.
+
+    ``access_token`` is optional: open-source Tilde's management API is unauthenticated (put your
+    own proxy in front of it), while hosted Tilde Cloud requires a management bearer credential.
+    """
 
     def __init__(self, base_url: str, access_token: str | None = None) -> None:
         (
             self.access,
             self.agents,
-            self.api_keys,
             self.connections,
             self.deployments,
             self.identities,
@@ -74,7 +76,6 @@ class ManagementClient:
             access_token,
             AgentAccessServiceClient,
             ManagementAgentServiceClient,
-            ApiKeysServiceClient,
             ConnectionsServiceClient,
             DeploymentServiceClient,
             IdentitiesServiceClient,

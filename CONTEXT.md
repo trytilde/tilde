@@ -1,15 +1,15 @@
 
 ## Release version
 
-The Rust workspace and TypeScript SDK packages share one Changie release version.
+The Rust workspace and the TypeScript and Python SDK packages share one Changie release version.
 `VERSION`, Cargo workspace/package lock entries, and `sdk/ts/packages/*` versions
 must agree. Internal SDK dependencies use unversioned pnpm workspace protocols;
 pnpm resolves published ranges, while a shared release bumps every SDK package.
 Private frontend and example packages are not independently released. Changie
 records release intent and updates manifests; it does not infer dependency impact.
 Release PRs batch that intent. A manual release of the merged default-branch commit
-checks and builds it before tagging, publishes the SDK to npm and the binary image
-to GHCR, and exposes GitHub release artifacts only when publishing succeeds. Tags
+checks and builds it before tagging, publishes the SDK to npm and PyPI and the binary
+image to GHCR, and exposes GitHub release artifacts only when publishing succeeds. Tags
 identify the checked commit; a partially published release is retried at that commit.
 
 ## Connections
@@ -20,7 +20,7 @@ Its HTTPS domain overrides `ENGINE_PUBLIC_EVENT_INGRESS_PUBLIC_URL` while enable
 explicit local URL settings, for all connection
 webhooks and provider manifests. Management owns setup links and OAuth callbacks
 on its own origin; ngrok is started only by the development launcher.
-Task owns tunnel shutdown, and the SOPS loader exports its token only for dev.
+Task owns tunnel shutdown.
 
 Connections own self-managed credential lifecycle, encrypted Postgres storage and
 short-lived connection setup tokens. Providers have a BuiltIn, Configured or Remote kind and one current catalog definition;
@@ -116,7 +116,7 @@ update atomically, and builtin definitions reconcile at startup. In-use methods 
 be deleted through registration. Remote authorization has its own opaque encryption
 identity; the migration retains existing ciphertext bindings without versioned providers.
 
-Capabilities are `channel` and `inference`. A connection type declares which it offers;
+Capabilities are `channel`, `inference` and `tool`. A connection type declares which it offers;
 an assignment grants one capability of one connection to one agent. Chat keeps a single
 owner per connection; an inference connection may be assigned to any number of agents.
 Every connection has a slug, `provider_id/name` (for example `linq/daniel@trytilde.ai`
@@ -129,6 +129,204 @@ Inference providers label the name "API key name", "Project name" or "Resource n
 account identity. An inference assignment may carry an alias, unique per agent and never a
 provider id; the agent can call `ctx.inference("fast")` instead of the slug, and the route
 resolves the alias from the same in-memory map (gateway loader or sidecar configuration).
+
+## Tools
+
+- Tool capability: a connection type's declaration that its provider ships tools. Unlike
+  `channel` and `inference` it is never assigned through `connection_agents`.
+- Managed tool provider: Tilde-shipped tools backed by a connection's credentials
+  (`tools/providers/<id>`). It owns definitions, schemas and upstream calls; names are
+  provider-local. Most are tables of one-call REST tools (`tools/providers/rest`); polling
+  tools (Tavily research, Firecrawl crawl) wait for the upstream job inside the call. Shipped:
+  Tavily, Firecrawl, PostHog, Stripe (refunds), Payload CMS; the Google Workspace products
+  (Mail, Calendar, Drive, Docs, Sheets, Search Console, Analytics), each its own provider with
+  one `oauth` type; Sentry (auth token or OAuth), whose tools are assembled once from a
+  generated catalog (hand-written issue tools, official Sentry MCP tools mapped onto REST, DSN
+  ingestion and one tool per remaining OpenAPI operation) and whose `regionUrl` inputs must be
+  HTTPS sentry.io origins so the token never leaves Sentry; GitHub (App installation, personal
+  access token or OAuth app) and Slack (the Slack app's bot token), whose chat app types
+  declare both `channel` and `tool`, so one connection serves chat and tools, as do Linq,
+  AgentMail and WhatsApp (Meta and Telnyx); E2B sandboxes, whose `apply_patch` format is
+  parsed by a shared module (`sandbox_patch`) Modal also uses; Modal, which manages sandboxes
+  over its gRPC API and works inside one through its task command router; AWS, which offers a
+  fixed snapshot of the official AWS MCP Server's tools and calls it over MCP with every
+  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`.
+- Tool host: a customer-hosted tool backend. Like an agent host it is never dialed. A
+  connected host opens `tilde.tool_host.v1.ToolHostService.Watch` with its token, publishes its
+  tools and answers calls through `Respond`; a Lambda host is its function ARN, invoked
+  synchronously with the gateway's AWS credentials and asked for its tools on registration or
+  refresh. Calls to a connected host cross gateway processes through the transient
+  `tool_host_calls` queue with commit-time notifications; `chat_tool_calls` stays the record.
+  A connected host whose stream has been quiet for thirty seconds stops being offered.
+  The UI calls tool hosts remote servers. The agent health sweep also samples every host's
+  availability (`tool_host_health`), which the Remote servers page shows as twelve hourly
+  buckets beside the host's tool count and its provider's auth method names.
+- Tool host provider and instances: a host whose tools need credentials publishes a provider
+  definition beside its tools (static schema or OAuth with the person's own client over HTTPS;
+  no custom setup UI, no managed or dynamic client). Its token endpoint is called like a
+  discovered one: public addresses only, DNS pinned. The provider belongs
+  to the host (`connection_providers.tool_host_id`): only it can redefine it, it is the one
+  registered provider allowed the `tool` capability, and deleting the host deletes the provider
+  and its connections. Each connection of that provider is an instance of the host, set up on the
+  standard setup page like any connection. Before an instance is ready the host verifies its
+  credentials (`VerifyRequest`); a refusal returns the setup to its form with the host's
+  message, and the host may name the account (`account_label`). Every call on an instance
+  carries its connection ID and credentials, resolved (and OAuth-refreshed) by Tilde per call;
+  in the queue they are sealed to the row, and the call names the method the instance was set
+  up with (`connection_type`). A host with a provider is used only through its instances,
+  which agents and personal connections use as they do managed providers.
+- MCP server: a connection type may serve its tools from the MCP server at a fixed URL
+  (`ConnectionType.mcp`). Its `McpCredential` says how the connection's secret reaches the
+  server: none, bearer (OAuth access token or `api_key`), `api_key` in a named header with a
+  prefix, or `api_key` as a query parameter. The curated servers carried over from trytilde/api
+  (Notion, Linear, HubSpot, Vercel, Neon, Salesforce, documentation servers and others) are
+  built-in providers in `tools/mcp_catalog.rs`, one connection type per way to reach the server;
+  a server of a service Tilde already integrates (Slack, AgentMail, Stripe) joins that provider
+  as `mcp_*` types. Any other server is added by URL as a registered (configured) provider of its
+  own: the MCP server is the adapter that lets a registered type declare the tool capability, so
+  it is registered like any provider. It is listed on the Remote servers page beside
+  tool hosts, not in the catalog, with the same 12-hour health history: every five minutes one
+  replica sends each such server an unauthenticated `initialize`, and an answer below 500 (a 401
+  is a live server asking for credentials) is healthy, a timeout, refusal or 5xx a failed check
+  (`mcp_server_health`, kept 14 days like tool host samples). Before a given connection lists its tools, a server's panel
+  shows what the installation (non-personal) connections discovered (a
+  personal connection's discovery can name its owner's account, so it stays theirs), else what the server lists without
+  credentials (probed, cached ten minutes, failures included), else, for a curated server only,
+  the snapshot shipped in `mcp_catalog_tools.json`, which can lag behind the server. Agents only
+  ever get a connection's discovered list. There is no generic "MCP server" provider
+  whose accounts each name a server. Tools are discovered over streamable HTTP (JSON or event-stream responses) into
+  `connection_tools`; a hash of the described tools makes an unchanged rediscovery a no-op, and
+  a tool the server drops leaves the catalog. Discovery happens on first listing and on
+  `RefreshConnectionTools`; there is no background rediscovery or session cache yet. Only
+  public addresses are dialed, with DNS pinned per request. A tool-level `isError` is the
+  tool's failure with the server's text; `structuredContent` is preferred as the output.
+- Tool list search and filters are the server's, in SQL before the keyset page; the web only
+  re-queries (search debounced). `ListProviders` takes `search` (name, id or instructions),
+  `capability`, `category` and `source` (CATALOG: neither an MCP server added by URL nor published
+  by a tool host; MCP_SERVER: the Remote servers page's MCP servers) and returns `categories`, the
+  category menu for that capability and source. `ListConnections` takes `search` (name, account
+  label or provider name), `provider_id` and `status`; `ListToolHosts` takes `search` (name) and
+  `with_provider`. `ListProviderTools` takes `search` over name and description, applied in the
+  handler because tools come from code, hosts, snapshots or live MCP servers, and `tool_host_id`
+  for a host's own tools. Pickers leave out the few sources an agent already has on the client.
+- OAuth client: an OAuth type's client comes from the setup form (the person's own app) or
+  from dynamic registration (`dynamic`, MCP-served types only): setup discovers the server's
+  authorization server (RFC 9728 metadata, RFC 8414/OpenID discovery), registers a public client
+  (RFC 7591) and runs the code flow with PKCE and the server as `resource` (RFC 8707). The
+  discovered endpoints, scope and resource stay with the connection for refresh. Every URL
+  discovery follows, and the discovered token endpoint at each exchange, is dialed over HTTPS
+  to public addresses only, resolved once and pinned (`Http::discovered`).
+- Tool source: an agent's use of one installation-owned tool-capable connection, or of one tool
+  host that needs no credentials. Which tools an agent gets is the agent's configuration:
+  connections and hosts hold credentials and describe their tools, and two agents may use one
+  connection with different tools. A source has a slug, derived from the connection's provider
+  and name (or the host's name) when it is added, unique within the agent and then fixed.
+  Adding the source is the grant.
+- Agent tool: a tool the agent uses from one of its sources, by the source's own tool name, with
+  the agent's settings for it: whether it runs in the background (async), an optional summary and
+  description replacing the tool's own in the agent's catalog, and its display. Tools are not
+  renamed. Summaries are at most 256 and descriptions 4096 characters (not bytes) wherever a
+  tool is defined, overridden or audited (`tools::SUMMARY_CHARS`/`DESCRIPTION_CHARS`).
+- Display: how an agent tool's calls show in end-user chats (the Tilde chat provider's activity
+  and watch): full (input and output), summary only, or hidden. Fixed on the tool-call record
+  when the call starts, like the summary; traces and management views keep the full call.
+- Catalog name: `{source slug}.{tool name}`, the tool name made catalog-safe. The agent's
+  `tools_invoke` capability still filters these names. Slugs that would prefix built-in names
+  (`tools`, `agents`, `thread`, `user`, ...) are suffixed.
+- Tool mode: one setting per agent, direct (the default) or dynamic, covering all its tools;
+  never mixed. A dynamic agent's tools are deferred: absent from the listed
+  catalog, found with `tools.search` (lexical ranking over name, summary and description; no
+  model or embedding store), described by `tools.schemas` and called through `tools.execute`.
+  The registry rewrites `tools.execute` into the inner call, so capability filtering, schema
+  validation, summary, audit record, span and async behavior are those of a listed tool. The
+  256-tool ceiling applies to listed tools only.
+- Bundled tool: a tool bundled with the agent in its source code and run in its process. The
+  developer writes it the framework's own way (Vercel `tool()`, LangChain `tool`/`@tool`,
+  Mastra `createTool`, OpenAI Agents `tool()`/`@function_tool`, Pydantic AI `Tool`, Agno
+  functions/toolkits, CrewAI `BaseTool`) and passes it to the adapter's
+  `withTildeTools(ctx, tools, options?)` / `with_tilde_tools(ctx, tools, options=)`, which returns
+  the framework's own tool collection: the channel's tools, the agent's other Tilde tools and the
+  native tools wrapped for auditing. Name, description and schemas are read from the native tool;
+  summary and display from its metadata (`metadata.tilde` where the framework has it) or
+  `options`. Each adapter documents its framework's caveats in code. The SDK registers exactly
+  that set (description, summary, input and output schemas, annotations, display) with
+  `RegisterBundledTools` at the start of every invocation, possibly empty, and on each change;
+  rows live per invocation (`invocation_bundled_tools`), so `tools.search` and `tools.schemas`
+  describe them beside server tools (provider `bundled`). Tilde never executes them: the SDK
+  routes a `tools.execute` naming one back to the process and audits each call through
+  `ReportToolCall` with the tool's summary. The SDK's lifecycle helpers (`stop`, `goals.*`,
+  `tasks.*`) are not bundled tools. `ToolService.ListBundledTools` returns the set of the agent's
+  latest invocation that registered any (with its ID, start time and deployment), shown
+  read-only as the "Bundled" group of the agent's Tools tab: they are configured in code.
+  Sidecar-hosted agents keep no registrations.
+- Declared bundled tool: a bundled tool `tilde deploy` found in the agent's code, stored with the
+  deployment (`DeploymentDeclarations.tools`, `deployment_tools`) and fixed like its prompts and
+  skills; `GetDeploymentContents` returns them. Core `defineTools(tools, options)` /
+  `define_tools(tools, options=)` marks a native tool collection (also passed per invocation as
+  `bundled`); core never converts native tools: each framework adapter's discover describes the
+  tools of a `defineTools` value of its framework and the static tools of framework agents it
+  recognises, with the same function its `withTildeTools` / `with_tilde_tools` publishes them
+  with. Tools declared twice under one name with different definitions fail the deploy. The
+  engine validates them as `RegisterBundledTools` does (`tools::bundled_valid`). Invocations
+  still register what they run; a deployment's declared set is what its code shipped.
+- Async (background) tool: returns a ticket (the call ID) at once while the provider works in the
+  background. The durable tool call stays `running` past the invocation's end (`detached`), and
+  the outcome wakes the agent: queued as input on the agent's live invocation in the thread,
+  which reads it or, once it ends, starts a fresh invocation from it; with none live, as a new
+  run in the same thread; keyed by the ticket either way. It is queued, never steered: steering
+  applies the concurrency policy, and `interrupt` would cancel the work that made the call.
+  `tools.result` reads it. A detached call abandoned by a crashed process is aborted after an
+  hour.
+- Summary: a short label for a call, fixed on the tool-call record when the call starts
+  (the agent's override, else the tool's own). Agent-local reports may supply their own.
+- Annotations and output schema: optional hints on a tool definition (read-only, destructive,
+  idempotent, open-world); hints for frameworks, never authorization.
+- Built-in tools: offered only when the agent's existing capabilities make them usable.
+  `agents.list` (agents.read), `agents.message` and `agents.wait` (agents.invoke: the target
+  joins the thread if needed and runs with the message as its objective), `thread.participants`
+  and `thread.search` (thread.read), `tools.result` (when the agent has async tools).
+- Personal tool federation: a person connects their own account through a setup link the agent
+  obtains with `user.connect_tool`; the connection is owned by that chat user
+  (`connections.owner_user_id`) and can never be an agent's tool source. An agent holding
+  `tools.personal` for the provider sees its tools as `user.{provider}.{account}.{tool}` only in
+  invocations acting for that user, or for another identity under the same root. The user of an
+  invocation is the run's source identity, else the thread's only active human; an unverified,
+  unattested channel identity is a claim and unlocks nothing.
+
+The invocation catalog lists the agent's tools on sources whose connection is ready or whose
+host can take a call; invoke rechecks the same catalog, validates input against
+the tool schema, resolves credentials and calls the provider or host. The catalog is built once
+per invocation (first ListTools or InvokeTool) and held in memory until the invocation ends, at
+most 15 minutes: tools added or removed, a mode change or a source going unready take effect from
+the agent's next invocation. Credentials, provider state and a connected host's liveness are
+still checked on every call, so an offline host is refused at once. Every server-executed tool
+runs inside an `execute_tool {name}` span (GenAI conventions) that the trace store records as a tool
+observation with bounded input and output. `tools.search`, `tools.schemas` and `tools.execute`
+get a span of their own; the tool `tools.execute` runs is a child span beneath it. A background
+tool's span (`tilde.tool.background`) ends with its ticket, and a `background {name}` child span
+covers the provider's work until the outcome is delivered. A tool's output is at most 1 MiB
+(`tools::MAX_OUTPUT`, shared by REST providers, tool host answers and the audit record); a
+larger one fails the call with a terminal "output larger than 1 MiB" record, and a background
+call delivers that failure. Agent tools, tool hosts, built-in and personal tools
+are gateway-only. Sidecar-hosted agents still see channel tools alone: serving them there
+needs a provider-level relay to the gateway (credentials stay central) that executes without
+auditing, because the replica holding the thread owns its tool-call records and activity order.
+
+Both SDKs expose `ctx.toolSource(slug)` / `ctx.tool_source(slug)`, tool `summary`/`annotations`/
+`outputSchema`/`background` and bundled tools; TypeScript also has `ManagementClient.tools`/`toolHosts`, and `@trytilde/sdk/tool-host` with
+`createToolHost` (dial-in) and `createToolLambdaHandler`. Tools declare zod `inputSchema` and
+`outputSchema`, which type `run(input, ctx)`; `defineAuth` declares the provider, its methods (zod
+credential schemas or OAuth) and `verify`, and its `auth.tool` gives `run` the instance's typed
+`ctx.auth`. The Python SDK's `tilde.tool_hosts` mirrors this with pydantic models (`Auth`,
+`Method`, `@auth.tool`/`@tool`, `create_tool_host`, `create_tool_lambda_handler`). Each SDK ships
+an example tool server that `tilde dev-agent` registers and starts beside the example agents.
+Once both servers are up, `dev-agent` gives every example agent the Python server's tools and a
+demo "Acme" workspace of the TypeScript CRM (Example Agent 1 in dynamic mode), leaving sources an
+agent already has alone. Each example writes two bundled tools (`local_time`, `roll_dice`) as
+native framework tools in a module-level `defineTools` / `define_tools` value, which `tilde deploy`
+declares with the deployment, and gives its model `withTildeTools` / `with_tilde_tools`: the channel's
+tools, every other Tilde tool of the agent (`ctx.agentTools` / `ctx.agent_tools`, which leave
+bundled tools out) and its bundled tools.
 
 ## Inference gateway
 
@@ -179,6 +377,150 @@ chart, month-by-month navigation, total and month-to-date beside the title) abov
 which shows spend and an inline monthly budget per connection.
 Inference security middleware builds on the same records and claims.
 
+## Prompts
+
+Prompts live in agent code and are registered with a deployment, never edited in the UI.
+`tilde deploy` (TS `@trytilde/sdk` bin, Python `python -m tilde deploy`) imports the agent's
+entry with `TILDE_DISCOVERY=1` (hosts become no-ops), finds what the code declares and sends it
+as `RegisterDeploymentRequest.declarations`; `--dry-run` prints those declarations as JSON, which
+is how `tilde dev` registers the examples. Declarations come from two places:
+
+- framework adapters, which read the framework's own objects so agents are written as its docs
+  show: Mastra agents' instructions and skills (`@trytilde/sdk-mastra-node`), CrewAI `@CrewBase`
+  YAML read before interpolation (`tilde-crewai`, entry point group `tilde.discover`). Adapters
+  are found by object type among the entry's exports (TS) or the globals of project modules
+  (Python), so agents are defined at module scope and `run(ctx)` calls them;
+- `definePrompt`/`define_prompt`, `defineSkills`, `defineSkill` for code without a framework.
+
+A prompt version has a format: plain, mustache (`{{var}}`, `{{> section}}` partials stored per
+version in `prompt_sections`), braces (`{var}`), or dynamic (a function; the template is its
+source and the text exists only at runtime). Every format hashes under one framed SHA-256 rule
+shared by `prompts::content_hash` and both SDKs (config is canonical JSON, `{}` by default), and
+records its origin (`config/agents.yaml#responder.goal`). Registration upserts a version per
+(prompt, hash) and links it to the deployment (`deployment_prompts`); `prompt_versions.
+deployment_id` is the first deployment that shipped it. A repeated external id ignores
+declarations: a deployment's contents never change.
+
+The gateway links every inference call to the versions that produced it
+(`inference_request_prompts`), off the request path in the audit worker: the request's
+system, developer and user text is matched against the invocation deployment's plain, mustache
+and braces versions (each literal segment in order within one message, at least 16 bytes of
+literal text), and `x-tilde-prompt: name@hash, …` stamps name versions the text cannot, dynamic
+ones in particular. SDK framework helpers stamp dynamic instructions (Mastra's per-call
+processor); `ctx.prompt(def)`/`render()` stamp definePrompt prompts. Request bodies never leave a
+sidecar: its Watch snapshot carries the deployment's text-matchable versions as literal segments
+(`Snapshot.prompts`, kept for the replica's life since a deployment's prompts never change), the
+replica's audit worker matches each body against them with the same matcher, and the frame ships
+matches and header stamps alike as `name@hash` (`InferenceUsage.prompts`) for the gateway to resolve. Module-level `inference(slug)` (TS AsyncLocalStorage, Python
+contextvar) resolves the running invocation per request, so a framework model is built once at
+import while every call still carries its invocation's token and stamps.
+
+The management `PromptService` is read-only: list, history with usage per version (requests,
+tokens, cost, latency). At runtime
+an agent lists its own prompts freely and another agent's with `agents.read`. The Prompts tab shows
+versions newest first with format, origin and first deployment, files with a line diff, and
+usage; a deployment's drawer on the Deployments tab lists the prompt and skill versions it
+shipped (`GetDeploymentContents`, which also returns its declared bundled tools). Per-deployment and per-invocation overrides for experiments
+are the planned next step; nothing in the version model changes for them.
+
+## Skills
+
+A skill is a directory with a `SKILL.md` (front matter `name:` and `description:`, the latter
+being what an agent sees before reading it) plus the files it uses. Skills are grouped into
+skill sources, the usual unit agents are given; there is
+no registry. A source is one of:
+
+- catalog: an entry of the catalog (`skills::catalog`), either a built-in Tilde group compiled
+  into the engine (files under `crates/tilde/src/skills/catalog/`: Tilde runtime, Tilde working
+  style, Tilde platform) or a managed provider: a trusted GitHub repository and branch (Anthropic,
+  Microsoft, Cloudflare, AWS, Cursor, Notion, Granola, Parallel, Superpowers, Browserbase, Cua,
+  Apollo.io, Zoom, Stripe, Neon, Vercel, YC Software QM) narrowed by include scopes (directory
+  prefixes, or exact files that contribute no skills) and exclude prefixes; only skills whose
+  files lie within them are kept, and `translations/` never is. Enabling an entry creates the
+  installation's one source for it. Startup re-syncs enabled built-in
+  groups, so an engine upgrade versions the skills it changed; providers sync like git sources
+  (on enable, hourly, on request), never at startup. `ListCatalog` returns each entry's category
+  and icon (served from `web/public`), a provider's repository and branch, and its skills (name,
+  description, repository path): built-ins from the binary, providers once synced.
+  `GetCatalogGroup` returns one entry for its panel; a provider not yet enabled is previewed
+  live (commit, tree, then only each in-scope SKILL.md, scoped and named as a sync would), stored
+  nowhere and cached in memory per provider for an hour.
+- git: a GitHub repository read through the REST API (`ENGINE_GITHUB_API_URL`, optional
+  `ENGINE_GITHUB_TOKEN` for private repositories and rate limits): the ref resolves to a commit,
+  the commit's tree is listed (two API calls), files are downloaded from raw content at that
+  commit (`ENGINE_GITHUB_RAW_URL`), and every `SKILL.md` under the optional path is a skill owning
+  the files beneath it except those of a nested skill. Syncs run on add, hourly and on request;
+  a failure is recorded on the source (`sync_error`) and keeps the last good skills. Each sync
+  claims the next `sync_generation` before fetching; one that finishes after a newer sync started
+  is dropped, so an older commit never overwrites a newer one.
+- editor: a collection authored in the Skills pages, or by an agent holding `skills.edit`. A save
+  based on a version that is no longer the latest is refused, and the editor reloads.
+- code: one per agent (`skill_sources.agent_id`), filled by `tilde deploy` from skill folders the
+  agent's code or framework declares. Its skills can have several live versions at once, one per
+  deployment (`deployment_skills`); it is read through its agent and never appears
+  in source lists, pickers or assignments. An invocation sees its own deployment's bundled skills,
+  which shadow assigned skills of the same name. Files too large or binary to send inline are
+  uploaded first (`MissingDeploymentFiles`, `UploadDeploymentFile`, content-addressed).
+
+Bundled skills are pinned per deployment; everything assigned through the registry (sources,
+single skills, connection links) is live: it applies to every deployment of the agent at its
+latest version on the next invocation, with no redeploy. `ListSkills` marks which skills the
+deployment shipped (`deployed`, already on disk beside the code); SDK framework helpers deliver
+the rest through the framework's own skill mechanism (`ctx.skills.directory()` materialises them
+into a content-addressed cache directory reused across invocations), or, for frameworks without
+native skills, as Tilde skill tools plus a summary in the instructions.
+
+Package rules follow Tilde's hosted skills: safe relative paths, no symlinks, 1 MiB for
+SKILL.md (read from object storage when over the 256 KiB inline limit), 10 MiB per file, 64 MiB
+and 2048 files per skill; names are lowercase, unique within
+a source, and repeats are suffixed. Every distinct file set is an immutable version whose hash
+covers each file's path, content digest and executable bit. Files are content-addressed objects
+(`skills/blobs/sha256/..`) in `ENGINE_SKILLS_S3_BUCKET`; UTF-8 files up to 256 KiB are kept
+inline in Postgres instead, and without the bucket only such files are accepted. Management
+reads and agents get text inline and other files through 15-minute presigned URLs.
+
+An agent adds a source
+(`agent_skill_sources`) switched off. Switched on, it gives the agent every skill in it,
+including those a later sync adds, except skills switched off one by one
+(`agent_skill_exclusions`); switching it on again clears those, and switching it off drops
+every skill of it, single skills given from it (`agent_skills`) included. Removing a source
+drops its single skills and exclusions too. Agents are also given skills through a connection:
+sources linked to a connection (`connection_skill_sources`) reach every agent assigned that
+connection's `skills` capability while the connection is ready. Every connection offers the capability.
+
+The Skills pages call sources groups. The Skills page (sidebar) lists skills grouped by
+source, collapsible and searchable, and adds sources from the Tilde catalog (its own page,
+`/skills/catalog`, sectioned by category with a panel per catalog group), a Git repository or
+the editor. Sources have no page of their
+own (old `/skills/sources/<id>` links redirect to `/skills`): each group row syncs
+(catalog and git), links connections and deletes. A skill page shows the latest files in a
+file tree, markdown through a tiptap editor, and edits editor skills only (catalog, git and
+bundled skills are read-only here and in the API); each save is the next version (history is
+kept, not shown), unchanged assets are sent back with `keep`, and the name and description are
+SKILL.md front matter edited inline, where a new `name:` renames the skill in place. The agent's Skills tab is one table
+grouped by source, like its Tools tab: a Use switch per source and, while it is on, per skill, bundled skills
+(locked on), connection-given skills marked "via" the connection, and an Add skills menu, as on
+the Tools tab: choose an existing source (added switched off),
+or go to the Skills page to add new skills.
+
+Every wake carries `InvokeRequest.state` (`InvocationState`): what the agent should hold
+locally for that invocation, today every skill it sees at its version (bundled ones marked
+`deployed`); more pushed metadata belongs there. The SDKs keep registry skills in one folder
+per agent under the OS temp directory (`TILDE_SKILLS_DIR`), remember each skill's version in
+memory, and on each invocation download only new or newer versions and delete removed skills.
+Agents read skills through the runtime `SkillService`: `ListSkills` returns every skill they
+are given with its source slug, description and file list (SDKs use the pushed state instead
+for their own agent); `ReadSkillFile` takes `name`, or
+`source/name` when two assigned sources share a name. Both take another agent's id under
+`agents.read`; such listings omit bundled skills, which are the agent's own implementation
+(management still shows them on its Skills tab and deployments). An agent
+sees the sources it holds `skills.read` on (targets are source ids; `skills.edit` implies it). Assigning a source (switched on whole) or a skill needs `agents.edit_skills` on the receiving
+agent (itself included) plus read on the source; unassigning needs only `agents.edit_skills`. With
+`skills.edit` on a source it writes skills into an editor source and re-syncs git and catalog
+sources. Runtime file info carries the executable bit, which `ctx.skills.directory()` restores.
+The SDK exposes this as `ctx.skills.list/read/summary/materialize/sources/assign/unassign/
+write/sync`. Sidecars relay the RPCs to the gateway.
+
 ## Chat
 
 - User: a specific human conversation identity. A channel identity retains its provider
@@ -224,13 +566,11 @@ authenticated layout, and public brokering lives outside it. Agent routes live i
 `_app/agent/`, with the shared editor and its tabs grouped in `$agentId/`.
 Standalone Connections and Chat pages are not exposed. Agent rows open `/agent/{id}/capabilities`;
 `/agent/{id}/chat-providers` and `/agent/{id}/iam` are sibling tab routes under a shared
-agent editor. Agent details are fetched by ID after the management session check,
-so direct URLs and refreshes do not depend on previously loading the registry. The
+agent editor. Agent details are fetched by ID, so direct URLs and refreshes do not depend on previously loading the registry. The
 shared editor preserves local state across tab navigation and browser Back/Forward. The dashboard header
 shows Agent Registry / agent-name breadcrumbs, updated from loaded and saved route data.
 Pages can contribute a DashboardNavigation slot beside the breadcrumbs; agent tabs use a
-React portal so their panel context and keyboard behavior remain intact. Sign out lives
-in the sidebar footer and notifies the existing authentication boundary after revocation.
+React portal so their panel context and keyboard behavior remain intact.
 `/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
 separate public route outside the authenticated app layout. Connection setup and
 identity verification host modules live under `web/src/routes/connections/` with
@@ -256,7 +596,7 @@ Tilde wordmark × provider icon, a title, description and body. Approval shows
 “Link recipient identity to agent” and explicitly describes incoming and outgoing
 messaging using the stored sender and recipient identities, never a display label.
 
-The agent IAM tab uses management-only AgentAccessService RPCs. Access belongs to the
+The agent access tab uses management-only AgentAccessService RPCs. Access belongs to the
 agent/channel assignment, with private, public, and disabled modes. Existing assignments
 migrate as public; new assignments start private (GitHub starts disabled). Public still
 records every sender identity; private accepts only verified or management-attested identities explicitly allowed
@@ -266,11 +606,11 @@ agent history. Mode/grant changes invalidate runtime access and cancel affected 
 Queued messages and claims recheck current policies under the connection lock.
 
 An identity is a provider-owned string `value` with an `email`, `phone_number`, or `username`
-type, unique within the connected account. Core IAM never normalizes identity values;
+type, unique within the connected account. Tilde never normalizes identity values;
 provider adapters construct inbound identities and validate verification recipients.
 Verification is independent of an agent's allow flag. Management can attest an identity
-when creating it with `skip_verification`; this records the asserting IAM user or API key
-separately from provider verification and never creates an agent allow grant. Management creates a pending request
+when creating it with `skip_verification`; this records `attested_at` separately from
+provider verification and never creates an agent allow grant. Management creates a pending request
 and the provider privately delivers the secret approval link. Only its hash is stored.
 The link expires after ten minutes; resends supersede prior proofs and are throttled.
 Reading the page never approves. An explicit public Approve RPC consumes the delivered
@@ -329,6 +669,8 @@ These operations retain the identity's chat user ID and never merge conversation
 
 An agent is identity and policy only. It has no endpoint and no wake-signing key: nothing
 calls an agent, so there is nothing to address or sign. How it runs belongs to its deployments.
+Its identity is a name (1-200 characters) and an optional free-text description (at most 500
+characters, empty by default), both trimmed, edited inline under the name in the agent header.
 Each agent has a stable random avatar seed, derived from its UUID at creation. The
 MIT-licensed Dispatch avatar renderer lives in `sdk/ts/packages/agent-avatar` and animates
 in the registry. Custom raster images are uploaded through management UploadAgentAvatar,
@@ -354,6 +696,12 @@ streamed chunk once; existing messages without that measurement are excluded fro
 response averages. No-data hours and missing response samples are not represented
 as healthy observations or zero latency. The registry refreshes every 30 seconds.
 
+ListAgents filters before keyset paging, in SQL: `search` matches name or description
+case-insensitively (or an exact UUID), `health` matches the same latest status the
+metrics report (Healthy, Degraded, Unhealthy, or Unknown when the newest check is older
+than 90 seconds or missing), and `paused` selects paused or active agents. The home page
+keeps these as `q`, `health` and `state` URL search params.
+
 Rust domain code is grouped under `agent/{mod,health,rpc}.rs` and
 `chat/{mod,rpc,runtime}.rs`. Conversation contracts and storage use Thread,
 `thread_id`, and `chat_threads`; registry metrics use `thread_count` and
@@ -361,7 +709,7 @@ Rust domain code is grouped under `agent/{mod,health,rpc}.rs` and
 
 Chat provider tools use an invocation-scoped ConnectRPC catalog and streaming
 InvokeTool transport. The SDK registers their server-authored descriptions and
-schemas as local tool wrappers before the agent loop. Sending is provider-owned;
+schemas as framework tool wrappers before the agent loop. Sending is provider-owned;
 there is no SendMessage RPC or shared sending trait. Providers explicitly publish
 canonical message events through scoped lifecycle helpers. Native text sending is one provider implementation. Connection-backed adapters expose
 provider-specific schemas and handlers through the same catalog. Stop stays SDK-local,
@@ -408,50 +756,93 @@ by `sdk/py/scripts/generate.py` and not committed.
 
 ## Tracing
 
-Langfuse owns observability history. Gateway configuration uses LANGFUSE_BASE_URL,
-LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Absent
-or incomplete configuration disables the native viewer and blackholes valid,
+Tilde is its own trace store. Spans live in one append-only ClickHouse table,
+`otel_traces`, in Rotel's OpenTelemetry layout with Tilde's facts materialized from span
+attributes: agent, invocation and thread ownership, and the observation type, level and
+model. A trace is simply its spans, and session and ownership facts ride on every row, so
+reads never join. Retried deliveries of a span collapse on the sorting key. History is kept
+for `ENGINE_CLICKHOUSE_RETENTION_DAYS`, or indefinitely when unset; the same setting governs
+logs and metrics. Absent configuration disables the viewer and discards valid,
 authenticated OTLP uploads. A configured outage is unavailable, not disabled.
-Rotel batches enabled ingress into the bounded, temporary telemetry_delivery
-outbox. It contains unencrypted OTLP until delivery and seven-day replay receipts;
-it is not a trace-history store. The worker uses commit notifications and retry
-deadlines. Five-minute terminal trace authorization never restores agent actions.
 
-Message and invocation rows retain W3C trace context across durable dispatch.
-Langfuse is the trace system of record. Sidecars accept scoped OTLP, stamp it with the
-verified invocation scope, and ship it to the gateway as telemetry frames in their
-publish stream. The gateway re-stamps the agent from the authenticated deployment and
-accepts batches into its bounded delivery queue. It forwards to Langfuse and clears
-delivered payloads. Postgres holds only temporary delivery payloads and expiring replay
-receipts, never permanent trace history. Delivery wakes through LISTEN/NOTIFY and
-uses scheduled retry deadlines. Langfuse credentials remain at the gateway.
+Observation: a span as the viewer presents it. The gateway projects `tilde.observation.*`
+attributes once, before queueing: type (generation, tool, chain, agent or span), model,
+input, output, level and completion start time. A session is a chat thread: spans carry
+`tilde.thread.id`, and a snapshot of session facts under `tilde.session.*` captured at
+acceptance, never identity display values or message bodies.
 
-Management trace reads query Langfuse. Without Langfuse configuration, tracing is
-disabled. Invocation tokens authorize agent uploads, including the terminal upload
-grace period; management tokens cannot authorize ingestion. The SDK batches per
-invocation and preserves the runtime callback path prefix in its OTLP URL.
+Observation cost: `crate::pricing` is the one place list prices become cost, for inference
+requests captured at the gateway and for generation spans captured in traces, from the
+`inference_prices` table keyed by Tilde provider id and model. A span names its provider
+through `gen_ai.provider.name`, `gen_ai.system` or the AI SDK's `ai.model.provider`; without
+one, whichever provider lists the model.
 
-W3C context survives durable message/invocation dispatch. The gateway maps verified
-thread IDs to Langfuse sessions and observation-level agent/run/invocation metadata.
-The management-only TracingService scopes observation and session queries by
-agent and verifies agent membership before loading a complete trace. The native shadcn/TanStack Observations and Sessions viewer uses progressive
-pagination, filters, an I/O/tree inspector and safe external deep links. Partial
-groups and missing metrics are explicit. No project secrets reach the browser.
+Media: a base64 data URI in any string attribute of a span becomes a
+content-addressed object in the media bucket (`ENGINE_MEDIA_S3_BUCKET`,
+`media/<agent>/<sha256>`) and a
+`@@@tildeMedia:type=…|id=…|source=…@@@` token in its place; attributes still over 64 KiB
+are stored whole (`payloads/<agent>/<sha256>`) and truncated on the span with an
+`<attribute>_ref` naming the copy. This covers the projected `tilde.observation.*` fields
+and the AI SDK or GenAI attributes they were copied from, so no full payload stays inline
+when the bucket is configured; without it both stay inline. The media bucket is never a
+queue bucket, so queue expiry cannot touch what stored spans reference.
+Observations name their owning agent; `TracingService.GetTraceObjectUrl` signs a
+ten-minute URL for an object whose key names that agent, which is how the inspector
+resolves a cooperating agent's media inside a shared trace.
+
+Metrics: `/v1/metrics` on the agent runtime listener accepts OTLP metrics under the same
+credentials as logs. Ownership is stamped on every data point, batches queue in
+`ENGINE_METRICS_S3_BUCKET`, Rotel writes them to `otel_metrics_<kind>` tables, and
+`METRICS_OTLP_*` forwards them. Sidecars mount the same `/v1/metrics`, accept the
+deployment token like logs, stamp ownership and relay Metrics frames. There is no metrics
+viewer.
+
+Telemetry queue: accepted trace, log and metric batches are written to object storage
+(`ENGINE_TRACES_S3_BUCKET`, `ENGINE_LOGS_S3_BUCKET`, `ENGINE_METRICS_S3_BUCKET`) and a pointer row in Postgres
+(`telemetry_objects`) before they are acknowledged. Each signal and destination is a queue,
+such as `traces/clickhouse` or `logs/external`. Every enqueue writes its own object
+(`<queue>/<agent>/<batch>/<enqueue>.pb`) while a unique `(queue, batch_id)` keeps a
+retried upload one pending pointer. Admission takes a per-queue advisory lock around the
+capacity read and pointer insert. Any gateway replica claims a pointer under a short
+lease, delivers the object and removes the pointer; a failed or abandoned delivery
+becomes due again (`Spool::drain`). Gateways hold no telemetry state. Delivery is at
+least once and bounded per queue and per agent. The engine never deletes a queued
+object; the bucket's lifecycle rule (at least one day) expires it. One sweeper
+(`crate::telemetry::spool::sweep_worker`) drops pointers older than a day from every
+queue. External OTLP forwarding
+(`TRACES_OTLP_*`, `LOGS_OTLP_*`) is an independent queue, so a collector outage never
+delays history.
+
+Message and invocation rows retain W3C trace context across durable dispatch. Sidecars
+accept scoped OTLP, stamp it with the verified invocation scope, and ship it to the
+gateway as telemetry frames in their publish stream. The gateway re-stamps the agent from
+the authenticated deployment. Storage credentials remain at the gateway. Invocation tokens
+authorize agent uploads, including the terminal upload grace period; management tokens
+cannot authorize ingestion.
+
+The management-only TracingService reads the span table with a mandatory server-authored
+agent predicate; every optional filter is a static parameter, never interpolated SQL.
+Filters are conditions on named columns: string columns (name, type, level, model, session,
+invocation, status message, input, output) with =, contains, does not contain, starts with,
+ends with, any of and none of; number columns (latency, tokens, cost, time to first token)
+with =, >, <, >=, <=; and `metadata` conditions on any span attribute. The web query
+language expresses these as `field:value`, `field:*text*`, `-field:value`, `field:a|b` and
+`field:>n` terms, with plain terms on the basic fields kept in their own URL parameters and
+everything else in `where`. A complete trace, which may include
+gateway and cooperating-agent spans, is returned only after proving one of its spans
+belongs to the caller's agent. Cursors are keyset positions bound to their filter and time
+window. Session summaries are page-local; the browser re-aggregates what it has loaded.
 
 Sidecars retain raw OTLP in their bounded in-memory outbox until gateway queue
-acceptance. They receive enablement but no Langfuse credentials, preserve cached
-configuration through disconnection, and apply terminal token grace.
+acceptance, preserve cached configuration through disconnection, and apply terminal
+token grace.
 
-Development starts a pinned local Langfuse stack with Compose defaults and
-overrides from the existing .env file. Volumes preserve data; startup supports
-opt-out or an external deployment without a separate bootstrap environment file.
-With `TS_ADDR`, host API clients and readiness checks use the same Tailscale
-address as the Compose port binding; without it they use loopback.
+Development starts ClickHouse and MinIO with Compose defaults and creates the avatar, log
+and trace buckets.
 The optional AI SDK dev agent emits model telemetry through Tilde.
-The tracing activity chart aggregates the whole filtered time range through the
-Langfuse Metrics API: counts, error counts, and average latency per interval.
-Input/output searches aggregate minimal observation pages on the server because
-the metrics endpoint lacks those filters. Brushing updates the table URL time filter while preserving the chart horizon
+The tracing activity chart aggregates the whole filtered time range in one span-store
+query, with every filter including input and output search: counts, error counts, and
+average latency per interval. Brushing updates the table URL time filter while preserving the chart horizon
 and aggregates. Selection edges resize the filter; full-width selection restores
 the original range. Explicit date controls replace the horizon. The chart never
 aggregates only loaded table rows.
@@ -466,54 +857,22 @@ initially fitted time range. Horizontal pinch zoom preserves fixed row heights
 and native vertical scrolling. Full-row hover previews restore the clicked
 selection, with details in dense Input/Output/Metadata tabs. Full-screen inspection places the graph and
 details in two columns. Session totals describe loaded
-results rather than all Langfuse history.
+results rather than all stored history.
 
 
 ## IAM
 
-- Principal: an authenticated IAM user, management API key, or registered agent. An IAM user is linked
-  by the OIDC issuer and subject; it is distinct from a ChatKit conversation user.
-- Management API: the listener serving OIDC login/exchange, the browser UI and
-  management RPCs. The guard authenticates every RPC; each handler then applies its own
-  rule (`authz::require` on the resource named in the request, `require_admin`, or
-  `require_user` where API keys are refused), and a test drives every RPC declared in the
-  contracts through the guard so none ships without a rule. There are no local password accounts.
-- Group: an audience for roles. The id prefix names who owns membership.
-  `tilde_system:admin` holds every action on everything and manages users, groups and
-  installation-wide roles; `tilde_system:user` is implicitly every signed-in user. `external:`
-  groups mirror the identity provider's group claim and are reconciled at each login. `local:`
-  groups are managed by administrators and survive login. Members are IAM users.
-- Action: one thing a caller may do to an agent: `view` (find and read), `edit` (change),
-  `deploy` (register, promote and retire deployments, issue their tokens), `share` (assign
-  and revoke roles). Actions do not imply each other; a role states everything it gives.
-- Role: a named set of statements, each an action on one agent or on every agent (the nil
-  resource id). Every agent is created with three system roles, never edited: reader
-  (`view`), editor (`view`, `edit`, `share`) and deployer (`view`, `deploy`, `share`), ids
-  `agent/<id>/<slug>`. The installation-wide `agents/<slug>` roles cover every agent, present
-  and future. A user, group or API key holds any number of roles; the actions of all of them
-  add up. One SQL function, `iam_held`, answers point checks and list filters. An agent on
-  which the caller holds no `view` is reported as not found.
-- Reach: assigning or revoking a role needs `share` on each agent it names and every
-  action it gives there, so editors hand out reader and editor, deployers reader and
-  deployer, administrators anything; installation-wide roles are administrators' to give.
-  A reader role for the all-users group opens an agent to every signed-in user ("Anyone can
-  view" in the share dialog).
-- Creation: any signed-in user may create agents and connections; an agent's roles are
-  created in the same transaction as its row and its creator becomes editor and deployer.
-  An API key creates an agent only when it holds edit on every agent. Deleting an agent
-  deletes its roles.
-- Inherited authorization: deployments, channel access, Tilde chat credentials, agent
-  budgets, logs, traces and sessions are checked against their agent. Connections and
-  identities carry no roles: any signed-in caller reaches them, and attaching a connection
-  needs edit on the agent. Identity budgets are for administrators.
-- Management API key: automation credential holding roles exactly as a user does. It
-  joins no groups, is never an administrator, and cannot call access, user, group, key
-  or provider-definition management. A creator gives a key only roles within their reach.
-  Non-administrators list and revoke only their own keys.
+- Principal: a registered agent acting under one invocation. Management callers are not
+  principals: the open-source build has no management users, sessions, API keys, roles or
+  groups.
+- Management API: the listener serving the browser UI and management RPCs. It is
+  unauthenticated and every caller can do everything; operators put their own authenticating
+  proxy in front of it. Lists return every row their filters keep, creation grants nothing
+  and deletion purges nothing beyond the resource itself.
 - Agent runtime API: a separate listener in the same process. It accepts only
   signed agent connect bearer tokens. It exposes agent registry operations,
   current-thread reads and invocation, and agent session callbacks. It has no
-  OIDC, connection administration or browser routes.
+  connection administration or browser routes.
 - Agent connect token: signed claims for one agent, invocation, run, thread and
   thread-specific participant, with a capability snapshot and a five-minute expiry.
   Ordinary RPC authorization checks the signature and expiry locally. Issued tokens
@@ -536,35 +895,18 @@ results rather than all Langfuse history.
   grant_capabilities. Thread reads, work reads/writes, own-run updates and tool
   invocation are separate capabilities. Any thread/work grant still stays inside
   the invocation's thread/agent scope. Tool targets are catalog tool names.
-- Capability ceiling for owners: capabilities let an agent act on other agents, so a
-  non-administrator editor may only select agents they hold themselves (view to
-  read or invoke, edit to change) and may never select all. Reaches already
-  stored stay valid when resubmitted unchanged.
-- Granting authority: creation grants no capabilities by default. Setting grants
-  requires explicit grant_capabilities authority over the target and cannot
-  exceed the caller's invocation capabilities. Endpoint changes also require
+- Granting authority: creation grants no capabilities by default. Management callers may
+  set any capability. An agent setting grants at runtime needs explicit grant_capabilities
+  authority over the target and cannot exceed its invocation capabilities. Endpoint changes also require
   authority at least as broad as the target agent's current capabilities.
 
-API keys are created, listed and revoked through the management API and the API keys
-sidebar page. The secret is shown once; only its digest and a display prefix are stored.
-Successful authentication is cached by digest for at most 30 seconds, bounded to 4096
-entries. Local revocation clears synchronously; PostgreSQL notifications invalidate other
-processes, with the TTL bounding missed notifications. Keys authenticate management RPCs;
-browser session endpoints remain OIDC-only, and agent runtime credentials remain separate.
-
-OIDC is configured through the environment. Browser login uses authorization code,
-PKCE and nonce validation, plus a browser-held verifier for the local one-time
-exchange. Management bearer sessions expire after eight hours and are revocable
-on logout. Only session hashes are persisted. The frontend keeps the token in
-local storage and sends Authorization headers; authentication does not use cookies.
-The installation signing key and temporary upstream PKCE verifiers are encrypted
-through the encryption module. Dev starts Compose Dex with a seeded local account.
+The installation signing key for agent connect tokens is encrypted through the encryption
+module.
 
 `ENGINE_MANAGEMENT_ENABLED` and `ENGINE_WEB_ENABLED` independently control
-management routes and React serving, defaulting to true. Management-off instances
-require no OIDC configuration. Packaged React assets share the management bind;
-that listener is absent when neither management nor embedded web is enabled.
-Development omits Vite when web is disabled and Dex when management is disabled.
+management routes and React serving, defaulting to true. Packaged React assets share the
+management bind; that listener is absent when neither management nor embedded web is enabled.
+Development omits Vite when web is disabled.
 The agent runtime and event ingress listeners and background workers remain active
 in every mode. Event ingress defaults to `127.0.0.1:8082` and mounts only signed
 provider webhook routes; management never mounts webhook ingress.
@@ -579,12 +921,12 @@ delegate to Task. Disposable Postgres lifecycle remains in a shell wrapper;
 JavaScript remains for substantive generation checks and integration tests.
 
 Dev dotenv files supply bind addresses, public URLs, Vite upstreams, browser
-origins, S3 endpoints and Dex callbacks. `TS_ADDR=<IPv4> task dev` relocates local
+origins and S3 endpoints. `TS_ADDR=<IPv4> task dev` relocates local
 service binds and URL hosts in `scripts/dev.py` before starting Task's services;
 custom external URLs and database settings remain independent.
 Without TS_ADDR, dotenv values pass through directly. `.env.example` lists local
 defaults. Dev ngrok always overrides the ingress public URL.
-`secrets.enc.yaml` and generated dotenv files remain private, ignored local files.
+Generated dotenv files remain private, ignored local files.
 
 For the default local engine database, `task dev` starts persistent Compose
 Postgres on loopback port 5432 and waits for health before launching the API.
@@ -667,18 +1009,7 @@ connections together. Neither read needs an additional invocation-state query.
 Development falls back to public `.env.example` defaults; private `.env` and
 `.env.local` override them. Tests use `.env.test` and start local storage when
 using its default endpoint.
-The original KMS-encrypted `secrets.enc.yaml` retains top-level dev credentials and
-its `test` overrides; `scripts/load-secrets.py` extracts chat credentials and the
-dev-only ngrok token and OpenAI key into
-ignored `.env.secrets` / `.env.secrets.test`. Exported values and ignored local
-mode-specific overrides take precedence. Test tasks use disposable Postgres.
-All six chat adapters have isolated outbound/inbound fixture coverage. Live account
-and two-way suites require the `live-chat-tests` Cargo feature and explicit ignored-test
-execution. Two-way tests use the production ConnectRPC tool API, encrypted credential
-resolution, real provider delivery and a real peer reply. Hookdeck raw captures retain
-the original signatures when replayed into local ingress. Slack/GitHub/AgentMail peers
-are automated; phone peers are assisted. Callback deduplication and tool input/output
-audit are asserted; temporary remote resources are cleaned up on failure too.
+All six chat adapters have isolated outbound/inbound fixture coverage.
 
 
 ## RPC audience boundaries
@@ -721,8 +1052,7 @@ use the additional `tc-live` class so they do not override read-only transcript 
 
 The built-in Tilde provider is a catalog provider (`tilde`, connection type
 `application`) like every other chat provider. Every agent owns exactly one Tilde
-connection, created in the agent's creation transaction together with its system roles
-and deleted with the agent; `StartConnection`, `Disconnect` and `UnassignCapability`
+connection, created in the agent's creation transaction and deleted with the agent; `StartConnection`, `Disconnect` and `UnassignCapability`
 refuse it, the web hides it from the add-provider picker, and startup backfills one for
 agents that predate it. Its single sealed value, `api_key`, is what management
 `TildeChatProviderService` reveals or rotates (rotation replaces the value, bumps the
@@ -961,26 +1291,23 @@ heartbeats. Replicated metadata distinguishes temporary
 availability from persistence, and persisted bytes can be downloaded through the
 gateway by any replica. Health samples arrive with heartbeats.
 
-## Langfuse observability integration
+## Sidecar telemetry
 
-Gateway configuration owns LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY,
-LANGFUSE_SECRET_KEY and optional LANGFUSE_PUBLIC_URL. Only tracing_enabled is
-included in sidecar configuration. Disabled telemetry is validated and discarded;
-gateway outages keep batches in the bounded sidecar outbox. Gateway acceptance places
-them in the shared transient telemetry_delivery queue. Stable payload receipts
-deduplicate reconnect replay; Langfuse owns all trace history. Platform spans use a process-wide
-provider routed to the correct local agent, preserving invocation context and
-terminal trace-token grace. The agent Tracing tab queries scoped Langfuse public
-APIs through management-only RPCs. No Langfuse credentials reach agents or browsers.
+Telemetry is always on, so sidecar configuration carries no telemetry switches; a
+configured sidecar relays every validated batch, and gateway outages keep batches in the
+bounded sidecar outbox.
+Gateway acceptance places them in the shared telemetry queue, where a batch is identified
+by its content so reconnect replay is not queued twice. Platform spans use a process-wide
+provider routed to the correct local agent, preserving invocation context and terminal
+trace-token grace. No storage credentials reach agents or browsers.
 
-Development fixtures live under `dev/`: Dex mounts `dev/dex/dex.yaml`.
 `REGISTER_DEV_AGENTS=1 task dev` runs `vercel-ai-example-agent` as a separate SDK server. It is a private TypeScript member
 of the SDK workspace, importing `@trytilde/sdk` normally and using Vercel AI SDK
 `generateText` with its OpenAI provider. Dev startup launches its compiled `dist/index.js`.
 The debug-only `dev-agent` command registers it through Agents, reusing its fixed
 ID. Only thread reading, run updates and provider tools
 are granted on creation. Registration does not alter assigned channels or existing
-grants. The child receives the OpenAI key from private SOPS-backed dev credentials,
+grants. The child receives the OpenAI key from private dev credentials,
 its deployment token, gateway URL and model; database/encryption credentials are not forwarded.
 Its model receives only the current channel tools and must call a provider tool for visible output.
 
@@ -1042,9 +1369,11 @@ HyperDX patterns for interval bucketing, automatic granularity, severity groupin
 and escaped ILIKE search, with Tilde’s mandatory agent scope and stable cursors. The Logs tab shares tracing’s
 chip/date controls and resizable histogram selection, with a full-width Time/Level/Messages
 virtual table, scroll pagination, right-side record inspection, and native trace
-links, and a bounded live view. Local ClickHouse is enabled by default for task dev,
-uses Compose defaults and .env overrides, and can be opted out independently of
-Langfuse with DEV_LOGS_ENABLED=0.
+links, and a bounded live view. ClickHouse and the log, trace and metric buckets are
+required: the engine refuses to start without them, and task dev always starts a local
+ClickHouse from Compose defaults and .env overrides unless ENGINE_CLICKHOUSE_URL names one.
+Telemetry intake and delivery use their own small Postgres pool, so a full or slow telemetry
+queue cannot starve management requests or agent heartbeats of connections.
 
 
 The TypeScript host supplies a logger-independent OTel `agentLogProcessor` with
@@ -1080,7 +1409,7 @@ Trace provenance uses `tilde.client_sdk.version` from the installed TypeScript S
 stamped before the gateway delivery queue. SDK instrumentation stamps every SDK,
 framework and RPC span it exports. Ownership normalization preserves only the
 client-reported SDK version; server versions are replaced by the owning process.
-Gateway projection exposes these as observation and trace metadata in Langfuse.
+They are stored with the span and shown in the trace inspector's metadata.
 Gateway-only traces have no client SDK version; traces bypassing a sidecar omit its version.
 Tracing and Logs share a dense square time-range dropdown with IBM Plex Mono text.
 
@@ -1096,7 +1425,7 @@ The sidebar logo row has a right-aligned light/dark toggle. The app retains the 
 and neutral charcoal tabs, table headers, inputs, hover states and portaled menus/dialogs
 in dark mode. It defaults to the system theme on initial load and persists
 an explicit choice in `tilde.theme`. The HTML shell applies that choice before first
-paint so reloads and the sign-in screen retain the selected palette.
+paint so reloads retain the selected palette.
 
 Weighted deployment routing replaces Manual. Active deployments are registered
 records across Gateway, Sidecar and Lambda execution types.
@@ -1151,10 +1480,10 @@ use the connected RunService stream exclusively, without an inbound HTTP fallbac
 Instance URLs remain for sidecar ingress and forwarding. Agents have no endpoint at all.
 
 The standalone `.github/actions/register-deployment` Node action registers CI releases
-using an explicit management API token or TILDE_API_KEY provided by its caller. It
+with an optional management token its caller provides; the open-source server ignores it. It
 returns a masked same-job deployment-token output and an authenticated deployment-page
 link. GitHub run IDs make reruns idempotent; missing tokens on retries fail unless the
-caller explicitly opts into rotation. Manual users sign in and rotate in the UI to
+caller explicitly opts into rotation. Manual users rotate in the UI to
 get a replacement; original tokens cannot be retrieved from their stored hashes.
 No bearer credentials are placed in job summaries, artifacts, or public links.
 
@@ -1183,10 +1512,11 @@ compact expandable run UI; trace adapters supply full captured arguments and res
 The Sessions table is a view over existing traces. Before accepting a trace batch into
 its existing durable delivery queue, the gateway captures provider/connection IDs and
 branding, identity IDs, retained message count, last-turn time, and metadata capture time
-for authenticated agent/session pairs. These are `tilde.session.*` OTLP attributes and
-`tilde_session_*` Langfuse trace/observation metadata. Identity values and message bodies
-are not added by this enrichment. Reserved metadata is replaced from trusted chat state;
-retry receipts ignore enrichment fields and preserve the first captured payload.
+for authenticated agent/session pairs. These are `tilde.session.*` span attributes. Identity
+values and message bodies are not added by this enrichment. Reserved metadata is replaced
+from trusted chat state. A batch is identified without its enrichment, so a retry is not
+queued twice while the first copy is pending; once delivered, a retry is enriched afresh
+and the newer snapshot wins.
 
 Session summaries select one whole snapshot using its metadata capture time, never sum
 counts across spans or use the largest count. Scrolling older pages cannot overwrite a

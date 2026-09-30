@@ -49,6 +49,7 @@ async fn priming_serves_tools_credentials_and_history_from_memory_until_invalida
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Warm".into(),

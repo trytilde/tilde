@@ -9,10 +9,12 @@ use secrecy::ExposeSecret;
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 struct Rpc(Deployments);
+/// Sized for RegisterDeployment's declarations: skill text travels inline and larger or
+/// binary files come through UploadDeploymentFile (10 MiB each) first.
 pub fn management_router(service: Deployments) -> axum::Router {
     crate::rpc::mount(
         connectrpc::Router::new().add_service(Arc::new(Rpc(service))),
-        1024 * 1024,
+        32 * 1024 * 1024,
     )
 }
 /// The complete sidecar-facing surface; every call authenticates a deployment token.
@@ -23,18 +25,48 @@ pub fn sidecar_router(service: Deployments) -> axum::Router {
     )
 }
 impl DeploymentService for Rpc {
+    async fn missing_deployment_files<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::MissingDeploymentFilesRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::MissingDeploymentFilesResponse> + Send + use<'a>,
+    > {
+        let r = r.to_owned_message();
+        Response::ok(management::MissingDeploymentFilesResponse {
+            sha256: self.0.skills().missing_files(&r.sha256).await?,
+            ..Default::default()
+        })
+    }
+    async fn upload_deployment_file<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::UploadDeploymentFileRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::UploadDeploymentFileResponse> + Send + use<'a>,
+    > {
+        let data = r.data.to_vec();
+        Response::ok(management::UploadDeploymentFileResponse {
+            sha256: self.0.skills().upload_file(data).await?,
+            ..Default::default()
+        })
+    }
+    async fn get_deployment_contents<'a>(
+        &'a self,
+        _: RequestContext,
+        r: ServiceRequest<'_, management::GetDeploymentContentsRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::GetDeploymentContentsResponse> + Send + use<'a>,
+    > {
+        let agent = id(r.agent_id)?;
+        Response::ok(self.0.contents(agent, id(r.deployment_id)?).await?)
+    }
     async fn get_deployment<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::GetDeploymentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::GetDeploymentResponse> + Send + use<'a>>
     {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::View,
-        )
-        .await?;
         let agent = id(r.agent_id)?;
         Response::ok(management::GetDeploymentResponse {
             deployment: self.0.get(agent).await?.into(),
@@ -45,17 +77,11 @@ impl DeploymentService for Rpc {
     }
     async fn set_deployment_weights<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::SetDeploymentWeightsRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetDeploymentWeightsResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         let r = r.to_owned_message();
         let agent = id(&r.agent_id)?;
         let weights = r
@@ -72,16 +98,10 @@ impl DeploymentService for Rpc {
     }
     async fn set_deployment<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::SetDeploymentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::SetDeploymentResponse> + Send + use<'a>>
     {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         Response::ok(management::SetDeploymentResponse {
             deployment: self
                 .0
@@ -99,17 +119,11 @@ impl DeploymentService for Rpc {
     }
     async fn issue_deployment_token<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::IssueDeploymentTokenRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::IssueDeploymentTokenResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         let token = self
             .0
             .issue_token(id(r.agent_id)?, id(r.deployment_id)?)
@@ -121,17 +135,11 @@ impl DeploymentService for Rpc {
     }
     async fn register_deployment<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::RegisterDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RegisterDeploymentResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         let agent = id(r.agent_id)?;
         let request = r.to_owned_message();
         let (deployment, token, created) = self
@@ -149,6 +157,7 @@ impl DeploymentService for Rpc {
                     commit_message: request.commit_message,
                     branch: request.branch,
                     commit_author: request.commit_author,
+                    declarations: request.declarations.into_option().unwrap_or_default(),
                 },
             )
             .await?;
@@ -163,17 +172,11 @@ impl DeploymentService for Rpc {
     }
     async fn promote_deployment<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::PromoteDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::PromoteDeploymentResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         Response::ok(management::PromoteDeploymentResponse {
             deployment: self
                 .0
@@ -185,17 +188,11 @@ impl DeploymentService for Rpc {
     }
     async fn retire_deployment<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::RetireDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RetireDeploymentResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Deploy,
-        )
-        .await?;
         Response::ok(management::RetireDeploymentResponse {
             deployment: self
                 .0
@@ -207,24 +204,14 @@ impl DeploymentService for Rpc {
     }
     async fn issue_ingress_token<'a>(
         &'a self,
-        ctx: RequestContext,
+        _: RequestContext,
         r: ServiceRequest<'_, management::IssueIngressTokenRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::IssueIngressTokenResponse> + Send + use<'a>,
     > {
-        crate::iam::authz::require(
-            &ctx,
-            crate::iam::authz::Resource::agent(id(r.agent_id)?),
-            crate::iam::authz::Action::Edit,
-        )
-        .await?;
-        let caller = crate::iam::authz::caller(&ctx)?;
-        let principal = caller.user.or(caller.api_key).ok_or_else(|| {
-            connectrpc::ConnectError::unauthenticated("Management identity required")
-        })?;
         let token = self
             .0
-            .issue_ingress_token(id(r.agent_id)?, r.thread_id.map(str::to_owned), principal)
+            .issue_ingress_token(id(r.agent_id)?, r.thread_id.map(str::to_owned))
             .await?;
         Response::ok(management::IssueIngressTokenResponse {
             token: token.expose_secret().into(),

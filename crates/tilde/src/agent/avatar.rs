@@ -114,6 +114,10 @@ impl AvatarStore {
         Ok(())
     }
     async fn url(&self, key: &str) -> Result<String, Error> {
+        self.signed_url(key, 3600).await
+    }
+    /// A browser-facing GET URL that expires.
+    pub(crate) async fn signed_url(&self, key: &str, seconds: u64) -> Result<String, Error> {
         Ok(self
             .signer()
             .await?
@@ -121,7 +125,7 @@ impl AvatarStore {
                 Method::GET,
                 self.object_url(&self.public_endpoint, key),
                 BTreeMap::new(),
-                3600,
+                seconds,
                 SystemTime::now(),
             )
             .map_err(|_| Error::AvatarStorage)?
@@ -129,7 +133,42 @@ impl AvatarStore {
             .to_string())
     }
 }
+/// The same private S3 client serves every bucket the engine writes; only avatars are signed out.
+pub type ObjectStore = AvatarStore;
 impl AvatarStore {
+    /// Another bucket behind the same endpoint and credentials.
+    pub fn bucket(&self, bucket: String) -> Self {
+        Self {
+            bucket,
+            ..self.clone()
+        }
+    }
+    /// The object's size, or None when it does not exist.
+    pub(crate) async fn size(&self, key: &str) -> Result<Option<u64>, Error> {
+        let mut request = self
+            .http
+            .head(self.object_url(&self.endpoint, key))
+            .build()
+            .map_err(|_| Error::AvatarStorage)?;
+        self.signer()
+            .await?
+            .sign_request_at(&mut request, &[], SystemTime::now())
+            .map_err(|_| Error::AvatarStorage)?;
+        let response = self
+            .http
+            .execute(request)
+            .await
+            .map_err(|_| Error::AvatarStorage)?;
+        match response.status() {
+            reqwest::StatusCode::NOT_FOUND => Ok(None),
+            // The header, not the (empty) HEAD body the client measures.
+            status if status.is_success() => Ok(response
+                .headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok()?.parse().ok())),
+            _ => Err(Error::AvatarStorage),
+        }
+    }
     pub(crate) async fn read(&self, key: &str) -> Result<Vec<u8>, Error> {
         let mut request = self
             .http

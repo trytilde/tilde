@@ -407,8 +407,8 @@ pub async fn sent(
         "complete",
         Some(scope.id),
         None::<Uuid>,
-        &(crate::telemetry::context::capture().0),
-        &(crate::telemetry::context::capture().1),
+        &(crate::telemetry::tracing::context::capture().0),
+        &(crate::telemetry::tracing::context::capture().1),
     )
     .await
     .map_err(super::ChatError::from)?;

@@ -16,10 +16,8 @@ import {
 } from "@trytilde/sdk";
 import { convertToModelMessages } from "ai";
 import { convertToAiSdkMessages, convertToAiSdkTools } from "../dist/index.js";
-import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 assert(process.env.TEST_DATABASE_URL, "Use scripts/with-postgres.sh");
 const scratch = await mkdtemp(join(tmpdir(), "tilde-attachments-"));
-const oidc = await startOidc();
 const seed = randomBytes(32).toString("base64");
 const image = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZb8AAAAASUVORK5CYII=",
@@ -160,7 +158,6 @@ const agentOptions = {
 };
 const env = {
   ...process.env,
-  ...oidc.env,
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   LOGS_QUEUE_DIR: scratch,
   ENGINE_ENCRYPTION_KEY: seed,
@@ -206,8 +203,7 @@ try {
     const m = logs.match(/ address=(127\.0\.0\.1:\d+)/);
     return m && `http://${m[1]}`;
   });
-  const accessToken = await loginManagement(url);
-  const client = createManagementClient({ baseUrl: url, accessToken });
+  const client = createManagementClient({ baseUrl: url });
   const agent = (
     await client.agents.createAgent({
       name: "Converter fixture",
@@ -221,7 +217,7 @@ try {
     })
   ).agent;
   connectedFixtures.push(
-    await connectAgentFixture({ url, accessToken, agentId: agent.id, options: agentOptions }),
+    await connectAgentFixture({ url, agentId: agent.id, options: agentOptions }),
   );
   const { token } = await client.deployments.issueIngressToken({ agentId: agent.id });
   const chat = createTildeChatClient({ baseUrl: url, agentId: agent.id, accessToken: token });
@@ -294,6 +290,5 @@ try {
     await stopped;
     clearTimeout(timer);
   }
-  await oidc.stop();
   await rm(scratch, { recursive: true, force: true });
 }

@@ -35,7 +35,7 @@ task check  # Generated code, frontend types, formatting and Clippy
 
 Build and dev install dependencies and generate contracts first. The release
 binary is `target/release/tilde` (or under `CARGO_TARGET_DIR` when configured).
-Task loads your `.env` and private `.env.secrets` / `.env.local` overrides. Set `DATABASE_URL` and
+Task loads your `.env` and private `.env.local` overrides. Set `DATABASE_URL` and
 encryption configuration there; exported environment variables take precedence.
 When changing dev ports, also update their matching listen/public URLs in `.env`. `task generate` runs
 contract generation independently of Rust compilation. `task --list` lists commands.
@@ -65,45 +65,45 @@ batches fragments, merges the changelog, updates package versions, refreshes
 the Cargo, pnpm and uv lockfiles, and checks version agreement. Install dependencies first with
 `task setup` and `cargo fetch --locked`. Review and commit the generated changes
 together before tagging `v<version>` and building/publishing the release artifacts.
-`release:prepare` only prepares versions locally. `task sdk:pack` builds public SDK
-tarballs in `dist/npm`; `task sdk:publish` publishes unpublished workspace packages
-to npm (`-- --dry-run` previews publishing).
+`release:prepare` only prepares versions locally. `task sdk:pack` builds public npm SDK
+tarballs in `dist/npm` and `task sdk:py:pack` builds the Python SDK sdists and wheels in
+`dist/py`; the Release workflow publishes them.
 
 ### CI and publishing
 
 - **Changie** requires a new PR fragment, validates fragments with Changie's batch
   dry-run, checks versions, and verifies that `changie merge` produces no drift.
 - **Check** runs generation, compatibility, formatting, Clippy, Cornucopia, and integration checks.
-- **Build** builds and smoke-tests Linux x86-64 and macOS ARM64 binaries with the
-  embedded UI, uploads archives/checksums and npm tarballs, and builds/tests the
-  Linux amd64 Docker image without pushing it.
+- **Build** packs the npm and Python SDK packages and builds and smoke-tests the
+  Linux amd64 Docker image (`tilde:ci`) without pushing it.
 - **Create Release PR** is manually dispatched on the default branch. Select a
   patch/minor/major/auto bump or give an explicit version; it updates `codex/release` with versions, lockfiles,
   release notes, and a blank acknowledgement so the PR passes the fragment rule.
-- **Release** runs when that PR's `VERSION` change lands on the default branch, and
-  can be dispatched there to rerun a release. It reruns Changie, Check, and Build,
-  creates the `v<version>` tag and a draft release with artifacts, publishes every
-  public `@trytilde/*` SDK package to npm and the open-source image
-  `ghcr.io/trytilde/tilde` as `<version>`, `<major>.<minor>` and `latest`, then makes
-  the GitHub release public. Rust crates remain internal build dependencies; the Rust
-  distribution is the binary/container, not crates.io packages. The proprietary
-  `ghcr.io/trytilde/tilde-cloud` image is released from `trytilde/tilde-cloud`.
+- **Release** runs when that PR's `VERSION` change lands on the default branch (or on
+  manual dispatch there). It reruns Changie, Check, and Build against the commit, then
+  publishes the container to `ghcr.io/trytilde/tilde` as `<version>`, `<major>.<minor>` and
+  `latest`, the public `@trytilde/*` packages to npm and the Python SDK packages to PyPI, and
+  finally creates the `v<version>` tag and GitHub release with the packages attached. Rust
+  crates remain internal build dependencies; the Rust distribution is the container, not
+  crates.io packages. The proprietary Tilde Cloud image is released from `trytilde/tilde-cloud`.
 
 Configure `GIT_BOT_TOKEN` with repository contents and pull-request write access
 for release PR creation; a bot token allows the PR to trigger CI. Configure
 `NPM_TOKEN` with publish access to the `@trytilde` scope (including any new packages)
-and the npm permissions needed for unattended publishing. GHCR and GitHub Releases
-use the repository's `GITHUB_TOKEN`; allow Actions to write packages and releases.
+and the npm permissions needed for unattended publishing. PyPI uses trusted publishing:
+register this repository's `release.yml` as a trusted publisher on each PyPI project. GHCR
+and GitHub Releases use the repository's `GITHUB_TOKEN`; allow Actions to write packages
+and releases.
 Require the Changie, Check, and Build checks before merging release PRs.
 
 Publishing currently accepts stable semantic versions only. All public SDK packages
-release together and pnpm skips versions already published. Releases start at 3.0.0,
+release together; versions already on npm, PyPI or GHCR are skipped, so a partially
+failed release is completed by rerunning it for the **same commit**. Releases start at 3.0.0,
 above the `@trytilde/sdk` (0.3.0) and `@trytilde/sdk-vercel-ai-node` (2.0.0) versions
-published from `trytilde/dispatch`, so no release version can collide with them. If publishing partially
-fails, rerun the failed jobs for the **same workflow run/commit**; the GitHub release
-stays a draft until both registries succeed. A tag pointing at another commit is
-rejected, and a completed release cannot be republished through this workflow.
-Registry publication is not atomic: one registry can succeed while another fails.
+published from `trytilde/dispatch`, so no release version can collide with them. The tag and
+GitHub release are created only after the image and every package are published. A tag
+pointing at another commit is rejected. Registry publication is not atomic: one registry can
+succeed while another fails.
 
 For PRs without release notes (including a release preparation PR), add a new
 `.changes/unreleased/Changed-YYYYMMDD-HHMMSS.yaml` acknowledgement with:
@@ -127,7 +127,7 @@ planner. New languages need manifest replacements and version checks added here.
 ## Development
 
 Requires the pinned Rust toolchain, Node 22.12+ (Node 24 recommended), pnpm and
-Postgres 16+. Docker runs local development Postgres, Dex, and the disposable test harness.
+Postgres 16+. Docker runs local development Postgres and the disposable test harness.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -151,88 +151,22 @@ The development seed is public and suitable only for disposable local data. For
 persistent data, generate a seed with `tilde generate-key` or `openssl rand -base64 32`
 and retain it in ignored `.env.local`. Never replace the seed for an existing database.
 
-Keep `secrets.enc.yaml` locally (it is ignored and absent from Git history). It is
-the original Tilde SOPS document, encrypted with the existing
-AWS KMS key; `.sops.yaml` defines that recipient for future edits. Its top-level
-credentials feed development, and its `test` map overrides them for tests. The
-loader extracts chat-provider credentials and the dev ngrok token, so legacy database/infrastructure
-settings do not override this runtime's defaults. Decrypted files stay ignored.
+Put private keys (for example `OPENAI_API_KEY` for the example agents or
+`NGROK_AUTHTOKEN`) in ignored `.env.local`, and test-only overrides in ignored
+`.env.test.local`. Exported variables take precedence, followed by `.env.local`, then `.env`
+for development. Test tasks instead use `.env.test.local`, then `.env.test`; the disposable
+Postgres wrapper supplies the actual test database URL. Task parses dotenv values as data;
+do not shell-source them, as they may contain multiline PEM keys.
 
 ```sh
-# Authenticate to the KMS-owning AWS account first (the original profile is shown).
-aws sso login --profile daniel_soma_shared_admin
-AWS_PROFILE=daniel_soma_shared_admin task secrets:load
-AWS_PROFILE=daniel_soma_shared_admin task secrets:edit # edit and refresh both dotenv files
-
 task dev
 task test:chat       # all six adapters, local HTTP fixtures and disposable Postgres
-task test:chat:accounts # read-only checks of configured live provider accounts
-task test:chat:live -- github # real two-way messages; optional provider name filter
 ```
-
-Requires SOPS and Python 3 for secret loading; ordinary fixture tests require no
-AWS access or provider secrets. Exported variables take precedence, followed by
-`.env.local`, `.env.secrets`, then `.env` for development. Test tasks instead use
-`.env.test.local`, `.env.secrets.test`, then `.env.test`; the disposable Postgres
-wrapper supplies the actual test database URL. Task parses dotenv values as data;
-do not shell-source the generated files, which may contain multiline PEM keys.
 
 The fixture suite checks Slack, GitHub, AgentMail, Linq, Meta WhatsApp and Telnyx
 WhatsApp through encrypted connections, agent tools, upstream HTTP, signed inbound
 webhooks and the stored conversation audit. It covers duplicate callbacks, rejected
-signatures and upstream send failures. Live tests are ignored by ordinary `cargo test`
-and fail on missing credentials rather than silently skipping.
-
-Both live targets require Cargo feature `live-chat-tests`; they also remain ignored
-so `cargo test --all-features` cannot send messages accidentally. Task supplies the
-feature and `--ignored`. `test:chat:accounts` retains the read-only account checks.
-`test:chat:live` runs one two-way test per adapter, sequentially, and accepts a test
-name filter after `--` (for example `slack`, `github`, or `agentmail`).
-
-Two-way tests call `ListTools` and `InvokeTool` over the real local ConnectRPC API,
-resolve encrypted credentials, send through the production provider adapter, check
-the accepted tool result and durable tool audit, and receive a real peer response.
-Following the original tilde-api tests, Hookdeck captures provider callbacks; the
-suite fetches the original raw body and headers and replays them into the local
-webhook endpoint **without re-signing or fabricating events**. The callback must
-pass provider signature/account checks, appear in the outbound conversation, and
-remain a single message after duplicate replay. This tests the application ingress;
-it does not test a public tunnel or production deployment's network routing.
-
-Slack reads back the outbound message with the bot token and replies with the test
-user token, explicitly mentioning the app. The peer must be human-authored because
-the adapter ignores bot events. If Slack marks the token's messages as bot-authored,
-use `CHAT_LIVE_SLACK_MANUAL_REPLY=true task test:chat:live -- slack` and reply in the
-new test thread with the printed marker while mentioning the app. GitHub reads back the App's comment and replies with the test PAT.
-AgentMail creates a temporary peer inbox and a webhook limited to the test inbox,
-then verifies delivery and sends a real email reply. Cleanup deletes Slack test
-messages and temporary AgentMail inbox/webhook resources, and closes the GitHub
-fixture issue, even when assertions fail. Phone messages and the primary email
-inbox's test conversation remain as test artifacts.
-
-Linq, Meta WhatsApp and Telnyx WhatsApp need a test recipient to reply with the
-unique marker printed by the test within 180 seconds. For WhatsApp, that recipient
-must message the business line before the run to open the messaging window. These
-are assisted live tests, not simulated peer responses. Missing prerequisites fail
-before sending; never point these tests at production recipients.
-
-Set missing values in ignored `.env.test.local`:
-
-| Provider | Additional two-way prerequisites |
-| --- | --- |
-| All | `HOOKDECK_API_KEY`, `CHAT_LIVE_<PROVIDER>_SOURCE_ID` with real provider webhook delivery enabled |
-| Slack | `E2E_CHATKIT_SLACK_USER_TOKEN` with `chat:write`; existing bot token needs channel history/read and write scopes |
-| GitHub | `E2E_CHATKIT_GITHUB_PAT` with issue/comment access to the test repo; existing GitHub App credentials and webhook secret |
-| AgentMail | `CHAT_LIVE_AGENTMAIL_SOURCE_URL` for the dedicated Hookdeck source; API key must create/delete temporary inboxes and webhooks |
-| Linq | Valid `E2E_MCP_LINQ_API_TOKEN`, `CHAT_LIVE_LINQ_PHONE_NUMBER`, `E2E_LINQ_WEBHOOK_SIGNING_SECRET`, and an available peer in `E2E_MCP_LINQ_CHAT_ID` |
-| Meta WhatsApp | `CHAT_LIVE_WHATSAPP_RECIPIENT`, Meta webhook subscription to its source, existing Meta credentials |
-| Telnyx WhatsApp | `CHAT_LIVE_TELNYX_RECIPIENT`, Telnyx webhook subscription to its source, existing Telnyx credentials/public key |
-
-The original Slack, GitHub, Linq and development WhatsApp source IDs are in
-`.env.test`, alongside a dedicated AgentMail capture source. Capture sources are
-retained for repeatable runs; the AgentMail provider subscription is temporary. Native API tools
-continue to run in `task test:chat`; the live suite also exercises the ConnectRPC
-boundary on every provider send.
+signatures and upstream send failures, and needs no provider credentials.
 
 Alternatively, use exported variables:
 
@@ -348,8 +282,8 @@ sidecar, register a **Sidecar** deployment in its **Deployment** tab and configu
 failure policy. Use the same deployment token for every replica of that release.
 
 Register a sidecar deployment in the **Deployments** tab (or from CI with
-`RegisterDeployment`) and use its token for every replica. The release archive and
-container include `tilde` and `tilde-sidecar`. Run the sidecar next to your SDK-hosted
+`RegisterDeployment`) and use its token for every replica. The container image
+(`ghcr.io/trytilde/tilde`) includes `tilde` and `tilde-sidecar`. Run the sidecar next to your SDK-hosted
 agent process:
 
 ```bash
@@ -423,7 +357,7 @@ route group. `ENGINE_SERVE` / `--serve` selects the groups a process mounts:
 
 | Group | Routes | Authentication |
 | --- | --- | --- |
-| `management` | Management RPCs, OIDC, connection setup, embedded UI | User bearer session from OIDC |
+| `management` | Management RPCs, connection setup, embedded UI | None: put your own authenticating proxy in front |
 | `runtime` | Agent runtime RPCs, invocation controls, OTLP uploads | Signed invocation connect token |
 | `ingress` | Provider webhooks and native conversation ingress | Provider signatures or scoped ingress tokens |
 | `sidecar` | The sidecar protocol | Agent deployment tokens |
@@ -432,95 +366,25 @@ The default is `all`. Operators who want network isolation run separate processe
 different `ENGINE_SERVE` values rather than separate ports. Binding outside loopback
 requires `--allow-network`.
 
+The management API and web UI have no login, users or API keys: anyone who reaches the
+`management` group administers the installation. Never expose it directly; serve it behind
+your own authenticating proxy (for example an identity-aware proxy, VPN or Tailscale), or
+run a process without the group (`ENGINE_SERVE=ingress,runtime,sidecar`) on the public
+network. Agent runtimes never receive management access.
+
 The agent's Capabilities tab also controls how new messages are scheduled:
 **Queue** finishes the active response then processes each message separately;
 **Interrupt** cancels it and starts fresh work; **Queue and batch** combines pending
 messages into the next response. The API owns this policy per agent/thread. Agent
 handlers respond to one invocation and honor its cancellation signal.
 
-Signing in through the configured OIDC provider admits a user; what they can then
-reach is decided by roles. A role is a set of actions on an agent, and every agent is
-created with three that cannot be edited:
-
-- **Reader** can view: find the agent in lists and read everything about it, including
-  its settings, deployments, channel access, sessions, traces and logs.
-- **Editor** can view, edit and share: change name, avatar, capabilities, attached chat
-  and inference connections, identity access and budgets, pause and delete, and give
-  others reader or editor.
-- **Deployer** can view, deploy and share: register, promote and retire deployments,
-  issue deployment and ingress tokens, and give others reader or deployer.
-
-A person, group or API key may hold several roles on an agent; their actions add up.
-Roles are given from the agent's share dialog (the people icon next to its name), which
-describes each role, and to an API key when the key is created. Sharing stays within the
-grantor's reach: a role can be given only by someone who can share the agent and holds
-every action the role gives, so administrators are the only ones who hand out the
-installation-wide **Reader**, **Editor** and **Deployer of all agents** roles, which cover
-agents created later too. "Anyone can view" in the share dialog gives the all-users group
-the reader role. Without a role an agent is not found: it is absent from lists and cannot
-be attached to anything. Connections and identities carry no roles of their own; any
-signed-in user reaches them, and attaching a connection to an agent needs editor on the
-agent.
-
-Any signed-in user may create agents and is editor and deployer of what they create.
-Groups are the roles' audiences: `tilde_system:admin` holds every action on everything and
-manages users, groups and keys; `tilde_system:user` is every signed-in user, so giving it a
-role shares an agent with everyone; `external:` groups mirror the identity provider's group
-claim at each login; `local:` groups are managed under **IAM › Groups** and never touched
-by login. The first user to sign in to a new installation becomes an administrator. Users
-that existed before this model was introduced remain administrators.
-
-API keys are for automation. A user creates one from **IAM › API keys** in the sidebar
-and gives it reader or editor on selected agents within their own reach, and optionally
-the deployer role for managing their deployments; administrators may give all agents. A key joins no groups, is never an
-administrator, never manages access, users, groups or keys, and creates agents or
-only when it is editor of all agents. Copy a new key before leaving the page; the secret
-is only shown once. Use it as an `Authorization: Bearer` credential
-for management RPCs. Revocation applies locally immediately and across processes within
-30 seconds. Agent runtimes never receive user tokens.
-
-Group membership is read from the database on every request, so local changes apply
-to live sessions at once. Provider group changes apply at the user's next login,
-at most one eight-hour session later; an administrator can end a user's sessions
-sooner with `IamService.RevokeUserSessions`.
-
-| Variable | Purpose |
-| --- | --- |
-| `ENGINE_OIDC_GROUPS_CLAIM` | ID token claim listing provider groups. Default `groups`. |
-| `ENGINE_OIDC_SCOPES` | Scopes requested at login. Default `openid profile email`; many providers need `groups` added. |
-| `ENGINE_OIDC_ADMIN_GROUPS` | Comma-separated provider groups whose members are administrators. When set, administrator membership follows the provider at every login. |
-| `ENGINE_OIDC_ADMIN_SUBJECTS` | Comma-separated subjects that are always administrators. |
-
-Configure `ENGINE_OIDC_ISSUER`, `ENGINE_OIDC_CLIENT_ID` and
-`ENGINE_OIDC_CLIENT_SECRET`. Register `<ENGINE_PUBLIC_URL>/auth/callback` at the
-provider. The public URL is the browser-facing origin, including Vite's port in
-development. Production requires HTTPS; `ENGINE_OIDC_ALLOW_HTTP=true` is for local
-development. The initial OIDC implementation validates RS256 ID tokens.
-
 `ENGINE_PUBLIC_URL` is also the default origin for provider webhooks and agent
 callbacks. Set `ENGINE_INGRESS_PUBLIC_URL` when providers reach the engine through a
 different origin, and `ENGINE_RUNTIME_PUBLIC_URL` when agent hosts do; the latter is
 the callback URL delivered on invocation.
 
-The browser stores its eight-hour user token in local storage and sends it through
-`Authorization: Bearer`; no authentication cookies are issued or accepted. Logout
-revokes the session. OIDC login/exchange endpoints are on the management API only.
 Provider OAuth callbacks and connection-brokering methods retain their own narrow
 protocol credentials on the management API.
-
-### Local Dex login
-
-`pnpm dev` starts Dex from the Compose `dev` profile when the explicit OIDC issuer
-matches the local Dex address. `.env.example` supplies that local configuration. Docker is required for this development
-login provider. Sign in with **`dev@tilde.local` / `password`**. Its client secret
-is the development-only `tilde-local-dev-secret`. The configuration is in
-`dev/dex/dex.yaml`; it uses in-memory storage and defaults to loopback port 5556.
-A production Compose engine should use an externally reachable identity provider.
-
-Set the two `DEX_DEV_*_CALLBACK` values to match your management and Vite URLs.
-Localhost redirects for the default ports are also retained.
-To start only Dex manually: `POSTGRES_PASSWORD=unused-local-dev docker compose
---profile dev up -d dex`. Stop it with the same Compose profile and `stop dex`.
 
 ### Agent capabilities
 
@@ -557,7 +421,7 @@ capture a more privileged agent's credentials.
 
 The SDK exposes invocation-authenticated `ctx.agents` registry methods and
 `ctx.invokeAgent({agentId, objective})` for agents already participating in the
-current thread. Management clients accept an OIDC-derived `accessToken` option.
+current thread.
 
 ### Optional management routes and React serving
 
@@ -568,17 +432,17 @@ ENGINE_SERVE=all
 ENGINE_WEB_ENABLED=true
 ```
 
-`ENGINE_SERVE=ingress,runtime,sidecar` removes management, OIDC and
-connection-brokering routes and makes OIDC configuration optional. Agent-facing routes
+`ENGINE_SERVE=ingress,runtime,sidecar` removes management and
+connection-brokering routes. Agent-facing routes
 and background workers continue running. The dev launcher exposes this switch as
 `ENGINE_MANAGEMENT_ENABLED=false`.
 
 `ENGINE_WEB_ENABLED=false` disables embedded React assets in packaged builds
 and prevents Vite from starting under `task dev`. It does not disable management
-RPCs or OIDC endpoints. Development starts Dex only when management is enabled.
+RPCs.
 
 In packaged builds the embedded UI is served by the same listener as the API. A
-separately served UI needs its API/auth paths proxied to an enabled management group;
+separately served UI needs its API paths proxied to an enabled management group;
 dev Vite supports `ENGINE_DEV_URL` for that upstream. When web is disabled, the dev
 public URL defaults to the API port rather than Vite's port.
 
@@ -592,8 +456,7 @@ token on every start and the process dials in with it, so no example listens on 
 `DEV_AGENTS` (comma-separated keys from `.env.example`) limits which ones start. Existing
 names and grants are preserved across restarts. Combine with `TS_ADDR` as usual.
 
-Run `task secrets:load` to load `openai_api_key` into private dev credentials. If
-`OPENAI_API_KEY` is missing, the launcher reads it from SOPS directly. No key is
+Set `OPENAI_API_KEY` in `.env.local`. No key is
 printed or passed in command arguments. `OPENAI_MODEL` defaults to `gpt-4o-mini`.
 The registration command exists only in debug builds. See the small implementation
 in `sdk/ts/examples/vercel-ai-example-agent/src`; the workspaces are built and synced before dev startup.
@@ -608,12 +471,12 @@ NGROK_DOMAIN=your-domain.ngrok-free.app
 NGROK_AUTHTOKEN=your-token
 ```
 
-`task secrets:load` also loads `ngrok_authtoken` from SOPS into the private dev
-dotenv file. Run `task dev`; ngrok forwards to the engine port at `ADDRESS:API_PORT`.
+Run `task dev`; ngrok forwards to the engine port at `ADDRESS:API_PORT`.
 The launcher sets `ENGINE_INGRESS_PUBLIC_URL=https://NGROK_DOMAIN`, overriding any
 configured ingress public URL while ngrok is enabled. This also updates the webhook
-URLs displayed and copied in connection setup iframes. Management and runtime routes on
-the tunnelled port still require their own credentials.
+URLs displayed and copied in connection setup iframes. The tunnel forwards the whole
+port, including the unauthenticated management routes: set `ENGINE_MANAGEMENT_ENABLED=false`
+or restrict the tunnel when the domain is reachable by others.
 
 All connection webhook URLs and provider manifests use the ingress public origin.
 Existing provider webhook registrations must be updated to the new URL shown on
@@ -633,16 +496,16 @@ use the matching ingress public URL and port.
 TS_ADDR=100.102.116.12 task dev
 ```
 
-Task loads `.env.local`, `.env.secrets`, and `.env`. The small dev launcher applies
+Task loads `.env.local` and `.env`. The small dev launcher applies
 `TS_ADDR` to local management and ingress binds, Vite/HMR, browser origins, setup
-URLs, local Dex callbacks and local MinIO URLs, and enables network binding.
+URLs and local MinIO URLs, and enables network binding.
 Custom external URLs and the agent runtime/database settings remain unchanged.
 Ngrok still overrides only the ingress public URL.
 
 Without `TS_ADDR`, dotenv values pass through directly. `.env.example` lists the
 local defaults. When changing ports, update their matching listen addresses and
 URLs together. When web is disabled, point `ENGINE_PUBLIC_URL` at the
-management API. The local Dex account remains `dev@tilde.local` / `password`.
+management API.
 
 `task dev` starts the project's persistent Compose Postgres and waits for it to
 be healthy when `DATABASE_URL` uses the default local engine database

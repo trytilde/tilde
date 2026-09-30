@@ -1,4 +1,3 @@
-// ViewModeToggle adapted from Langfuse's MIT component; see ATTRIBUTION.md.
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";

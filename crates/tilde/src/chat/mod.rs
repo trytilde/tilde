@@ -78,8 +78,12 @@ pub struct Chat {
     pub(crate) work_notifications: Arc<crate::database::notifications::Notifications>,
     pub(crate) control_notifications: Arc<crate::database::notifications::Notifications>,
     pub(crate) channels: Option<providers::Channels>,
+    /// One instance per process: its tool hosts share a notification listener.
+    pub tools: Option<crate::tools::Tools>,
     pub(crate) deployments: Option<crate::deployment::Deployments>,
     pub(crate) inference: Option<crate::inference::Gateway>,
+    /// Configured with object storage and GitHub; runtime and management skill routes use it.
+    pub(crate) skills: Option<crate::skills::Skills>,
     pub warm: Arc<warm::Warm>,
     pub tokens: crate::iam::tokens::Tokens,
     pub(crate) store: RuntimeStore,
@@ -152,6 +156,17 @@ impl Chat {
         self.inference = Some(inference);
         self
     }
+    pub fn with_skills(mut self, skills: Option<crate::skills::Skills>) -> Self {
+        self.skills = skills;
+        self
+    }
+    /// The configured skills service, or one without object storage or GitHub for tests.
+    pub(crate) fn skills(&self) -> Result<crate::skills::Skills> {
+        Ok(match &self.skills {
+            Some(skills) => skills.clone(),
+            None => crate::skills::Skills::new(self.pg()?.clone()),
+        })
+    }
     pub fn with_objects(mut self, objects: Option<crate::agent::avatar::AvatarStore>) -> Self {
         self.objects = objects;
         self
@@ -164,8 +179,10 @@ impl Chat {
             control_notifications: Arc::default(),
             objects: None,
             channels: None,
+            tools: None,
             deployments: None,
             inference: Some(runtime.inference()),
+            skills: None,
             warm: Arc::default(),
             tokens: crate::iam::tokens::Tokens::sidecar(runtime.clone()),
             encryption: Arc::new(
@@ -209,6 +226,7 @@ impl Chat {
         mut self,
         connections: crate::connections::service::Connections,
     ) -> Self {
+        self.tools = Some(crate::tools::Tools::new(connections.clone()));
         self.channels = Some(providers::Channels::new(connections, self.warm.clone()));
         self
     }
@@ -221,8 +239,10 @@ impl Chat {
             control_notifications: Arc::default(),
             objects: None,
             channels: None,
+            tools: None,
             deployments: None,
             inference: None,
+            skills: None,
             warm: Arc::default(),
             tokens: crate::iam::tokens::Tokens::new(pool.clone(), encryption.clone()),
             store: RuntimeStore::Postgres(pool),
@@ -479,8 +499,8 @@ impl Chat {
             "complete",
             None::<Uuid>,
             reply,
-            &(crate::telemetry::context::capture().0),
-            &(crate::telemetry::context::capture().1),
+            &(crate::telemetry::tracing::context::capture().0),
+            &(crate::telemetry::tracing::context::capture().1),
         )
         .await?;
         self.targets(&tx, thread, message, &r.addressed_participant_ids)

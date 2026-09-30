@@ -1,15 +1,21 @@
 // This file was generated with `cornucopia`. Do not modify.
 
 #[derive(Debug)]
-pub struct RunParams<T1: crate::StringSql, T2: crate::ArraySql<Item = T1>, T3: crate::StringSql> {
-    pub is_admin: bool,
-    pub caller_user: Option<uuid::Uuid>,
-    pub caller_key: Option<uuid::Uuid>,
-    pub caller_groups: T2,
+pub struct RunParams<
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
+> {
     pub p1: Option<chrono::DateTime<chrono::Utc>>,
     pub p2: Option<uuid::Uuid>,
     pub p4: Option<uuid::Uuid>,
-    pub p5: Option<T3>,
+    pub p5: Option<T1>,
+    pub p6: Option<T2>,
+    pub p7: Option<T3>,
+    pub p8: Option<T4>,
+    pub p9: Option<T5>,
     pub p3: i64,
 }
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +32,7 @@ pub struct Record {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub channel_capable: bool,
     pub inference_capable: bool,
+    pub tool_capable: bool,
     pub associated_agents: serde_json::Value,
 }
 pub struct RecordBorrowed<'a> {
@@ -41,6 +48,7 @@ pub struct RecordBorrowed<'a> {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub channel_capable: bool,
     pub inference_capable: bool,
+    pub tool_capable: bool,
     pub associated_agents: postgres_types::Json<&'a serde_json::value::RawValue>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
@@ -58,6 +66,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             updated_at,
             channel_capable,
             inference_capable,
+            tool_capable,
             associated_agents,
         }: RecordBorrowed<'a>,
     ) -> Self {
@@ -74,6 +83,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             updated_at,
             channel_capable,
             inference_capable,
+            tool_capable,
             associated_agents: serde_json::from_str(associated_agents.0.get()).unwrap(),
         }
     }
@@ -147,7 +157,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT c.id,c.name,c.provider_id,c.type_id,c.status,c.account_label,c.token_expires_at,c.credential_version,c.created_at,c.updated_at,t.channel_capable,t.inference_capable, COALESCE((SELECT jsonb_agg(jsonb_build_object('capability',ca.capability,'id',a.id,'name',a.name,'alias',ca.alias) ORDER BY ca.capability,a.id) FROM connection_agents ca JOIN agents a ON a.id=ca.agent_id WHERE ca.connection_id=c.id AND iam_held('agent',a.id,ARRAY['view']::TEXT[],$1,$2,$3,$4::TEXT[])),'[]'::jsonb) AS associated_agents FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) WHERE ($5::TIMESTAMPTZ IS NULL OR (c.created_at,c.id)<($5,$6)) AND ($7::UUID IS NULL OR EXISTS(SELECT 1 FROM connection_agents ca WHERE ca.connection_id=c.id AND ca.agent_id=$7 AND ($8::TEXT IS NULL OR ca.capability=$8))) AND ($7::UUID IS NOT NULL OR $8::TEXT IS NULL OR ($8='channel' AND t.channel_capable AND NOT EXISTS(SELECT 1 FROM connection_agents ca WHERE ca.connection_id=c.id AND ca.capability='channel')) OR ($8='inference' AND t.inference_capable)) ORDER BY c.created_at DESC,c.id DESC LIMIT $9",
+        "SELECT c.id,c.name,c.provider_id,c.type_id,c.status,c.account_label,c.token_expires_at,c.credential_version,c.created_at,c.updated_at,t.channel_capable,t.inference_capable,t.tool_capable, COALESCE((SELECT jsonb_agg(jsonb_build_object('capability',ca.capability,'id',a.id,'name',a.name,'alias',ca.alias) ORDER BY ca.capability,a.id) FROM connection_agents ca JOIN agents a ON a.id=ca.agent_id WHERE ca.connection_id=c.id),'[]'::jsonb) AS associated_agents FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) WHERE ($1::TIMESTAMPTZ IS NULL OR (c.created_at,c.id)<($1,$2)) AND ($3::UUID IS NULL OR EXISTS(SELECT 1 FROM connection_agents ca WHERE ca.connection_id=c.id AND ca.agent_id=$3 AND ($4::TEXT IS NULL OR ca.capability=$4))) AND ($3::UUID IS NOT NULL OR $4::TEXT IS NULL OR ($4='channel' AND t.channel_capable AND NOT EXISTS(SELECT 1 FROM connection_agents ca WHERE ca.connection_id=c.id AND ca.capability='channel')) OR ($4='inference' AND t.inference_capable) OR $4='skills' OR ($4='tool' AND t.tool_capable)) AND ($5::TEXT IS NULL OR c.name ILIKE '%'||$5||'%' OR c.account_label ILIKE '%'||$5||'%' OR EXISTS(SELECT 1 FROM connection_providers p WHERE p.provider_id=c.provider_id AND p.name ILIKE '%'||$5||'%')) AND ($6::TEXT IS NULL OR c.provider_id=$6) AND ($7::TEXT IS NULL OR c.status=$7) AND ($8::TEXT IS NULL OR provider_source(c.provider_id)=$8) ORDER BY c.created_at DESC,c.id DESC LIMIT $9",
         None,
     )
 }
@@ -165,34 +175,26 @@ impl RunStmt {
         's,
         C: GenericClient,
         T1: crate::StringSql,
-        T2: crate::ArraySql<Item = T1>,
+        T2: crate::StringSql,
         T3: crate::StringSql,
+        T4: crate::StringSql,
+        T5: crate::StringSql,
     >(
         &'s self,
         client: &'c C,
-        is_admin: &'a bool,
-        caller_user: &'a Option<uuid::Uuid>,
-        caller_key: &'a Option<uuid::Uuid>,
-        caller_groups: &'a T2,
         p1: &'a Option<chrono::DateTime<chrono::Utc>>,
         p2: &'a Option<uuid::Uuid>,
         p4: &'a Option<uuid::Uuid>,
-        p5: &'a Option<T3>,
+        p5: &'a Option<T1>,
+        p6: &'a Option<T2>,
+        p7: &'a Option<T3>,
+        p8: &'a Option<T4>,
+        p9: &'a Option<T5>,
         p3: &'a i64,
     ) -> RecordQuery<'c, 'a, 's, C, Record, 9> {
         RecordQuery {
             client,
-            params: [
-                is_admin,
-                caller_user,
-                caller_key,
-                caller_groups,
-                p1,
-                p2,
-                p4,
-                p5,
-                p3,
-            ],
+            params: [p1, p2, p4, p5, p6, p7, p8, p9, p3],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -210,7 +212,8 @@ impl RunStmt {
                         updated_at: row.try_get(9)?,
                         channel_capable: row.try_get(10)?,
                         inference_capable: row.try_get(11)?,
-                        associated_agents: row.try_get(12)?,
+                        tool_capable: row.try_get(12)?,
+                        associated_agents: row.try_get(13)?,
                     })
                 },
             mapper: |it| Record::from(it),
@@ -223,14 +226,16 @@ impl<
     's,
     C: GenericClient,
     T1: crate::StringSql,
-    T2: crate::ArraySql<Item = T1>,
+    T2: crate::StringSql,
     T3: crate::StringSql,
+    T4: crate::StringSql,
+    T5: crate::StringSql,
 >
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2, T3>,
+        RunParams<T1, T2, T3, T4, T5>,
         RecordQuery<'c, 'a, 's, C, Record, 9>,
         C,
     > for RunStmt
@@ -238,19 +243,11 @@ impl<
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2, T3>,
+        params: &'a RunParams<T1, T2, T3, T4, T5>,
     ) -> RecordQuery<'c, 'a, 's, C, Record, 9> {
         self.bind(
-            client,
-            &params.is_admin,
-            &params.caller_user,
-            &params.caller_key,
-            &params.caller_groups,
-            &params.p1,
-            &params.p2,
-            &params.p4,
-            &params.p5,
-            &params.p3,
+            client, &params.p1, &params.p2, &params.p4, &params.p5, &params.p6, &params.p7,
+            &params.p8, &params.p9, &params.p3,
         )
     }
 }

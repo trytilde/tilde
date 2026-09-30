@@ -22,7 +22,7 @@ use std::{
 use tilde::{
     encryption::{Encryption, SealedSecret, SecretBinding},
     iam::tokens::Tokens,
-    telemetry::{Destination, Runtime},
+    telemetry::tracing::{Destination, Runtime},
 };
 use uuid::Uuid;
 
@@ -159,6 +159,23 @@ fn destination(url: &str) -> Option<Destination> {
     )
     .unwrap()
 }
+/// Traces are queued in a bucket for the span store and forwarded to the collector.
+async fn delivery(db: &Database, remote: &str) -> tilde::telemetry::tracing::Delivery {
+    let storage = common::Storage::load();
+    let (config, _) = common::clickhouse(&storage).await;
+    tilde::telemetry::tracing::Delivery::start(
+        db.pool.clone(),
+        tilde::telemetry::tracing::Sinks {
+            objects: common::bucket(&storage),
+            media: Some(common::bucket(&storage)),
+            store: tilde::telemetry::tracing::store::Store(
+                tilde::telemetry::clickhouse::Store::from_config(&config).unwrap(),
+            ),
+            external: destination(remote),
+        },
+    )
+    .unwrap()
+}
 async fn wait_count(collector: &Collector, count: usize) {
     tokio::time::timeout(Duration::from_secs(15), async {
         while collector.received.load(Ordering::SeqCst) < count {
@@ -183,7 +200,11 @@ async fn durable_trace_relay_retries_collector_outages() {
     let token = tokens.issue(id(1), id(5), id(2), id(4)).await.unwrap();
     let (collector, remote, remote_task) = collector().await;
     collector.available.store(false, Ordering::SeqCst);
-    let runtime = Runtime::start(db.pool.clone(), tokens.clone(), destination(&remote));
+    let runtime = Runtime::start(
+        db.pool.clone(),
+        tokens.clone(),
+        delivery(&db, &remote).await,
+    );
     let (url, server) = serve(tilde::iam::listeners::agent_runtime_router(
         tilde::agent::Agents::new(db.pool.clone(), crypto.clone()),
         tilde::chat::Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into()),
@@ -265,14 +286,6 @@ async fn durable_trace_relay_retries_collector_outages() {
             for (key, value) in [
                 ("tilde.client_sdk.version", "1.2.3-client"),
                 ("tilde.gateway.version", env!("CARGO_PKG_VERSION")),
-                (
-                    "langfuse.trace.metadata.tilde_client_sdk_version",
-                    "1.2.3-client",
-                ),
-                (
-                    "langfuse.observation.metadata.tilde_gateway_version",
-                    env!("CARGO_PKG_VERSION"),
-                ),
             ] {
                 assert!(
                     span.attributes.iter().any(|a| a.key == key
@@ -293,7 +306,7 @@ async fn durable_trace_relay_retries_collector_outages() {
         assert!(attrs.iter().any(|a| a.key == "tilde.invocation.id"
             && a.value.as_ref().unwrap().value == Some(Value::StringValue(id(5).to_string()))));
     }
-    let parent = tilde::telemetry::context::restore(
+    let parent = tilde::telemetry::tracing::context::restore(
         "00-01010101010101010101010101010101-0202020202020202-01",
         "",
     );
@@ -420,10 +433,7 @@ async fn durable_trace_relay_retries_collector_outages() {
             .get()
             .await
             .unwrap()
-            .query_one(
-                "SELECT count(*) FROM telemetry_delivery WHERE payload IS NOT NULL",
-                &[]
-            )
+            .query_one("SELECT count(*) FROM telemetry_objects", &[])
             .await
             .unwrap()
             .get::<_, i64>(0),
@@ -459,7 +469,11 @@ async fn request_context_survives_durable_invocation_dispatch() {
     common::dialled_in(&db.pool, crypto.clone(), id(1)).await;
     let chat = tilde::chat::Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1:1".into());
     let (collector, remote, remote_server) = collector().await;
-    let runtime = Runtime::start(db.pool.clone(), chat.tokens.clone(), destination(&remote));
+    let runtime = Runtime::start(
+        db.pool.clone(),
+        chat.tokens.clone(),
+        delivery(&db, &remote).await,
+    );
     opentelemetry::global::set_tracer_provider(runtime.provider.clone());
     async fn trigger(State(chat): State<tilde::chat::Chat>) -> String {
         chat.post(tilde::chat::PostMessage {
@@ -478,7 +492,7 @@ async fn request_context_survives_durable_invocation_dispatch() {
             .route("/trigger", post(trigger))
             .with_state(chat.clone())
             .layer(axum::middleware::from_fn(
-                tilde::telemetry::context::request,
+                tilde::telemetry::tracing::context::request,
             )),
     )
     .await;
@@ -553,14 +567,8 @@ async fn request_context_survives_durable_invocation_dispatch() {
 
 /// Exercise the production listener composition, including telemetry's independent late-flush auth.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials() {
-    use sha2::{Digest, Sha256};
-    use tilde::{
-        agent::Agents,
-        chat::Chat,
-        connections::service::Connections,
-        iam::{listeners, oidc::Oidc},
-    };
+async fn agent_trace_capture_is_runtime_only_and_rejects_other_credentials() {
+    use tilde::{agent::Agents, chat::Chat, connections::service::Connections, iam::listeners};
 
     let db = Database::new().await;
     db.pool
@@ -581,60 +589,27 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
         "https://ingress.example".into(),
     )
     .unwrap();
-    let oidc = Oidc::new(
-        db.pool.clone(),
-        crypto.clone(),
-        "http://127.0.0.1:5556".into(),
-        "trace-boundary".into(),
-        SecretString::from("fixture-oidc-secret"),
-        "http://127.0.0.1".into(),
-        true,
-    )
-    .unwrap();
-    let management_token = SecretString::from("fixture-management-session-for-trace-boundary");
-    db.pool
-        .get()
-        .await
-        .unwrap()
-        .execute(
-            "INSERT INTO iam_users(id,issuer,subject) VALUES($1,$2,$3)",
-            &[&(id(10)), &("http://127.0.0.1:5556"), &("trace-operator")],
-        )
-        .await
-        .unwrap();
-    db.pool
-        .get()
-        .await
-        .unwrap()
-        .execute(
-            "INSERT INTO iam_group_members(group_id,user_id) VALUES('tilde_system:admin',$1)",
-            &[&(id(10))],
-        )
-        .await
-        .unwrap();
-    db.pool.get().await.unwrap().execute("INSERT INTO iam_sessions(token_hash,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '1 hour')", &[&(Sha256::digest(management_token.expose_secret().as_bytes()).to_vec()), &(id(10))]).await.unwrap();
+    let other_token = SecretString::from("not-an-agent-token");
     let (collector, remote, remote_server) = collector().await;
-    let telemetry = Runtime::start(db.pool.clone(), chat.tokens.clone(), destination(&remote));
+    let telemetry = Runtime::start(
+        db.pool.clone(),
+        chat.tokens.clone(),
+        delivery(&db, &remote).await,
+    );
     let (runtime_url, runtime_server) = serve(listeners::agent_runtime_router(
         agents.clone(),
         chat.clone(),
         &telemetry.tracing,
     ))
     .await;
-    let (management_url, management_server) = serve(listeners::management_router(
-        agents,
-        chat,
-        connections,
-        oidc,
-    ))
-    .await;
+    let (management_url, management_server) =
+        serve(listeners::management_router(agents, chat, connections)).await;
     let http = reqwest::Client::new();
-    // Establish that this is a real valid management session, not merely an invalid token rejection.
+    // The management listener is unauthenticated; the operator's proxy guards it.
     assert_eq!(
         http.post(format!(
             "{management_url}/tilde.management.v1.AgentService/ListAgents"
         ))
-        .bearer_auth(management_token.expose_secret())
         .json(&serde_json::json!({}))
         .send()
         .await
@@ -642,23 +617,9 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
         .status(),
         200
     );
-    // The control plane never accepts an agent's invocation token, and a management RPC
-    // reached with it does not even resolve a caller.
-    assert_eq!(
-        http.post(format!(
-            "{management_url}/tilde.management.v1.AgentService/ListAgents"
-        ))
-        .bearer_auth(agent_token.expose_secret())
-        .json(&serde_json::json!({}))
-        .send()
-        .await
-        .unwrap()
-        .status(),
-        401
-    );
     for token in [
         None,
-        Some(management_token.expose_secret()),
+        Some(other_token.expose_secret()),
         Some(agent_token.expose_secret()),
     ] {
         let mut request = http
@@ -671,7 +632,7 @@ async fn agent_trace_capture_is_runtime_only_and_rejects_management_credentials(
         assert_eq!(request.send().await.unwrap().status(), 404);
     }
     let endpoint = format!("{runtime_url}/v1/traces");
-    for token in [None, Some(management_token.expose_secret())] {
+    for token in [None, Some(other_token.expose_secret())] {
         let mut request = http
             .post(&endpoint)
             .header("content-type", "application/x-protobuf")

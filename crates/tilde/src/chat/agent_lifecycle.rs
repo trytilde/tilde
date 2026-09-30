@@ -100,8 +100,8 @@ pub(crate) async fn requeue_inputs(
         run,
         state.thread_id,
         state.agent_id,
-        &(crate::telemetry::context::capture().0),
-        &(crate::telemetry::context::capture().1),
+        &(crate::telemetry::tracing::context::capture().0),
+        &(crate::telemetry::tracing::context::capture().1),
         deployment,
     )
     .await?;

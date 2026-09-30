@@ -15,8 +15,12 @@ const SessionConversation = lazy(() =>
   import("./session-conversation").then((module) => ({ default: module.SessionConversation })),
 );
 import { TracePayload } from "./trace-payload";
+/** The bucket key of a payload the gateway kept only a prefix of, if any. */
+const reference = (row: Observation, field: "input" | "output") =>
+  row.attributes.find((a) => a.key === `tilde.observation.${field}_ref`)?.value;
 import { cost, date, duration, number } from "./format";
-import { ExternalLink } from "./links";
+import { TildeLoader } from "@/components/loading-screen";
+import { SkeletonLines } from "@/components/table-skeleton";
 export function Inspector({
   agentId,
   traceId,
@@ -55,11 +59,8 @@ export function Inspector({
     setRows(initialObservation ? [initialObservation] : []);
     setCursor("");
     const request = sessionId
-      ? traces.getSession(
-          { agentId, sessionId, filter, refresh: attempt > 0 },
-          { signal: abort.signal },
-        )
-      : traces.getTrace({ agentId, traceId, refresh: attempt > 0 }, { signal: abort.signal });
+      ? traces.getSession({ agentId, sessionId, filter }, { signal: abort.signal })
+      : traces.getTrace({ agentId, traceId }, { signal: abort.signal });
     void request
       .then((page) => {
         if (abort.signal.aborted) return;
@@ -110,6 +111,8 @@ export function Inspector({
     }
   }
   const activeKey = hovered ?? selected;
+  // A whole trace includes cooperating agents' spans; each span's media and full payloads
+  // belong to that span's own agent, so they are resolved under its id, not the viewer's.
   const active = rows.find((r) => observationKey(r) === activeKey);
   const metadata = active
     ? JSON.stringify({
@@ -165,11 +168,6 @@ export function Inspector({
                 />
                 <TooltipContent>{fullScreen ? "Exit full screen" : "Full screen"}</TooltipContent>
               </Tooltip>
-              <ExternalLink
-                href={sessionId ? rows[0]?.sessionUrl : rows[0]?.traceUrl}
-                label={sessionId ? "Open session in Langfuse" : "Open trace in Langfuse"}
-                compact
-              />
             </div>
           </header>
           {error && (
@@ -189,13 +187,7 @@ export function Inspector({
             </div>
           )}
           {sessionId ? (
-            <Suspense
-              fallback={
-                <p role="status" className="p-4 text-xs">
-                  Loading session…
-                </p>
-              }
-            >
+            <Suspense fallback={<TildeLoader />}>
               <SessionConversation
                 rows={rows}
                 busy={busy}
@@ -234,11 +226,6 @@ export function Inspector({
                         <h3 className="min-w-0 truncate text-sm font-semibold" title={active.name}>
                           {active.name}
                         </h3>
-                        <ExternalLink
-                          href={active.observationUrl}
-                          label="Open observation in Langfuse"
-                          compact
-                        />
                       </div>
                       <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] sm:grid-cols-4">
                         {[
@@ -294,10 +281,20 @@ export function Inspector({
                         ))}
                       </TabsList>
                       <TabsContent value="input" className="min-h-0 flex-1 overflow-auto p-3">
-                        <TracePayload key={`${activeKey}:input`} text={active.input} />
+                        <TracePayload
+                          key={`${activeKey}:input`}
+                          text={active.input}
+                          agentId={active.agentId || agentId}
+                          reference={reference(active, "input")}
+                        />
                       </TabsContent>
                       <TabsContent value="output" className="min-h-0 flex-1 overflow-auto p-3">
-                        <TracePayload key={`${activeKey}:output`} text={active.output} />
+                        <TracePayload
+                          key={`${activeKey}:output`}
+                          text={active.output}
+                          agentId={active.agentId || agentId}
+                          reference={reference(active, "output")}
+                        />
                       </TabsContent>
                       <TabsContent value="metadata" className="min-h-0 flex-1 overflow-auto p-3">
                         <TracePayload key={`${activeKey}:metadata`} text={metadata} />
@@ -305,11 +302,13 @@ export function Inspector({
                     </Tabs>
                   </>
                 ) : (
-                  <p className="p-3 text-xs text-muted-foreground">
-                    {busy
-                      ? "Loading trace…"
-                      : "Select a span in the chart. Scroll the chart to load more spans."}
-                  </p>
+                  <div className="p-3 text-xs text-muted-foreground">
+                    {busy ? (
+                      <SkeletonLines rows={4} label="Loading trace" />
+                    ) : (
+                      "Select a span in the chart. Scroll the chart to load more spans."
+                    )}
+                  </div>
                 )}
               </div>
             </div>

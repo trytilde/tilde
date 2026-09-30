@@ -1,0 +1,2 @@
+# The responder answers conversations with Agent.kickoff_async and runs no tasks. CrewAI loads
+# this file for every crew instance; it exists (empty) so that load does not warn.

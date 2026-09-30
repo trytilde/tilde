@@ -1,18 +1,13 @@
+import { conditions } from "./filter-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Controller, useForm } from "@trytilde/connection-ui";
-import { traces } from "@/client";
-import {
-  TracingState,
-  type GetTracingStatusResponse,
-  type Observation,
-} from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+import { type Observation } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 import { Button } from "@/components/ui/button";
 import { TraceDateTimePicker } from "./date-time-picker";
 import { TimeRangeSelect } from "../observability/time-range-select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowRightIcon, RefreshCwIcon, XIcon } from "lucide-react";
-import { ExternalLink } from "./links";
 import { Inspector } from "./inspector";
 import { TraceActivityChart } from "./activity-chart";
 import { TraceGrid } from "./trace-grid";
@@ -36,8 +31,6 @@ export function AgentTracing({
 }) {
   const search = parseSearch(useSearch({ strict: false }) as Record<string, unknown>);
   const navigate = useNavigate();
-  const [status, setStatus] = useState<GetTracingStatusResponse>();
-  const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [activityWindow, setActivityWindow] = useState<{
@@ -48,7 +41,6 @@ export function AgentTracing({
   function update(patch: TraceSearch, preserveActivity = false) {
     if (!preserveActivity && ("range" in patch || "from" in patch || "to" in patch))
       setActivityWindow(null);
-    setError("");
     void navigate({ to: ".", search: (previous) => ({ ...previous, ...patch }), replace: true });
   }
   const form = useForm<{ from: string; to: string }>({
@@ -80,6 +72,7 @@ export function AgentTracing({
     search.output,
     search.type,
     search.level,
+    search.where,
   ]);
   useEffect(() => {
     const now = new Date();
@@ -102,15 +95,7 @@ export function AgentTracing({
         search.range === "custom" && search.to
           ? new Date(search.to).toISOString()
           : (activityWindow?.toTime ?? end.toISOString()),
-      name: search.name,
-      model: search.model,
-      sessionId: search.session,
-      invocationId: search.invocation,
-      inputSearch: search.input,
-      outputSearch: search.output,
-      type:
-        search.preset === "llm" ? "GENERATION" : search.preset === "tool" ? "TOOL" : search.type,
-      level: search.preset === "errors" ? "ERROR" : search.level,
+      conditions: conditions(search),
     };
   }, [queryKey, attempt, activityWindow]);
   // Brushing filters the table while metrics keep the original time horizon.
@@ -133,23 +118,6 @@ export function AgentTracing({
       Date.parse(filter.toTime) !== Date.parse(activityWindow.toTime))
       ? { from: filter.fromTime, to: filter.toTime }
       : null;
-  useEffect(() => {
-    const abort = new AbortController();
-    setError("");
-    setStatus(undefined);
-    void traces
-      .getTracingStatus({ agentId }, { signal: abort.signal })
-      .then((status) => {
-        if (!abort.signal.aborted) setStatus(status);
-      })
-      .catch((error: unknown) => {
-        if (!abort.signal.aborted)
-          setError(error instanceof Error ? error.message : "Unable to check tracing");
-      });
-    return () => abort.abort();
-  }, [agentId, attempt]);
-  const ready = status?.state === TracingState.READY;
-  const disabled = status?.state === TracingState.DISABLED;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return (
     <TooltipProvider delay={350}>
@@ -163,10 +131,7 @@ export function AgentTracing({
             role="group"
             aria-label="Trace filter bar"
           >
-            <fieldset
-              disabled={!ready}
-              className="flex min-w-0 flex-1 flex-wrap items-center gap-2 disabled:opacity-60"
-            >
+            <fieldset className="flex min-w-0 flex-1 flex-wrap items-center gap-2 disabled:opacity-60">
               <GroupHint text="Filter by model calls, tool calls, or errors.">
                 <Tabs
                   value={search.preset ?? "all"}
@@ -183,7 +148,6 @@ export function AgentTracing({
                       <TabsTrigger
                         key={id}
                         value={id}
-                        disabled={!ready}
                         className="h-[22px] rounded px-2 text-xs font-normal data-active:font-bold"
                       >
                         {label}
@@ -193,17 +157,11 @@ export function AgentTracing({
                 </Tabs>
               </GroupHint>
               <span aria-hidden="true" className="mx-1 h-5 shrink-0 border-l" />
-              <TraceSearchInput
-                search={search}
-                observations={observations}
-                disabled={!ready}
-                onApply={update}
-              />
+              <TraceSearchInput search={search} observations={observations} onApply={update} />
             </fieldset>
             <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5">
               <TimeRangeSelect
                 value={search.range ?? "24h"}
-                disabled={!ready}
                 label="Date range"
                 timezone={timezone}
                 onChange={(range) => update({ range })}
@@ -217,7 +175,7 @@ export function AgentTracing({
                       size="icon-sm"
                       className="size-[26px]"
                       aria-label="Clear date range"
-                      disabled={!ready || (!search.range && !search.from && !search.to)}
+                      disabled={!search.range && !search.from && !search.to}
                       onClick={() => {
                         form.clearErrors();
                         update({ range: undefined, from: undefined, to: undefined });
@@ -250,7 +208,6 @@ export function AgentTracing({
                   Refresh traces
                 </TooltipContent>
               </Tooltip>
-              <ExternalLink href={status?.projectUrl} label="Open project in Langfuse" compact />
             </div>
           </div>
           {search.range === "custom" && (
@@ -258,7 +215,7 @@ export function AgentTracing({
               className="border-t bg-muted/10 px-3 py-1.5"
               onSubmit={(event) => event.preventDefault()}
             >
-              <fieldset disabled={!ready} className="flex items-center gap-2">
+              <fieldset className="flex items-center gap-2">
                 <Controller
                   control={form.control}
                   name="from"
@@ -267,7 +224,6 @@ export function AgentTracing({
                       value={field.value}
                       label="Start"
                       timezone={timezone}
-                      disabled={!ready}
                       onChange={(value) => {
                         field.onChange(value);
                         applyRange();
@@ -284,7 +240,6 @@ export function AgentTracing({
                       value={field.value}
                       label="End"
                       timezone={timezone}
-                      disabled={!ready}
                       onChange={(value) => {
                         field.onChange(value);
                         applyRange();
@@ -301,54 +256,37 @@ export function AgentTracing({
             </form>
           )}
         </div>
-        {(!ready || error) && (
-          <div
-            role={error || status?.state === TracingState.UNAVAILABLE ? "alert" : "status"}
-            className="shrink-0 border-b bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
-          >
-            {error || status?.message || "Checking tracing availability…"}
-            {disabled && (
-              <p className="mt-1">
-                Your administrator can enable Langfuse for this installation. Trace uploads are
-                discarded while it is disabled.
-              </p>
-            )}
-          </div>
-        )}
-        {ready && (
-          <TraceActivityChart
-            key={`activity:${agentId}:${attempt}`}
-            agentId={agentId}
-            filter={activityFilter}
-            refresh={attempt > 0}
-            selectedRange={selectedRange}
-            onRange={(from, to) => {
-              setActivityWindow(
-                (previous) =>
-                  previous ?? {
-                    fromTime: filter.fromTime,
-                    toTime: filter.toTime,
-                    previous: { range: search.range, from: search.from, to: search.to },
-                  },
-              );
-              update({ range: "custom", from, to }, true);
-            }}
-            onClear={() => {
-              if (activityWindow) update(activityWindow.previous, true);
-            }}
-          />
-        )}
+        <TraceActivityChart
+          key={`activity:${agentId}:${attempt}`}
+          agentId={agentId}
+          filter={activityFilter}
+          refresh={attempt > 0}
+          selectedRange={selectedRange}
+          onRange={(from, to) => {
+            setActivityWindow(
+              (previous) =>
+                previous ?? {
+                  fromTime: filter.fromTime,
+                  toTime: filter.toTime,
+                  previous: { range: search.range, from: search.from, to: search.to },
+                },
+            );
+            update({ range: "custom", from, to }, true);
+          }}
+          onClear={() => {
+            if (activityWindow) update(activityWindow.previous, true);
+          }}
+        />
         <TraceGrid
           key={`${agentId}:${queryKey}:${attempt}`}
           agentId={agentId}
           filter={filter}
           refresh={attempt > 0}
           view={view}
-          ready={ready}
           onInspect={update}
           onObservations={setObservations}
         />
-        {ready && (search.trace || search.inspectSession) && (
+        {(search.trace || search.inspectSession) && (
           <Inspector
             key={search.trace || search.inspectSession}
             agentId={agentId}

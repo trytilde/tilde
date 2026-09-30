@@ -6,6 +6,7 @@ fn avatar_row(r: tilde_queries::queries::agent::avatar::Record) -> DbResult<crat
     Ok(crate::agent::Agent {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: serde_json::from_value(serde_json::Value::String(r.concurrency_policy))
             .map_err(crate::database::DbError::decode)?,
         avatar_seed: r.avatar_seed,
@@ -37,6 +38,7 @@ fn create_row(r: tilde_queries::queries::agent::create::Record) -> DbResult<crat
     Ok(crate::agent::Agent {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: serde_json::from_value(serde_json::Value::String(r.concurrency_policy))
             .map_err(crate::database::DbError::decode)?,
         avatar_seed: r.avatar_seed,
@@ -56,9 +58,10 @@ pub async fn create_opt(
     p2: &str,
     p3: &str,
     p4: &serde_json::Value,
+    description: &str,
 ) -> DbResult<Option<crate::agent::Agent>> {
     tilde_queries::queries::agent::create::run()
-        .bind(db, &p1, &p2, &p3, &p4)
+        .bind(db, &p1, &p2, &description, &p3, &p4)
         .opt()
         .await?
         .map(create_row)
@@ -75,6 +78,7 @@ fn get_row(r: tilde_queries::queries::agent::get::Record) -> DbResult<crate::age
     Ok(crate::agent::Agent {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: serde_json::from_value(serde_json::Value::String(r.concurrency_policy))
             .map_err(crate::database::DbError::decode)?,
         avatar_seed: r.avatar_seed,
@@ -103,6 +107,7 @@ pub async fn get_opt(
 pub struct GetForCreateRow {
     pub id: uuid::Uuid,
     pub name: String,
+    pub description: String,
     pub concurrency_policy: String,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<String>,
@@ -118,6 +123,7 @@ fn get_for_create_row(
     Ok(GetForCreateRow {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: r.concurrency_policy,
         avatar_seed: r.avatar_seed,
         avatar_key: r.avatar_key,
@@ -159,6 +165,7 @@ fn list_row(r: tilde_queries::queries::agent::list::Record) -> DbResult<crate::a
     Ok(crate::agent::Agent {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: serde_json::from_value(serde_json::Value::String(r.concurrency_policy))
             .map_err(crate::database::DbError::decode)?,
         avatar_seed: r.avatar_seed,
@@ -178,20 +185,12 @@ pub async fn list_all(
     p2: Option<uuid::Uuid>,
     p3: i64,
     p4: &str,
-    caller: &crate::iam::authz::Access,
+    health: &str,
+    paused: Option<bool>,
+    fresh_after: chrono::DateTime<chrono::Utc>,
 ) -> DbResult<Vec<crate::agent::Agent>> {
     tilde_queries::queries::agent::list::run()
-        .bind(
-            db,
-            &p1,
-            &p2,
-            &p4,
-            &caller.admin,
-            &caller.user,
-            &caller.api_key,
-            &caller.groups,
-            &p3,
-        )
+        .bind(db, &fresh_after, &health, &p1, &p2, &p4, &paused, &p3)
         .all()
         .await?
         .into_iter()
@@ -209,6 +208,7 @@ fn update_row(r: tilde_queries::queries::agent::update::Record) -> DbResult<crat
     Ok(crate::agent::Agent {
         id: r.id,
         name: r.name,
+        description: r.description,
         concurrency_policy: serde_json::from_value(serde_json::Value::String(r.concurrency_policy))
             .map_err(crate::database::DbError::decode)?,
         avatar_seed: r.avatar_seed,
@@ -228,9 +228,10 @@ pub async fn update_opt(
     p2: Option<&str>,
     p3: Option<&str>,
     p4: Option<&serde_json::Value>,
+    description: Option<&str>,
 ) -> DbResult<Option<crate::agent::Agent>> {
     tilde_queries::queries::agent::update::run()
-        .bind(db, &p2, &p3, &p4, &p1)
+        .bind(db, &p2, &description, &p3, &p4, &p1)
         .opt()
         .await?
         .map(update_row)

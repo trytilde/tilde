@@ -18,11 +18,8 @@ export function TraceActivityChart({
   selectedRange: { from: string; to: string } | null;
 }) {
   const load = useCallback(
-    async (signal: AbortSignal, retry: boolean) => {
-      const response = await traces.getObservationMetrics(
-        { agentId, filter, refresh: refresh || retry },
-        { signal },
-      );
+    async (signal: AbortSignal, _retry: boolean) => {
+      const response = await traces.getObservationMetrics({ agentId, filter }, { signal });
       return response.buckets.map((bucket) => ({ ...bucket, count: bucket.observationCount }));
     },
     [agentId, filter, refresh],

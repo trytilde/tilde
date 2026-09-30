@@ -35,6 +35,7 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_REQUEST_JSON_ANY);
         reg.register_json_any(super::__WATCH_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SNAPSHOT_JSON_ANY);
+        reg.register_json_any(super::__PROMPT_PATTERN_JSON_ANY);
         reg.register_json_any(super::__PING_JSON_ANY);
         reg.register_json_any(super::__THREAD_LEASE_JSON_ANY);
         reg.register_json_any(super::__DIRECTIVE_JSON_ANY);
@@ -83,6 +84,10 @@ pub use self::__buffa::view::WatchResponseOwnedView;
 pub use self::__buffa::view::SnapshotView;
 #[doc(inline)]
 pub use self::__buffa::view::SnapshotOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptPatternView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptPatternOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::PingView;
 #[doc(inline)]

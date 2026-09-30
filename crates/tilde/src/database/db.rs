@@ -46,22 +46,3 @@ pub async fn test_connection_setup_material_one(
         .await?
         .ok_or(DbError::NotFound)
 }
-
-pub async fn test_live_channel_ready_execute(
-    db: &impl GenericClient,
-    p1: uuid::Uuid,
-    p2: bool,
-) -> DbResult<u64> {
-    Ok(tilde_queries::queries::testing::live_channel_ready::run()
-        .bind(db, &p2, &p1)
-        .await?)
-}
-
-pub async fn test_live_chat_lease_execute(
-    db: &impl GenericClient,
-    p1: uuid::Uuid,
-) -> DbResult<u64> {
-    Ok(tilde_queries::queries::testing::live_chat_lease::run()
-        .bind(db, &p1)
-        .await?)
-}

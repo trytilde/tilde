@@ -1,0 +1,10 @@
+[project]
+name = "example-tool-server"
+version = "0.1.0"
+description = "Local development tool server built on the Tilde Python SDK"
+requires-python = ">=3.11"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = ["trytilde"]
+
+[tool.uv]
+package = false

@@ -13,12 +13,13 @@ pub fn definition() -> Provider {
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_CHAT.into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: "account".into(),
             name: "Linq account".into(),
             credential_source: CredentialSource::Static {
                 schema: serde_json::json!({"type": "object", "additionalProperties": false, "properties": {"api_token": {"type": "string", "title": "API token", "minLength": 1, "writeOnly": true}, "phone_number": {"type": "string", "title": "Sending phone number", "minLength": 1, "pattern": "^\\+[0-9]{7,15}$"}, "webhook_signing_secret": {"type": "string", "title": "Webhook signing secret", "minLength": 1, "writeOnly": true}}, "required": ["api_token", "phone_number", "webhook_signing_secret"]}),
             },
-            capabilities: vec![Capability::Channel],
+            capabilities: vec![Capability::Channel, Capability::Tool],
         }],
     }
 }

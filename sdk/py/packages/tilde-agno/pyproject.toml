@@ -7,6 +7,10 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = ["trytilde", "agno>=3,<4"]
 
+# `tilde deploy` reads module-level agents' prompts (and skill folders) through this discoverer.
+[project.entry-points."tilde.discover"]
+agno = "tilde_agno.discover:discover"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

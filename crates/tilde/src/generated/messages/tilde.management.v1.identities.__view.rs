@@ -28,10 +28,6 @@ pub struct IdentityView<'a> {
     pub attested_at: ::buffa::MessageFieldView<
         ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
     >,
-    /// Field 10: `attested_by_user_id`
-    pub attested_by_user_id: ::core::option::Option<&'a str>,
-    /// Field 11: `attested_by_api_key_id`
-    pub attested_by_api_key_id: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for IdentityView<'a> {
@@ -155,22 +151,6 @@ impl<'a> ::buffa::MessageView<'a> for IdentityView<'a> {
                     }
                 }
             }
-            10u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                view.attested_by_user_id = Some(::buffa::types::borrow_str(&mut cur)?);
-            }
-            11u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                view.attested_by_api_key_id = Some(
-                    ::buffa::types::borrow_str(&mut cur)?,
-                );
-            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -218,8 +198,6 @@ impl<'a> ::buffa::MessageView<'a> for IdentityView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
-            attested_by_user_id: self.attested_by_user_id.map(|s| s.to_string()),
-            attested_by_api_key_id: self.attested_by_api_key_id.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -270,12 +248,6 @@ impl<'a> ::buffa::ViewEncode<'a> for IdentityView<'a> {
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
-        }
-        if let Some(ref v) = self.attested_by_user_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
-        if let Some(ref v) = self.attested_by_api_key_id {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -328,12 +300,6 @@ impl<'a> ::buffa::ViewEncode<'a> for IdentityView<'a> {
             );
             self.attested_at.write_to(__cache, buf);
         }
-        if let Some(ref v) = self.attested_by_user_id {
-            ::buffa::types::put_string_field(10u32, v, buf);
-        }
-        if let Some(ref v) = self.attested_by_api_key_id {
-            ::buffa::types::put_string_field(11u32, v, buf);
-        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -385,12 +351,6 @@ impl<'__a> ::serde::Serialize for IdentityView<'__a> {
             if let ::core::option::Option::Some(__v) = self.attested_at.as_option() {
                 __map.serialize_entry("attestedAt", __v)?;
             }
-        }
-        if let ::core::option::Option::Some(__v) = self.attested_by_user_id {
-            __map.serialize_entry("attestedByUserId", __v)?;
-        }
-        if let ::core::option::Option::Some(__v) = self.attested_by_api_key_id {
-            __map.serialize_entry("attestedByApiKeyId", __v)?;
         }
         __map.end()
     }
@@ -535,16 +495,6 @@ impl IdentityOwnedView {
         ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
     > {
         &self.0.reborrow().attested_at
-    }
-    /// Field 10: `attested_by_user_id`
-    #[must_use]
-    pub fn attested_by_user_id(&self) -> ::core::option::Option<&'_ str> {
-        self.0.reborrow().attested_by_user_id
-    }
-    /// Field 11: `attested_by_api_key_id`
-    #[must_use]
-    pub fn attested_by_api_key_id(&self) -> ::core::option::Option<&'_ str> {
-        self.0.reborrow().attested_by_api_key_id
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<IdentityView<'static>>>

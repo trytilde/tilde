@@ -23,11 +23,16 @@ pub mod __buffa {
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
         reg.register_json_any(super::__INVOKE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__INVOCATION_STATE_JSON_ANY);
     }
 }
 #[doc(inline)]
 pub use self::__buffa::view::InvokeRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::InvokeRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvocationStateView;
+#[doc(inline)]
+pub use self::__buffa::view::InvocationStateOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

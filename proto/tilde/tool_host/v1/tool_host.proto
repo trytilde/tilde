@@ -1,0 +1,46 @@
+syntax = "proto3";
+package tilde.tool_host.v1;
+import "tilde/types/v1/chat.proto";
+import "tilde/types/v1/connections.proto";
+// Customer-hosted tools. Like agent hosts, a tool host is never dialed: a connected host opens
+// Watch with its tool host token, publishes its tool definitions and receives calls as frames,
+// answering each through Respond. A Lambda host is invoked synchronously with a JSON-encoded
+// LambdaRequest and returns a LambdaResponse; it holds no connection and no token.
+//
+// A host that needs credentials publishes a provider definition beside its tools. Each
+// connection of that provider is an instance of the host: set up through Tilde's setup page,
+// stored encrypted by Tilde, and sent with every call made on it. Its tools are then callable
+// only through such a connection.
+service ToolHostService {
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  rpc Respond(RespondRequest) returns (RespondResponse);
+}
+// Tool names are host-local; an agent using the host prefixes them with its source slug. Each Watch replaces the
+// host's published tools and provider.
+message WatchRequest { repeated tilde.types.v1.ToolDefinition tools = 1; optional tilde.types.v1.Provider provider = 2; }
+message WatchResponse { oneof frame { HostRegistered registered = 1; ToolCallRequest call = 2; HostPing ping = 3; VerifyRequest verify = 4; } }
+message HostRegistered { string tool_host_id = 1; }
+message HostPing {}
+// `call_id` is the agent's tool call ID: use it for upstream idempotency. `connection_id`,
+// `connection_type` (the provider method the instance was set up with) and `credentials` are
+// set when the call is made on an instance of the host's provider.
+message ToolCallRequest {
+  string call_id = 1; string name = 2; string input_json = 3 [debug_redact = true];
+  string agent_id = 4; string thread_id = 5;
+  optional string connection_id = 6; repeated tilde.types.v1.InputField credentials = 7;
+  optional string connection_type = 8;
+}
+// Sent at the end of an instance's setup, before the connection is ready: an error fails the
+// setup with the host's message, and `account_label` names the account the credentials reach.
+message VerifyRequest { string call_id = 1; string connection_id = 2; repeated tilde.types.v1.InputField credentials = 3; string connection_type = 4; }
+// Answers a call or a verify request; `account_label` applies to verify only.
+message RespondRequest { string call_id = 1; oneof outcome { string output_json = 2 [debug_redact = true]; string error = 3; } optional string account_label = 4; }
+message RespondResponse {}
+message LambdaRequest { oneof request { LambdaListTools list_tools = 1; ToolCallRequest call = 2; VerifyRequest verify = 3; } }
+message LambdaListTools {}
+// For list_tools `tools` and `provider`; for a call, `error` when it failed and `output_json`
+// otherwise; for verify, `error` or `account_label`.
+message LambdaResponse {
+  repeated tilde.types.v1.ToolDefinition tools = 1; string output_json = 2 [debug_redact = true]; string error = 3;
+  optional tilde.types.v1.Provider provider = 4; optional string account_label = 5;
+}

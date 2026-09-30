@@ -1383,20 +1383,6 @@ pub async fn thread_lock_one(db: &impl GenericClient, p1: uuid::Uuid) -> DbResul
         .ok_or(DbError::NotFound)
 }
 
-pub use tilde_queries::queries::chat::threads_list::Record as ThreadsListRow;
-
-pub async fn threads_list_all(
-    db: &impl GenericClient,
-    p1: Option<uuid::Uuid>,
-    p2: Option<uuid::Uuid>,
-    p3: i64,
-) -> DbResult<Vec<ThreadsListRow>> {
-    Ok(tilde_queries::queries::chat::threads_list::run()
-        .bind(db, &p1, &p2, &p3)
-        .all()
-        .await?)
-}
-
 pub use tilde_queries::queries::chat::tool_get::Record as ToolGetRow;
 
 pub async fn tool_get_one(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<ToolGetRow> {
@@ -1432,10 +1418,13 @@ pub async fn tool_write_one(
     p10: &str,
     p11: &str,
     p12: i64,
+    p13: &str,
+    p14: bool,
+    p15: &str,
 ) -> DbResult<ToolWriteRow> {
     tilde_queries::queries::chat::tool_write::run()
         .bind(
-            db, &p1, &p2, &p3, &p4, &p5, &p6, &p8, &p11, &p9, &p7, &p10, &p12,
+            db, &p1, &p2, &p3, &p4, &p5, &p6, &p8, &p13, &p14, &p15, &p11, &p9, &p7, &p10, &p12,
         )
         .opt()
         .await?

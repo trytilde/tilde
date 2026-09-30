@@ -1,16 +1,23 @@
 // This file was generated with `cornucopia`. Do not modify.
 
 #[derive(Debug)]
-pub struct RunParams<T1: crate::StringSql, T2: crate::StringSql, T3: crate::JsonSql> {
+pub struct RunParams<
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::JsonSql,
+> {
     pub p1: uuid::Uuid,
     pub p2: T1,
-    pub p3: T2,
-    pub p4: T3,
+    pub description: T2,
+    pub p3: T3,
+    pub p4: T4,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub id: uuid::Uuid,
     pub name: String,
+    pub description: String,
     pub concurrency_policy: String,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<String>,
@@ -22,6 +29,7 @@ pub struct Record {
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub name: &'a str,
+    pub description: &'a str,
     pub concurrency_policy: &'a str,
     pub avatar_seed: uuid::Uuid,
     pub avatar_key: Option<&'a str>,
@@ -35,6 +43,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         RecordBorrowed {
             id,
             name,
+            description,
             concurrency_policy,
             avatar_seed,
             avatar_key,
@@ -47,6 +56,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
         Self {
             id,
             name: name.into(),
+            description: description.into(),
             concurrency_policy: concurrency_policy.into(),
             avatar_seed,
             avatar_key: avatar_key.map(|v| v.into()),
@@ -126,7 +136,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO agents (id, name, concurrency_policy, capabilities, avatar_seed) VALUES ($1, $2, $3, $4, $1) ON CONFLICT (id) DO NOTHING RETURNING id, name, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities",
+        "INSERT INTO agents (id, name, description, concurrency_policy, capabilities, avatar_seed) VALUES ($1, $2, $3, $4, $5, $1) ON CONFLICT (id) DO NOTHING RETURNING id, name, description, concurrency_policy AS concurrency_policy, avatar_seed, avatar_key, paused, created_at, updated_at, capabilities AS capabilities",
         None,
     )
 }
@@ -145,18 +155,20 @@ impl RunStmt {
         C: GenericClient,
         T1: crate::StringSql,
         T2: crate::StringSql,
-        T3: crate::JsonSql,
+        T3: crate::StringSql,
+        T4: crate::JsonSql,
     >(
         &'s self,
         client: &'c C,
         p1: &'a uuid::Uuid,
         p2: &'a T1,
-        p3: &'a T2,
-        p4: &'a T3,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
+        description: &'a T2,
+        p3: &'a T3,
+        p4: &'a T4,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 5> {
         RecordQuery {
             client,
-            params: [p1, p2, p3, p4],
+            params: [p1, p2, description, p3, p4],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -164,34 +176,51 @@ impl RunStmt {
                     Ok(RecordBorrowed {
                         id: row.try_get(0)?,
                         name: row.try_get(1)?,
-                        concurrency_policy: row.try_get(2)?,
-                        avatar_seed: row.try_get(3)?,
-                        avatar_key: row.try_get(4)?,
-                        paused: row.try_get(5)?,
-                        created_at: row.try_get(6)?,
-                        updated_at: row.try_get(7)?,
-                        capabilities: row.try_get(8)?,
+                        description: row.try_get(2)?,
+                        concurrency_policy: row.try_get(3)?,
+                        avatar_seed: row.try_get(4)?,
+                        avatar_key: row.try_get(5)?,
+                        paused: row.try_get(6)?,
+                        created_at: row.try_get(7)?,
+                        updated_at: row.try_get(8)?,
+                        capabilities: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),
         }
     }
 }
-impl<'c, 'a, 's, C: GenericClient, T1: crate::StringSql, T2: crate::StringSql, T3: crate::JsonSql>
+impl<
+    'c,
+    'a,
+    's,
+    C: GenericClient,
+    T1: crate::StringSql,
+    T2: crate::StringSql,
+    T3: crate::StringSql,
+    T4: crate::JsonSql,
+>
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2, T3>,
-        RecordQuery<'c, 'a, 's, C, Record, 4>,
+        RunParams<T1, T2, T3, T4>,
+        RecordQuery<'c, 'a, 's, C, Record, 5>,
         C,
     > for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2, T3>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
-        self.bind(client, &params.p1, &params.p2, &params.p3, &params.p4)
+        params: &'a RunParams<T1, T2, T3, T4>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 5> {
+        self.bind(
+            client,
+            &params.p1,
+            &params.p2,
+            &params.description,
+            &params.p3,
+            &params.p4,
+        )
     }
 }

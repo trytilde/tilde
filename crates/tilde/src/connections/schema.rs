@@ -167,6 +167,9 @@ pub fn oauth_inputs(grant: OAuthGrant, config: &OAuth, additional: Option<&Value
     if grant == OAuthGrant::JwtBearer {
         schema["properties"] = json!({"issuer":{"type":"string","title":"Service account issuer","minLength":1},"private_key":{"type":"string","title":"Private key (PEM)","writeOnly":true,"contentMediaType":"application/x-pem-file","minLength":1},"subject":{"type":"string","title":"Subject (optional)"}});
         schema["required"] = json!(["issuer", "private_key"]);
+    } else if config.client != OAuthClient::Form {
+        // Registered at setup: the person setting up enters no client.
+        schema["required"] = json!([]);
     } else {
         schema["properties"] =
             json!({"client_id":{"type":"string","title":"Client ID","minLength":1}});

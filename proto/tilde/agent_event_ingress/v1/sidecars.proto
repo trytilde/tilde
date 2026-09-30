@@ -28,8 +28,12 @@ service SidecarService {
 }
 message WatchRequest { string instance_id = 1; string public_url = 2; string runtime_url = 3; }
 message WatchResponse { oneof frame { Snapshot snapshot = 1; GetConfigurationResponse configuration = 2; ThreadLease lease = 3; Directive directive = 4; Ping ping = 5; } }
-// Leases in the snapshot are the ones this instance holds.
-message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; string deployment_id = 4; }
+// Leases in the snapshot are the ones this instance holds. `prompts` are the deployment's
+// text-matchable prompt versions (immutable per deployment): the replica matches each
+// inference request against them itself and ships only `name@hash`, so bodies stay local.
+message Snapshot { GetConfigurationResponse configuration = 1; repeated ThreadLease leases = 2; string token_signing_key = 3 [debug_redact = true]; string deployment_id = 4; repeated PromptPattern prompts = 5; }
+// One prompt version's literal text segments, found in order within one message.
+message PromptPattern { string name = 1; bytes hash = 2; repeated string segments = 3; }
 message Ping {}
 // Who executes a (thread, agent) pair. `held` is false when nobody does. `version` is the
 // lease row's last change in Unix milliseconds; a replica ignores frames older than the lease it holds.
@@ -44,7 +48,9 @@ message ProviderEventDirective { string connection_id = 1; tilde.types.v1.Provid
 message PublishRequest { string instance_id = 1; repeated Upstream frames = 2; }
 message Upstream { oneof frame { Heartbeat heartbeat = 1; Event event = 3; DirectiveResult directive_result = 4; Telemetry telemetry = 5; Release release = 6; InferenceUsage inference = 7; } }
 // One forwarded inference call, parsed off the hot path by the replica; the gateway stores it.
-message InferenceUsage { string id = 1; int64 created_at = 2; string invocation_id = 3; string thread_id = 4; string run_id = 5; string participant_id = 6; string connection_id = 7; string provider_id = 8; string kind = 9; string path = 10; string model = 11; int32 status = 12; int32 latency_ms = 13; optional int32 first_byte_ms = 14; int64 request_bytes = 15; int64 response_bytes = 16; optional int64 input_tokens = 17; optional int64 output_tokens = 18; optional int64 cached_input_tokens = 19; string usage = 20; optional int64 cache_write_tokens = 21; optional int64 units = 22; }
+// `prompts` are `name@hash` stamps from `x-tilde-prompt` plus versions the replica matched in the
+// request text, resolved to versions by the gateway.
+message InferenceUsage { string id = 1; int64 created_at = 2; string invocation_id = 3; string thread_id = 4; string run_id = 5; string participant_id = 6; string connection_id = 7; string provider_id = 8; string kind = 9; string path = 10; string model = 11; int32 status = 12; int32 latency_ms = 13; optional int32 first_byte_ms = 14; int64 request_bytes = 15; int64 response_bytes = 16; optional int64 input_tokens = 17; optional int64 output_tokens = 18; optional int64 cached_input_tokens = 19; string usage = 20; optional int64 cache_write_tokens = 21; optional int64 units = 22; repeated string prompts = 23; reserved 24; }
 message Heartbeat { string sample_id = 1; bool ready = 2; bool agent_ready = 3; int32 latency_ms = 4; bool agent_connected = 5; }
 // The replica evicted an idle thread and no longer executes on it.
 message Release { string thread_id = 1; }
@@ -52,7 +58,7 @@ message Event { tilde.types.v1.RuntimeEvent event = 1; }
 message DirectiveResult { string id = 1; CallResult result = 2; }
 // Immutable telemetry batches (traces, logs) accepted once by payload receipt.
 message Telemetry { TelemetryKind kind = 1; bytes payload = 2; }
-enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; TELEMETRY_KIND_LOGS = 2; }
+enum TelemetryKind { TELEMETRY_KIND_UNSPECIFIED = 0; TELEMETRY_KIND_TRACES = 1; TELEMETRY_KIND_LOGS = 2; TELEMETRY_KIND_METRICS = 3; }
 // Frames the gateway would not accept are named so the replica drops them; run
 // state from a replica that no longer holds the thread also reports the lease.
 message PublishResponse { repeated string rejected_event_ids = 3; repeated ThreadLease lost = 4; }
@@ -80,5 +86,5 @@ message CredentialField { string name = 1; string value = 2 [debug_redact = true
 message ConnectionConfiguration { tilde.types.v1.Capability capability = 12; string alias = 13; bool inference_blocked = 14; tilde.types.v1.ChannelAccessMode access_mode = 9; repeated IdentityGrant identities = 10; int64 expires_at = 11; string id = 1; string provider_id = 2; string type_id = 3; string name = 4; string status = 5; string account_label = 6; int64 credential_version = 7; repeated CredentialField credentials = 8; }
 // Blocked budgets: `inference_blocked` for the agent itself, `inference_blocked_identities` for
 // chat identities whose runs must not carry inference connections in their tokens.
-message GetConfigurationResponse { bool inference_blocked = 7; repeated string inference_blocked_identities = 8; bool logs_enabled = 6; bool tracing_enabled = 5; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; reserved 3; reserved "webhook_signing_key"; repeated ConnectionConfiguration connections = 4; }
+message GetConfigurationResponse { bool inference_blocked = 7; repeated string inference_blocked_identities = 8; reserved 5, 6, 9; reserved "tracing_enabled", "logs_enabled", "metrics_enabled"; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; reserved 3; reserved "webhook_signing_key"; repeated ConnectionConfiguration connections = 4; }
 message IdentityGrant { string id = 1; tilde.types.v1.IdentityType identity_type = 2; string value = 3; bool verified = 4; bool allowed = 5; }

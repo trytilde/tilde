@@ -1,5 +1,6 @@
 import {
   AgentHealthStatus,
+  type AgentHealthHour,
   type AgentMetrics,
 } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +33,8 @@ export function HealthBadge({ metrics }: { metrics?: AgentMetrics }) {
   );
 }
 
-export function HealthHistory({ metrics }: { metrics?: AgentMetrics }) {
-  const hours = metrics?.healthHistory ?? [];
+/** Twelve hourly buckets, oldest first; shared by agents and remote tool servers. */
+export function HealthHistory({ hours = [] }: { hours?: AgentHealthHour[] }) {
   const buckets = Array.from({ length: 12 }, (_, index) => {
     const hour = hours[index];
     const state = !hour?.totalChecks

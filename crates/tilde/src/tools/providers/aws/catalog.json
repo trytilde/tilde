@@ -1,0 +1,412 @@
+[
+  {
+    "name": "aws___call_aws",
+    "description": "DEPRECATED: This tool is being deprecated in favor of `run_script`. Use `run_script` instead.\n\nExecute AWS CLI commands. PRIMARY tool when you know the exact command needed.\n\n- Command MUST start with \"aws\" and follow AWS CLI syntax\n- For cross-region operations, include --region; for alternate profiles, include --profile\n- max_results defaults to 100 for paginated operations. Larger values consume more tokens. OMIT for non-paginated ops (get, create, delete).\n\nPAGINATION: If response has non-null \"pagination_token\", results are INCOMPLETE. Call again with \"--starting-token <value>\". ALWAYS paginate through ALL pages before reporting counts or conclusions.\n\nMULTI-STEP PATTERNS: Most tasks require list→describe workflows. List operations return only identifiers—always follow with describe/get calls for full details. Never infer from names alone; retrieve and inspect actual data.\n\nMULTI-REGION/PROFILE: When a task involves \"all regions\" or multiple profiles, query EVERY relevant region/profile separately.\n\nLOCAL FILE SYSTEM: No filesystem access. Use '-' for output file args. No 'file://'/'fileb://'—provide values inline. S3-to-S3 operations (both source and destination are S3 URIs) ARE supported.\n\nCommand restrictions: NO pipes, shell operators, grep/awk/sed, redirection, command substitution, shell variables, or local file paths.\n\nBACKGROUND TASKS: Long-running operations return {task_id, status:\"working\"}. Poll via `get_tasks` tool with task_ids=[...]—NOT an aws subcommand. Each task runs once.\n\nFILE UPLOAD: Ask user for a staging bucket. Get pre-signed URL via get_presigned_url, upload file, then call call_aws with staging_sources (bucket, key, cli_argument, optional extract). Do NOT include cli_argument flags in cli_command. For directories: zip first (zip-only, max 4GB), use extract:true. For commands with native S3 args (--code S3Bucket=X,S3Key=Y), use those directly—no staging needed.\n\nExamples:\n- aws s3api put-object --bucket my-bucket --key data.bin with staging_sources=[{\"bucket\":\"staging\",\"key\":\"data.bin\",\"cli_argument\":\"--body\"}]\n- aws lambda create-function --function-name F --runtime python3.12 --handler index.handler --role <arn> with staging_sources=[{\"bucket\":\"staging\",\"key\":\"func.zip\",\"cli_argument\":\"--zip-file\"}]",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cli_command": {
+          "description": "Complete AWS CLI command. MUST start with \"aws\"",
+          "type": "string"
+        },
+        "max_results": {
+          "default": 100,
+          "description": "Max items for paginated operations. Defaults to 100. If response has non-null pagination_token, use --starting-token for more.",
+          "type": "integer"
+        },
+        "staging_sources": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "items": {
+                    "description": "Reference to a file previously uploaded to S3 via get_presigned_url.",
+                    "properties": {
+                      "bucket": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "cli_argument": {
+                        "type": "string"
+                      },
+                      "extract": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "bucket",
+                      "key",
+                      "cli_argument"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Use ONLY when CLI needs a LOCAL file/dir input (`--body`, `--zip-file`, `--template-body`, `--policy-document`, `--cli-input-json` from file, `deploy push --source`, `gamelift upload-build --build-root`).\n\nSKIP if data already in S3 and CLI accepts S3 natively (`--s3-bucket/--s3-key`, `--code S3Bucket=,S3Key=`, `--s3-location`, `--revision s3Location={bucket=,key=,...}`).\n\nSteps: get_presigned_url(operation=\"upload\") → HTTP PUT → call this tool with cli_command FULLY OMITTING the file flag (no dangling `--zip-file`/`--body`/`--source`) plus `staging_sources` (≤25): [{\"bucket\":\"<bucket>\",\"key\":\"<key>\",\"cli_argument\":\"--zip-file\",\"extract\":false}]. `extract:true` for dirs (.zip only, ≤4GB). When CLI needs local file: 1) ask user for bucket 2) get_presigned_url(upload) 3) HTTP PUT 4) call_aws + staging_sources (OMIT file arg from cli_command)."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cli_command"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "aws___get_presigned_url",
+    "description": "Generate pre-signed S3 URLs for uploading or downloading files. Use BEFORE call_aws when a command requires a local file path. Use for direct S3 uploads/downloads instead of call_aws. Max upload 5 GB; larger files use multipart via call_aws. For uploads: generates PUT URL. For downloads: generates GET URL. No special headers needed unless s3_params provided—then corresponding HTTP headers MUST be included or request fails with SignatureDoesNotMatch.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "description": "Array of 1-25 presigned URL requests.",
+          "items": {
+            "description": "A single presigned URL request.",
+            "properties": {
+              "operation": {
+                "description": "PUT (upload) or GET (download).",
+                "enum": [
+                  "upload",
+                  "download"
+                ],
+                "type": "string"
+              },
+              "bucket": {
+                "description": "S3 bucket name.",
+                "type": "string"
+              },
+              "key": {
+                "description": "S3 object key.",
+                "type": "string"
+              },
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Override region. Falls back to session region."
+              },
+              "expires_in": {
+                "default": 900,
+                "description": "URL expiration in seconds (1–900). Above 900 → S3 rejects with 403.",
+                "maximum": 900,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "s3_params": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Extra S3 parameters to sign (e.g. ContentType). Corresponding headers MUST be included."
+              }
+            },
+            "required": [
+              "operation",
+              "bucket",
+              "key"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "description": "Generic wrapper for non-object return types.",
+      "properties": {
+        "result": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "aws___get_tasks",
+    "description": "Poll status of long-running tasks. Use after a tool call returns task_id with status \"working\". Up to 3 IDs per call. Tasks expire after 5 min. Pass poll_iteration (start at 1, increment each call) and follow the recommended_wait_seconds in the response before polling again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "task_ids": {
+          "description": "One or more task IDs (up to 3) from previous tool invocations.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "poll_iteration": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Poll attempt number (1-based, increment each call). Used to suggest wait time before next poll."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "task_ids"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "aws___run_script",
+    "description": "Execute Python code in a sandboxed environment with AWS API access via `call_boto3`.\n\nTop-level `await` supported. No network access except `call_boto3`.\n\nThe response includes an `api_calls` list summarizing the AWS API calls the script issued\n(one entry per call: `{service, operation, status, n_items?, error?}`). Use it\nto verify which APIs ran, in what order, and that no expected step was silently skipped or\nswallowed by `return_exceptions=True` before trusting `return_value`.\n\n```python\nasync def call_boto3(\n    *,                                # only keyword arguments\n    service_name: str,                # aws service name, e.g. s3\n    operation_name: str,              # API operation name, e.g. ListBuckets\n    region_name: str | None = None,   # Optional. default to the user configured region\n    params: dict | None = None,       # Optional. parameters to call the API, default to empty\n) -> dict:                            # returns json dict, datetimes as ISO strings\n    ...\n```\n\n⚠️ FORBIDDEN: `getattr`, `__class__`, `__dict__`, `__subclasses__`, `import boto3`, subprocess, HTTP/socket calls. Use `isinstance()`/`hasattr()` instead.\n\n\n⚠️ USE run_script FOR:\n- 2+ API calls: listing, filtering, counting, parallel calls, multi-step, multi-region\n- ANY analysis or comparison: configs, policies, tags, properties across resources\n- Permission checks: gather identity, resource, and trust policies in one script\n- Streaming APIs (live-tail, subscribe-to-shard) - results auto-capped; inform user if partial.\n\n⚠️ ONE SCRIPT PER TASK: Do NOT split work across multiple run_script calls. If answering the question requires fetching IDs then describing each - do both in one script. Returning intermediate data to \"decide the next step\" wastes round-trips and inflates the context. Plan the full logic before writing the script.\n\n⚠️ LIST→DESCRIBE IS MANDATORY:\nList APIs return ONLY names/ARNs. To check ANY attribute:\n1. List* → get ALL names\n2. Get*/Describe* PER RESOURCE for the attribute\n3. Feature-specific APIs are SEPARATE: streams, encryption, lifecycle, metrics often have dedicated Get* APIs NOT in the main Describe.\n4. ResourceNotFoundException = \"not configured\"-valid data, don't skip\n\n⚠️ CONTENTS vs CONTAINER: \"empty buckets\" → list objects IN bucket. \"records in table\" → scan. \"X configured\" → Get*Configuration API.\n\n⚠️ NEVER TRUNCATE: Check ALL resources. Never `[:10]` or `[:50]`. Missing resource = wrong answer.\n\n⚠️ DISTRUST EMPTY RESULTS: Before reporting \"0 found\" verify the response had expected keys and no exceptions occurred. If uncertain → \"unable to verify\" NOT \"0 found\".\n\nRULES:\n1. SELF-CONTAINED: Never paste resource names/ARNs from prior results into code. Discover everything inside the script.\n2. OUTPUT: `result = {...}` then `result` alone on the last line. Never use `print()`.\n3. CONCURRENCY: Use `asyncio.gather(*[...])` for parallel calls. Use `return_exceptions=True` only for read APIs (Describe*, List*, Get*). For mutation APIs (Put*, Create*, Delete*, Update*), let exceptions propagate immediately.\n4. REGIONS: The user's default region is used when region_name is not specified. For all-regions: DescribeRegions, iterate ALL.\n5. PAGINATION: List/Describe APIs are auto-paginated - do NOT pass limit parameters or loop over tokens manually. Just call the API and all results are returned. Auto-pagination is bypassed only when you explicitly pass the limit key (e.g. `MaxResults`, `Limit`, `MaxItems`) - avoid doing this unless you intentionally want a page.\n6. PERMISSIONS: Gather ALL policies in ONE script (identity, resource, trust). ARN `bucket` ≠ `bucket/*`. Report YES, PARTIAL, or NO with reasoning.\n7. VERIFY API RESPONSE: Confirm the operation returns the field you need.\n8. NO COMMENTS: Do not write any comments in the code.\n9. FETCH VS JUDGE: Use the script to fetch and structure data. For mechanical tasks (count, filter by exact value, aggregate) encode the logic in the script. For tasks requiring judgment (\"misconfigured\", \"issues\", \"best practices\", \"anomalies\") return the relevant raw fields and let the LLM reason. Do not hardcode evaluation heuristics in Python.\n\nIMPORTS: The following modules are pre-imported - do not write any import statements: asyncio, collections, csv, dataclasses, datetime, decimal, enum, fractions, functools, itertools, json, math, re, statistics, string, time, typing, uuid, ClientError from botocore, io (StringIO, BytesIO only). Do not re-import.\n\n\nEXAMPLES:\n\nParallel calls:\n```python\nbuckets, funcs = await asyncio.gather(\n    call_boto3(service_name='s3',operation_name='ListBuckets'),\n    call_boto3(service_name='lambda',operation_name='ListFunctions'),\n    return_exceptions=True,\n)\nresult = {\n    'buckets':len(buckets.get('Buckets',[])) if isinstance(buckets,dict) else f'ERR:{buckets}',\n    'functions':len(funcs.get('Functions',[])) if isinstance(funcs,dict) else f'ERR:{funcs}'}\nresult\n```\n\nMulti-region:\n```python\nregions = [r['RegionName'] for r in (await call_boto3(service_name='ec2', operation_name='DescribeRegions'))['Regions']]\nresponses = await asyncio.gather(*[call_boto3(service_name='ec2', operation_name='DescribeInstances', region_name=r) for r in regions], return_exceptions=True)\nresult = {r: len([i for rv in res.get('Reservations',[]) for i in rv['Instances']]) for r,res in zip(regions,responses) if isinstance(res,dict)}\nresult\n```\n\nList→Describe (auto-paginated - no token loop needed):\n```python\nr = await call_boto3(service_name='dynamodb', operation_name='ListTables')\ntables = r['TableNames']\nresult = await asyncio.gather(*[call_boto3(service_name='dynamodb',\n    operation_name='DescribeKinesisStreamingDestination',\n    params={'TableName': t}) for t in tables], return_exceptions=True)\nresult\n```",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "Python code to execute",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "fastmcp": {
+        "tags": []
+      }
+    }
+  },
+  {
+    "name": "aws___get_regional_availability",
+    "description": "AWS resource availability per region.\n\n- Max 10 regions; multi-region needs `filters`; single-region supports `next_token`.\n- Status: isAvailableIn | isNotAvailableIn | isPlannedIn | Not Found.\n- Response key: products | service_apis | cfn_resources.\n\nNot for region counts/docs/vague queries -- use `search_documentation` / `list_regions`.\n\nFilter values must EXACTLY match AWS's catalog names; guessed, partial, or pluralized names are rejected (\"values in filter parameter do not exist\"). If unsure of the exact name, first call once for a single region with resource_type set and NO filters to list all valid names, then re-call filtering on the exact match.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "AWS region codes (max 10). Multi-region requires `filters`; single-region supports `next_token`."
+        },
+        "resource_type": {
+          "type": "string",
+          "description": "Required: 'product' | 'api' | 'cfn'."
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Use exact AWS product or sub-feature name.\n\n- product: 'Amazon Bedrock' (service), or sub-features like 'Comprehend Auto Scaling', 'Latency-Based Routing', 'PrivateLink Support'. When the user names a specific sub-feature, filter on the sub-feature -- do NOT generalize to the parent service ('Amazon Comprehend'); that returns availability for the wrong scope.\n- api: 'SdkServiceId+Operation' (e.g. 'CloudFormation+CreateStack', 'IAM+GetSSHPublicKey') or 'SdkServiceId' (e.g. 'EC2'). Use a literal '+' between service and operation -- not space, colon, or hyphen.\n- cfn: 'AWS::EC2::Instance', 'AWS::Lambda::Function'.\n\nInclude every region the user named; don't add filters they didn't request.\n\nValues must EXACTLY match AWS's catalog (e.g. 'AWS Lambda', not 'Lambda' or 'AWS Lambda Service'). If unsure of the exact name, first call once for one region with NO filters to list valid names, then filter on the exact match."
+        },
+        "next_token": {
+          "type": "string",
+          "description": "Pagination token. Single-region, no filters only."
+        },
+        "region": {
+          "type": "string",
+          "description": "Unused; use `regions`."
+        }
+      },
+      "required": [
+        "resource_type"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "aws___list_regions",
+    "description": "Retrieve a list of all AWS regions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "aws___read_documentation",
+    "description": "Fetch full AWS doc pages as markdown. `search_documentation` already returns verbatim page chunks, so don't re-read a URL whose chunk you already have to \"confirm\" or \"round out\" an answer -- the chunk is the real page text; treat it as authoritative.\n\nReading the full page is justified ONLY when the chunks genuinely lack the content:\n- an enumeration or aggregation (\"list all X\", \"how many X\") needs the complete set and the chunks show only part of it;\n- no search result is on-topic after refining the query, and a known doc URL would have the answer.\nOtherwise, answer from the chunks. Use exact URLs from `search_documentation`; don't guess slugs.\n\nInput: `requests: [{url, max_length?, start_index?}]`. Batch 2-5.\n- `max_length` default 10000.\n- `start_index` default 0; use prior `end_index` to continue, TOC offset to jump.\n\nAllow-listed prefixes: docs.aws.amazon.com; aws.amazon.com (not /marketplace); repost.aws/knowledge-center; docs.amplify.aws; ui.docs.amplify.aws; github.com/{aws-cloudformation/aws-cloudformation-templates, aws-samples/{aws-cdk-examples, generative-ai-cdk-constructs-samples, serverless-patterns}, awsdocs/aws-cdk-guide, awslabs/aws-solutions-constructs, cdklabs/cdk-nag} (README on `main`); constructs.dev/packages/{@aws-cdk-containers, @aws-cdk, @cdk-cloudformation, aws-analytics-reference-architecture, aws-cdk-lib, cdk-amazon-chime-resources, cdk-aws-lambda-powertools-layer, cdk-ecr-deployment, cdk-lambda-powertools-python-layer, cdk-serverless-clamscan, cdk8s, cdk8s-plus-33}; strandsagents.com/latest/documentation/docs/.\n\nOutput: SUCCESS -- markdown + `total_length, start_index, end_index, truncated, redirected_url?` (truncated includes TOC with char ranges). ERROR -- `error_code` in {not_found, invalid_url, throttled, downstream_error, validation_error}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Doc URL with allow-listed prefix; use exact URL from search."
+              },
+              "max_length": {
+                "type": "integer",
+                "description": "Chars returned (default 10000)."
+              },
+              "start_index": {
+                "type": "integer",
+                "description": "Char offset (default 0). Use prior `end_index` to continue, or TOC offset to jump."
+              }
+            },
+            "required": [
+              "url"
+            ]
+          },
+          "description": "List of `{url, max_length?, start_index?}`. Batch 2-5."
+        }
+      },
+      "required": []
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "aws___retrieve_skill",
+    "description": "Retrieve an AWS skill (workflows, references). Returns SKILL.md, or `file` if given.\n\nCall `search_documentation` FIRST and copy `skill_name` verbatim -- it is an opaque registry ID. Never guess or fabricate `skill_name` or `file`.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Optional file path within the skill, copied as cited (e.g. `references/architecture.md`). Don't add or strip a `references/` prefix. Omit for SKILL.md."
+        },
+        "skill_name": {
+          "type": "string",
+          "description": "Required. Exact `skill_name` from a search_documentation result, copied verbatim. Do not invent or modify."
+        }
+      },
+      "required": [
+        "skill_name"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "aws___search_documentation",
+    "description": "AWS docs search. Each result's `context` is verbatim page text -- a real chunk of the actual page, not a short snippet -- and usually already contains the answer, so answer directly from it. Use `read_documentation` only when the chunks genuinely lack the needed detail.\n\nPick ONE topic. Add a 2nd ONLY if query genuinely spans domains. Extra topics dilute ranking.\n\n- reference_documentation -- API/SDK/CLI specs, config params\n- current_awareness -- new/released/announced\n- troubleshooting -- errors, \"how to fix\" (NOT for conceptual/feature questions)\n- amplify_docs -- Amplify (+ language)\n- cdk_docs -- CDK concepts/guides\n- cdk_constructs -- CDK code samples, L3\n- cloudformation -- CFN/SAM templates\n- strands_docs -- Strands Agents SDK (its Skills/agents concepts go here, NOT agent_skills)\n- agent_skills -- this tool's guided skills (load via `retrieve_skill`)\n- general (default) -- architecture, best practices, tutorials, feature behavior\n\nResults: rank_order (lower=better), url, title, context (verbatim page chunk -- answer directly from it).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return (default 4)."
+        },
+        "search_phrase": {
+          "type": "string",
+          "description": "Keywords; preserve exact error strings and all task terms verbatim."
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "topic name"
+          },
+          "description": "Up to 3 from: reference_documentation, current_awareness, troubleshooting, amplify_docs, cdk_docs, cdk_constructs, cloudformation, agent_skills, strands_docs, general. Default [\"general\"]."
+        }
+      },
+      "required": [
+        "search_phrase"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    }
+  }
+]

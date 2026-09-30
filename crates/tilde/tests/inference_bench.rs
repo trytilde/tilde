@@ -82,6 +82,7 @@ async fn serve_bench_gateway() {
     let agent = Uuid::new_v4();
     agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id: agent,
             name: "Bench".into(),

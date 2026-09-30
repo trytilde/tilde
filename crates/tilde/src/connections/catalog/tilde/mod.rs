@@ -23,6 +23,7 @@ pub fn definition() -> Provider {
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_CHAT.into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: TYPE_ID.into(),
             name: "Application".into(),
             credential_source: CredentialSource::Static {

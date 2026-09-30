@@ -1,25 +1,22 @@
 import { ThemeToggle } from "./theme-toggle";
-import { logout } from "@/auth";
 import { TildeWordmark } from "@trytilde/connection-ui";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  BookOpenIcon,
   BotIcon,
   ChevronRightIcon,
-  KeyRoundIcon,
-  LogOutIcon,
-  ShieldCheckIcon,
-  UsersIcon,
+  PlugIcon,
+  ServerIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useCaller } from "@/hooks/use-caller";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -31,20 +28,6 @@ import {
 const SidebarMaterial = lazy(() => import("./sidebar-material"));
 
 export function AppSidebar() {
-  const caller = useCaller();
-  const [signingOut, setSigningOut] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
-  async function signOut() {
-    setSigningOut(true);
-    setLogoutError("");
-    try {
-      await logout();
-    } catch (error) {
-      setLogoutError(error instanceof Error ? error.message : "Unable to sign out.");
-    } finally {
-      setSigningOut(false);
-    }
-  }
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
     <Sidebar collapsible="offcanvas" variant="inset">
@@ -72,40 +55,49 @@ export function AppSidebar() {
                       <span>Agent Registry</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                  {/* IAM groups the installation-wide identity pages. The group row only
-                      opens and closes; it is never the active page itself. */}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/skills")}
+                      render={<Link to="/skills" />}
+                    >
+                      <BookOpenIcon />
+                      <span>Skills</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  {/* Tools: the tool connections agents use, and the remote servers behind them. */}
                   <Collapsible
                     defaultOpen
                     className="group/collapsible"
                     render={<SidebarMenuItem />}
                   >
                     <CollapsibleTrigger render={<SidebarMenuButton />}>
-                      <ShieldCheckIcon />
-                      <span>IAM</span>
+                      <WrenchIcon />
+                      <span>Tools</span>
                       <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub className="border-sidebar-foreground">
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton
-                            isActive={pathname.startsWith("/api-keys")}
-                            render={<Link to="/api-keys" />}
+                            isActive={
+                              pathname.startsWith("/tools") &&
+                              !pathname.startsWith("/tools/remote-servers")
+                            }
+                            render={<Link to="/tools/connections" />}
                           >
-                            <KeyRoundIcon />
-                            <span>API keys</span>
+                            <PlugIcon />
+                            <span>Connections</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                        {caller.admin && (
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton
-                              isActive={pathname.startsWith("/groups")}
-                              render={<Link to="/groups" />}
-                            >
-                              <UsersIcon />
-                              <span>Groups</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        )}
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            isActive={pathname.startsWith("/tools/remote-servers")}
+                            render={<Link to="/tools/remote-servers" />}
+                          >
+                            <ServerIcon />
+                            <span>Remote servers</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </Collapsible>
@@ -113,25 +105,6 @@ export function AppSidebar() {
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="mt-auto">
-            {logoutError && (
-              <p role="alert" className="px-2 text-xs text-destructive">
-                {logoutError}
-              </p>
-            )}
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={() => void signOut()}
-                  disabled={signingOut}
-                  aria-busy={signingOut}
-                >
-                  <LogOutIcon />
-                  <span>Sign out</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
         </div>
       </div>
     </Sidebar>

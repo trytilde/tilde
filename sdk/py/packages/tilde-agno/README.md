@@ -1,25 +1,51 @@
 # Agno adapter
 
 Core history and delivery live in `trytilde`. This package converts typed context to
-Agno messages and channel tools to Agno functions, following Tilde's core/framework
-separation.
+Agno messages and channel tools to Agno functions, bundles an invocation's run options in
+`tilde_agno(ctx, agent)`, serves registry skills through `TildeSkills` and lets `tilde deploy`
+register module-level agents and teams.
 
 ```python
+import tilde
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
-from tilde_agno import convert_to_agno_messages, convert_to_agno_tools
+from agno.skills import LocalSkills
+from tilde_agno import TildeSkills, convert_to_agno_messages, tilde_agno
 
-history = await ctx.message.history()
-messages = await convert_to_agno_messages(history.items, context=ctx)
-agent = Agent(
-    model=OpenAIChat(id="gpt-4o-mini"),
+INFERENCE = tilde.inference("default")
+responder = Agent(
+    model=OpenAIChat(
+        id="gpt-4o-mini",
+        base_url=INFERENCE.base_url,
+        api_key=INFERENCE.api_key,
+        http_client=INFERENCE.async_client(),
+    ),
     instructions="Respond using the current channel's tools. Returned model text is private.",
-    tools=convert_to_agno_tools(ctx.channel.current),
+    skills=TildeSkills([LocalSkills("skills")]),
     tool_call_limit=8,
     telemetry=False,
 )
-await agent.arun(input=messages)
+
+
+async def run(ctx):
+    history = await ctx.message.history()
+    messages = await convert_to_agno_messages(history.items, context=ctx)
+    await responder.arun(input=messages, **await tilde_agno(ctx, responder))
 ```
+
+`tilde_agno` returns `run_context` (with the current channel's tools as Agno's per-run
+`client_tools`), a `run_id` that a stop or suspension cancels, and the thread as `session_id`.
+Agno has no per-step message hook, so input steered while the agent works is appended to the
+next Tilde tool result by a tool hook (an agent-level `tool_hooks` replaces it). Dynamic
+`instructions`, `description` or `system_message` stamp the invocation's model calls.
+`TildeSkills` is Agno's `Skills` plus the skills assigned to the agent in Tilde, loaded for each
+invocation from `ctx.skills.directory()`; with plain `Skills` (or none) the registry skills come
+as `list_skills`/`read_skill` tools with their summary in the system message.
+
+`tilde deploy` (entry point `tilde.discover`) registers each module-level `Agent`/`Team`:
+`<name or variable>/instructions` (`/<n>` from 1 for a list), `/description` and
+`/system_message`, plain or braces when `{var}` is resolved in context, dynamic (the function's
+source) for callables; `LocalSkills` folders ship with the deployment.
 
 The converted list is passed as the run input. Agno appends a `list[Message]` input verbatim
 after its own system message, so roles and media survive and Tilde remains the source of
@@ -79,3 +105,34 @@ conflicts raise.
 The core SDK exposes typed callable tools on `ctx.channel.slack`, `github`, `agentmail`,
 `linq`, `whatsapp`, `telnyx_whatsapp`, and `native`. Use `ctx.channel.connections()` and
 `ctx.channel.for_connection(id)` when multiple connections use a provider.
+
+## Bundled tools
+
+The agent's own Agno tools join Tilde's with one call:
+
+```python
+from tilde import BundledOptions
+from tilde_agno import with_tilde_tools
+
+
+def roll_dice(count: int = 1) -> list[int]:
+    """Roll six-sided dice."""
+    return [random.randint(1, 6) for _ in range(count)]
+
+
+tools = await with_tilde_tools(
+    ctx, [roll_dice], options={"roll_dice": BundledOptions(summary="Rolled dice")}
+)
+agent = Agent(model=model, tools=tools)
+await agent.arun(input=messages)
+```
+
+`with_tilde_tools` takes plain functions, `@tool` functions and toolkits and returns the
+current channel's tools, `ctx.agent_tools` and copies of the native functions. It publishes the
+native tools to Tilde with their parameter schema and MCP `annotations` hints, so
+`tools.search` finds them and a `tools.execute` naming one runs it here as the same agent. Every
+call is audited once with the model's call id by `pre_hook`/`post_hook`, chained around the
+tool's own hooks; the entrypoint is untouched, so Agno's argument injection keeps working. Agno
+has no free metadata or output schema, so summaries come from `options`. Run with `arun`: the
+audit hooks are async. Agno swallows hook errors, so a failed audit never fails the call, and
+toolkit-level instructions are not carried over.

@@ -117,8 +117,15 @@ impl Deployments {
                 tracing::warn!(agent_id=%agent, dropped = before - usage.len(), "Rejected inference records for unassigned connections");
             }
             if !usage.is_empty() {
-                crate::inference::db::requests_insert_execute(&self.pool.get().await?, &usage)
-                    .await?;
+                let db = self.pool.get().await?;
+                let records: Vec<&crate::inference::audit::Record> = usage.iter().collect();
+                crate::inference::db::requests_insert_execute(&db, &records).await?;
+                // Sidecar records carry stamps only; see inference::audit.
+                let stamped: Vec<_> = usage.iter().map(|r| (r, None)).collect();
+                let mut linker = crate::prompts::matching::Linker::new(
+                    crate::prompts::Prompts::new(self.pool.clone()),
+                );
+                crate::inference::audit::link_prompts(&db, &mut linker, &stamped).await;
             }
         }
         let (rejected, lost) = match self
@@ -498,6 +505,7 @@ impl Deployments {
                     &(value.input_json),
                     &(value.output_json),
                     &(value.error),
+                    &(value.summary),
                 )
                 .await?;
             }

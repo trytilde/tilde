@@ -25,13 +25,14 @@ pub struct RunParams<
     pub p9: Option<T9>,
     pub p10: Option<T10>,
     pub p11: Option<T11>,
+    pub p12: Option<uuid::Uuid>,
 }
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label",
+        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label,tool_host_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label,tool_host_id=excluded.tool_host_id",
         None,
     )
 }
@@ -73,9 +74,10 @@ impl RunStmt {
         p9: &'a Option<T9>,
         p10: &'a Option<T10>,
         p11: &'a Option<T11>,
+        p12: &'a Option<uuid::Uuid>,
     ) -> Result<u64, tokio_postgres::Error> {
         client
-            .execute(self.0, &[p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11])
+            .execute(self.0, &[p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12])
             .await
     }
 }
@@ -125,6 +127,7 @@ impl<
             &params.p9,
             &params.p10,
             &params.p11,
+            &params.p12,
         ))
     }
 }

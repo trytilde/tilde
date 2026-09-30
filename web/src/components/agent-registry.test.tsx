@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }));
+// The inference tab stays mounted; its connections and budgets have their own tests.
+vi.mock("@/components/agent-connections", () => ({ AgentConnections: () => null }));
 import { useState } from "react";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { AgentEditor } from "./agent-editor";
@@ -10,7 +11,7 @@ import {
   BinaryPermission,
   TargetSelection,
 } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
-import { AgentRegistry } from "./agent-registry";
+import { AgentRegistry, type RegistrySearch } from "./agent-registry";
 
 const rpc = vi.hoisted(() => ({
   listAgents: vi.fn(),
@@ -21,11 +22,10 @@ const rpc = vi.hoisted(() => ({
   pauseAgent: vi.fn(),
   resumeAgent: vi.fn(),
 }));
-vi.mock("@/client", () => ({ agents: rpc }));
-// ResourceKind.AGENT = 1: these tests exercise the registry as a caller who may create agents.
-vi.mock("@/hooks/use-caller", () => ({
-  CallerProvider: ({ children }: { children: ReactNode }) => children,
-  useCaller: () => ({ userId: "user-1", admin: true, groupIds: [], creatable: [1] }),
+// The editor's usage chart loads in the background; it never answers here.
+vi.mock("@/client", () => ({
+  agents: rpc,
+  inference: { getUsage: () => new Promise(() => {}) },
 }));
 afterEach(() => {
   cleanup();
@@ -54,7 +54,65 @@ function RegistryHarness() {
   );
 }
 
+// Stands in for the home route, which keeps these filters in the URL.
+function FilteredRegistry({ initial = {} }: { initial?: RegistrySearch }) {
+  const [search, setSearch] = useState(initial);
+  return (
+    <AgentRegistry
+      search={search}
+      onSearch={(patch) => setSearch((previous) => ({ ...previous, ...patch }))}
+      onOpen={() => {}}
+      onCreate={() => {}}
+    />
+  );
+}
+
 describe("Agent Registry", () => {
+  it("sends search and health filters to the server and restarts paging from the first page", async () => {
+    rpc.listAgents.mockImplementation(async ({ pageToken }) =>
+      pageToken
+        ? { agents: [grace], nextPageToken: "" }
+        : { agents: [ada], nextPageToken: "server-cursor" },
+    );
+    render(<FilteredRegistry initial={{ state: "paused" }} />);
+    await screen.findByRole("row", { name: "Edit Ada" });
+    expect(rpc.listAgents.mock.lastCall![0]).toMatchObject({ paused: true, search: "" });
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByRole("row", { name: "Edit Grace" });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Unhealthy" }));
+    await screen.findByRole("row", { name: "Edit Ada" });
+    expect(rpc.listAgents.mock.lastCall![0]).toMatchObject({
+      pageToken: "",
+      health: AgentHealthStatus.UNHEALTHY,
+      paused: true,
+    });
+
+    const calls = rpc.listAgents.mock.calls.length;
+    const input = screen.getByRole("textbox", { name: "Search agents" });
+    fireEvent.change(input, { target: { value: "bil" } });
+    fireEvent.change(input, { target: { value: "billing " } });
+    await waitFor(() =>
+      expect(rpc.listAgents.mock.lastCall![0]).toMatchObject({
+        search: "billing",
+        health: AgentHealthStatus.UNHEALTHY,
+        pageToken: "",
+      }),
+    );
+    // Debounced: the intermediate keystroke never reaches the server.
+    expect(rpc.listAgents.mock.calls.slice(calls).map(([request]) => request.search)).toEqual([
+      "billing",
+    ]);
+
+    rpc.listAgents.mockResolvedValue({ agents: [], nextPageToken: "" });
+    fireEvent.click(screen.getByRole("tab", { name: "All" }));
+    await screen.findByText("No agents match these filters.");
+    expect(rpc.listAgents.mock.lastCall![0]).toMatchObject({
+      search: "billing",
+      health: AgentHealthStatus.UNSPECIFIED,
+    });
+  });
+
   it("renders measured health, twelve hourly bars, and thread metrics", async () => {
     const healthHistory = Array.from({ length: 12 }, (_, index) => ({
       totalChecks: index < 7 ? 120 : 0,
@@ -106,7 +164,9 @@ describe("Agent Registry", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(
+      within(screen.getByRole("navigation", { name: "Pagination" })).queryByRole("tab"),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: /first page|last page/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     await screen.findByRole("row", { name: "Edit Grace" });
@@ -114,6 +174,8 @@ describe("Agent Registry", () => {
     expect(rpc.listAgents.mock.lastCall![0]).toEqual({
       pageToken: "server-cursor",
       pageSize: 10,
+      search: "",
+      health: AgentHealthStatus.UNSPECIFIED,
     });
     expect((screen.getByRole("button", { name: "Next page" }) as HTMLButtonElement).disabled).toBe(
       true,

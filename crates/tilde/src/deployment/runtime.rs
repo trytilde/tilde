@@ -80,6 +80,8 @@ pub(crate) struct Memory {
     /// Ready inference connections from the replicated configuration, by slug.
     inference_upstreams: Arc<crate::inference::Upstreams>,
     inference: std::sync::OnceLock<crate::inference::Gateway>,
+    /// The deployment's text-matchable prompts from the first Watch snapshot, for the audit worker.
+    pub(crate) prompts: std::sync::OnceLock<Vec<control::PromptPattern>>,
     pub(crate) outbox_notify: tokio::sync::Notify,
     pub(crate) work: SyncMutex<VecDeque<(Uuid, Uuid)>>,
     pub(crate) work_notify: tokio::sync::Notify,
@@ -126,6 +128,7 @@ impl Runtime {
                 outbox: SyncMutex::default(),
                 inference_upstreams: Arc::default(),
                 inference: std::sync::OnceLock::new(),
+                prompts: std::sync::OnceLock::new(),
                 outbox_notify: tokio::sync::Notify::new(),
                 work: SyncMutex::default(),
                 work_notify: tokio::sync::Notify::new(),
@@ -809,42 +812,6 @@ impl Runtime {
         let mut thread = t.thread.clone();
         thread.participants.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(thread)
-    }
-    pub async fn list_threads(
-        &self,
-        after: &str,
-        limit: usize,
-    ) -> Result<(Vec<types::Thread>, String)> {
-        let mut keys: Vec<Uuid> = self
-            .state
-            .threads
-            .read()
-            .unwrap_or_else(|e| e.into_inner())
-            .keys()
-            .copied()
-            .collect();
-        keys.sort();
-        let start = if after.is_empty() {
-            None
-        } else {
-            Some(id(after)?)
-        };
-        let mut threads = vec![];
-        let mut next = String::new();
-        for key in keys
-            .into_iter()
-            .filter(|k| start.is_none_or(|after| *k > after))
-        {
-            if threads.len() == limit {
-                next = threads
-                    .last()
-                    .map(|t: &types::Thread| t.id.clone())
-                    .unwrap_or_default();
-                break;
-            }
-            threads.push(self.thread(key).await?);
-        }
-        Ok((threads, next))
     }
     pub async fn add_participant(&self, r: chat::AddParticipant) -> Result<types::Thread> {
         let thread = id(&r.thread_id)?;

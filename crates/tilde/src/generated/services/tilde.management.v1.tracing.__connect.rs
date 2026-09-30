@@ -1,15 +1,3 @@
-///Shorthand for `OwnedView<GetTracingStatusRequestView<'static>>`.
-pub type OwnedGetTracingStatusRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusRequestView<
-        'static,
-    >,
->;
-///Shorthand for `OwnedView<GetTracingStatusResponseView<'static>>`.
-pub type OwnedGetTracingStatusResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusResponseView<
-        'static,
-    >,
->;
 ///Shorthand for `OwnedView<ListObservationsRequestView<'static>>`.
 pub type OwnedListObservationsRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::ListObservationsRequestView<
@@ -50,48 +38,18 @@ pub type OwnedGetSessionRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetSessionResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::GetSessionResponseView<'static>,
 >;
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::management::v1::GetTracingStatusResponse,
->
-for crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusResponseView<
-    '_,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<
-    crate::proto::tilde::management::v1::GetTracingStatusResponse,
->
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusResponseView<
+///Shorthand for `OwnedView<GetTraceObjectUrlRequestView<'static>>`.
+pub type OwnedGetTraceObjectUrlRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlRequestView<
         'static,
     >,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
+>;
+///Shorthand for `OwnedView<GetTraceObjectUrlResponseView<'static>>`.
+pub type OwnedGetTraceObjectUrlResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::tilde::management::v1::ListObservationsResponse,
 >
@@ -244,14 +202,50 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetTraceObjectUrlResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetTraceObjectUrlResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const TRACING_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.TracingService";
-/// Static [`Spec`](::connectrpc::Spec) for the `GetTracingStatus` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const TRACING_SERVICE_GET_TRACING_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.management.v1.TracingService/GetTracingStatus",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListObservations` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const TRACING_SERVICE_LIST_OBSERVATIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.TracingService/ListObservations",
@@ -276,7 +270,13 @@ pub const TRACING_SERVICE_GET_SESSION_SPEC: ::connectrpc::Spec = ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
-/// Read-only observability. Langfuse credentials never cross this API boundary.
+/// Static [`Spec`](::connectrpc::Spec) for the `GetTraceObjectUrl` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const TRACING_SERVICE_GET_TRACE_OBJECT_URL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.TracingService/GetTraceObjectUrl",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Read-only observability over Tilde's span store. Storage credentials never cross this API boundary.
 ///
 /// # Implementing handlers
 ///
@@ -327,29 +327,6 @@ pub const TRACING_SERVICE_GET_SESSION_SPEC: ::connectrpc::Spec = ::connectrpc::S
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait TracingService: Send + Sync + 'static {
-    /// Handle the GetTracingStatus RPC.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn get_tracing_status<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::management::v1::GetTracingStatusRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::management::v1::GetTracingStatusResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
     /// Handle the ListObservations RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -442,6 +419,30 @@ pub trait TracingService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// A short-lived URL for media (`@@@tildeMedia:...|id=<id>|...@@@` in a payload) or a full
+    /// payload (`tilde.observation.input_ref` / `output_ref` attribute) of the agent's observations.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_trace_object_url<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::GetTraceObjectUrlResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -474,35 +475,6 @@ impl<S: TracingService> TracingServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
-            .route_view_idempotent(
-                TRACING_SERVICE_SERVICE_NAME,
-                "GetTracingStatus",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::management::v1::GetTracingStatusRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_tracing_status(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::management::v1::GetTracingStatusResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(TRACING_SERVICE_GET_TRACING_STATUS_SPEC)
             .route_view_idempotent(
                 TRACING_SERVICE_SERVICE_NAME,
                 "ListObservations",
@@ -619,6 +591,35 @@ impl<S: TracingService> TracingServiceExt for S {
                 },
             )
             .with_spec(TRACING_SERVICE_GET_SESSION_SPEC)
+            .route_view_idempotent(
+                TRACING_SERVICE_SERVICE_NAME,
+                "GetTraceObjectUrl",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_trace_object_url(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::GetTraceObjectUrlResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(TRACING_SERVICE_GET_TRACE_OBJECT_URL_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -673,12 +674,6 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("tilde.management.v1.TracingService/")?;
         match method {
-            "GetTracingStatus" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
-                        .with_spec(TRACING_SERVICE_GET_TRACING_STATUS_SPEC),
-                )
-            }
             "ListObservations" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -703,6 +698,12 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
                         .with_spec(TRACING_SERVICE_GET_SESSION_SPEC),
                 )
             }
+            "GetTraceObjectUrl" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(TRACING_SERVICE_GET_TRACE_OBJECT_URL_SPEC),
+                )
+            }
             _ => None,
         }
     }
@@ -718,28 +719,6 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "GetTracingStatus" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::management::v1::GetTracingStatusRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::management::v1::GetTracingStatusRequest,
-                    >::from_parts(&req, &body);
-                    svc.get_tracing_status(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::management::v1::GetTracingStatusResponse,
-                        >(format)
-                })
-            }
             "ListObservations" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -828,6 +807,28 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
                         >(format)
                 })
             }
+            "GetTraceObjectUrl" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_trace_object_url(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::GetTraceObjectUrlResponse,
+                        >(format)
+                })
+            }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
         }
     }
@@ -895,7 +896,7 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
 /// let client = TracingServiceClient::new(conn, config);
-/// let response = client.get_tracing_status(request).await?;
+/// let response = client.list_observations(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -907,7 +908,7 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
 /// let client = TracingServiceClient::new(http, config);
-/// let response = client.get_tracing_status(request).await?;
+/// let response = client.list_observations(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -917,7 +918,7 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.get_tracing_status(request).await?;
+/// let resp = client.list_observations(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -925,7 +926,7 @@ impl<T: TracingService> ::connectrpc::Dispatcher for TracingServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.get_tracing_status(request).await?.into_owned();
+/// let owned = client.list_observations(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -955,51 +956,6 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
-    }
-    /// Call the GetTracingStatus RPC. Sends a request to /tilde.management.v1.TracingService/GetTracingStatus.
-    pub async fn get_tracing_status(
-        &self,
-        request: crate::proto::tilde::management::v1::GetTracingStatusRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.get_tracing_status_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the GetTracingStatus RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_tracing_status_with_options(
-        &self,
-        request: crate::proto::tilde::management::v1::GetTracingStatusRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::management::v1::__buffa::view::GetTracingStatusResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                TRACING_SERVICE_GET_TRACING_STATUS_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
     }
     /// Call the ListObservations RPC. Sends a request to /tilde.management.v1.TracingService/ListObservations.
     pub async fn list_observations(
@@ -1175,6 +1131,51 @@ where
                 &self.transport,
                 &self.config,
                 TRACING_SERVICE_GET_SESSION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetTraceObjectUrl RPC. Sends a request to /tilde.management.v1.TracingService/GetTraceObjectUrl.
+    pub async fn get_trace_object_url(
+        &self,
+        request: crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_trace_object_url_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetTraceObjectUrl RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_trace_object_url_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::GetTraceObjectUrlRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetTraceObjectUrlResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                TRACING_SERVICE_GET_TRACE_OBJECT_URL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

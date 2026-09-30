@@ -4,6 +4,8 @@ include!("tilde.runtime.v1.agents.rs");
 include!("tilde.runtime.v1.cache.rs");
 include!("tilde.runtime.v1.chat.rs");
 include!("tilde.runtime.v1.controls.rs");
+include!("tilde.runtime.v1.prompts.rs");
+include!("tilde.runtime.v1.skills.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -25,6 +27,8 @@ pub mod __buffa {
         include!("tilde.runtime.v1.cache.__view.rs");
         include!("tilde.runtime.v1.chat.__view.rs");
         include!("tilde.runtime.v1.controls.__view.rs");
+        include!("tilde.runtime.v1.prompts.__view.rs");
+        include!("tilde.runtime.v1.skills.__view.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -60,6 +64,8 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_TYPING_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_TYPING_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_BUNDLED_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REGISTER_BUNDLED_TOOLS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TOOLS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_REQUEST_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_RESPONSE_JSON_ANY);
@@ -81,6 +87,25 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SKILL_FILE_INFO_JSON_ANY);
+        reg.register_json_any(super::__SKILL_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__READ_SKILL_FILE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__READ_SKILL_FILE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILL_SOURCES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SOURCE_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__LIST_SKILL_SOURCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ASSIGN_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ASSIGN_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNASSIGN_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__WRITE_SKILL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WRITE_SKILL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SYNC_SKILL_SOURCE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SYNC_SKILL_SOURCE_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -212,6 +237,14 @@ pub use self::__buffa::view::ListToolsRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListToolsRequestOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::RegisterBundledToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterBundledToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterBundledToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RegisterBundledToolsResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ListToolsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListToolsResponseOwnedView;
@@ -295,5 +328,81 @@ pub use self::__buffa::view::AcknowledgeCommandRequestOwnedView;
 pub use self::__buffa::view::AcknowledgeCommandResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListPromptsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillFileInfoView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillFileInfoOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReadSkillFileRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ReadSkillFileRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReadSkillFileResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ReadSkillFileResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SourceSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::SourceSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSkillSourcesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AssignSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnassignSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WriteSkillRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::WriteSkillRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WriteSkillResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::WriteSkillResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SyncSkillSourceResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

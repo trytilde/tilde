@@ -8,6 +8,7 @@ uv sync --frozen "${shared[@]}" \
   --package trytilde-langchain --package trytilde-pydantic-ai \
   --package trytilde-openai-agents --package trytilde-agno \
   --package example-agent-langchain --package example-agent-pydantic-ai \
-  --package example-agent-openai-agents --package example-agent-agno
+  --package example-agent-openai-agents --package example-agent-agno \
+  --package example-tool-server
 UV_PROJECT_ENVIRONMENT=.venv-crewai uv sync --frozen "${shared[@]}" \
   --package trytilde-crewai --package example-agent-crewai

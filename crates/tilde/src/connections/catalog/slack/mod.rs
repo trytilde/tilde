@@ -4,20 +4,20 @@ use crate::connections::model::*;
 pub fn definition() -> Provider {
     Provider {
         account_name_label: Some("Slack workspace".into()),
-        icon_url: Some(
-            "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/slack/default.svg"
-                .into(),
+        icon_url: Some("/provider-icons/slack.svg".into()),
+        instructions: Some(
+            "Connect a Slack app to receive workspace conversations and use Slack tools.".into(),
         ),
-        instructions: Some("Connect a Slack app to receive workspace conversations.".into()),
         id: "slack".into(),
         name: "Slack".into(),
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_CHAT.into()],
         connection_types: vec![ConnectionType {
+            mcp: None,
             id: "slack_app".into(),
             name: "Slack App".into(),
             credential_source: CredentialSource::Custom,
-            capabilities: vec![Capability::Channel],
+            capabilities: vec![Capability::Channel, Capability::Tool],
         }],
     }
 }
@@ -118,24 +118,35 @@ pub(crate) fn slack_account_label(values: &Values) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Bot scopes for chat and for the Slack tools (`tools/providers/slack.rs`).
 fn slack_scopes() -> Vec<&'static str> {
     vec![
         "app_mentions:read",
         "channels:history",
         "channels:join",
+        "channels:manage",
         "channels:read",
         "chat:write",
         "chat:write.public",
+        "emoji:read",
+        "files:read",
+        "files:write",
         "groups:history",
         "groups:read",
+        "groups:write",
         "im:history",
         "im:read",
         "im:write",
         "mpim:history",
         "mpim:read",
-        "files:read",
+        "mpim:write",
+        "pins:read",
+        "pins:write",
         "reactions:read",
         "reactions:write",
+        "team:read",
+        "usergroups:read",
+        "users.profile:read",
         "users:read",
         "users:read.email",
     ]

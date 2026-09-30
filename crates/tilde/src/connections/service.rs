@@ -17,10 +17,23 @@ use std::sync::Arc;
 use subtle::ConstantTimeEq;
 use uuid::Uuid;
 
+/// Which connections a list returns; every filter applies in SQL before the page. With
+/// `agent_id`, `capability` narrows to that assignment; alone it keeps connections whose type
+/// offers it (channel: still unassigned). `search` matches the name, account label or provider
+/// name.
+#[derive(Default)]
+pub struct ConnectionFilter<'a> {
+    pub agent_id: Option<Uuid>,
+    pub capability: Option<Capability>,
+    pub search: Option<&'a str>,
+    pub provider_id: Option<&'a str>,
+    pub status: Option<&'a str>,
+    pub source: Option<crate::connections::catalog::ProviderSource>,
+}
 #[derive(Clone)]
 pub struct Connections {
     pub(crate) pool: Pool,
-    pub(super) crypto: Arc<Encryption>,
+    pub(crate) crypto: Arc<Encryption>,
     /// Browser-facing setup pages and OAuth redirects on management.
     pub(crate) public_url: String,
     /// Provider webhook delivery only, independently exposed from management.
@@ -82,7 +95,7 @@ impl Connections {
             crypto,
             public_url: public_url.trim_end_matches('/').into(),
             public_event_ingress_url: public_event_ingress_url.trim_end_matches('/').into(),
-            http: Http::new()?,
+            http: Http::new()?.with_private_origin(endpoints.0.get("mcp_private_origin").cloned()),
             endpoints,
             credentials: Arc::default(),
             notifications: Arc::default(),
@@ -129,6 +142,7 @@ impl Connections {
                 },
             );
     }
+    /// Reconcile the built-in provider catalog.
     pub async fn seed(&self) -> Result<(), Error> {
         catalog::seed(&self.pool).await
     }
@@ -165,15 +179,33 @@ impl Connections {
             }
         };
         let identity = remote_authorization.as_ref().map(|_| authorization_id);
-        catalog::register(&self.pool, provider, false, remote_authorization, identity).await
+        catalog::register(
+            &self.pool,
+            provider,
+            false,
+            remote_authorization,
+            identity,
+            None,
+        )
+        .await
     }
     pub async fn providers(
         &self,
         after: &str,
-        search: Option<&str>,
+        filter: &catalog::ProviderFilter<'_>,
         size: u32,
     ) -> Result<(Vec<Provider>, String), Error> {
-        catalog::list(&self.pool, after, search, size).await
+        catalog::list(&self.pool, after, filter, size).await
+    }
+    /// The categories of the providers `filter`'s capability and source keep.
+    pub async fn provider_categories(
+        &self,
+        filter: &catalog::ProviderFilter<'_>,
+    ) -> Result<Vec<String>, Error> {
+        Ok(
+            crate::connections::db::provider_categories_all(&self.pool.get().await?, filter)
+                .await?,
+        )
     }
     pub async fn provider(&self, id: &str) -> Result<Provider, Error> {
         catalog::get(&self.pool, id).await
@@ -190,23 +222,23 @@ impl Connections {
         agent_id: Option<Uuid>,
         capability: Option<Capability>,
     ) -> Result<(Vec<Connection>, Option<(chrono::DateTime<Utc>, Uuid)>), Error> {
-        self.list_as(
+        self.list_filtered(
             after,
             size,
-            agent_id,
-            capability,
-            &crate::iam::authz::Access::system(),
+            &ConnectionFilter {
+                agent_id,
+                capability,
+                ..Default::default()
+            },
         )
         .await
     }
-    /// Every connection; attached agents are listed only when the caller can view them.
-    pub async fn list_as(
+    /// Every connection `filter` keeps.
+    pub async fn list_filtered(
         &self,
         after: Option<(chrono::DateTime<Utc>, Uuid)>,
         size: u32,
-        agent_id: Option<Uuid>,
-        capability: Option<Capability>,
-        caller: &crate::iam::authz::Access,
+        filter: &ConnectionFilter<'_>,
     ) -> Result<(Vec<Connection>, Option<(chrono::DateTime<Utc>, Uuid)>), Error> {
         let size = if size == 0 { 50 } else { size.min(100) };
         let mut rows = crate::connections::db::connection_list_all(
@@ -214,9 +246,7 @@ impl Connections {
             after.map(|p| p.0),
             after.map(|p| p.1),
             i64::from(size) + 1,
-            agent_id,
-            capability.map(Capability::as_str),
-            caller,
+            filter,
         )
         .await?;
         let more = rows.len() > size as usize;
@@ -616,6 +646,9 @@ impl Connections {
         runtime.validate_input(&typ, &setup.step, &values)?;
         self.claim(&setup, action, &setup.step).await?;
         let result = self.start_method(&setup, &connection, &typ, values).await;
+        if let Err(Error::CredentialsRejected(message)) = result {
+            return Err(Error::CredentialsRejected(message));
+        }
         if let Err(error) = result {
             // The broker only shows the generic failure; keep the provider's reason server-side.
             tracing::warn!(
@@ -684,7 +717,8 @@ impl Connections {
             return self.brokering_url(&setup);
         }
         let result = self.finish_callback(&setup, parameters).await;
-        if result.is_err() {
+        // A tool host's refusal already returned the setup to its form.
+        if result.is_err() && !matches!(result, Err(Error::CredentialsRejected(_))) {
             self.fail(&setup, "provider_callback_failed").await?;
         }
         self.brokering_url(&setup)
@@ -711,7 +745,7 @@ impl Connections {
         &self,
         setup: &Setup,
         token: Option<Token>,
-        account: Option<String>,
+        mut account: Option<String>,
     ) -> Result<(), Error> {
         let expires = token.as_ref().and_then(|t| t.expires_at);
         if let Some(token) = token {
@@ -724,6 +758,36 @@ impl Connections {
                 values.insert("scope".into(), SecretString::from(scope));
             }
             self.stage(setup, &values).await?;
+        }
+        // An instance of a tool host's provider is ready only once its host accepts the
+        // credentials. A refusal rewinds the setup to its form so they can be corrected there.
+        let connection = self.get(setup.connection_id).await?;
+        let hosts = crate::tools::hosts::ToolHosts::new(self.clone());
+        let verified = match hosts.of_provider(&connection.provider_id).await? {
+            Some(host) => {
+                hosts
+                    .verify(
+                        host,
+                        connection.id,
+                        &connection.type_id,
+                        &self.staged(setup).await?,
+                    )
+                    .await
+            }
+            None => Ok(None),
+        };
+        match verified {
+            Ok(label) => account = label.or(account),
+            Err(Error::CredentialsRejected(message)) => {
+                crate::connections::db::setup_values_delete_execute(
+                    &self.pool.get().await?,
+                    setup.id,
+                )
+                .await?;
+                self.transition(setup, "fields").await?;
+                return Err(Error::CredentialsRejected(message));
+            }
+            Err(error) => return Err(error),
         }
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
@@ -1046,13 +1110,6 @@ impl Connections {
             {
                 catalog::tilde::create(&tx, &self.crypto, agent.id, &agent.name).await?;
             }
-            // Role rows are idempotent; agents from before roles existed get theirs here.
-            crate::iam::authz::create_roles(
-                &tx,
-                crate::iam::authz::Resource::agent(agent.id),
-                &crate::iam::authz::Access::system(),
-            )
-            .await?;
             tx.commit().await?;
             drop(tx_client);
         }
@@ -1082,10 +1139,17 @@ impl Connections {
         row: &Connection,
         assignment: &Assignment,
     ) -> Result<(), Error> {
+        if assignment.capability == Capability::Tool {
+            return Err(invalid(
+                "Tools are given by adding the connection to an agent's tools, not by an assignment",
+            ));
+        }
         if !row.capable(assignment.capability) {
             return Err(invalid(match assignment.capability {
                 Capability::Channel => "This connection type does not support chat",
                 Capability::Inference => "This connection type does not support inference",
+                Capability::Skills => "Every connection supports skills",
+                Capability::Tool => "This connection type does not serve tools",
             }));
         }
         if crate::connections::db::agent_exists_opt(tx, assignment.agent_id)
@@ -1106,7 +1170,7 @@ impl Connections {
         }
         match (&assignment.alias, assignment.capability) {
             (Some(alias), Capability::Inference) => validate_alias(alias)?,
-            (Some(_), Capability::Channel) => {
+            (Some(_), _) => {
                 return Err(invalid("Only inference assignments take an alias"));
             }
             (None, _) => {}

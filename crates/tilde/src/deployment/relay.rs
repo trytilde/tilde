@@ -20,6 +20,12 @@ struct RuntimeClaims {
     iat: i64,
     exp: i64,
 }
+/// Runtime services a sidecar cannot serve from its replicated state.
+pub const RELAYED_SERVICES: &[&str] = &[
+    "tilde.runtime.v1.AgentService/",
+    "tilde.runtime.v1.PromptService/",
+    "tilde.runtime.v1.SkillService/",
+];
 impl Deployments {
     pub async fn relay(
         &self,
@@ -27,9 +33,9 @@ impl Deployments {
         r: wire::RelayRequest,
     ) -> Result<wire::CallResult, Error> {
         let instance = id(&r.instance_id)?;
-        let method = r
-            .path
-            .strip_prefix("tilde.runtime.v1.AgentService/")
+        let method = RELAYED_SERVICES
+            .iter()
+            .find_map(|service| r.path.strip_prefix(service))
             .ok_or(Error::Denied)?;
         if method.is_empty() || !method.bytes().all(|b| b.is_ascii_alphanumeric()) {
             return Err(Error::Denied);
@@ -125,10 +131,14 @@ impl Deployments {
                 invocation_id: claims.invocation_id,
             });
         request.extensions_mut().insert(scope);
-        let response = match crate::agent::rpc::runtime::router(self.agents.clone(), self.chat())
-            .oneshot(request)
-            .await
-        {
+        let chat = self.chat();
+        let router = crate::agent::rpc::runtime::router(self.agents.clone(), chat.clone())
+            .merge(crate::prompts::rpc::runtime_router(
+                crate::prompts::Prompts::new(self.pool.clone()),
+                chat.clone(),
+            ))
+            .merge(crate::skills::rpc::runtime_router(chat.skills()?, chat));
+        let response = match router.oneshot(request).await {
             Ok(response) => response,
             Err(never) => match never {},
         };

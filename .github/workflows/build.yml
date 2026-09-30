@@ -8,41 +8,27 @@ on:
 permissions:
   contents: read
 jobs:
-  binary:
-    name: Build ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-          - os: macos-15
-            target: aarch64-apple-darwin
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+  # Releases publish exactly these packages, so a failed pack fails the PR, not the release.
+  sdk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - run: task version:check build
-      - name: Archive and smoke-test binary
-        env:
-          RELEASE_TARGET: ${{ matrix.target }}
-        run: task release:archive
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir sdk/ts install --frozen-lockfile
+      - run: task sdk:pack sdk:py:pack
       - uses: actions/upload-artifact@v4
         with:
-          name: tilde-${{ matrix.target }}
-          path: dist/release/*
-          if-no-files-found: error
-      - name: Pack SDK packages
-        if: runner.os == 'Linux'
-        run: task sdk:pack
-      - uses: actions/upload-artifact@v4
-        if: runner.os == 'Linux'
-        with:
-          name: sdk-packages
+          name: npm-packages
           path: dist/npm/*.tgz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-packages
+          path: dist/py/*
           if-no-files-found: error
   container:
     runs-on: ubuntu-24.04

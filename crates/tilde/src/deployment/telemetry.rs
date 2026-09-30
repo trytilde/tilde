@@ -1,5 +1,5 @@
 //! Agent OTLP arrives at the replica, is stamped with its verified invocation
-//! scope, and travels to the gateway as Telemetry frames. Langfuse credentials
+//! scope, and travels to the gateway as Telemetry frames. Storage credentials
 //! and external export exist only at the gateway.
 use super::{Deployments, runtime::Runtime, sidecar::Node};
 use crate::{
@@ -98,13 +98,11 @@ pub(crate) fn normalize(
     }
     Ok(request)
 }
-/// Queue a verified trace batch for the gateway when tracing is enabled.
+/// Queue a verified trace batch for the gateway once the sidecar is configured.
 pub fn relay_traces(runtime: &Runtime, request: &ExportTraceServiceRequest) -> Result<()> {
-    if !runtime.configuration()?.tracing_enabled {
-        return Ok(());
-    }
+    runtime.configuration()?;
     let mut request = request.clone();
-    crate::telemetry::mapping::stamp_version(
+    crate::telemetry::tracing::mapping::stamp_version(
         &mut request.resource_spans,
         "tilde.sidecar.version",
         env!("CARGO_PKG_VERSION"),
@@ -254,12 +252,13 @@ pub fn router(node: Node) -> Router {
     Router::new()
         .route_service("/v1/traces", service)
         .merge(super::logs::router(node.clone()))
+        .merge(super::metrics::router(node.clone()))
         .layer(middleware::from_fn_with_state(node, authorize))
 }
 async fn authorize(State(node): State<Node>, mut request: Request, next: Next) -> Response {
     use sha2::{Digest, Sha256};
     use subtle::ConstantTimeEq;
-    crate::logs::ingress::strip_headers(request.headers_mut());
+    crate::telemetry::logs::ingress::strip_headers(request.headers_mut());
     let token = request
         .headers()
         .get(http::header::AUTHORIZATION)
@@ -269,7 +268,11 @@ async fn authorize(State(node): State<Node>, mut request: Request, next: Next) -
         return http::StatusCode::UNAUTHORIZED.into_response();
     };
     let hash: [u8; 32] = Sha256::digest(token.as_bytes()).into();
-    if request.uri().path() == "/v1/logs" && bool::from(hash.ct_eq(node.token_hash())) {
+    // Logs and metrics accept the deployment token for startup and background telemetry;
+    // traces always need an invocation.
+    if matches!(request.uri().path(), "/v1/logs" | "/v1/metrics")
+        && bool::from(hash.ct_eq(node.token_hash()))
+    {
         request.headers_mut().remove(http::header::AUTHORIZATION);
         for (key, value) in [
             ("x-tilde-trace-agent", node.runtime.agent_id.to_string()),
@@ -345,19 +348,41 @@ impl Deployments {
                         }
                     }
                 }
-                crate::telemetry::mapping::normalize(&mut request.resource_spans);
+                crate::telemetry::tracing::mapping::normalize(&mut request.resource_spans);
                 queue.accept(&request.encode_to_vec()).await
             }
             Some(wire::TelemetryKind::Logs) => {
                 let Some(delivery) = &self.logs else {
                     return Ok(());
                 };
-                if !delivery.enabled() {
-                    return Ok(());
-                }
                 let request = ExportLogsServiceRequest::decode(telemetry.payload.as_slice())
                     .map_err(|_| Error::Invalid("Invalid relayed OTLP logs".into()))?;
                 super::logs::accept(delivery, agent, deployment, request).await
+            }
+            Some(wire::TelemetryKind::Metrics) => {
+                let Some(delivery) = &self.metrics else {
+                    return Ok(());
+                };
+                let mut request =
+                    opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest::decode(
+                        telemetry.payload.as_slice(),
+                    )
+                    .map_err(|_| Error::Invalid("Invalid relayed OTLP metrics".into()))?;
+                let stamp = |key: &str, value: String| KeyValue {
+                    key: key.into(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(value)),
+                    }),
+                    ..Default::default()
+                };
+                crate::telemetry::metrics::ingress::stamp(
+                    &mut request.resource_metrics,
+                    &[
+                        stamp("tilde.agent.id", agent.to_string()),
+                        stamp("tilde.deployment.id", deployment.to_string()),
+                    ],
+                );
+                delivery.accept(agent.to_string(), &request).await
             }
             _ => Ok(()),
         }
@@ -372,7 +397,7 @@ pub fn platform(
     tokio::task::JoinHandle<()>,
 ) {
     let (tx, mut rx) = bounded::<Message<ResourceSpans>>(32);
-    let provider = crate::telemetry::platform_provider(tx, true, "tilde-sidecar");
+    let provider = crate::telemetry::tracing::platform_provider(tx, "tilde-sidecar");
     let worker = tokio::spawn(async move {
         while let Some(message) = rx.next().await {
             for resource in message.payload {
@@ -422,8 +447,10 @@ pub fn platform(
 pub async fn capture(State(node): State<Node>, mut request: Request, next: Next) -> Response {
     request
         .extensions_mut()
-        .insert(crate::telemetry::context::AgentOwner(node.runtime.agent_id));
-    crate::telemetry::context::request(request, next).await
+        .insert(crate::telemetry::tracing::context::AgentOwner(
+            node.runtime.agent_id,
+        ));
+    crate::telemetry::tracing::context::request(request, next).await
 }
 
 #[cfg(test)]
@@ -445,10 +472,7 @@ mod tests {
                 cache_bytes: 1024 * 1024,
             },
         );
-        runtime.configure(wire::GetConfigurationResponse {
-            tracing_enabled: true,
-            ..Default::default()
-        });
+        runtime.configure(wire::GetConfigurationResponse::default());
         let claims = Claims {
             iss: String::new(),
             aud: String::new(),
@@ -478,16 +502,12 @@ mod tests {
             panic!("missing telemetry frame")
         };
         let mut request = ExportTraceServiceRequest::decode(frame.payload.as_slice()).unwrap();
-        crate::telemetry::mapping::normalize(&mut request.resource_spans);
+        crate::telemetry::tracing::mapping::normalize(&mut request.resource_spans);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
         for (key, expected) in [
             ("tilde.client_sdk.version", "2.3.4-client"),
             ("tilde.sidecar.version", env!("CARGO_PKG_VERSION")),
             ("tilde.gateway.version", env!("CARGO_PKG_VERSION")),
-            (
-                "langfuse.trace.metadata.tilde_sidecar_version",
-                env!("CARGO_PKG_VERSION"),
-            ),
         ] {
             assert!(
                 span.attributes.iter().any(|a| a.key == key

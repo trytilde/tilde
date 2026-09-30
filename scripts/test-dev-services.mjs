@@ -14,10 +14,6 @@ try {
   await copyFile(new URL("./dev-ngrok.sh", import.meta.url), join(root, "scripts/dev-ngrok.sh"));
   await copyFile(new URL("./dev-api.sh", import.meta.url), join(root, "scripts/dev-api.sh"));
   await copyFile(new URL("./dev.py", import.meta.url), join(root, "scripts/dev.py"));
-  await copyFile(
-    new URL("./dev-langfuse.py", import.meta.url),
-    join(root, "scripts/dev-langfuse.py"),
-  );
   await copyFile(new URL("./dev-logs.py", import.meta.url), join(root, "scripts/dev-logs.py"));
   await copyFile(
     new URL("./run-dev-agent.py", import.meta.url),
@@ -29,7 +25,7 @@ try {
   const stub = `#!/usr/bin/env node
 const fs=require('node:fs');const path=require('node:path');
 const command=path.basename(process.argv[1]);const args=process.argv.slice(2);
-fs.appendFileSync(process.env.SWITCH_LOG,JSON.stringify({command,args,publicUrl:process.env.ENGINE_PUBLIC_URL,bind:process.env.ENGINE_LISTEN,serve:process.env.ENGINE_SERVE,host:process.env.WEB_HOST,network:process.env.ENGINE_ALLOW_NETWORK,issuer:process.env.ENGINE_OIDC_ISSUER,agent:process.env.ENGINE_RUNTIME_PUBLIC_URL,ingressUrl:process.env.ENGINE_INGRESS_PUBLIC_URL,connectionUi:process.env.ENGINE_CONNECTION_UI_DEV_URL,setup:process.env.ENGINE_CONNECTION_SETUP_PUBLIC_URL,apiUpstream:process.env.ENGINE_DEV_URL,webCallback:process.env.DEX_DEV_WEB_CALLBACK,apiCallback:process.env.DEX_DEV_API_CALLBACK})+'\\n');
+fs.appendFileSync(process.env.SWITCH_LOG,JSON.stringify({command,args,publicUrl:process.env.ENGINE_PUBLIC_URL,bind:process.env.ENGINE_LISTEN,serve:process.env.ENGINE_SERVE,host:process.env.WEB_HOST,network:process.env.ENGINE_ALLOW_NETWORK,agent:process.env.ENGINE_RUNTIME_PUBLIC_URL,ingressUrl:process.env.ENGINE_INGRESS_PUBLIC_URL,connectionUi:process.env.ENGINE_CONNECTION_UI_DEV_URL,setup:process.env.ENGINE_CONNECTION_SETUP_PUBLIC_URL,apiUpstream:process.env.ENGINE_DEV_URL})+'\\n');
 if(command==='docker'||command==='uv'||args.includes('check-config')||(command==='pnpm' && !args.includes('vite')))process.exit(0);
 if(command==='ngrok' && process.env.FAIL_NGROK==='true')setTimeout(()=>{console.error('ngrok fixture failed');process.exit(8)},700);
 if(command==='cargo' && process.env.FAIL_API==='true')setTimeout(()=>{console.error('API fixture failed');process.exit(7)},700);
@@ -48,6 +44,8 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
           const configuration = {
             REGISTER_DEV_AGENTS: registerDevAgents ? "1" : "0",
             OPENAI_API_KEY: "fixture-openai-key",
+            // The fixture root stands in for the open-source checkout holding sdk/.
+            TILDE_SDK_ROOT: "",
             NGROK_ENABLED: String(ngrok),
             NGROK_DOMAIN: "fixture.ngrok.app",
             NGROK_AUTHTOKEN: "fixture-token",
@@ -67,11 +65,9 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
             ENGINE_DEV_URL: `http://${configuredHost}:18080`,
             ENGINE_CONNECTION_SETUP_PUBLIC_URL: `http://${configuredHost}:18080`,
             ENGINE_CONNECTION_UI_DEV_URL: `http://${configuredHost}:5174`,
-            ENGINE_OIDC_ISSUER: `http://${configuredHost}:5556`,
-            DEX_DEV_ISSUER: `http://${configuredHost}:5556`,
-            DEX_DEV_WEB_CALLBACK: `http://${configuredHost}:15173/auth/callback`,
-            DEX_DEV_API_CALLBACK: `http://${configuredHost}:18080/auth/callback`,
             ENGINE_S3_ENDPOINT: "",
+            // Unset so dev starts its local ClickHouse; .env.test names an existing one.
+            ENGINE_CLICKHOUSE_URL: "",
             DATABASE_URL: "postgres://engine:fixture@127.0.0.1:5432/engine",
             POSTGRES_PASSWORD: "fixture",
           };
@@ -83,8 +79,6 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
           );
           const env = {
             ...process.env,
-            DEV_LANGFUSE_ENABLED: "0",
-            DEV_LOGS_ENABLED: "0",
             PATH: `${join(root, "bin")}:${process.env.PATH}`,
             SWITCH_LOG: log,
           };
@@ -132,7 +126,8 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
               calls.filter((c) => c.command === "cargo" && c.args.includes("dev-agent")).length,
               registerDevAgents ? 1 : 0,
             );
-            assert.equal(calls.filter((c) => c.command === "docker").length, management ? 2 : 1);
+            // Postgres and ClickHouse.
+            assert.equal(calls.filter((c) => c.command === "docker").length, 2);
             assert.equal(
               calls.filter(
                 (c) => c.command === "pnpm" && c.args.join(" ") === "--dir web exec vite",
@@ -188,13 +183,10 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
             assert.equal(api.bind, `${host}:18080`);
             assert.equal(api.host, host);
             assert.equal(api.network, address ? "true" : "false");
-            assert.equal(api.issuer, `http://${host}:5556`);
             assert.equal(api.agent, `http://${host}:18080`);
             assert.equal(api.connectionUi, `http://${host}:5174`);
             assert.equal(api.setup, `http://${host}:18080`);
             assert.equal(api.apiUpstream, `http://${host}:18080`);
-            assert.equal(api.webCallback, `http://${host}:15173/auth/callback`);
-            assert.equal(api.apiCallback, `http://${host}:18080/auth/callback`);
           } finally {
             if (child.exitCode === null) {
               const exited = once(child, "exit");
@@ -219,8 +211,6 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
       cwd: root,
       env: {
         ...process.env,
-        DEV_LANGFUSE_ENABLED: "0",
-        DEV_LOGS_ENABLED: "0",
         PATH: `${join(root, "bin")}:${process.env.PATH}`,
         NGROK_ENABLED: "true",
         NGROK_DOMAIN: "fixture.ngrok.app",
@@ -241,8 +231,6 @@ process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{},1000);
     );
     const env = {
       ...process.env,
-      DEV_LANGFUSE_ENABLED: "0",
-      DEV_LOGS_ENABLED: "0",
       PATH: `${join(root, "bin")}:${process.env.PATH}`,
       SWITCH_LOG: join(root, `failure-${failureSource}`),
       REGISTER_DEV_AGENTS: "0",

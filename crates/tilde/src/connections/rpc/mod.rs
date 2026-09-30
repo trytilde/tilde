@@ -81,8 +81,46 @@ pub(super) fn connection_type_wire(typ: m::ConnectionType) -> types::ConnectionT
             .map(|cap| capability_wire(cap).into())
             .collect(),
         credential_source: Some(source),
+        mcp_server: typ
+            .mcp
+            .map(|server| types::McpServer {
+                url: server.url,
+                credential: (match server.credential {
+                    m::McpCredential::None => 1,
+                    m::McpCredential::Bearer => 2,
+                    m::McpCredential::Header { .. } => 3,
+                    m::McpCredential::Query { .. } => 4,
+                })
+                .into(),
+                name: server.credential.name().map(str::to_owned),
+                prefix: server.credential.prefix().to_owned(),
+                ..Default::default()
+            })
+            .into(),
         ..Default::default()
     }
+}
+fn mcp_model(server: types::McpServer) -> Result<m::McpServer, Error> {
+    let name = || {
+        server
+            .name
+            .clone()
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| m::invalid("This MCP credential needs a header or parameter name"))
+    };
+    Ok(m::McpServer {
+        url: server.url.clone(),
+        credential: match server.credential.to_i32() {
+            1 => m::McpCredential::None,
+            2 => m::McpCredential::Bearer,
+            3 => m::McpCredential::Header {
+                name: name()?,
+                prefix: server.prefix.clone(),
+            },
+            4 => m::McpCredential::Query { name: name()? },
+            _ => return Err(m::invalid("MCP credential required")),
+        },
+    })
 }
 pub(super) fn oauth_wire(o: m::OAuth) -> types::OAuthConfiguration {
     types::OAuthConfiguration {
@@ -97,6 +135,11 @@ pub(super) fn oauth_wire(o: m::OAuth) -> types::OAuthConfiguration {
         pkce: o.pkce,
         scopes: o.scopes,
         scope_separator: o.scope_separator,
+        client: (match o.client {
+            m::OAuthClient::Form => 1,
+            m::OAuthClient::Dynamic => 3,
+        })
+        .into(),
         authorization_parameters: parameters_wire(o.authorization_parameters),
         token_parameters: parameters_wire(o.token_parameters),
         access_token_path: o.access_token_path,
@@ -156,6 +199,12 @@ pub(super) fn oauth_model(o: types::OAuthConfiguration) -> Result<m::OAuth, Erro
         } else {
             o.scope_path
         },
+        client: match o.client.to_i32() {
+            0 | 1 => m::OAuthClient::Form,
+            3 => m::OAuthClient::Dynamic,
+            _ => return Err(m::invalid("Unknown OAuth client")),
+        },
+        host_published: false,
         success_path: o.success_path,
         result_fields: o
             .result_fields
@@ -189,7 +238,7 @@ pub(super) fn parameters_model(
     }
     Ok(out)
 }
-pub(super) fn provider_model(provider: types::Provider) -> Result<m::Provider, Error> {
+pub(crate) fn provider_model(provider: types::Provider) -> Result<m::Provider, Error> {
     let mut types = vec![];
     for typ in provider.connection_types {
         use types::connection_type::CredentialSource as Wire;
@@ -233,6 +282,7 @@ pub(super) fn provider_model(provider: types::Provider) -> Result<m::Provider, E
             name: typ.name,
             capabilities,
             credential_source,
+            mcp: typ.mcp_server.into_option().map(mcp_model).transpose()?,
         });
     }
     Ok(m::Provider {
@@ -289,6 +339,8 @@ pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection
         capabilities: [
             (c.channel_capable, types::Capability::Channel),
             (c.inference_capable, types::Capability::Inference),
+            (true, types::Capability::Skills),
+            (c.tool_capable, types::Capability::Tool),
         ]
         .into_iter()
         .filter_map(|(capable, cap)| capable.then_some(cap.into()))
@@ -389,6 +441,8 @@ pub(super) fn capability_wire(cap: m::Capability) -> types::Capability {
     match cap {
         m::Capability::Channel => types::Capability::Channel,
         m::Capability::Inference => types::Capability::Inference,
+        m::Capability::Skills => types::Capability::Skills,
+        m::Capability::Tool => types::Capability::Tool,
     }
 }
 pub(super) fn capability_model(
@@ -398,6 +452,10 @@ pub(super) fn capability_model(
         Ok(m::Capability::Channel)
     } else if cap == types::Capability::Inference {
         Ok(m::Capability::Inference)
+    } else if cap == types::Capability::Skills {
+        Ok(m::Capability::Skills)
+    } else if cap == types::Capability::Tool {
+        Ok(m::Capability::Tool)
     } else {
         Err(m::invalid("Unknown capability"))
     }

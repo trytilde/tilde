@@ -2,11 +2,12 @@
 
 include!("tilde.types.v1.access.rs");
 include!("tilde.types.v1.agent.rs");
-include!("tilde.types.v1.authorization.rs");
 include!("tilde.types.v1.chat.rs");
 include!("tilde.types.v1.connections.rs");
 include!("tilde.types.v1.deployment.rs");
+include!("tilde.types.v1.prompt.rs");
 include!("tilde.types.v1.runtime_event.rs");
+include!("tilde.types.v1.skill.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -26,11 +27,12 @@ pub mod __buffa {
         use super::*;
         include!("tilde.types.v1.access.__view.rs");
         include!("tilde.types.v1.agent.__view.rs");
-        include!("tilde.types.v1.authorization.__view.rs");
         include!("tilde.types.v1.chat.__view.rs");
         include!("tilde.types.v1.connections.__view.rs");
         include!("tilde.types.v1.deployment.__view.rs");
+        include!("tilde.types.v1.prompt.__view.rs");
         include!("tilde.types.v1.runtime_event.__view.rs");
+        include!("tilde.types.v1.skill.__view.rs");
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -57,10 +59,6 @@ pub mod __buffa {
         reg.register_json_any(super::__AGENT_HEALTH_HOUR_JSON_ANY);
         reg.register_json_any(super::__CAPABILITIES_JSON_ANY);
         reg.register_json_any(super::__TARGET_PERMISSION_JSON_ANY);
-        reg.register_json_any(super::__RESOURCE_JSON_ANY);
-        reg.register_json_any(super::__PRINCIPAL_JSON_ANY);
-        reg.register_json_any(super::__ROLE_JSON_ANY);
-        reg.register_json_any(super::__ROLE_ASSIGNMENT_JSON_ANY);
         reg.register_json_any(super::__USER_JSON_ANY);
         reg.register_json_any(super::__PARTICIPANT_JSON_ANY);
         reg.register_json_any(super::__PARTICIPANT_REF_JSON_ANY);
@@ -70,6 +68,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GOAL_JSON_ANY);
         reg.register_json_any(super::__TASK_JSON_ANY);
         reg.register_json_any(super::__TOOL_DEFINITION_JSON_ANY);
+        reg.register_json_any(super::__TOOL_ANNOTATIONS_JSON_ANY);
         reg.register_json_any(super::__TYPING_JSON_ANY);
         reg.register_json_any(super::__ATTACHMENT_JSON_ANY);
         reg.register_json_any(super::__TOOL_CALL_JSON_ANY);
@@ -82,6 +81,7 @@ pub mod __buffa {
         reg.register_json_any(super::__PARAMETER_JSON_ANY);
         reg.register_json_any(super::__O_AUTH_RESULT_FIELD_JSON_ANY);
         reg.register_json_any(super::__O_AUTH_CONFIGURATION_JSON_ANY);
+        reg.register_json_any(super::__MCP_SERVER_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_TYPE_JSON_ANY);
         reg.register_json_any(super::__STATIC_CREDENTIAL_SOURCE_JSON_ANY);
         reg.register_json_any(super::__O_AUTH_CREDENTIAL_SOURCE_JSON_ANY);
@@ -97,6 +97,10 @@ pub mod __buffa {
         reg.register_json_any(super::__DEPLOYMENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_DEPLOYMENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_INSTANCE_JSON_ANY);
+        reg.register_json_any(super::__PROMPT_JSON_ANY);
+        reg.register_json_any(super::__PROMPT_SECTION_JSON_ANY);
+        reg.register_json_any(super::__PROMPT_VERSION_JSON_ANY);
+        reg.register_json_any(super::__PROMPT_VERSION_USAGE_JSON_ANY);
         reg.register_json_any(super::__INVOCATION_STATE_JSON_ANY);
         reg.register_json_any(super::__RUNTIME_EVENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_COMMAND_JSON_ANY);
@@ -107,6 +111,12 @@ pub mod __buffa {
         reg.register_json_any(super::__ATTACHMENT_SOURCE_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_EVENT_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_ATTACHMENT_JSON_ANY);
+        reg.register_json_any(super::__SKILL_SOURCE_JSON_ANY);
+        reg.register_json_any(super::__SKILL_FILE_JSON_ANY);
+        reg.register_json_any(super::__SKILL_VERSION_JSON_ANY);
+        reg.register_json_any(super::__SKILL_JSON_ANY);
+        reg.register_json_any(super::__CATALOG_GROUP_JSON_ANY);
+        reg.register_json_any(super::__CATALOG_SKILL_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -146,22 +156,6 @@ pub use self::__buffa::view::TargetPermissionView;
 #[doc(inline)]
 pub use self::__buffa::view::TargetPermissionOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ResourceView;
-#[doc(inline)]
-pub use self::__buffa::view::ResourceOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::PrincipalView;
-#[doc(inline)]
-pub use self::__buffa::view::PrincipalOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RoleView;
-#[doc(inline)]
-pub use self::__buffa::view::RoleOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::RoleAssignmentView;
-#[doc(inline)]
-pub use self::__buffa::view::RoleAssignmentOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::UserView;
 #[doc(inline)]
 pub use self::__buffa::view::UserOwnedView;
@@ -197,6 +191,10 @@ pub use self::__buffa::view::TaskOwnedView;
 pub use self::__buffa::view::ToolDefinitionView;
 #[doc(inline)]
 pub use self::__buffa::view::ToolDefinitionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ToolAnnotationsView;
+#[doc(inline)]
+pub use self::__buffa::view::ToolAnnotationsOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::TypingView;
 #[doc(inline)]
@@ -245,6 +243,10 @@ pub use self::__buffa::view::OAuthResultFieldOwnedView;
 pub use self::__buffa::view::OAuthConfigurationView;
 #[doc(inline)]
 pub use self::__buffa::view::OAuthConfigurationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ConnectionTypeView;
 #[doc(inline)]
@@ -306,6 +308,22 @@ pub use self::__buffa::view::AgentInstanceView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentInstanceOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::PromptView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptSectionView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptSectionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptVersionView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptVersionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptVersionUsageView;
+#[doc(inline)]
+pub use self::__buffa::view::PromptVersionUsageOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::InvocationStateView;
 #[doc(inline)]
 pub use self::__buffa::view::InvocationStateOwnedView;
@@ -345,5 +363,29 @@ pub use self::__buffa::view::ProviderEventOwnedView;
 pub use self::__buffa::view::ProviderAttachmentView;
 #[doc(inline)]
 pub use self::__buffa::view::ProviderAttachmentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillSourceView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillSourceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillFileView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillFileOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillVersionView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillVersionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillView;
+#[doc(inline)]
+pub use self::__buffa::view::SkillOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CatalogGroupView;
+#[doc(inline)]
+pub use self::__buffa::view::CatalogGroupOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CatalogSkillView;
+#[doc(inline)]
+pub use self::__buffa::view::CatalogSkillOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

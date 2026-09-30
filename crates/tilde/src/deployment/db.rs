@@ -2,16 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 use crate::database::{DbError, DbResult, GenericClient};
 
-pub use tilde_queries::queries::deployment::active_work::Record as ActiveWorkRow;
-
-pub async fn active_work_one(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<ActiveWorkRow> {
-    tilde_queries::queries::deployment::active_work::run()
-        .bind(db, &p1)
-        .opt()
-        .await?
-        .ok_or(DbError::NotFound)
-}
-
 pub use tilde_queries::queries::deployment::agent_runs::Record as AgentRunsRow;
 
 pub async fn agent_runs_all(
@@ -529,12 +519,6 @@ pub async fn lease_release_execute(
         .await?)
 }
 
-pub async fn leases_clear_execute(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<u64> {
-    Ok(tilde_queries::queries::deployment::leases_clear::run()
-        .bind(db, &p1)
-        .await?)
-}
-
 pub use tilde_queries::queries::deployment::leases_held::Record as LeasesHeldRow;
 
 pub async fn leases_held_all(
@@ -765,9 +749,10 @@ pub async fn project_tool_execute(
     p8: &str,
     p9: &str,
     p10: &str,
+    p11: &str,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::deployment::project::tool::run()
-        .bind(db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10)
+        .bind(db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11)
         .await?)
 }
 
@@ -848,12 +833,6 @@ pub async fn secrets_init_execute(
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::deployment::secrets_init::run()
         .bind(db, &p2, &p1)
-        .await?)
-}
-
-pub async fn serving_clear_execute(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<u64> {
-    Ok(tilde_queries::queries::deployment::serving_clear::run()
-        .bind(db, &p1)
         .await?)
 }
 

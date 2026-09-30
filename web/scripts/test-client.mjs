@@ -1,4 +1,3 @@
-import { startOidc, loginManagement } from "../../scripts/test-oidc.mjs";
 // Real generated-client integration against the packaged Rust server and isolated Postgres.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -20,13 +19,10 @@ assert(database, "TEST_DATABASE_URL is required; use task test");
 const binary = resolve(process.env.ENGINE_TEST_BINARY ?? "target/debug/tilde");
 const seed = randomBytes(32).toString("base64");
 let logs = "";
-const oidc = await startOidc();
-const tokens = new Map();
 const scratch = await mkdtemp(join(tmpdir(), "tilde-binary-"));
 async function start(key = seed) {
   const env = {
     ...process.env,
-    ...oidc.env,
     DATABASE_URL: database,
     ENGINE_ENCRYPTION_BACKEND: "seed",
     ENGINE_ENCRYPTION_KEY: key,
@@ -71,7 +67,6 @@ async function start(key = seed) {
     });
   });
   const url = await ready;
-  tokens.set(url, await loginManagement(url));
   return {
     url,
     async stop() {
@@ -93,12 +88,6 @@ function client(url, binary) {
       baseUrl: url,
       useBinaryFormat: binary,
       useHttpGet: !binary,
-      interceptors: [
-        (next) => async (request) => {
-          request.header.set("Authorization", `Bearer ${tokens.get(url)}`);
-          return next(request);
-        },
-      ],
     }),
   );
 }
@@ -203,5 +192,4 @@ try {
 } finally {
   if (server) await server.stop();
   await rm(scratch, { recursive: true, force: true });
-  await oidc.stop();
 }

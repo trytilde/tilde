@@ -16,9 +16,10 @@ const client = createClient(ConnectionsService, transport);
 const broker = createClient(ConnectionSetupService, transport);
 const catalog = await client.listProviders({ pageSize: 30 });
 const github = catalog.providers.find((provider) => provider.id === "github");
-assert.equal(github.connectionTypes.length, 1);
-assert.equal(github.connectionTypes[0].credentialSource.case, "custom");
-assert.deepEqual(github.connectionTypes[0].capabilities, [Capability.CHANNEL]);
+// The GitHub App serves chat and tools; tokens and OAuth apps serve tools only.
+const app = github.connectionTypes.find((type) => type.id === "github_app");
+assert.equal(app.credentialSource.case, "custom");
+assert.deepEqual(app.capabilities, [Capability.CHANNEL, Capability.TOOL]);
 const providerId = `custom/sdk-${randomUUID()}`;
 await client.registerProvider({
   provider: {
@@ -72,7 +73,8 @@ const done = await broker.saveCredentials({
 assert.equal(done.state.action.case, "complete");
 const get = await client.getConnection({ id: connectionId });
 assert.equal(get.connection.status, "ready");
-assert.deepEqual(get.connection.capabilities, []);
+// Every connection offers skills; its type offers neither chat nor inference here.
+assert.deepEqual(get.connection.capabilities, [Capability.SKILLS]);
 assert(!JSON.stringify(get, (_, v) => (typeof v === "bigint" ? v.toString() : v)).includes(secret));
 const oauthId = `custom/oauth-${randomUUID()}`;
 await client.registerProvider({

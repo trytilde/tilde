@@ -18,6 +18,11 @@ pub struct RunParams<
     T14: crate::StringSql,
     T15: crate::StringSql,
     T16: crate::JsonSql,
+    T17: crate::StringSql,
+    T18: crate::StringSql,
+    T19: crate::StringSql,
+    T20: crate::StringSql,
+    T21: crate::StringSql,
 > {
     pub p1: T1,
     pub p2: T2,
@@ -37,13 +42,19 @@ pub struct RunParams<
     pub p16: Option<T15>,
     pub p17: Option<T16>,
     pub p18: bool,
+    pub p19: bool,
+    pub p20: Option<T17>,
+    pub p21: Option<T18>,
+    pub p22: Option<T19>,
+    pub p23: T20,
+    pub p24: T21,
 }
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema,inference_capable=excluded.inference_capable",
+        "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema,inference_capable=excluded.inference_capable,tool_capable=excluded.tool_capable,mcp_url=excluded.mcp_url,mcp_credential=excluded.mcp_credential,mcp_credential_name=excluded.mcp_credential_name,mcp_credential_prefix=excluded.mcp_credential_prefix,oauth_client=excluded.oauth_client",
         None,
     )
 }
@@ -76,6 +87,11 @@ impl RunStmt {
         T14: crate::StringSql,
         T15: crate::StringSql,
         T16: crate::JsonSql,
+        T17: crate::StringSql,
+        T18: crate::StringSql,
+        T19: crate::StringSql,
+        T20: crate::StringSql,
+        T21: crate::StringSql,
     >(
         &'s self,
         client: &'c C,
@@ -97,12 +113,19 @@ impl RunStmt {
         p16: &'a Option<T15>,
         p17: &'a Option<T16>,
         p18: &'a bool,
+        p19: &'a bool,
+        p20: &'a Option<T17>,
+        p21: &'a Option<T18>,
+        p22: &'a Option<T19>,
+        p23: &'a T20,
+        p24: &'a T21,
     ) -> Result<u64, tokio_postgres::Error> {
         client
             .execute(
                 self.0,
                 &[
-                    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18,
+                    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17,
+                    p18, p19, p20, p21, p22, p23, p24,
                 ],
             )
             .await
@@ -127,12 +150,39 @@ impl<
     T14: crate::StringSql,
     T15: crate::StringSql,
     T16: crate::JsonSql,
+    T17: crate::StringSql,
+    T18: crate::StringSql,
+    T19: crate::StringSql,
+    T20: crate::StringSql,
+    T21: crate::StringSql,
 >
     crate::client::async_::Params<
         'a,
         'a,
         'a,
-        RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>,
+        RunParams<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12,
+            T13,
+            T14,
+            T15,
+            T16,
+            T17,
+            T18,
+            T19,
+            T20,
+            T21,
+        >,
         std::pin::Pin<
             Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
         >,
@@ -159,6 +209,11 @@ impl<
             T14,
             T15,
             T16,
+            T17,
+            T18,
+            T19,
+            T20,
+            T21,
         >,
     ) -> std::pin::Pin<
         Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
@@ -183,6 +238,12 @@ impl<
             &params.p16,
             &params.p17,
             &params.p18,
+            &params.p19,
+            &params.p20,
+            &params.p21,
+            &params.p22,
+            &params.p23,
+            &params.p24,
         ))
     }
 }

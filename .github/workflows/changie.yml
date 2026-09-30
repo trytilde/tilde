@@ -31,4 +31,4 @@ jobs:
       - name: Check generated changelog and manifest replacements
         run: |
           changie merge
-          git diff --exit-code -- CHANGELOG.md VERSION Cargo.toml sdk/ts/packages sdk/py/packages sdk/py/packages
+          git diff --exit-code -- CHANGELOG.md VERSION Cargo.toml sdk/ts/packages sdk/py/packages

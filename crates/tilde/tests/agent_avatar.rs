@@ -1,32 +1,16 @@
 mod common;
 use base64::Engine;
-use client_aws_sigv4::Credentials;
 use tilde::{
     agent::{Agents, CreateAgent, avatar::AvatarStore},
     error::Error,
 };
 use uuid::Uuid;
 
-/// Exercises real private-object PUT, signed GET, replacement cleanup and database association.
-/// Run task test:avatars to start MinIO with the .env configuration.
+/// Exercises real private-object PUT, signed GET, replacement and database association.
 #[tokio::test]
 async fn avatars_round_trip_through_private_s3_and_keep_the_generated_identity() {
     let db = common::Database::new().await;
-    let env = |name| {
-        std::env::var(name).unwrap_or_else(|_| panic!("{name} required; run task test:avatars"))
-    };
-    let store = AvatarStore::new(
-        env("ENGINE_S3_BUCKET"),
-        env("ENGINE_S3_REGION"),
-        env("ENGINE_S3_ENDPOINT"),
-        None,
-        Some(Credentials {
-            access_key_id: env("ENGINE_S3_ACCESS_KEY_ID"),
-            secret_access_key: env("ENGINE_S3_SECRET_ACCESS_KEY"),
-            session_token: None,
-        }),
-    )
-    .unwrap();
+    let store: AvatarStore = common::bucket(&common::Storage::load());
     let encryption = tilde::encryption::Encryption::initialize(&db.pool, common::seed(9))
         .await
         .unwrap();
@@ -35,6 +19,7 @@ async fn avatars_round_trip_through_private_s3_and_keep_the_generated_identity()
     let id = Uuid::new_v4();
     let created = agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             id,
             name: "Avatar fixture".into(),
@@ -80,25 +65,5 @@ async fn avatars_round_trip_through_private_s3_and_keep_the_generated_identity()
     assert_eq!(second.avatar_seed, created.avatar_seed);
     assert_eq!(agents.get(id).await.unwrap().avatar_key, second.avatar_key);
     assert_eq!(http.get(first_url).send().await.unwrap().status(), 404);
-    // Clean only this test's randomly named object, using a signed delete.
-    let mut url = url::Url::parse(&agents.avatar_url(&second).await.unwrap().unwrap()).unwrap();
-    url.set_query(None);
-    let mut request = http.delete(url).build().unwrap();
-    client_aws_sigv4::Signer::new(
-        Credentials {
-            access_key_id: env("ENGINE_S3_ACCESS_KEY_ID"),
-            secret_access_key: env("ENGINE_S3_SECRET_ACCESS_KEY"),
-            session_token: None,
-        },
-        env("ENGINE_S3_REGION"),
-        "s3",
-    )
-    .sign_request_at(&mut request, &[], std::time::SystemTime::now())
-    .unwrap();
-    http.execute(request)
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
     db.close().await;
 }

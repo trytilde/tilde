@@ -5,6 +5,7 @@
 @import "@fontsource/ibm-plex-mono/latin-600.css";
 @import "@fontsource/ibm-plex-mono/latin-700.css";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 @import "shadcn/tailwind.css";
 @source "./**/*.{ts,tsx}";
 @source "../../sdk/ts/packages/agent-avatar/src";

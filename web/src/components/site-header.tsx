@@ -1,50 +1,43 @@
 import { AgentAvatar } from "./agent-avatar";
-import { useEffect, useState } from "react";
 import { Link, useParams, useRouterState } from "@tanstack/react-router";
-import { iam } from "@/client";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useDashboardBreadcrumbs } from "./dashboard-breadcrumbs";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Top-level sections by path prefix; anything under them gets a second crumb. */
-const sections: { prefix: string; label: string; to: "/" | "/api-keys" | "/groups" }[] = [
-  { prefix: "/api-keys", label: "API keys", to: "/api-keys" },
-  { prefix: "/groups", label: "Groups", to: "/groups" },
+const sections: {
+  prefix: string;
+  label: string;
+  to: "/" | "/skills" | "/tools/connections";
+}[] = [
+  { prefix: "/skills", label: "Skills", to: "/skills" },
+  { prefix: "/tools", label: "Tools", to: "/tools/connections" },
 ];
 export function SiteHeader() {
-  const { agentId, groupId } = useParams({ strict: false });
+  const { agentId } = useParams({ strict: false });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const creating = pathname === "/agent/new";
-  const { agent, setNavigationHost, setActionsHost } = useDashboardBreadcrumbs();
-  const [groupName, setGroupName] = useState<{ id: string; name: string }>();
-  useEffect(() => {
-    if (!groupId) return;
-    const abort = new AbortController();
-    void iam
-      .getGroup({ id: groupId }, { signal: abort.signal })
-      .then((response) => {
-        if (!abort.signal.aborted && response.group)
-          setGroupName({ id: groupId, name: response.group.name });
-      })
-      .catch(() => undefined);
-    return () => abort.abort();
-  }, [groupId]);
+  const { agent, page, setNavigationHost, setActionsHost } = useDashboardBreadcrumbs();
   const section = sections.find(
     (candidate) => pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`),
   ) ?? { prefix: "/", label: "Agent Registry", to: "/" as const };
+  const named = page?.path === pathname ? page : undefined;
   const current = creating
     ? "Create agent"
-    : pathname === "/api-keys/new"
-      ? "Create API key"
-      : groupId
-        ? groupName?.id === groupId
-          ? groupName.name
-          : "Loading group…"
-        : agentId
-          ? agent?.id === agentId
-            ? agent.name
-            : "Loading agent…"
-          : undefined;
+    : pathname === "/tools/remote-servers"
+      ? "Remote servers"
+      : pathname === "/tools/connections"
+        ? "Connections"
+        : pathname === "/tools/catalog" || pathname.startsWith("/tools/catalog/")
+          ? "Catalog"
+          : pathname.startsWith("/skills/") || pathname.startsWith("/tools/")
+            ? (named?.label ?? null)
+            : agentId
+              ? agent?.id === agentId
+                ? agent.name
+                : null
+              : undefined;
   return (
     <header className="flex shrink-0 flex-col border-b">
       <div className="flex min-h-14 min-w-0 w-full items-center gap-x-3 px-4 py-2 lg:px-6">
@@ -53,7 +46,7 @@ export function SiteHeader() {
         <nav aria-label="Breadcrumb" className="min-w-0 max-w-full lg:max-w-[50%]">
           <ol className="flex min-w-0 items-center gap-2 text-sm">
             <li className="shrink-0">
-              {current ? (
+              {current !== undefined ? (
                 <Link
                   to={section.to}
                   className="text-muted-foreground transition-colors hover:text-foreground"
@@ -66,7 +59,22 @@ export function SiteHeader() {
                 </span>
               )}
             </li>
-            {current && (
+            {current !== undefined && named?.parent && (
+              <>
+                <li aria-hidden="true" className="text-muted-foreground">
+                  /
+                </li>
+                <li className="shrink-0">
+                  <Link
+                    to={named.parent.to}
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {named.parent.label}
+                  </Link>
+                </li>
+              </>
+            )}
+            {current !== undefined && (
               <>
                 <li aria-hidden="true" className="text-muted-foreground">
                   /
@@ -77,13 +85,17 @@ export function SiteHeader() {
                       <AgentAvatar agent={agent} className="size-5!" />
                     </span>
                   )}
-                  <span
-                    aria-current="page"
-                    title={current}
-                    className="min-w-0 truncate font-medium"
-                  >
-                    {current}
-                  </span>
+                  {current === null ? (
+                    <Skeleton className="h-4 w-28" role="status" aria-label="Loading" />
+                  ) : (
+                    <span
+                      aria-current="page"
+                      title={current}
+                      className="min-w-0 truncate font-medium"
+                    >
+                      {current}
+                    </span>
+                  )}
                 </li>
               </>
             )}

@@ -142,6 +142,7 @@ struct Fixture {
     tasks: Vec<tokio::task::JoinHandle<()>>,
     stop: tokio::sync::watch::Sender<bool>,
 }
+const SUPPORT_PROMPT: &str = "You are the support agent for Acme. Answer in one paragraph.";
 impl Fixture {
     async fn new() -> Self {
         Self::new_with(true).await
@@ -164,6 +165,7 @@ impl Fixture {
         let agent = Uuid::new_v4();
         agents
             .create(CreateAgent {
+                description: String::new(),
                 concurrency_policy: policy,
                 id: agent,
                 name: "Sidecar".into(),
@@ -221,6 +223,23 @@ impl Fixture {
                     commit_message: None,
                     branch: None,
                     commit_author: None,
+                    // A static prompt the replicas match in request bodies themselves.
+                    declarations: tilde::proto::tilde::management::v1::DeploymentDeclarations {
+                        prompts: vec![tilde::proto::tilde::management::v1::DeclaredPrompt {
+                            name: "support/instructions".into(),
+                            format: types::PromptFormat::Plain.into(),
+                            template: SUPPORT_PROMPT.into(),
+                            config: "{}".into(),
+                            hash: hex::encode(tilde::prompts::content_hash(
+                                SUPPORT_PROMPT,
+                                &Default::default(),
+                                "{}",
+                            )),
+                            origin: "src/agent.ts#support/instructions".into(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
                 },
             )
             .await
@@ -254,6 +273,7 @@ impl Fixture {
                     commit_message: None,
                     branch: None,
                     commit_author: None,
+                    declarations: Default::default(),
                 },
             )
             .await
@@ -321,10 +341,7 @@ impl Fixture {
             })
             .await;
         }
-        let ingress_token = deployments
-            .issue_ingress_token(agent, None, Uuid::nil())
-            .await
-            .unwrap();
+        let ingress_token = deployments.issue_ingress_token(agent, None).await.unwrap();
         Self {
             db,
             agent,
@@ -1424,6 +1441,8 @@ async fn sidecars_forward_inference_from_replicated_credentials_and_ship_usage()
     let body: serde_json::Value = response.json().await.unwrap();
     assert_eq!(body["usage"]["prompt_tokens"], 12);
     assert_eq!(seen.lock().unwrap().as_slice(), ["Bearer sk-sidecar"]);
+    // The body carries the deployment's static prompt: the replica matches it locally and
+    // ships only its `name@hash`, which the gateway links to the version.
     let aliased = fx
         .http
         .post(format!(
@@ -1431,7 +1450,10 @@ async fn sidecars_forward_inference_from_replicated_credentials_and_ship_usage()
             invocation.callback_url
         ))
         .bearer_auth(&invocation.capability)
-        .json(&serde_json::json!({"model":"gpt-5","messages":[{"role":"user","content":"hi"}]}))
+        .json(&serde_json::json!({"model":"gpt-5","messages":[
+            {"role":"system","content":SUPPORT_PROMPT},
+            {"role":"user","content":"hi"}
+        ]}))
         .send()
         .await
         .unwrap();
@@ -1475,6 +1497,18 @@ async fn sidecars_forward_inference_from_replicated_credentials_and_ship_usage()
     );
     assert_eq!(row.connection_id, connection);
     assert_eq!(row.invocation_id.to_string(), invocation.invocation_id);
+    let prompts = tilde::prompts::Prompts::new(fx.db.pool.clone());
+    let listed = prompts.list(fx.agent).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    let usage = eventually(async || {
+        let (_, _, usage) = prompts.get(listed[0].id).await.ok()?;
+        usage.into_iter().next()
+    })
+    .await;
+    assert_eq!(
+        usage.requests, 1,
+        "only the call carrying the prompt text is linked"
+    );
     fx.finish.notify_one();
     upstream_task.abort();
     fx.shutdown().await;
@@ -1511,6 +1545,7 @@ async fn sidecar_conversations_keep_their_owner_when_latest_becomes_lambda() {
                 commit_message: None,
                 branch: None,
                 commit_author: None,
+                declarations: Default::default(),
             },
         )
         .await

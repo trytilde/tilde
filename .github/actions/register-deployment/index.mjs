@@ -1,5 +1,6 @@
 import { appendFile, readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 
 // Dependency-free Connect unary JSON client; GitHub provides the Node runtime.
 // Error messages deliberately never include HTTP bodies, URLs, credentials or causes.
@@ -43,7 +44,7 @@ async function rpc(url, token, method, body) {
       headers: {
         "Content-Type": "application/json",
         "Connect-Protocol-Version": "1",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(body),
       redirect: "error", // Never forward credentials through an API redirect.
@@ -56,7 +57,7 @@ async function rpc(url, token, method, body) {
   }
   if (!response.ok)
     throw new ActionError(
-      `${method} failed (HTTP ${response.status}). Check the API key, deployment fields and permissions in Tilde.`,
+      `${method} failed (HTTP ${response.status}). Check the API URL, credentials and deployment fields.`,
     );
   try {
     return await response.json();
@@ -64,12 +65,41 @@ async function rpc(url, token, method, body) {
     throw new ActionError(`${method} returned an invalid JSON response.`);
   }
 }
+/**
+ * Run the caller's deploy command (normally `npx tilde deploy dist/index.js --json`, which also
+ * registers the prompts and skills the code declares) and read its JSON result. Its stdout
+ * holds the token, so it is parsed, never echoed; stderr (the inventory) passes through.
+ */
+async function runCommand(command, env) {
+  const child = spawn(command, { shell: true, env, stdio: ["ignore", "pipe", "inherit"] });
+  let stdout = "";
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  const [code] = await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (...result) => resolve(result));
+  }).catch(() => {
+    throw new ActionError("command could not be started.");
+  });
+  if (code !== 0) throw new ActionError(`command failed (exit ${code}); see its output above.`);
+  let result;
+  try {
+    result = JSON.parse(stdout.trim().split("\n").at(-1));
+  } catch {
+    throw new ActionError("command did not print deployment JSON; pass --json to tilde deploy.");
+  }
+  return {
+    deployment: { id: result?.deploymentId },
+    token: result?.token ?? undefined,
+    created: result?.created,
+  };
+}
 async function run() {
-  // Explicit input wins; GitHub secrets must be passed by the caller, never discovered.
+  // Optional: open-source Tilde's management API takes no credential; Tilde Cloud requires a
+  // management API key. Explicit input wins; secrets must be passed by the caller.
   const apiToken = input("api-token", env.TILDE_API_KEY?.trim());
   mask(apiToken);
-  if (!apiToken)
-    throw new ActionError("Pass api-token or set TILDE_API_KEY from secrets.TILDE_API_KEY.");
   if (!env.GITHUB_OUTPUT)
     throw new ActionError("GITHUB_OUTPUT is required; run this as a GitHub Action.");
   const url = baseUrl(input("url", env.TILDE_URL), "url / TILDE_URL");
@@ -135,7 +165,16 @@ async function run() {
         }
       : {}),
   };
-  const registered = await rpc(url, apiToken, "RegisterDeployment", body);
+  const command = input("command");
+  // The command registers the deployment itself from the same environment and GitHub metadata.
+  const registered = command
+    ? await runCommand(command, {
+        ...env,
+        TILDE_URL: url,
+        TILDE_API_KEY: apiToken || undefined,
+        TILDE_AGENT_ID: agentId,
+      })
+    : await rpc(url, apiToken, "RegisterDeployment", body);
   let token = registered.token;
   // Mask before any file command, summary or validation error can emit it.
   if (typeof token === "string") mask(token);
@@ -150,15 +189,15 @@ async function run() {
   await output("deployment-url", deploymentUrl);
   await output("created", String(created));
   if (env.GITHUB_STEP_SUMMARY) {
-    // Only identifiers and an authenticated page link, never a bearer credential.
+    // Only identifiers and a page link, never a bearer credential.
     await appendFile(
       env.GITHUB_STEP_SUMMARY,
-      `### Tilde deployment\n\nDeployment: \`${deploymentId}\`\n\n[Open deployments](<${deploymentUrl.replaceAll(">", "%3E").replaceAll("<", "%3C")}>)\n\nFor manual setup, sign in to Tilde and select **Rotate token** on this deployment. This generates a replacement and invalidates the CI-issued token.\n`,
+      `### Tilde deployment\n\nDeployment: \`${deploymentId}\`\n\n[Open deployments](<${deploymentUrl.replaceAll(">", "%3E").replaceAll("<", "%3C")}>)\n\nFor manual setup, open Tilde and select **Rotate token** on this deployment. This generates a replacement and invalidates the CI-issued token.\n`,
     );
   }
   if (outputToken === "false") {
     // Registration still issues a token server-side. Discard it rather than exporting
-    // it to later steps. Manual users issue a replacement in the authenticated UI.
+    // it to later steps. Manual users issue a replacement in the Tilde UI.
     token = undefined;
     process.stdout.write(
       "Tilde deployment registered. Token output is disabled; open the deployment link for manual setup.\n",

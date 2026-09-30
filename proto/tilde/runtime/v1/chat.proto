@@ -17,6 +17,10 @@ service ChatService {
   rpc ReportToolCall(ReportToolCallRequest) returns (ReportToolCallResponse);
   rpc SetTyping(SetTypingRequest) returns (SetTypingResponse);
   rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  // Replaces this invocation's bundled tools: the definitions of tools the agent ships in its
+  // code and runs in its process, so tools.search can rank them beside server tools. The engine
+  // never executes them.
+  rpc RegisterBundledTools(RegisterBundledToolsRequest) returns (RegisterBundledToolsResponse);
   rpc InvokeTool(stream InvokeToolRequest) returns (InvokeToolResponse);
   rpc ListGoals(ListGoalsRequest) returns (ListGoalsResponse);
   rpc CreateGoal(CreateGoalRequest) returns (CreateGoalResponse);
@@ -68,6 +72,10 @@ message SetTypingRequest { bool typing = 1; }
 message SetTypingResponse {}
 
 message ListToolsRequest {}
+
+message RegisterBundledToolsRequest { repeated tilde.types.v1.ToolDefinition tools = 1; }
+
+message RegisterBundledToolsResponse {}
 
 message ListToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; }
 

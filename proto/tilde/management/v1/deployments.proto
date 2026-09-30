@@ -1,6 +1,8 @@
 syntax = "proto3";
 package tilde.management.v1;
+import "tilde/types/v1/chat.proto";
 import "tilde/types/v1/deployment.proto";
+import "tilde/types/v1/prompt.proto";
 service DeploymentService {
   rpc GetDeployment(GetDeploymentRequest) returns (GetDeploymentResponse);
   rpc SetDeploymentWeights(SetDeploymentWeightsRequest) returns (SetDeploymentWeightsResponse);
@@ -13,6 +15,12 @@ service DeploymentService {
   rpc RetireDeployment(RetireDeploymentRequest) returns (RetireDeploymentResponse);
   rpc IssueDeploymentToken(IssueDeploymentTokenRequest) returns (IssueDeploymentTokenResponse);
   rpc IssueIngressToken(IssueIngressTokenRequest) returns (IssueIngressTokenResponse);
+  // Skill files too large or binary to send inline are uploaded first, content-addressed:
+  // `tilde deploy` asks which digests are missing and uploads only those.
+  rpc MissingDeploymentFiles(MissingDeploymentFilesRequest) returns (MissingDeploymentFilesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc UploadDeploymentFile(UploadDeploymentFileRequest) returns (UploadDeploymentFileResponse);
+  // The prompt and skill versions and the bundled tools a deployment shipped.
+  rpc GetDeploymentContents(GetDeploymentContentsRequest) returns (GetDeploymentContentsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
 }
 message GetDeploymentRequest { string agent_id = 1; }
 message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.AgentInstance instances = 2; repeated tilde.types.v1.AgentDeployment deployments = 3; }
@@ -23,7 +31,39 @@ message RegisterDeploymentRequest {
   reserved 4; optional string target_reference = 5; optional string repository = 6;
   optional string commit_sha = 7; optional string external_id = 8; optional string label = 9;
   optional string commit_message = 10; optional string branch = 11; optional string commit_author = 12;
+  // What the agent's code declares, read by `tilde deploy` from the entry module. A repeat of an
+  // existing external id ignores it: a deployment's contents never change.
+  DeploymentDeclarations declarations = 13;
 }
+// Everything a deployment ships besides its code. `tilde deploy --dry-run` prints this as JSON.
+message DeploymentDeclarations { repeated DeclaredPrompt prompts = 1; repeated DeclaredSkill skills = 2; repeated DeclaredTool tools = 3; }
+// `hash` is the SDK's content hash (see crates/tilde/src/prompts); the engine recomputes it.
+message DeclaredPrompt {
+  string name = 1; tilde.types.v1.PromptFormat format = 2; string template = 3;
+  repeated tilde.types.v1.PromptSection sections = 4; string config = 5; string hash = 6; string origin = 7;
+}
+// A bundled tool: native framework code the agent runs itself, described as the SDKs publish it
+// per invocation (`RegisterBundledTools`). Empty `output_schema_json` means none is declared.
+message DeclaredTool {
+  string name = 1; string description = 2; string summary = 3; string input_schema_json = 4;
+  string output_schema_json = 5; tilde.types.v1.ToolAnnotations annotations = 6;
+  tilde.types.v1.ToolDisplay display = 7; string origin = 8;
+}
+message DeclaredSkill { string name = 1; repeated DeclaredSkillFile files = 2; string origin = 3; }
+// UTF-8 text up to 256 KiB travels as content; `tilde deploy` sends anything else by the digest
+// of an uploaded file. `data` carries other bytes inline (dry-run output uses it for them).
+message DeclaredSkillFile {
+  string path = 1; bool executable = 2;
+  oneof body { string content = 3; string sha256 = 4; bytes data = 5; }
+}
+message MissingDeploymentFilesRequest { string agent_id = 1; repeated string sha256 = 2; }
+message MissingDeploymentFilesResponse { repeated string sha256 = 1; }
+message UploadDeploymentFileRequest { string agent_id = 1; bytes data = 2; }
+message UploadDeploymentFileResponse { string sha256 = 1; }
+message GetDeploymentContentsRequest { string agent_id = 1; string deployment_id = 2; }
+message DeploymentPrompt { string prompt_id = 1; string name = 2; tilde.types.v1.PromptVersion version = 3; }
+message DeploymentSkill { string skill_id = 1; string name = 2; string version_id = 3; uint32 number = 4; string description = 5; string origin = 6; }
+message GetDeploymentContentsResponse { repeated DeploymentPrompt prompts = 1; repeated DeploymentSkill skills = 2; repeated DeclaredTool tools = 3; }
 message RegisterDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; string token = 2 [debug_redact = true]; bool created = 3; }
 message PromoteDeploymentRequest { string agent_id = 1; string deployment_id = 2; }
 message PromoteDeploymentResponse { tilde.types.v1.Deployment deployment = 1; }

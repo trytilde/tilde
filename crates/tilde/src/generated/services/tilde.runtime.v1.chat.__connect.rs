@@ -104,6 +104,18 @@ pub type OwnedListToolsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListToolsResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::runtime::v1::__buffa::view::ListToolsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<RegisterBundledToolsRequestView<'static>>`.
+pub type OwnedRegisterBundledToolsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RegisterBundledToolsResponseView<'static>>`.
+pub type OwnedRegisterBundledToolsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<InvokeToolRequestView<'static>>`.
 pub type OwnedInvokeToolRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolRequestView<'static>,
@@ -568,6 +580,48 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::RegisterBundledToolsResponse,
+>
+for crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::RegisterBundledToolsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::InvokeToolResponse>
 for crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolResponseView<'_> {
     fn encode(
@@ -905,6 +959,12 @@ pub const CHAT_SERVICE_SET_TYPING_SPEC: ::connectrpc::Spec = ::connectrpc::Spec:
 /// Static [`Spec`](::connectrpc::Spec) for the `ListTools` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHAT_SERVICE_LIST_TOOLS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.runtime.v1.ChatService/ListTools",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RegisterBundledTools` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_REGISTER_BUNDLED_TOOLS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.ChatService/RegisterBundledTools",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -1257,6 +1317,31 @@ pub trait ChatService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::runtime::v1::ListToolsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Replaces this invocation's bundled tools: the definitions of tools the agent ships in its
+    /// code and runs in its process, so tools.search can rank them beside server tools. The engine
+    /// never executes them.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn register_bundled_tools<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::runtime::v1::RegisterBundledToolsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1793,6 +1878,35 @@ impl<S: ChatService> ChatServiceExt for S {
                 },
             )
             .with_spec(CHAT_SERVICE_LIST_TOOLS_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "RegisterBundledTools",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.register_bundled_tools(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::runtime::v1::RegisterBundledToolsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_REGISTER_BUNDLED_TOOLS_SPEC)
             .route_view_client_stream(
                 CHAT_SERVICE_SERVICE_NAME,
                 "InvokeTool",
@@ -2137,6 +2251,12 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .with_spec(CHAT_SERVICE_LIST_TOOLS_SPEC),
                 )
             }
+            "RegisterBundledTools" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_REGISTER_BUNDLED_TOOLS_SPEC),
+                )
+            }
             "InvokeTool" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::client_streaming()
@@ -2439,6 +2559,28 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::runtime::v1::ListToolsResponse,
+                        >(format)
+                })
+            }
+            "RegisterBundledTools" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+                    >::from_parts(&req, &body);
+                    svc.register_bundled_tools(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::runtime::v1::RegisterBundledToolsResponse,
                         >(format)
                 })
             }
@@ -3226,6 +3368,51 @@ where
                 &self.transport,
                 &self.config,
                 CHAT_SERVICE_LIST_TOOLS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RegisterBundledTools RPC. Sends a request to /tilde.runtime.v1.ChatService/RegisterBundledTools.
+    pub async fn register_bundled_tools(
+        &self,
+        request: crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.register_bundled_tools_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RegisterBundledTools RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn register_bundled_tools_with_options(
+        &self,
+        request: crate::proto::tilde::runtime::v1::RegisterBundledToolsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::RegisterBundledToolsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_REGISTER_BUNDLED_TOOLS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

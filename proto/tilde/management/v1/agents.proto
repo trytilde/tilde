@@ -24,7 +24,7 @@ message CreateAgentRequest {
   string id = 1;
   string name = 2;
   reserved 3;
-  reserved "description";
+  string description = 8;
   reserved 4, 5;
   reserved "endpoint_url", "webhook_signing_key";
   tilde.types.v1.Capabilities capabilities = 6;
@@ -38,8 +38,12 @@ message GetAgentRequest { string id = 1; }
 message GetAgentResponse { tilde.types.v1.Agent agent = 1; }
 
 message ListAgentsRequest {
-  // Case-insensitive name search, or an exact agent UUID.
+  // Case-insensitive name or description search, or an exact agent UUID.
   string search = 3;
+  // Latest health status, as reported in Agent.metrics; UNSPECIFIED matches every agent.
+  tilde.types.v1.AgentHealthStatus health = 4;
+  // Present to list only paused (true) or only active (false) agents.
+  optional bool paused = 5;
   uint32 page_size = 1;
   string page_token = 2;
 }
@@ -53,7 +57,7 @@ message UpdateAgentRequest {
   string id = 1;
   optional string name = 2;
   reserved 3;
-  reserved "description";
+  optional string description = 7;
   reserved 4;
   reserved "endpoint_url";
   // Present empty map clears grants; absence preserves them.

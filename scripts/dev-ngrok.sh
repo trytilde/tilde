@@ -9,7 +9,7 @@ case "${NGROK_ENABLED:-false}" in
   *) fail 'NGROK_ENABLED must be true or false' ;;
 esac
 
-[[ -n "${NGROK_AUTHTOKEN:-}" ]] || fail 'Set NGROK_AUTHTOKEN in .env.local or load it with task secrets:load'
+[[ -n "${NGROK_AUTHTOKEN:-}" ]] || fail 'Set NGROK_AUTHTOKEN in .env.local'
 # Require a bare DNS domain so the advertised origin and ngrok endpoint agree.
 [[ "${NGROK_DOMAIN:-}" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$ ]] || fail 'Set NGROK_DOMAIN to your ngrok hostname (without https:// or a path)'
 command -v ngrok >/dev/null || fail 'Install the ngrok CLI before enabling NGROK_ENABLED'

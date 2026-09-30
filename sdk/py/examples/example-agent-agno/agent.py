@@ -1,27 +1,52 @@
-"""Reply generation: Tilde history -> Agno messages, channel tools -> Agno functions."""
+"""The Agno agent, defined once at module scope; each invocation runs it with Tilde's per-run
+pieces (channel, Tilde and bundled tools, steering, registry skills, cancellation). Model text
+stays private."""
 
 import asyncio
 import logging
+import os
+from pathlib import Path
 
 from agno.agent import Agent
-from agno.models.base import Model
+from agno.models.openai import OpenAIChat
+from agno.skills import LocalSkills
+from bundled_tools import TOOL_GUIDANCE, TOOLS
 
+import tilde
 from tilde import AgentContext
-from tilde_agno import convert_to_agno_messages, convert_to_agno_tools
+from tilde_agno import TildeSkills, convert_to_agno_messages, tilde_agno
 
 log = logging.getLogger("example-agent-agno")
-
-INSTRUCTIONS = (
-    "You are Example Agent 1, a helpful local development assistant. Use the current channel "
-    "tools to respond to the latest message, concisely and helpfully. Model text is private and "
-    "is not delivered to the user. Choose the appropriate provider tool using its instructions "
-    "and conversation references. Use the supplied attachments when answering."
-)
-TOOL_CALL_LIMIT = 8
 TIMEOUT_SECONDS = 60
 
+# The inference connection this agent was given; the gateway holds its provider key. Built once:
+# each request resolves the invocation running it.
+INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
+responder = Agent(
+    model=OpenAIChat(
+        id=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+        base_url=INFERENCE.base_url,
+        api_key=INFERENCE.api_key,
+        http_client=INFERENCE.async_client(),
+        store=False,
+        max_retries=0,
+        max_tokens=600,
+    ),
+    instructions=(
+        "You are Example Agent 1, a helpful local development assistant. Use the current channel "
+        "tools to respond to the latest message, concisely and helpfully. Model text is private "
+        "and is not delivered to the user. Choose the appropriate provider tool using its "
+        "instructions and conversation references. Use the supplied attachments when answering."
+        + TOOL_GUIDANCE
+    ),
+    # Shipped with the deployment by `tilde deploy`; skills assigned in Tilde join per invocation.
+    skills=TildeSkills([LocalSkills(str(Path(__file__).parent / "skills"))]),
+    tool_call_limit=8,
+    telemetry=False,
+)
 
-async def respond(ctx: AgentContext, model: Model) -> None:
+
+async def respond(ctx: AgentContext) -> None:
     """Visible responses are explicit provider tool calls; a text-only result sends nothing."""
     log.info("Agent invocation started")
     stage = "history"
@@ -33,14 +58,10 @@ async def respond(ctx: AgentContext, model: Model) -> None:
             log.info("No context to respond to")
             return
         stage = "inference"
-        agent = Agent(
-            model=model,
-            instructions=INSTRUCTIONS,
-            tools=convert_to_agno_tools(ctx.channel.current),
-            tool_call_limit=TOOL_CALL_LIMIT,
-            telemetry=False,
+        result = await asyncio.wait_for(
+            responder.arun(input=messages, **await tilde_agno(ctx, responder, bundled=TOOLS)),
+            timeout=TIMEOUT_SECONDS,
         )
-        result = await asyncio.wait_for(agent.arun(input=messages), timeout=TIMEOUT_SECONDS)
         log.info("Agent invocation completed: %d tool calls", len(result.tools or []))
     except Exception as error:
         if ctx.cancelled:

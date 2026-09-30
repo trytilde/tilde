@@ -21,6 +21,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/sdk
 
+  examples/example-tool-server:
+    dependencies:
+      '@trytilde/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
+
   examples/langchain-example-agent:
     dependencies:
       '@langchain/core':
@@ -56,6 +65,9 @@ importers:
       pino:
         specifier: 10.3.1
         version: 10.3.1
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
     devDependencies:
       '@types/node':
         specifier: 24.3.0
@@ -117,6 +129,9 @@ importers:
       pino:
         specifier: 10.3.1
         version: 10.3.1
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
     devDependencies:
       '@types/node':
         specifier: 24.3.0
@@ -151,9 +166,15 @@ importers:
       '@trytilde/sdk-openai-agents-node':
         specifier: workspace:*
         version: link:../../packages/sdk-openai-agents-node
+      openai:
+        specifier: 7.17.0
+        version: 7.17.0(undici@6.28.1)(ws@8.21.3)(zod@4.6.1)
       pino:
         specifier: 10.3.1
         version: 10.3.1
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
     devDependencies:
       '@types/node':
         specifier: 24.3.0
@@ -194,6 +215,9 @@ importers:
       pino:
         specifier: 10.3.1
         version: 10.3.1
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
     devDependencies:
       '@types/node':
         specifier: 24.3.0
@@ -373,6 +397,9 @@ importers:
       '@connectrpc/connect-web':
         specifier: 2.2.0
         version: 2.2.0(@bufbuild/protobuf@2.14.1)(@connectrpc/connect@2.2.0(@bufbuild/protobuf@2.14.1))
+      zod:
+        specifier: ^4.6.1
+        version: 4.6.1
 
   packages/sdk-langchain-node:
     dependencies:
@@ -383,6 +410,9 @@ importers:
       '@langchain/core':
         specifier: ^1.2.11
         version: 1.2.11(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(openai@7.17.0(undici@6.28.1)(ws@8.21.3)(zod@4.6.1))(ws@8.21.3)
+      langchain:
+        specifier: ^1.5.11
+        version: 1.5.11(@langchain/core@1.2.11(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(openai@7.17.0(undici@6.28.1)(ws@8.21.3)(zod@4.6.1))(ws@8.21.3))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.222.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(openai@7.17.0(undici@6.28.1)(ws@8.21.3)(zod@4.6.1))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(ws@8.21.3)
 
   packages/sdk-mastra-node:
     dependencies:

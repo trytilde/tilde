@@ -9,8 +9,10 @@ pub const CATEGORY_SPREADSHEETS: &str = "spreadsheets";
 pub const CATEGORY_CHAT: &str = "chat";
 pub const CATEGORY_DEVELOPER_TOOLS: &str = "developer_tools";
 pub const CATEGORY_SANDBOX: &str = "sandbox";
+pub const CATEGORY_CLOUD_INFRASTRUCTURE: &str = "cloud_infrastructure";
 pub const CATEGORY_SEARCH: &str = "search";
 pub const CATEGORY_ANALYTICS: &str = "analytics";
+pub const CATEGORY_PRODUCT_ANALYTICS: &str = "product_analytics";
 pub const CATEGORY_INFERENCE: &str = "inference";
 /// Unclassified runtime providers may use this until the registrant supplies a specific category.
 pub const CATEGORY_OTHER: &str = "other";

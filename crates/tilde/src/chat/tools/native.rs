@@ -100,7 +100,7 @@ pub(crate) async fn invoke(
 /// Successful calls publish the canonical message and tool result in one transaction.
 /// Failed attempts roll back all message writes before using the normal failure recorder.
 pub(crate) async fn invoke_complete(context: &Context, input: Value) -> ToolResult<Value> {
-    let result = async {
+    let mut result = async {
         context.authorize().await?;
         let message_input: Input = serde_json::from_value(input.clone())
             .map_err(|_| ConnectError::invalid_argument("Invalid native message input"))?;
@@ -115,9 +115,8 @@ pub(crate) async fn invoke_complete(context: &Context, input: Value) -> ToolResu
     if result.is_err() {
         // The unique claim also protects this fallback against a concurrent successful
         // call or an uncertain COMMIT: it cannot overwrite an existing terminal result.
-        let execution =
-            super::audit::Execution::begin(context, "sendMessage", "native", &input).await?;
-        execution.finish(&result).await?;
+        let execution = super::audit::Execution::begin(context, &definition(), &input).await?;
+        execution.finish(&mut result).await?;
     }
     result
 }
@@ -182,7 +181,7 @@ async fn complete_message(
     let output_json = output.to_string();
     let event_count =
         4_i64 + i64::from(!attachments.is_empty()) + i64::from(!input.text.is_empty());
-    let (traceparent, tracestate) = crate::telemetry::context::capture();
+    let (traceparent, tracestate) = crate::telemetry::tracing::context::capture();
     let row = crate::chat::db::native_message_complete_opt(
         &tx,
         context.call_id,
@@ -338,8 +337,8 @@ impl Context {
             "streaming",
             Some(self.scope.id),
             reply.map(id).transpose()?,
-            &(crate::telemetry::context::capture().0),
-            &(crate::telemetry::context::capture().1),
+            &(crate::telemetry::tracing::context::capture().0),
+            &(crate::telemetry::tracing::context::capture().1),
         )
         .await
         .map_err(ChatError::from)?;

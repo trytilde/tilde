@@ -31,6 +31,9 @@ void test(
             async listTools() {
               return { tools: [] };
             },
+            async registerBundledTools() {
+              return {};
+            },
           });
           router.service(RunService, {
             async *watch(request, ctx) {

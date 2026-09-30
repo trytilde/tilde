@@ -123,6 +123,37 @@ it("keeps failed edits available for retry without a redundant back button", asy
   expect(onClose).not.toHaveBeenCalled();
 });
 
+it("edits the description inline: Enter saves, Escape discards, blur saves", async () => {
+  updateAgent.mockImplementation(async (patch) => ({ agent: { ...agent, ...patch } }));
+  render(<AgentEditor agent={agent} onClose={vi.fn()} onSaved={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Add a description" }));
+  const field = screen.getByRole("textbox", { name: "Agent description" });
+  fireEvent.change(field, { target: { value: "Answers billing questions" } });
+  fireEvent.keyDown(field, { key: "Escape" });
+  expect(screen.queryByRole("textbox", { name: "Agent description" })).toBeNull();
+  expect(updateAgent).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Edit agent description" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Agent description" }), {
+    target: { value: "Answers billing questions" },
+  });
+  fireEvent.submit(screen.getByRole("textbox", { name: "Agent description" }));
+  await screen.findByRole("button", { name: "Answers billing questions" });
+  expect(updateAgent).toHaveBeenCalledTimes(1);
+  expect(updateAgent).toHaveBeenLastCalledWith({
+    id: agent.id,
+    description: "Answers billing questions",
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Answers billing questions" }));
+  const again = screen.getByRole("textbox", { name: "Agent description" });
+  fireEvent.change(again, { target: { value: "" } });
+  fireEvent.blur(again);
+  await screen.findByRole("button", { name: "Add a description" });
+  expect(updateAgent).toHaveBeenLastCalledWith({ id: agent.id, description: "" });
+  expect(updateAgent).toHaveBeenCalledTimes(2);
+});
+
 it("creates an agent identity without an endpoint, signing key or deployment type", async () => {
   createAgent.mockResolvedValue({ agent });
   const onSaved = vi.fn();
@@ -130,12 +161,17 @@ it("creates an agent identity without an endpoint, signing key or deployment typ
   fireEvent.change(screen.getByRole("textbox", { name: "Agent name" }), {
     target: { value: "Ada" },
   });
+  fireEvent.change(screen.getByRole("textbox", { name: "Agent description" }), {
+    target: { value: "Answers billing questions" },
+  });
   expect(screen.queryByLabelText("Webhook signing key")).toBeNull();
   expect(screen.queryByRole("textbox", { name: "Agent endpoint" })).toBeNull();
   expect(screen.queryByRole("tablist", { name: "Deployment mode" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
   await waitFor(() =>
-    expect(createAgent).toHaveBeenCalledWith(expect.objectContaining({ name: "Ada" })),
+    expect(createAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Ada", description: "Answers billing questions" }),
+    ),
   );
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(true));
 });

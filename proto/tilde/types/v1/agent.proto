@@ -21,7 +21,8 @@ message Agent {
   string id = 1;
   string name = 2;
   reserved 3;
-  reserved "description";
+  // Free-text summary shown under the name; at most 500 characters.
+  string description = 14;
   reserved 4;
   reserved "endpoint_url";
   google.protobuf.Timestamp created_at = 5;
@@ -71,6 +72,15 @@ message Capabilities {
   BinaryPermission work_write = 10;
   BinaryPermission run_update = 11;
   TargetPermission tools_invoke = 12;
+  // Fine-grained half of updating an agent: assign its skills.
+  TargetPermission agents_edit_skills = 14;
+  // Write skills into the targeted editor skill sources and sync targeted git sources.
+  TargetPermission skills_edit = 15;
+  // See the targeted skill sources and assign their skills (with agents_edit_skills on the
+  // receiving agent); skills_edit implies it.
+  TargetPermission skills_read = 16;
+  // Tools on the conversing user's own connections. SELECTED ids are provider IDs.
+  TargetPermission tools_personal = 17;
 }
 
 enum BinaryPermission {
@@ -88,6 +98,6 @@ enum TargetSelection {
 
 message TargetPermission {
   TargetSelection mode = 1;
-  // Allowed only with SELECTED: agent UUIDs, or catalog tool names for tools_invoke.
+  // Allowed only with SELECTED: agent UUIDs, catalog tool names for tools_invoke, or provider IDs for tools_personal.
   repeated string ids = 2;
 }

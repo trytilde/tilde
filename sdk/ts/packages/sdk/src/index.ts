@@ -1,5 +1,3 @@
-import { ApiKeysService } from "@trytilde/contracts/tilde/management/v1/api_keys_pb.js";
-import { IamService } from "@trytilde/contracts/tilde/management/v1/iam_pb.js";
 import { IdentitiesService } from "@trytilde/contracts/tilde/management/v1/identities_pb.js";
 import { createChannels } from "./channels.js";
 import type { Channels } from "./channel-types.js";
@@ -22,6 +20,10 @@ import {
   InvocationCommandKind,
 } from "@trytilde/contracts/tilde/runtime/v1/controls_pb.js";
 import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
+import {
+  ToolHostRegistryService,
+  ToolService,
+} from "@trytilde/contracts/tilde/management/v1/tools_pb.js";
 import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
 import { initializeTracing, invocationTracing, tracingInterceptor } from "./tracing.js";
 export { agentSpanProcessor } from "./tracing.js";
@@ -51,6 +53,46 @@ import { AgentService as ManagementAgentService } from "@trytilde/contracts/tild
 import { AgentService as RuntimeAgentService } from "@trytilde/contracts/tilde/runtime/v1/agents_pb.js";
 import { TildeChatProviderService } from "@trytilde/contracts/tilde/management/v1/tilde_chat_pb.js";
 import { ChatService as RuntimeChatService } from "@trytilde/contracts/tilde/runtime/v1/chat_pb.js";
+import { PromptService as RuntimePromptService } from "@trytilde/contracts/tilde/runtime/v1/prompts_pb.js";
+import { SkillService as RuntimeSkillService } from "@trytilde/contracts/tilde/runtime/v1/skills_pb.js";
+import type { Prompt } from "@trytilde/contracts/tilde/types/v1/prompt_pb.js";
+import { PromptDefinition, type PromptStamp, type PromptVariables } from "./prompts.js";
+export {
+  PromptDefinition,
+  definePrompt,
+  promptHash,
+  canonicalJson,
+  type PromptDeclaration,
+  type PromptVariables,
+  type PromptStamp,
+} from "./prompts.js";
+export { PromptFormat } from "@trytilde/contracts/tilde/types/v1/prompt_pb.js";
+import { declaration, runWithContext, validInferenceSlug } from "./invocation.js";
+export { inference, runWithContext, type InferenceClient } from "./invocation.js";
+export {
+  defineSkills,
+  defineSkill,
+  type SkillsDefinition,
+  type SkillDefinition,
+  type SkillFileInput,
+} from "./skills.js";
+export type {
+  Discoverer,
+  ProjectDiscoverer,
+  Discovery,
+  DiscoveryContext,
+  DiscoveredPrompt,
+  DiscoveredSkill,
+  DiscoveredTool,
+} from "./discovery.js";
+import { createSkillsClient, type SkillsClient } from "./skills.js";
+export type {
+  SkillsClient,
+  SkillSummary,
+  SkillFileBody,
+  SkillFileInfo,
+  SkillSourceSummary,
+} from "./skills.js";
 import {
   InvokeRequestSchema,
   type InvokeRequest,
@@ -62,6 +104,7 @@ import {
 } from "@trytilde/contracts/tilde/run/v1/run_pb.js";
 import {
   MessageSchema,
+  ToolDisplay,
   type Participant,
   type Message as ChatMessage,
 } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
@@ -72,12 +115,16 @@ export {
   TargetSelection,
   AgentConcurrencyPolicy,
 } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
-/** Connection contracts are namespaced so their capabilities stay distinct from IAM grants. */
+/** Connection contracts are namespaced so their capabilities stay distinct from agent capabilities. */
 export * as management from "./management.js";
 export * as runtime from "./runtime.js";
 export { createTildeChatClient, type TildeChatClientOptions } from "./tilde-chat.js";
 
-/** One reusable HTTP/2 transport and generated Connect clients; no REST or tenant wrapper. */
+/**
+ * One reusable HTTP/2 transport and generated Connect clients; no REST or tenant wrapper.
+ * `accessToken` is optional: open-source Tilde's management API is unauthenticated (secure it
+ * with your own proxy), while hosted Tilde Cloud requires a management bearer credential.
+ */
 export type ClientOptions = { baseUrl: string; accessToken?: string };
 function transport(options: ClientOptions) {
   return createConnectTransport({
@@ -94,9 +141,6 @@ function transport(options: ClientOptions) {
   });
 }
 export class ManagementClient {
-  readonly apiKeys: RpcClient<typeof ApiKeysService>;
-  /** Groups, memberships and resource grants. */
-  readonly iam: RpcClient<typeof IamService>;
   readonly identities: RpcClient<typeof IdentitiesService>;
   readonly access: RpcClient<typeof AgentAccessService>;
   readonly agents: RpcClient<typeof ManagementAgentService>;
@@ -105,10 +149,10 @@ export class ManagementClient {
   readonly connections: RpcClient<typeof ConnectionsService>;
   readonly logs: RpcClient<typeof LogsService>;
   readonly traces: RpcClient<typeof TracingService>;
+  readonly tools: RpcClient<typeof ToolService>;
+  readonly toolHosts: RpcClient<typeof ToolHostRegistryService>;
   constructor(options: ClientOptions) {
     const rpc = transport(options);
-    this.apiKeys = connectClient(ApiKeysService, rpc);
-    this.iam = connectClient(IamService, rpc);
     this.identities = connectClient(IdentitiesService, rpc);
     this.access = connectClient(AgentAccessService, rpc);
     this.agents = connectClient(ManagementAgentService, rpc);
@@ -117,6 +161,8 @@ export class ManagementClient {
     this.connections = connectClient(ConnectionsService, rpc);
     this.logs = connectClient(LogsService, rpc);
     this.traces = connectClient(TracingService, rpc);
+    this.tools = connectClient(ToolService, rpc);
+    this.toolHosts = connectClient(ToolHostRegistryService, rpc);
   }
 }
 export class RuntimeClient {
@@ -131,24 +177,94 @@ export class RuntimeClient {
 export const createManagementClient = (options: ClientOptions) => new ManagementClient(options);
 export const createRuntimeClient = (options: ClientOptions) => new RuntimeClient(options);
 
-/** Local wrappers for invocation-scoped provider tools. Descriptions and formats come from Tilde. */
+/**
+ * A tool in `ctx.tools`: a provider tool published for this invocation (descriptions and formats
+ * come from Tilde) or an SDK lifecycle helper.
+ */
 export type Tool = {
   description: string;
   inputSchema: Record<string, unknown>;
   /** Present on provider tools; SDK-local lifecycle helpers have no provider owner. */
   providerId?: string;
   chunkSchema?: Record<string, unknown>;
-  execute(input: unknown, execution: { toolCallId: string }): Promise<unknown>;
-  /** A framework must explicitly feed chunks; registering a local tool does not stream tokens. */
+  outputSchema?: Record<string, unknown>;
+  /** Short label for transcripts. Pass it to reportToolCall for tools you run yourself. */
+  summary?: string;
+  /** Provider hints for ordering, confirming or parallelising calls; never authorization. */
+  annotations?: ToolAnnotations;
+  /** Returns a ticket at once; the outcome arrives later as new input and through tools.result. */
+  background?: boolean;
+  execute(input: unknown, execution: ToolExecution): Promise<unknown>;
+  /** A framework must explicitly feed chunks; registering a bundled tool does not stream tokens. */
   stream?(
     input: unknown,
     chunks: AsyncIterable<unknown>,
     execution: { toolCallId: string },
   ): Promise<unknown>;
 };
+export type ToolAnnotations = {
+  readOnly: boolean;
+  destructive: boolean;
+  idempotent: boolean;
+  openWorld: boolean;
+};
+export type ToolExecution = {
+  toolCallId: string;
+  /**
+   * Opaque framework state from the adapter that runs this call (for example OpenAI Agents'
+   * RunContext). A `tools.execute` naming a bundled tool hands it to that tool's native runner.
+   */
+  frameworkContext?: unknown;
+};
+/** How calls of the agent's bundled tools show in end-user chats. Traces keep full detail. */
+export type ToolDisplayMode = "full" | "summary" | "hidden";
+/** Tilde metadata for bundled tools, keyed by tool name; it overrides the native tool's own. */
+export type BundledToolOptions = Record<
+  string,
+  { summary?: string; display?: ToolDisplayMode; annotations?: ToolAnnotations }
+>;
+/**
+ * An agent's bundled tools: its framework's own native tools (an AI SDK `ToolSet`, LangChain
+ * tools, OpenAI Agents function tools, Mastra tools) with their Tilde options. Pass it to the
+ * adapter's per-invocation helper as `bundled`, or its parts to `withTildeTools`; exported from
+ * the entry module, `tilde deploy` declares the tools with the deployment, described by the
+ * framework adapter exactly as `withTildeTools` publishes them.
+ */
+export type BundledTools<T> = {
+  readonly [declaration]: "tools";
+  readonly tools: T;
+  readonly options: BundledToolOptions;
+};
+export function defineTools<T>(tools: T, options: BundledToolOptions = {}): BundledTools<T> {
+  return { [declaration]: "tools", tools, options };
+}
+/** @internal A `defineTools` value, also one made by another copy of the SDK. */
+export const isBundledTools = (value: unknown): value is BundledTools<unknown> =>
+  !!value &&
+  typeof value === "object" &&
+  (value as Record<symbol, unknown>)[declaration] === "tools";
+/**
+ * @internal Framework adapters' `withTildeTools` publishes bundled tools in this shape.
+ * `execute` runs the adapter's audited native tool for a `tools.execute` naming it.
+ */
+export type BundledTool = {
+  name: string;
+  description: string;
+  summary?: string;
+  display?: ToolDisplayMode;
+  inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  annotations?: ToolAnnotations;
+  execute(input: unknown, execution: ToolExecution): Promise<unknown>;
+};
 export type ToolCatalog = Record<string, Tool>;
 export type SteeringInput = { id: string; text: string; message?: ChatMessage };
 
+const DISPLAY = {
+  full: ToolDisplay.FULL,
+  summary: ToolDisplay.SUMMARY,
+  hidden: ToolDisplay.HIDDEN,
+} as const;
 class StopLoop extends Error {}
 function toolId(invocation: string, call: string, name: string) {
   if (!call) throw new Error("Tool call ID is required");
@@ -163,6 +279,70 @@ function object(input: unknown): Record<string, unknown> {
 function string(input: Record<string, unknown>, key: string): string {
   if (typeof input[key] !== "string") throw new Error(`${key} must be a string`);
   return input[key];
+}
+
+/** A tool value as JSON for audit records; values JSON cannot encode keep their string form. */
+function auditJson(value: unknown): JsonValue {
+  try {
+    const encoded = JSON.stringify(value);
+    return encoded === undefined ? null : (JSON.parse(encoded) as JsonValue);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * The name a framework shows the model for a Tilde tool: `name` with characters matching
+ * `invalid` (a global regex, the framework's disallowed characters) replaced by "_". Catalog
+ * names (`{source}.{tool}`) can exceed the 64 characters models accept, so a longer result is
+ * truncated and suffixed with a hash of `name`, keeping it stable and distinct from other long
+ * names sharing its start. Adapters bind each alias to its catalog tool when converting.
+ */
+export function modelToolName(name: string, invalid = /[^a-zA-Z0-9_-]/g): string {
+  const key = name.replace(invalid, "_");
+  if (key.length <= 64) return key;
+  const hash = createHash("sha256").update(name).digest("hex").slice(0, 8);
+  return `${key.slice(0, 55)}_${hash}`;
+}
+
+/**
+ * @internal Framework adapters audit every call of a native bundled tool through this, whether
+ * the model called it directly or through `tools.execute`: `running`, then `completed`, `failed`
+ * or `aborted`. `outcome` maps a returned value to what is audited, or to a failure for
+ * frameworks that return errors instead of throwing. Returns or rethrows the tool's own outcome.
+ */
+export async function auditToolCall<T>(
+  ctx: Pick<AgentContext, "reportToolCall" | "signal">,
+  call: {
+    name: string;
+    toolCallId: string;
+    input: unknown;
+    summary?: string;
+    display?: ToolDisplayMode;
+  },
+  run: () => Promise<T>,
+  outcome: (output: T) => { output: unknown } | { error: string } = (output) => ({ output }),
+): Promise<T> {
+  const { input, ...report } = call;
+  const failed = (error: string) =>
+    ctx.reportToolCall({
+      ...report,
+      status: ctx.signal.aborted ? "aborted" : "failed",
+      error: error.slice(0, 2048),
+    });
+  await ctx.reportToolCall({ ...report, status: "running", input: auditJson(input ?? {}) });
+  let output: T;
+  try {
+    output = await run();
+  } catch (error) {
+    await failed(error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+  const result = outcome(output);
+  if ("error" in result) await failed(result.error);
+  else
+    await ctx.reportToolCall({ ...report, status: "completed", output: auditJson(result.output) });
+  return output;
 }
 
 /** Invocation-bound SDK context. The model cannot choose its acting agent or thread. */
@@ -189,8 +369,18 @@ export class AgentContext {
   readonly attachments;
   readonly goals;
   readonly tasks;
+  /** Skills attached to this agent in the Skills tab, at their latest version. */
+  readonly skills: SkillsClient;
+  /** Deployed prompt histories: this agent's freely, others' with agents.read. */
+  readonly prompts: {
+    list(agentId?: string): Promise<Prompt[]>;
+  };
+  private readonly promptService: RpcClient<typeof RuntimePromptService>;
+  /** Stamps of prompts rendered in this invocation, latest version per name. */
+  private readonly activePrompts = new Map<string, string>();
   private readonly session: RpcClient<typeof RuntimeChatService>;
   private readonly providerToolNames = new Set<string>();
+  private bundledTools = new Map<string, BundledTool>();
   private readonly steering: SteeringInput[] = [];
   private readonly accepted = new Map<string, string>();
   #headers: Headers;
@@ -254,6 +444,16 @@ export class AgentContext {
     this.signal.addEventListener("abort", () => clearInterval(renewal), { once: true });
     const registry = connectClient(RuntimeAgentService, transport);
     const chat = connectClient(RuntimeChatService, transport);
+    this.promptService = connectClient(RuntimePromptService, transport);
+    this.prompts = {
+      list: async (agentId = "") =>
+        (await this.promptService.listPrompts({ agentId }, options())).prompts,
+    };
+    this.skills = createSkillsClient(connectClient(RuntimeSkillService, transport), options, {
+      agentId: request.agentId,
+      // Pushed with the wake by current engines; older ones leave it out and the SDK lists.
+      skills: request.state?.skills,
+    });
     this.getMessages = (input: { beforeMessageId?: string; limit?: number } = {}) =>
       chat.listMessages({ ...input }, options());
     this.attachments = {
@@ -436,11 +636,15 @@ export class AgentContext {
       })),
     };
   }
-  /** Audit local framework tools. Provider tools invoked through Tilde are audited automatically. */
+  /** Audit framework tools run in this process. Provider tools invoked through Tilde are audited automatically. */
   async reportToolCall(input: {
     toolCallId: string;
     name: string;
     status: "running" | "completed" | "failed" | "aborted";
+    /** Short label for transcripts, fixed by the first report of the call. */
+    summary?: string;
+    /** How the call shows in end-user chats, fixed by the first report of the call. */
+    display?: ToolDisplayMode;
     input?: JsonValue;
     output?: JsonValue;
     error?: string;
@@ -456,6 +660,8 @@ export class AgentContext {
           outputJson: input.output === undefined ? "" : JSON.stringify(input.output),
           error: input.error ?? "",
           inputDelta: input.inputDelta ?? "",
+          summary: input.summary ?? "",
+          display: input.display ? DISPLAY[input.display] : ToolDisplay.UNSPECIFIED,
         },
       },
       { headers: this.#headers, signal: this.signal },
@@ -465,7 +671,7 @@ export class AgentContext {
     await this.session.setTyping({ typing }, { headers: this.#headers, signal: this.signal });
   }
 
-  /** Refresh server-authored descriptors before exposing local tools to the reasoning framework. */
+  /** Refresh server-authored descriptors before exposing tools to the reasoning framework. */
   async refreshTools() {
     const response = await this.session.listTools(
       {},
@@ -490,8 +696,22 @@ export class AgentContext {
         inputSchema,
         providerId: definition.providerId,
         chunkSchema,
-        execute: (input, execution) =>
-          this.invokeProviderTool(definition.name, input, undefined, execution.toolCallId),
+        outputSchema: definition.outputSchemaJson
+          ? (JSON.parse(definition.outputSchemaJson) as Record<string, unknown>)
+          : undefined,
+        summary: definition.summary || undefined,
+        annotations: definition.annotations,
+        background: definition.detached || undefined,
+        execute: (input, execution) => {
+          // A tool found by search may be one this process runs itself.
+          if (definition.name === "tools.execute") {
+            const { name, input: inner } = object(input) as { name?: string; input?: unknown };
+            const bundled = typeof name === "string" ? this.bundledTools.get(name) : undefined;
+            // The adapter's executor audits the call; the outer tools.execute is not audited.
+            if (bundled) return bundled.execute(inner ?? {}, execution);
+          }
+          return this.invokeProviderTool(definition.name, input, undefined, execution.toolCallId);
+        },
       };
       if (chunkSchema)
         wrapper.stream = (input, chunks, execution) =>
@@ -504,6 +724,66 @@ export class AgentContext {
       this.tools[name] = wrapper;
       this.providerToolNames.add(name);
     }
+    await this.publishBundledTools();
+  }
+  /**
+   * @internal Called by framework adapters' `withTildeTools`: replace the agent's bundled tools
+   * (defined in its code, run in this process) and publish them, so `tools.search` and
+   * `tools.schemas` describe them and a `tools.execute` naming one runs it here. They never join
+   * `ctx.tools` or `ctx.agentTools`: the framework already holds the native tools.
+   */
+  async setBundledTools(tools: BundledTool[]) {
+    const incoming = new Map<string, BundledTool>();
+    for (const tool of tools) {
+      if (
+        ["__proto__", "constructor", "prototype"].includes(tool.name) ||
+        tool.name.startsWith("tools.") ||
+        Object.hasOwn(this.tools, tool.name) ||
+        incoming.has(tool.name)
+      )
+        throw new Error(`Bundled tool ${tool.name} conflicts with another tool`);
+      incoming.set(tool.name, tool);
+    }
+    this.bundledTools = incoming;
+    await this.publishBundledTools();
+  }
+  /** Tilde never executes bundled tools; it only describes them. */
+  private async publishBundledTools() {
+    await this.session.registerBundledTools(
+      {
+        tools: [...this.bundledTools.values()].map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          summary: tool.summary ?? "",
+          inputSchemaJson: JSON.stringify(tool.inputSchema),
+          outputSchemaJson: tool.outputSchema ? JSON.stringify(tool.outputSchema) : "",
+          annotations: tool.annotations,
+          display: tool.display ? DISPLAY[tool.display] : ToolDisplay.UNSPECIFIED,
+        })),
+      },
+      { headers: this.#headers, signal: this.signal },
+    );
+  }
+  /**
+   * Everything the agent can use besides messaging: its tool sources, Tilde's built-in tools
+   * (`tools.search`, `agents.*`, `thread.*`, ...) and personal tools. Framework adapters'
+   * `withTildeTools` combines them with `channel.current` and the agent's bundled tools.
+   */
+  get agentTools(): ToolCatalog {
+    const tools: ToolCatalog = Object.create(null);
+    for (const [name, tool] of Object.entries(this.tools)) {
+      const channel = tool.providerId === "native" || /^channel_[a-f0-9]{32}\./i.test(name);
+      if (this.providerToolNames.has(name) && !channel) tools[name] = tool;
+    }
+    return tools;
+  }
+  /** The tools the agent uses from one of its sources, keyed by tool name. */
+  toolSource(slug: string): ToolCatalog {
+    const prefix = `${slug}.`;
+    const tools: ToolCatalog = Object.create(null);
+    for (const name of this.providerToolNames)
+      if (name.startsWith(prefix)) tools[name.slice(prefix.length)] = this.tools[name];
+    return tools;
   }
   private async invokeProviderTool(
     name: string,
@@ -638,13 +918,24 @@ export class AgentContext {
    * it (for example `fast`). Spread the result into the provider
    * factory: `createOpenAI(ctx.inference("openai/prod"))`. The gateway forwards the provider's
    * own wire format, swaps in the real credential and accounts the call; `fetch` carries the
-   * current invocation token, so renewals apply to long-running loops.
+   * current invocation token, so renewals apply to long-running loops. Calls carry the stamps
+   * of every prompt active in this invocation; `{ prompt }` stamps only that one and
+   * `{ prompt: null }` none. Model clients built at module scope use `inference()` instead.
    */
-  inference(slug: string): { baseURL: string; apiKey: string; fetch: typeof fetch } {
-    if (!/^([a-z0-9_]+\/)?[A-Za-z0-9._@+:-]+$/.test(slug))
+  inference(
+    slug: string,
+    options: { prompt?: PromptStamp | null } = {},
+  ): { baseURL: string; apiKey: string; fetch: typeof fetch } {
+    if (!validInferenceSlug(slug))
       throw new Error("Inference slug must be provider/account or an alias");
     const baseURL = `${this.callbackUrl.replace(/\/$/, "")}/inference/${slug}`;
     const authorization = () => this.#headers.get("authorization")!;
+    const stamp = () =>
+      options.prompt === null
+        ? ""
+        : options.prompt
+          ? `${options.prompt.name}@${options.prompt.hash}`
+          : [...this.activePrompts.values()].join(", ");
     return {
       baseURL,
       apiKey: "tilde",
@@ -653,7 +944,32 @@ export class AgentContext {
           init?.headers ?? (input instanceof Request ? input.headers : undefined),
         );
         headers.set("authorization", authorization());
+        const prompt = stamp();
+        if (prompt) headers.set("x-tilde-prompt", prompt);
+        else headers.delete("x-tilde-prompt");
         return fetch(input, { ...init, headers, signal: init?.signal ?? this.signal });
+      },
+    };
+  }
+  /**
+   * Stamp this invocation's later inference calls with a prompt version. Rendering a
+   * `definePrompt` prompt does this; framework adapters call it for dynamic prompts.
+   */
+  activatePrompt(prompt: PromptStamp) {
+    this.activePrompts.set(prompt.name, `${prompt.name}@${prompt.hash}`);
+  }
+  /** A renderer for a `definePrompt` prompt whose renders stamp this invocation's calls. */
+  prompt<C extends Record<string, unknown>>(definition: PromptDefinition<C>) {
+    return {
+      name: definition.name,
+      hash: definition.hash,
+      stamp: definition.stamp,
+      config: definition.config,
+      telemetry: definition.telemetry,
+      render: (variables?: PromptVariables) => {
+        const text = definition.render(variables);
+        this.activatePrompt(definition);
+        return text;
       },
     };
   }
@@ -881,7 +1197,8 @@ async function runInvocation(
       await ready;
       await context.refreshTools();
       controller.signal.throwIfAborted();
-      await options.run(context);
+      // Module-level `inference()` and prompt renders resolve this invocation.
+      await runWithContext(context, () => options.run(context));
       await context.settleSuspension();
       settle();
     } catch (error) {
@@ -926,6 +1243,9 @@ async function runInvocation(
   }
 }
 
+/** Set by `tilde deploy` while it imports the entry module. */
+const discovering = () => process.env.TILDE_DISCOVERY === "1";
+
 export type ConnectAgentOptions = Omit<InvocationOptions, "deploymentLogging"> & {
   /** Tilde's runtime listener root. Defaults to TILDE_GATEWAY_URL. */
   gatewayUrl?: string;
@@ -952,6 +1272,8 @@ export type ConnectedAgent = {
  * ends, until close() is called. Tilde never calls the host; it only dials out.
  */
 export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
+  // `tilde deploy` imports the entry module to read its declarations; nothing may start.
+  if (discovering()) return { instanceId: "", registration: undefined, close: async () => {} };
   const gatewayUrl = options.gatewayUrl ?? process.env.TILDE_GATEWAY_URL;
   const deploymentToken = options.deploymentToken ?? process.env.TILDE_DEPLOYMENT_TOKEN;
   if (!gatewayUrl || !deploymentToken)
@@ -1068,6 +1390,10 @@ export function connectAgent(options: ConnectAgentOptions): ConnectedAgent {
  * does not retry an invocation that already ended.
  */
 export function createLambdaHandler(options: InvocationOptions): (event: unknown) => Promise<void> {
+  if (discovering())
+    return async () => {
+      throw new Error("Lambda handlers do not run while tilde deploy reads the module");
+    };
   initializeTracing(options.tracing === "existing");
   initializeLogging(options.logging === "existing", options.deploymentLogging);
   const host = createHostState();

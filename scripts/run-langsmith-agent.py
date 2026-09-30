@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Run the isolated trace demo with only the OpenAI key extracted from SOPS.
+"""Run the isolated trace demo with OPENAI_API_KEY and LANGSMITH_API_KEY from the environment.
 
-The key stays in memory and the child environment, never a dotenv file or command
-argument. LANGSMITH_API_KEY is supplied separately by the user.
+Task loads them from .env.local or .env.langsmith; neither value is printed.
 """
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -14,26 +12,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():
-    result = subprocess.run(
-        ["sops", "decrypt", "--extract", '["openai_api_key"]', "--output-type", "json",
-         str(ROOT / "secrets.enc.yaml")],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, text=True,
-    )
-    if result.returncode and "ExpiredToken" in result.stderr:
-        sys.exit("SOPS AWS credentials have expired. Refresh the workspace AWS session and retry.")
-    if result.returncode:
-        sys.exit("Could not load the OpenAI key from SOPS. Check local SOPS/AWS access.")
-    try:
-        key = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        key = result.stdout.strip()
-    if not isinstance(key, str) or not key.strip():
-        sys.exit("SOPS openai_api_key is missing or empty.")
     if sys.argv[1:] == ["--check"]:
-        print("OpenAI key is available from SOPS (value not displayed).")
-        print("LangSmith key is " + ("available." if os.environ.get("LANGSMITH_API_KEY") else "still required."))
+        for name in ["OPENAI_API_KEY", "LANGSMITH_API_KEY"]:
+            print(f"{name} is " + ("available." if os.environ.get(name) else "still required."))
         return
-    env = {**os.environ, "OPENAI_API_KEY": key, "LANGSMITH_TRACING": "true"}
+    if not os.environ.get("OPENAI_API_KEY"):
+        sys.exit("Set OPENAI_API_KEY before running the demo.")
+    env = {**os.environ, "LANGSMITH_TRACING": "true"}
     env.setdefault("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
     env.setdefault("LANGSMITH_PROJECT", "test")
     if not env.get("LANGSMITH_API_KEY"):

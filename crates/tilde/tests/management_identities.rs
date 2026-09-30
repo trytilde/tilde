@@ -1,23 +1,14 @@
 mod common;
 use common::{Database, seed};
-use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, json};
 use std::sync::Arc;
-use tilde::{
-    agent::Agents,
-    chat::Chat,
-    connections::service::Connections,
-    encryption::Encryption,
-    iam::{api_keys::ApiKeys, oidc::Oidc},
-};
+use tilde::{agent::Agents, chat::Chat, connections::service::Connections, encryption::Encryption};
 use uuid::Uuid;
 
 struct Fixture {
     db: Database,
     connections: Connections,
-    oidc: Oidc,
     origin: String,
-    session: SecretString,
     server: tokio::task::JoinHandle<()>,
 }
 async fn serve(router: axum::Router) -> (String, tokio::task::JoinHandle<()>) {
@@ -53,76 +44,31 @@ impl Fixture {
             agents.clone(),
             connections.clone(),
         );
-        let oidc = Oidc::new(
-            db.pool.clone(),
-            encryption,
-            "http://127.0.0.1:5556".into(),
-            "fixture".into(),
-            SecretString::from("fixture-secret"),
-            "http://127.0.0.1".into(),
-            true,
-        )
-        .unwrap();
-        let session = tilde::connections::model::random_secret();
-        let user = tilde::iam::db::user_upsert_one(
-            &db.pool.get().await.unwrap(),
-            Uuid::new_v4(),
-            "fixture",
-            "manager",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        use sha2::{Digest, Sha256};
-        tilde::iam::db::session_create_execute(
-            &db.pool.get().await.unwrap(),
-            &Sha256::digest(session.expose_secret().as_bytes()),
-            user.id,
-        )
-        .await
-        .unwrap();
         let (origin, server) = serve(
-            tilde::iam::listeners::management_router(
-                agents,
-                chat.clone(),
-                connections.clone(),
-                oidc.clone(),
-            )
-            .merge(tilde::deployment::public::router(deployments, chat)),
+            tilde::iam::listeners::management_router(agents, chat.clone(), connections.clone())
+                .merge(tilde::deployment::public::router(deployments, chat)),
         )
         .await;
         Self {
             db,
             connections,
-            oidc,
             origin,
-            session,
             server,
         }
     }
-    async fn call(
-        &self,
-        token: &str,
-        service: &str,
-        method: &str,
-        body: Value,
-    ) -> reqwest::Response {
+    async fn call(&self, service: &str, method: &str, body: Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(format!(
                 "{}/tilde.management.v1.{service}/{method}",
                 self.origin
             ))
-            .bearer_auth(token)
             .json(&body)
             .send()
             .await
             .unwrap()
     }
     async fn ok(&self, service: &str, method: &str, body: Value) -> Value {
-        let r = self
-            .call(self.session.expose_secret(), service, method, body)
-            .await;
+        let r = self.call(service, method, body).await;
         assert!(
             r.status().is_success(),
             "RPC {service}/{method}: {}",
@@ -162,154 +108,6 @@ impl Fixture {
 }
 
 #[tokio::test]
-async fn management_keys_authenticate_cache_revoke_and_never_list_secrets() {
-    let f = Fixture::new().await;
-    let created = f
-        .call(
-            f.session.expose_secret(),
-            "ApiKeysService",
-            "CreateApiKey",
-            json!({"name":"Backend","roleIds":["agents/editor"]}),
-        )
-        .await;
-    assert_eq!(created.status(), 200);
-    assert_eq!(created.headers()["cache-control"], "no-store");
-    let created: Value = created.json().await.unwrap();
-    let secret = SecretString::from(created["secret"].as_str().unwrap().to_owned());
-    let key_id = created["apiKey"]["id"].as_str().unwrap();
-    let key = Uuid::parse_str(key_id).unwrap();
-    let peer = ApiKeys::new(f.db.pool.clone());
-    // Warm both caches before revoking. A second service models another management process.
-    assert!(peer.authenticate(secret.expose_secret()).await.is_ok());
-    assert!(
-        f.oidc
-            .api_keys()
-            .authenticate(secret.expose_secret())
-            .await
-            .is_ok()
-    );
-    let listed = f.ok("ApiKeysService", "ListApiKeys", json!({})).await;
-    assert!(!listed.to_string().contains(secret.expose_secret()));
-    assert!(listed["apiKeys"][0].get("tokenHash").is_none());
-    assert!(listed["apiKeys"][0].get("secret").is_none());
-    // A key performs the management writes its roles cover, and never issues or revokes keys.
-    let user = f
-        .call(
-            secret.expose_secret(),
-            "IdentitiesService",
-            "CreateIdentity",
-            json!({"identityType":"IDENTITY_TYPE_USERNAME","value":"API user"}),
-        )
-        .await;
-    assert_eq!(user.status(), 200);
-    let child = f
-        .call(
-            secret.expose_secret(),
-            "ApiKeysService",
-            "CreateApiKey",
-            json!({"name":"Child"}),
-        )
-        .await;
-    assert_eq!(child.status(), 403);
-    f.ok("ApiKeysService", "CreateApiKey", json!({"name":"Second"}))
-        .await;
-    let agent = Uuid::new_v4();
-    f.ok(
-        "AgentService",
-        "CreateAgent",
-        json!({"id":agent,"name":"Token issuer fixture"}),
-    )
-    .await;
-    assert_eq!(
-        f.call(
-            secret.expose_secret(),
-            "DeploymentService",
-            "IssueIngressToken",
-            json!({"agentId":agent})
-        )
-        .await
-        .status(),
-        200
-    );
-    let invalid = f
-        .call(
-            "tilde_key_invalid",
-            "ApiKeysService",
-            "ListApiKeys",
-            json!({}),
-        )
-        .await;
-    assert_eq!(invalid.status(), 401);
-    // API keys don't masquerade as human browser sessions.
-    assert_eq!(
-        reqwest::Client::new()
-            .get(format!("{}/auth/session", f.origin))
-            .bearer_auth(secret.expose_secret())
-            .send()
-            .await
-            .unwrap()
-            .status(),
-        401
-    );
-    assert_eq!(
-        f.call(
-            secret.expose_secret(),
-            "ApiKeysService",
-            "RevokeApiKey",
-            json!({"id":key}),
-        )
-        .await
-        .status(),
-        403
-    );
-    f.ok("ApiKeysService", "RevokeApiKey", json!({"id":key}))
-        .await;
-    assert!(
-        f.oidc
-            .api_keys()
-            .authenticate(secret.expose_secret())
-            .await
-            .is_err()
-    );
-    tokio::time::timeout(std::time::Duration::from_secs(3), async {
-        loop {
-            if peer.authenticate(secret.expose_secret()).await.is_err() {
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("peer receives revocation notification");
-    assert_eq!(
-        f.call(
-            secret.expose_secret(),
-            "IdentitiesService",
-            "CreateIdentity",
-            json!({"identityType":"IDENTITY_TYPE_USERNAME","value":"Denied"})
-        )
-        .await
-        .status(),
-        401
-    );
-    f.ok("ApiKeysService", "RevokeApiKey", json!({"id":key}))
-        .await;
-    let page = f
-        .ok("ApiKeysService", "ListApiKeys", json!({"pageSize":1}))
-        .await;
-    assert_eq!(page["apiKeys"].as_array().unwrap().len(), 1);
-    let next = f
-        .ok(
-            "ApiKeysService",
-            "ListApiKeys",
-            json!({"pageSize":1,"pageToken":page["nextPageToken"]}),
-        )
-        .await;
-    assert_ne!(page["apiKeys"][0]["id"], next["apiKeys"][0]["id"]);
-    f.close().await;
-}
-
-#[tokio::test]
 async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
     let f = Fixture::new().await;
     let identity = f
@@ -339,13 +137,11 @@ async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
     )
     .await;
     let a = f.call(
-        f.session.expose_secret(),
         "IdentitiesService",
         "LinkIdentity",
         json!({"identityId":id,"rootIdentityId":root_a}),
     );
     let b = f.call(
-        f.session.expose_secret(),
         "IdentitiesService",
         "LinkIdentity",
         json!({"identityId":id,"rootIdentityId":root_b}),
@@ -363,7 +159,6 @@ async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
     };
     assert_eq!(
         f.call(
-            f.session.expose_secret(),
             "IdentitiesService",
             "UnlinkIdentity",
             json!({"identityId":id,"rootIdentityId":wrong})
@@ -375,7 +170,6 @@ async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
     let batch = Uuid::new_v4();
     assert!(
         !f.call(
-            f.session.expose_secret(),
             "IdentitiesService",
             "CreateRootIdentity",
             json!({"id":batch,"identityIds":[id]})
@@ -385,14 +179,9 @@ async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
         .is_success()
     );
     assert_eq!(
-        f.call(
-            f.session.expose_secret(),
-            "IdentitiesService",
-            "GetRootIdentity",
-            json!({"id":batch})
-        )
-        .await
-        .status(),
+        f.call("IdentitiesService", "GetRootIdentity", json!({"id":batch}))
+            .await
+            .status(),
         404
     );
     let unlinked = f
@@ -411,7 +200,7 @@ async fn roots_are_optional_atomic_and_cannot_steal_another_association() {
     assert!(created["identity"].get("verifiedAt").is_none());
     let retry=f.ok("IdentitiesService","CreateIdentity",json!({"identityType":"IDENTITY_TYPE_USERNAME","value":"app-user-42","createRoot":true})).await;
     assert_eq!(retry["identity"]["rootIdentityId"], root);
-    let invalid=f.call(f.session.expose_secret(),"IdentitiesService","CreateIdentity",json!({"identityType":"IDENTITY_TYPE_USERNAME","value":"invalid","createRoot":true,"rootIdentityId":root})).await;
+    let invalid=f.call("IdentitiesService","CreateIdentity",json!({"identityType":"IDENTITY_TYPE_USERNAME","value":"invalid","createRoot":true,"rootIdentityId":root})).await;
     assert_eq!(invalid.status(), 400);
     let members = f
         .ok(
@@ -537,7 +326,7 @@ async fn channel_identity_resolution_is_agent_scoped_and_linking_preserves_parti
             .await
             .is_err()
     );
-    let denied=f.call(f.session.expose_secret(),"IdentitiesService","CreateIdentity",json!({"agentId":agent_a,"providerId":"slack/missing","identityType":"IDENTITY_TYPE_USERNAME","value":"U12345","createRoot":true})).await;
+    let denied=f.call("IdentitiesService","CreateIdentity",json!({"agentId":agent_a,"providerId":"slack/missing","identityType":"IDENTITY_TYPE_USERNAME","value":"U12345","createRoot":true})).await;
     assert_eq!(denied.status(), 404);
     let pending_a = Uuid::new_v4();
     let pending_b = Uuid::new_v4();
@@ -732,9 +521,7 @@ async fn tilde_connection_is_created_with_the_agent_and_gates_application_keys()
             json!({"connectionId":connection,"assignment":{"capability":"CAPABILITY_CHANNEL","agentId":agent}}),
         ),
     ] {
-        let response = f
-            .call(f.session.expose_secret(), service, method, body)
-            .await;
+        let response = f.call(service, method, body).await;
         assert_eq!(response.status(), 400, "{service}/{method}");
     }
     assert!(

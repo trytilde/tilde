@@ -13,10 +13,8 @@ import { parseLogSearch } from "./search";
 import {
   LogRecordSchema,
   LogMetricBucketSchema,
-  LogsState,
 } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 const rpc = vi.hoisted(() => ({
-  getLogsStatus: vi.fn(),
   listLogs: vi.fn(),
   getLogMetrics: vi.fn(),
 }));
@@ -87,25 +85,17 @@ const record = create(LogRecordSchema, {
   service: "example-agent-1",
   attributes: [{ key: "answer", value: "42" }],
 });
-function ready() {
-  rpc.getLogsStatus.mockResolvedValue({ state: LogsState.READY });
+function withRecord() {
   rpc.listLogs.mockResolvedValue({ records: [record], nextCursor: "" });
 }
-it("disables stored-log controls without issuing queries", async () => {
-  rpc.getLogsStatus.mockResolvedValue({
-    state: LogsState.DISABLED,
-    message: "Log storage disabled",
-  });
+it("queries straight away and shows a failed query as an alert", async () => {
+  rpc.listLogs.mockRejectedValue(new Error("Log query failed upstream"));
   mount();
-  await screen.findByText("Log storage disabled");
-  expect(rpc.listLogs).not.toHaveBeenCalled();
-  expect(rpc.getLogMetrics).not.toHaveBeenCalled();
-  expect((screen.getByRole("combobox", { name: "Search logs" }) as HTMLInputElement).disabled).toBe(
-    true,
-  );
+  expect((await screen.findByRole("alert")).textContent).toContain("Log query failed upstream");
+  expect(rpc.listLogs).toHaveBeenCalled();
 });
 it("uses Time/Level/Messages columns, filter chips, scroll pagination, and a safe right-side inspector", async () => {
-  ready();
+  withRecord();
   rpc.listLogs.mockImplementation((r) =>
     Promise.resolve({
       records: r.cursor
@@ -153,7 +143,7 @@ it("uses Time/Level/Messages columns, filter chips, scroll pagination, and a saf
   expect(within(sheet).getByText(record.body).tagName).toBe("PRE");
 });
 it("shows whole-range log counts without latency and preserves the histogram when brushing", async () => {
-  ready();
+  withRecord();
   rpc.getLogMetrics.mockResolvedValue({
     buckets: [0, 250, 0, 100].map((count, index) =>
       create(LogMetricBucketSchema, {
@@ -201,7 +191,7 @@ it("shows whole-range log counts without latency and preserves the histogram whe
   );
 });
 it("aborts old log pages when filters change", async () => {
-  ready();
+  withRecord();
   let resolveOld!: (value: unknown) => void;
   let oldSignal: AbortSignal | undefined;
   rpc.listLogs.mockImplementation((r, options) =>

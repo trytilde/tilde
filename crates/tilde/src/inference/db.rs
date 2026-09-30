@@ -35,7 +35,7 @@ pub async fn requests_for_agent_all(
 /// the statement turns back into NULL, because array parameters cannot hold NULL elements.
 pub async fn requests_insert_execute(
     db: &impl GenericClient,
-    records: &[super::audit::Record],
+    records: &[&super::audit::Record],
 ) -> DbResult<u64> {
     let ids: Vec<_> = records.iter().map(|r| r.id).collect();
     let created: Vec<_> = records.iter().map(|r| r.created_at).collect();
@@ -78,6 +78,33 @@ pub async fn requests_insert_execute(
         .collect();
     let units: Vec<i64> = records.iter().map(|r| r.units.unwrap_or(-1)).collect();
     let usages: Vec<&str> = records.iter().map(|r| r.usage.as_str()).collect();
+    // Price each distinct model once; a model the sheet does not list costs nothing known.
+    let mut rates = std::collections::HashMap::new();
+    let mut costs = Vec::with_capacity(records.len());
+    for record in records {
+        let key = (
+            record.provider_id.clone(),
+            record.model.clone().unwrap_or_default(),
+        );
+        if !rates.contains_key(&key) {
+            let rate = crate::pricing::rate(db, Some(&key.0), &key.1).await?;
+            rates.insert(key.clone(), rate);
+        }
+        let cost = rates[&key].as_ref().and_then(|rate| {
+            rate.cost_micros(crate::pricing::Usage {
+                input_tokens: record.input_tokens,
+                output_tokens: record.output_tokens,
+                cached_input_tokens: record.cached_input_tokens,
+                cache_write_tokens: record.cache_write_tokens,
+                images: (record.kind == "image").then_some(record.units).flatten(),
+                characters: (record.kind == "speech").then_some(record.units).flatten(),
+                seconds: (record.kind == "transcription")
+                    .then_some(record.units)
+                    .flatten(),
+            })
+        });
+        costs.push(cost.unwrap_or(-1));
+    }
     Ok(tilde_queries::queries::inference::requests_insert::run()
         .bind(
             db,
@@ -104,6 +131,7 @@ pub async fn requests_insert_execute(
             &cache_writes,
             &units,
             &usages,
+            &costs,
         )
         .await?)
 }
@@ -112,6 +140,24 @@ pub use tilde_queries::queries::inference::budgets_list::Record as BudgetRow;
 pub use tilde_queries::queries::inference::budgets_settle::Record as SettledRow;
 pub use tilde_queries::queries::inference::exhausted::Record as ExhaustedRow;
 pub use tilde_queries::queries::inference::price_get::Record as PriceRow;
+pub async fn price_find_opt(db: &impl GenericClient, model: &str) -> DbResult<Option<PriceRow>> {
+    Ok(tilde_queries::queries::inference::price_find::run()
+        .bind(db, &model)
+        .opt()
+        .await?
+        .map(|r| PriceRow {
+            provider_id: r.provider_id,
+            model: r.model,
+            input_per_m_micros: r.input_per_m_micros,
+            output_per_m_micros: r.output_per_m_micros,
+            cached_input_per_m_micros: r.cached_input_per_m_micros,
+            cache_write_per_m_micros: r.cache_write_per_m_micros,
+            image_micros: r.image_micros,
+            character_per_m_micros: r.character_per_m_micros,
+            second_micros: r.second_micros,
+            source: r.source,
+        }))
+}
 pub use tilde_queries::queries::inference::usage_by_connection::Record as UsageRow;
 
 pub async fn prices_upsert_execute(

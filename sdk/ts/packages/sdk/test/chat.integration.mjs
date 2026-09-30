@@ -1,6 +1,5 @@
 import { connectAgentFixture } from "./connected-agent-fixture.mjs";
 import { BinaryPermission, TargetSelection } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
-import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -21,7 +20,6 @@ assert(
   process.env.TEST_DATABASE_URL,
   "Run through scripts/with-postgres.sh; TEST_DATABASE_URL is required",
 );
-const oidc = await startOidc();
 const scratch = await mkdtemp(join(tmpdir(), "tilde-sdk-chat-"));
 const binary = resolve(process.env.ENGINE_TEST_BINARY ?? "target/debug/tilde");
 const seed = randomBytes(32).toString("base64");
@@ -140,7 +138,6 @@ let child;
 async function start() {
   const env = {
     ...process.env,
-    ...oidc.env,
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     LOGS_QUEUE_DIR: join(scratch, "logs"),
     ENGINE_ENCRYPTION_BACKEND: "seed",
@@ -188,8 +185,7 @@ const connectedFixtures = [];
 
 try {
   const url = await start();
-  const accessToken = await loginManagement(url);
-  const client = createManagementClient({ baseUrl: url, accessToken });
+  const client = createManagementClient({ baseUrl: url });
   const unbound = rpcClient(
     RuntimeChatService,
     createConnectTransport({
@@ -222,7 +218,7 @@ try {
   ).agent;
   for (const current of [agent, second])
     connectedFixtures.push(
-      await connectAgentFixture({ url, accessToken, agentId: current.id, options: agentOptions }),
+      await connectAgentFixture({ url, agentId: current.id, options: agentOptions }),
     );
   // Readiness reaches the registry only through heartbeats from the connected instance.
   const instanceReady = async () =>
@@ -236,15 +232,6 @@ try {
   await eventually(instanceReady);
   const { token } = await client.deployments.issueIngressToken({ agentId: agent.id });
   const chat = createTildeChatClient({ baseUrl: url, agentId: agent.id, accessToken: token });
-  const managementOnIngress = createTildeChatClient({
-    baseUrl: url,
-    agentId: agent.id,
-    accessToken,
-  });
-  await assert.rejects(
-    managementOnIngress.listThreads({}),
-    (e) => e.code === Code.PermissionDenied,
-  );
   const alice = (await chat.createUser({ name: "Alice" })).user;
   const bob = (await chat.createUser({ name: "Bob" })).user;
   const thread = (
@@ -503,7 +490,6 @@ try {
   );
 } finally {
   await Promise.allSettled(connectedFixtures.map((connection) => connection.close()));
-  await oidc.stop();
   releaseChunk?.();
   watchAbort?.abort();
   if (child && child.exitCode === null) {

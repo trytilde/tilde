@@ -8,4 +8,10 @@ export {
   type AttachmentConversion,
   type AttachmentHandler,
 } from "./attachments.js";
-export { convertToOpenAIAgentsTools, type ConvertToOpenAIAgentsToolsOptions } from "./tools.js";
+export {
+  convertToOpenAIAgentsTools,
+  withTildeTools,
+  type ConvertToOpenAIAgentsToolsOptions,
+} from "./tools.js";
+export { discover, instructionsPrompt } from "./discover.js";
+export { tildeOpenAIAgents, type TildeToolsOptions } from "./invocation.js";

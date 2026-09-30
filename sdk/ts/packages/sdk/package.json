@@ -2,6 +2,9 @@
   "name": "@trytilde/sdk",
   "version": "3.0.0",
   "license": "Apache-2.0",
+  "bin": {
+    "tilde": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
@@ -34,6 +37,10 @@
     "./tilde-chat": {
       "types": "./dist/tilde-chat.d.ts",
       "import": "./dist/tilde-chat.js"
+    },
+    "./tool-host": {
+      "types": "./dist/tool-host.d.ts",
+      "import": "./dist/tool-host.js"
     }
   },
   "scripts": {
@@ -56,6 +63,10 @@
     "@trytilde/contracts": "workspace:*"
   },
   "devDependencies": {
-    "@connectrpc/connect-web": "2.2.0"
+    "@connectrpc/connect-web": "2.2.0",
+    "zod": "^4.6.1"
+  },
+  "peerDependencies": {
+    "zod": "^4.6.1"
   }
 }

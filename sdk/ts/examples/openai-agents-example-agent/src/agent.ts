@@ -1,16 +1,33 @@
 import { logger } from "./logger.js";
-import type { AgentContext } from "@trytilde/sdk";
-import { Agent, run } from "@openai/agents";
-import {
-  convertToOpenAIAgentsMessages,
-  convertToOpenAIAgentsTools,
-} from "@trytilde/sdk-openai-agents-node";
+import { bundledTools } from "./bundled-tools.js";
+import { inference, type AgentContext } from "@trytilde/sdk";
+import { Agent, OpenAIResponsesModel, run, setTracingDisabled } from "@openai/agents";
+import OpenAI from "openai";
+import { convertToOpenAIAgentsMessages, tildeOpenAIAgents } from "@trytilde/sdk-openai-agents-node";
 
-const instructions =
-  "You are Example Agent (OpenAI Agents), a helpful local development assistant. Use the current channel tools to respond to the latest message, concisely and helpfully. Model text is private and is not delivered to the user. Choose the appropriate provider tool using its instructions and conversation references. Use the supplied attachments when answering.";
+// The SDK's default trace exporter uploads prompts and tool data to OpenAI; Tilde collects OTel spans itself.
+setTracingDisabled(true);
+// The inference connection this agent was given; the gateway holds its provider key.
+const openai = new OpenAI({
+  ...inference(process.env.TILDE_INFERENCE ?? "default"),
+  maxRetries: 0,
+});
+
+/**
+ * A plain OpenAI Agents SDK agent at module scope. `tilde deploy` registers its instructions as
+ * the prompt `openai-agents-example-agent/instructions`; model calls go through the invocation
+ * that is running when they are made.
+ */
+export const agent = new Agent({
+  name: "openai-agents-example-agent",
+  instructions:
+    "You are Example Agent (OpenAI Agents), a helpful local development assistant. Use the current channel tools to respond to the latest message, concisely and helpfully. Model text is private and is not delivered to the user. Choose the appropriate provider tool using its instructions and conversation references. Use the supplied attachments when answering. Your other tools (the time, dice, a CRM, unit and date helpers, and tools.search when some tools are only found by searching) are for working out the answer; still reply through the channel tools.",
+  model: new OpenAIResponsesModel(openai, process.env.OPENAI_MODEL ?? "gpt-4o-mini"),
+  modelSettings: { maxTokens: 600, store: false },
+});
 
 /** Visible responses are explicit provider tool calls; a text-only model result sends nothing. */
-export async function respond(ctx: AgentContext, model: string): Promise<void> {
+export async function respond(ctx: AgentContext): Promise<void> {
   logger.info("Agent invocation started");
   let stage: "history" | "inference" = "history";
   try {
@@ -18,14 +35,10 @@ export async function respond(ctx: AgentContext, model: string): Promise<void> {
     logger.debug({ messageCount: history.items.length }, "Loaded conversation history");
     const items = await convertToOpenAIAgentsMessages({ messages: history.items, context: ctx });
     stage = "inference";
-    const agent = new Agent({
-      name: "openai-agents-example-agent",
-      instructions,
-      model,
-      tools: convertToOpenAIAgentsTools(ctx.channel.current),
-      modelSettings: { maxTokens: 600, store: false },
-    });
-    const result = await run(agent, items, {
+    // A copy of the agent with the channel tools and skills, plus steering and cancellation.
+    const tilde = await tildeOpenAIAgents(ctx, agent, { bundled: bundledTools });
+    const result = await run(tilde.agent, items, {
+      ...tilde.options,
       signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(60000)]),
       maxTurns: 8,
     });

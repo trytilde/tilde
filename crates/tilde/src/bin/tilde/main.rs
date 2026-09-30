@@ -19,6 +19,8 @@ mod web;
 
 #[cfg(debug_assertions)]
 mod dev_agent;
+#[cfg(debug_assertions)]
+mod dev_skills;
 
 #[derive(Parser)]
 #[command(
@@ -77,15 +79,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(backend) = args.encryption_backend {
         config.encryption_backend = backend;
     }
-    let avatars = config.avatar_store()?;
     let protection = config.key_protection()?;
-    let trace_destination = tilde::telemetry::Destination::langfuse(
-        config.langfuse_base_url.take(),
-        config.langfuse_public_url.take(),
-        config.langfuse_public_key.take(),
-        config.langfuse_secret_key.take(),
+    let buckets = config.buckets()?;
+    let avatars = buckets.avatars;
+    let trace_forwarding = tilde::telemetry::tracing::Destination::new(
+        config
+            .traces_otlp_endpoint
+            .clone()
+            .filter(|v| !v.trim().is_empty()),
+        config.traces_otlp_headers.clone(),
     )?;
-    let _ = tilde::logs::clickhouse::Store::from_config(&config)?;
+    let _ = tilde::telemetry::clickhouse::Store::from_config(&config)?;
     if matches!(args.command, Some(Command::CheckConfig)) {
         return Ok(());
     }
@@ -104,9 +108,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     #[cfg(debug_assertions)]
     if matches!(args.command, Some(Command::DevAgent)) {
-        return dev_agent::run(pool, encryption).await;
+        return dev_agent::run(pool, encryption, buckets.skills.clone()).await;
     }
-    let logs = tilde::logs::Runtime::start(pool.clone(), &config)?;
+    // Telemetry intake and delivery have their own connections, so a full or slow telemetry
+    // queue can never take the ones management requests and agent heartbeats need.
+    let telemetry_pool = database::pool(config.database_url.0.expose_secret(), 6)?;
+    let logs =
+        tilde::telemetry::logs::Runtime::start(telemetry_pool.clone(), &config, buckets.logs)?;
+    let metrics = tilde::telemetry::metrics::Runtime::start(
+        telemetry_pool.clone(),
+        &config,
+        buckets.metrics,
+    )?;
+    let trace_store = tilde::telemetry::tracing::store::Store(
+        tilde::telemetry::clickhouse::Store::from_config(&config)?,
+    );
     let mut agents = Agents::new(pool.clone(), encryption.clone());
     if let Some(avatars) = avatars {
         agents = agents.with_avatar_store(avatars);
@@ -164,6 +180,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     connections.backfill_tilde().await?;
     connections.recover().await?;
     connections.restore_agent_identities().await?;
+    let trace_delivery = tilde::telemetry::tracing::Delivery::start(
+        telemetry_pool.clone(),
+        tilde::telemetry::tracing::Sinks {
+            objects: buckets.traces,
+            media: buckets.media.clone(),
+            store: trace_store.clone(),
+            external: trace_forwarding,
+        },
+    )?;
+    let sweep_cancel = tokio_util::sync::CancellationToken::new();
+    let sweeper = tokio::spawn(tilde::telemetry::spool::sweep_worker(
+        telemetry_pool.clone(),
+        sweep_cancel.clone(),
+    ));
     let deployments = tilde::deployment::Deployments::new(
         pool.clone(),
         encryption.clone(),
@@ -171,15 +201,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         connections.clone(),
     )
     .with_logs(logs.delivery.clone())
-    .with_telemetry(tilde::telemetry::delivery::Queue::new(
-        pool.clone(),
-        trace_destination.is_some(),
-    ));
+    .with_metrics(metrics.delivery.clone())
+    .with_telemetry(trace_delivery.queue.clone());
     let health = tilde::agent::health::AgentHealth::new(pool.clone());
     health.cleanup().await?;
     let inference = tilde::inference::gateway::Loader::new(pool.clone(), connections.clone());
     inference.load().await?;
     tilde::inference::prices::reconcile(&pool).await?;
+    let skills = tilde::skills::Skills::new(pool.clone())
+        .with_store(buckets.skills.clone())
+        .with_github(tilde::skills::github::GitHub::new(
+            &config.github_api_url,
+            &config.github_raw_url,
+            config
+                .github_token
+                .as_ref()
+                .map(|t| secrecy::SecretString::from(t.0.expose_secret().to_owned())),
+        )?);
+    skills.reconcile().await?;
+    let deployments = deployments.with_skills(skills.clone());
     let chat = tilde::chat::Chat::new(pool.clone(), encryption.clone(), runtime_url)
         .with_connections(connections.clone())
         .with_deployments(deployments.clone())
@@ -189,11 +229,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 pool.clone(),
             )),
         })
-        .with_objects(agents.object_store().cloned());
+        .with_objects(agents.object_store().cloned())
+        .with_skills(Some(skills.clone()));
     let trace_reader =
-        tilde::telemetry::viewer::Reader::new(pool.clone(), trace_destination.clone());
-    let telemetry =
-        tilde::telemetry::Runtime::start(pool.clone(), chat.tokens.clone(), trace_destination);
+        tilde::telemetry::tracing::viewer::Reader::new(pool.clone(), trace_store, buckets.media);
+    let telemetry = tilde::telemetry::tracing::Runtime::start(
+        telemetry_pool.clone(),
+        chat.tokens.clone(),
+        trace_delivery,
+    );
     opentelemetry::global::set_tracer_provider(telemetry.provider.clone());
     let (chat_shutdown, chat_shutdown_rx) = tokio::sync::watch::channel(false);
     let mut relay_worker = tokio::spawn(deployments.clone().relay_worker(chat_shutdown_rx.clone()));
@@ -204,6 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let mut connection_worker = tokio::spawn(connections.clone().worker(chat_shutdown_rx.clone()));
     let _inference_worker = tokio::spawn(inference.worker(chat_shutdown_rx.clone()));
+    let _skills_worker = tokio::spawn(skills.worker(chat_shutdown_rx.clone()));
     let _budget_worker = tokio::spawn(tilde::inference::budgets::worker(
         pool.clone(),
         chat_shutdown_rx.clone(),
@@ -214,6 +259,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         chat_shutdown_rx.clone(),
     ));
     let mut health_worker = tokio::spawn(health.run(chat_shutdown_rx.clone()));
+    let _mcp_health_worker = chat
+        .tools
+        .clone()
+        .map(|tools| tokio::spawn(tools.run_mcp_health(chat_shutdown_rx.clone())));
     let chat_worker = tokio::spawn(chat.clone().worker(chat_shutdown_rx));
     let readiness_pool = pool.clone();
     let mut router = Router::new()
@@ -241,7 +290,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 chat.clone(),
                 &telemetry.tracing,
             )
-            .merge(logs.router(&telemetry.tracing)),
+            .merge(logs.router(&telemetry.tracing))
+            .merge(metrics.router(&telemetry.tracing)),
         );
     }
     if serve.ingress {
@@ -257,36 +307,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         router = router.merge(tilde::deployment::rpc::sidecar_router(deployments.clone()));
     }
     if serve.management {
-        let oidc = tilde::iam::oidc::Oidc::new(
-            pool.clone(),
-            encryption,
-            config.oidc_issuer.expect("validated OIDC issuer"),
-            config.oidc_client_id.expect("validated OIDC client ID"),
-            config.oidc_client_secret.expect("validated OIDC secret").0,
-            public_url.clone(),
-            config.oidc_allow_http,
-        )?
-        .with_group_mapping(tilde::iam::oidc::GroupMapping {
-            claim: config.oidc_groups_claim.clone(),
-            scopes: config.oidc_scopes.clone(),
-            admin_groups: list(&config.oidc_admin_groups),
-            admin_subjects: list(&config.oidc_admin_subjects),
-        });
-        let trace_router = tilde::telemetry::viewer::router(trace_reader)
-            .merge(tilde::logs::viewer::router(logs.reader.clone()))
-            .layer(axum::middleware::from_fn_with_state(
-                oidc.clone(),
-                tilde::iam::oidc::management_guard,
-            ));
+        // Unauthenticated: operators put their own proxy in front of the management group.
         router = router
             .merge(
-                tilde::iam::listeners::management_router(
-                    agents,
-                    chat.clone(),
-                    connections.clone(),
-                    oidc,
-                )
-                .merge(trace_router),
+                tilde::iam::listeners::management_router(agents, chat.clone(), connections.clone())
+                    .merge(tilde::telemetry::tracing::viewer::router(trace_reader))
+                    .merge(tilde::telemetry::logs::viewer::router(logs.reader.clone())),
             )
             .merge(tilde::connections::assets::router(
                 config.connection_ui_dev_url.clone(),
@@ -305,7 +331,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             network::guard,
         ))
         .layer(axum::middleware::from_fn(
-            tilde::telemetry::context::request,
+            tilde::telemetry::tracing::context::request,
         ));
     tracing::info!(address=%address, serve=%serve, web_enabled=web_served, "tilde listening");
     let (server_shutdown, server_shutdown_rx) = tokio::sync::watch::channel(false);
@@ -349,10 +375,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let _ = chat_worker.await;
     logs.shutdown().await;
+    metrics.shutdown().await;
     telemetry.shutdown().await;
+    sweep_cancel.cancel();
+    // A sweep stops at the next page of expired pointers; the rest waits for the next replica.
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), sweeper).await;
     if let Err(error) = tilde::chat::audit::flush(&pool).await {
         tracing::warn!(%error, "Audit queue did not drain during shutdown");
     }
+    telemetry_pool.close().await;
     pool.close().await;
     result?;
     Ok(())
@@ -373,12 +404,4 @@ async fn shutdown() {
 
 async fn wait_shutdown(mut receiver: tokio::sync::watch::Receiver<bool>) {
     let _ = receiver.wait_for(|stop| *stop).await;
-}
-fn list(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-        .map(str::to_owned)
-        .collect()
 }

@@ -2,7 +2,7 @@ name: Register Tilde deployment
 description: Register a CI deployment and optionally return a masked deployment token for subsequent steps in the same job.
 inputs:
   api-token:
-    description: Management API key. Falls back to TILDE_API_KEY; pass secrets.TILDE_API_KEY from the calling workflow.
+    description: Management API key, required by Tilde Cloud and not used by open-source Tilde. Falls back to TILDE_API_KEY; pass secrets.TILDE_API_KEY from the calling workflow.
     required: false
   url:
     description: Tilde management API URL. Falls back to TILDE_URL.
@@ -40,13 +40,16 @@ inputs:
   output-token:
     description: Return the masked deployment-token output. Set false for manual setup through Tilde; retries never rotate credentials in this mode.
     default: "true"
+  command:
+    description: Optional deploy command, e.g. `npx tilde deploy dist/index.js --json`, run with TILDE_URL, TILDE_AGENT_ID and (when given) TILDE_API_KEY set. It registers the deployment (with the prompts and skills the code declares) instead of this action; put type, label and external-id flags in the command.
+    required: false
 outputs:
   deployment-id:
     description: Registered deployment UUID.
   deployment-token:
     description: Masked secret for subsequent steps in this job only; omitted when output-token is false. Never put this in artifacts, logs, summaries, or job outputs.
   deployment-url:
-    description: Authenticated Tilde deployment page (contains no token).
+    description: Tilde deployment page (contains no token).
   created:
     description: Whether this run created the deployment.
 runs:

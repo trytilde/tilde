@@ -19,8 +19,6 @@ pub async fn get(db: &impl GenericClient, id: Uuid) -> DbResult<Option<wire::Ide
             root_identity_id: r.root_identity_id.map(|id| id.to_string()),
             verified_at: r.verified_at.map(timestamp).into(),
             attested_at: r.attested_at.map(timestamp).into(),
-            attested_by_user_id: r.attested_by_user_id.map(|id| id.to_string()),
-            attested_by_api_key_id: r.attested_by_api_key_id.map(|id| id.to_string()),
             ..Default::default()
         }))
 }
@@ -46,8 +44,6 @@ pub async fn list(
             root_identity_id: r.root_identity_id.map(|id| id.to_string()),
             verified_at: r.verified_at.map(timestamp).into(),
             attested_at: r.attested_at.map(timestamp).into(),
-            attested_by_user_id: r.attested_by_user_id.map(|id| id.to_string()),
-            attested_by_api_key_id: r.attested_by_api_key_id.map(|id| id.to_string()),
             ..Default::default()
         })
         .collect())
@@ -63,13 +59,8 @@ pub async fn native_create(db: &impl GenericClient, id: Uuid, value: &str) -> Db
     q::native_create::run().bind(db, &id, &value).await?;
     Ok(())
 }
-pub async fn attest(
-    db: &impl GenericClient,
-    id: Uuid,
-    user: Option<Uuid>,
-    key: Option<Uuid>,
-) -> DbResult<()> {
-    q::attest::run().bind(db, &user, &key, &id).await?;
+pub async fn attest(db: &impl GenericClient, id: Uuid) -> DbResult<()> {
+    q::attest::run().bind(db, &id).await?;
     Ok(())
 }
 pub async fn root_create(db: &impl GenericClient, id: Uuid) -> DbResult<()> {

@@ -4,6 +4,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { LogRecord } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import { TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { date } from "../tracing/format";
+import { TableSkeletonRows } from "@/components/table-skeleton";
 const features = tableFeatures({});
 const helper = createColumnHelper<typeof features, LogRecord>();
 const columns = helper.columns([
@@ -126,6 +127,7 @@ export function LogTable({
           ))}
         </TableHeader>
         <TableBody>
+          {busy && !records.length && <TableSkeletonRows columns={3} label="Loading logs" />}
           {top > 0 && (
             <TableRow aria-hidden="true" className="border-0">
               <TableCell colSpan={3} style={{ height: top, padding: 0 }} />
@@ -169,9 +171,9 @@ export function LogTable({
       {!busy && !records.length && !error && (
         <p className="p-4 text-xs text-muted-foreground">No logs match these filters.</p>
       )}
-      {busy && (
+      {busy && !!records.length && (
         <p role="status" className="px-3 py-2 text-[11px] text-muted-foreground">
-          Loading logs…
+          Loading more logs…
         </p>
       )}
     </div>

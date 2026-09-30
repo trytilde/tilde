@@ -19,13 +19,11 @@ const labels: Record<string, string> = {
 
 export function TimeRangeSelect({
   value,
-  disabled,
   label,
   timezone,
   onChange,
 }: {
   value: string;
-  disabled: boolean;
   label: string;
   timezone: string;
   onChange: (value: string) => void;
@@ -33,7 +31,6 @@ export function TimeRangeSelect({
   return (
     <Select
       value={value}
-      disabled={disabled}
       onValueChange={(next) => {
         if (next) onChange(next);
       }}

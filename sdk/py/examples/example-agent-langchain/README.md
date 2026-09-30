@@ -12,18 +12,30 @@ blocks by `trytilde-langchain`.
 Run it from `sdk/py` with the workspace environment:
 
 ```
-OPENAI_API_KEY=... TILDE_GATEWAY_URL=... TILDE_DEPLOYMENT_TOKEN=... uv run --directory examples/example-agent-langchain python main.py
+TILDE_GATEWAY_URL=... TILDE_DEPLOYMENT_TOKEN=... uv run --directory examples/example-agent-langchain python main.py
 ```
 
 `OPENAI_MODEL` (default `gpt-4o-mini`) is optional. The deployment token comes
 from registering a Gateway deployment for the agent; the host dials out to Tilde
 and exposes no endpoint. Assign channels normally.
 
-`main.py` configures the dial-in Tilde host (`run_connected_agent`)
-and the `ChatOpenAI` model; `agent.py` generates replies with `create_agent` and
-a recursion limit of 16. History, typed context conversion, attachments and
-reply routing are owned by the SDK through `ctx.message.history()`,
-`convert_to_langchain_messages` and `convert_to_langchain_tools(ctx.channel.current)`.
-Logging goes through the standard `logging` module, which the core SDK routes to
-Tilde per invocation. Failures expose only the stage and HTTP status, never
-upstream response bodies.
+`main.py` configures the dial-in Tilde host (`run_connected_agent`). `agent.py`
+creates the agent once at module scope with `create_agent`, the static system
+prompt and `tilde_middleware()`, and per invocation calls `agent.ainvoke` with the
+converted history and a recursion limit of 16. The middleware gives each
+invocation the current channel's tools, steering input, dynamic prompt stamps and
+the registry's skills (as `list_skills` / `read_skill` tools plus a summary; plain
+`create_agent` has no native skills). History, typed context conversion,
+attachments and reply routing are owned by the SDK through `ctx.message.history()`
+and `convert_to_langchain_messages`. Logging goes through the standard `logging`
+module, which the core SDK routes to Tilde per invocation. Failures expose only the
+stage and HTTP status, never upstream response bodies.
+
+Model calls go through Tilde's inference gateway with `tilde.inference(TILDE_INFERENCE)`
+(default `default`, the alias the local registrar gives the example's OpenAI connection), so
+the process never holds a provider key; the model is built once and each request carries the
+running invocation's token.
+
+The system prompt is registered with the deployment as `example-agent-langchain/system_prompt`.
+Preview it from this directory with `../../.venv/bin/python -m tilde deploy main.py --dry-run`;
+`tilde dev` does the same when it registers the example.

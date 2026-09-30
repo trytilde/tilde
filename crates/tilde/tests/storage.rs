@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 fn input(id: Uuid, name: &str) -> CreateAgent {
     CreateAgent {
+        description: String::new(),
         concurrency_policy: Default::default(),
         capabilities: Default::default(),
         id,
@@ -50,6 +51,7 @@ async fn central_migrations_and_agent_lifecycle() {
     ));
     let updated = service
         .update(UpdateAgent {
+            description: None,
             concurrency_policy: None,
             capabilities: None,
             id,
@@ -60,6 +62,7 @@ async fn central_migrations_and_agent_lifecycle() {
     assert_eq!(updated.name, "Grace");
     let untouched = service
         .update(UpdateAgent {
+            description: None,
             concurrency_policy: None,
             capabilities: None,
             id,
@@ -223,7 +226,14 @@ async fn pagination_keeps_equal_timestamps_and_input_validation_prevents_bad_rec
     assert!(!a.agents.iter().any(|x| x.id == b.agents[0].id));
     assert!(service.list(20, "invalid").await.is_err());
     let search = service
-        .list_filtered(1, "", "b", &tilde::iam::authz::Access::system())
+        .list_filtered(
+            1,
+            "",
+            &tilde::agent::AgentFilter {
+                search: "b",
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
     assert_eq!(search.agents.len(), 1);
@@ -245,6 +255,7 @@ async fn expired_invocation_fails_atomically_and_can_be_explicitly_resumed() {
     let agents = Agents::new(db.pool.clone(), encryption.clone());
     let agent = agents
         .create(CreateAgent {
+            description: String::new(),
             concurrency_policy: Default::default(),
             capabilities: Default::default(),
             id: Uuid::new_v4(),

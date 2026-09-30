@@ -7,6 +7,7 @@ pub mod budget_set;
 pub mod budgets_list;
 pub mod budgets_settle;
 pub mod exhausted;
+pub mod price_find;
 pub mod price_get;
 pub mod prices_upsert;
 pub mod requests_for_agent;

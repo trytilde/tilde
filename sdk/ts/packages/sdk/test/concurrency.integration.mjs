@@ -16,10 +16,8 @@ import {
   TargetSelection,
 } from "../dist/index.js";
 import { AgentConcurrencyPolicy } from "../dist/management.js";
-import { startOidc, loginManagement } from "../../../../../scripts/test-oidc.mjs";
 assert(process.env.TEST_DATABASE_URL, "Use scripts/with-postgres.sh");
 const scratch = await mkdtemp(join(tmpdir(), "tilde-concurrency-"));
-const oidc = await startOidc();
 const contexts = [];
 const errors = [];
 const releases = new Map();
@@ -50,7 +48,6 @@ const agentOptions = {
 };
 const env = {
   ...process.env,
-  ...oidc.env,
   DATABASE_URL: process.env.TEST_DATABASE_URL,
   LOGS_QUEUE_DIR: scratch,
   ENGINE_ENCRYPTION_BACKEND: "seed",
@@ -94,8 +91,7 @@ try {
     const match = logs.match(/ address=(127\.0\.0\.1:\d+)/);
     return match && `http://${match[1]}`;
   });
-  const accessToken = await loginManagement(url);
-  const client = createManagementClient({ baseUrl: url, accessToken });
+  const client = createManagementClient({ baseUrl: url });
   async function setup(policy) {
     const agent = (
       await client.agents.createAgent({
@@ -109,7 +105,7 @@ try {
       })
     ).agent;
     connectedFixtures.push(
-      await connectAgentFixture({ url, accessToken, agentId: agent.id, options: agentOptions }),
+      await connectAgentFixture({ url, agentId: agent.id, options: agentOptions }),
     );
     assert.equal((await client.agents.getAgent({ id: agent.id })).agent.concurrencyPolicy, policy);
     const { token } = await client.deployments.issueIngressToken({ agentId: agent.id });
@@ -224,6 +220,5 @@ try {
     await done;
     clearTimeout(timeout);
   }
-  await oidc.stop();
   await rm(scratch, { recursive: true, force: true });
 }

@@ -7,11 +7,9 @@ header, and data table. Agent creation and editing have dedicated routes.
 TanStack Router uses file-based routing in `src/routes`. Add routes with
 `createFileRoute`; Vite generates `src/routeTree.gen.ts` during development and builds.
 Commit the generated tree, but do not edit it by hand. `_app/route.tsx` owns the
-authenticated layout; public connection brokering sits outside it. The shared
+dashboard layout; public connection brokering sits outside it. The shared
 `_app/agent/$agentId/route.tsx` editor stays mounted as its child tab routes change.
-Agent fetching stays inside the authenticated component tree so it runs after
-the session check. Agent routes are grouped under `_app/agent/`, with tab routes
-in `$agentId/`. The standalone Connections and Chat pages are not exposed.
+Agent routes are grouped under `_app/agent/`, with tab routes in `$agentId/`. The standalone Connections and Chat pages are not exposed.
 
 `use-cursor-page.ts` sends the server's opaque `nextPageToken` as the next request's
 `pageToken`. Previous reuses visited page-start cursors. Page-size changes restart
@@ -26,12 +24,9 @@ square-and-horizontal-stroke brand guidance. Fonts and assets are bundled locall
 Run `pnpm --dir web test` for cursor and table interaction tests, and
 `pnpm --dir web build` for type checking and the production bundle.
 
-The management API provides OIDC login. The UI stores its user bearer token in
-local storage and adds Authorization headers to generated clients. Sign out
-revokes the server session and clears local storage. The callback route is
-handled by the UI and exchanges a one-time code with a browser-held verifier.
-No authentication cookies are used. The agent editor supports default-deny
-capabilities with Any or explicit target lists where supported.
+The management API is unauthenticated; operators put their own proxy in front of
+it. The agent editor supports default-deny capabilities with Any or explicit target
+lists where supported.
 
 Public connection setup and identity verification hosts live under
 `src/routes/connections/`. Their `-` prefixed modules are excluded from route
