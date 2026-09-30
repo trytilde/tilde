@@ -1,6 +1,8 @@
 name: Build
+# Pull requests cover branches; push runs only for main so a PR push does not run twice.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_call:
 permissions:
