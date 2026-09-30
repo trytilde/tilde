@@ -38,24 +38,27 @@ export function AddServers({ existing, onChanged }: { existing: boolean; onChang
   const [deployment, setDeployment] = useState<Deployment>();
   const [choosing, setChoosing] = useState<"mcp" | "host">();
   const [setup, setSetup] = useState<CatalogProvider>();
+  let chooseExisting = existing;
+  let authOptions: Record<string, string> = AUTH;
+  let deploymentOptions: Record<string, string> = DEPLOYMENTS;
   return (
     <>
-      <ServerMenu
-        icon={<ServerIcon />}
-        label="Add MCP server"
-        createLabel="Create new · choose auth method"
-        options={AUTH}
-        onExisting={existing ? () => setChoosing("mcp") : undefined}
-        onCreate={(key) => setAuth(key as Auth)}
-      />
-      <ServerMenu
-        icon={<ZapIcon />}
-        label="Add Tilde tool server"
-        createLabel="Create new · choose deployment method"
-        options={DEPLOYMENTS}
-        onExisting={existing ? () => setChoosing("host") : undefined}
-        onCreate={(key) => setDeployment(key as Deployment)}
-      />
+        <ServerMenu
+          icon={<ServerIcon />}
+          label="Add MCP server"
+          createLabel="Create new · choose auth method"
+          options={authOptions}
+          onExisting={chooseExisting ? () => setChoosing("mcp") : undefined}
+          onCreate={(key) => setAuth(key as Auth)}
+        />
+        <ServerMenu
+          icon={<ZapIcon />}
+          label="Add Tilde tool server"
+          createLabel="Create new · choose deployment method"
+          options={deploymentOptions}
+          onExisting={chooseExisting ? () => setChoosing("host") : undefined}
+          onCreate={(key) => setDeployment(key as Deployment)}
+        />
       <AddMcpServer
         open={!!auth}
         auth={auth ?? "oauth"}

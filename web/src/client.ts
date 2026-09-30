@@ -16,8 +16,9 @@ import {
 import { TracingService } from "@trytilde/contracts/tilde/management/v1/tracing_pb.js";
 import { ConnectionSetupService } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
 
-// The management API is unauthenticated; operators put their own proxy in front of it.
-const transport = createConnectTransport({ baseUrl: window.location.origin });
+const transport = createConnectTransport({
+  baseUrl: window.location.origin,
+});
 
 export const agents = createClient(AgentService, transport);
 export const agentAccess = createClient(AgentAccessService, transport);

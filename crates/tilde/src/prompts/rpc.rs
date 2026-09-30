@@ -125,7 +125,7 @@ pub fn management_router(prompts: Prompts) -> axum::Router {
 impl ManagementPromptService for Management {
     async fn list_prompts<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListPromptsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListPromptsResponse> + Send + use<'a>> {
         let agent = id(request.agent_id)?;
@@ -142,7 +142,7 @@ impl ManagementPromptService for Management {
     }
     async fn get_prompt<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetPromptRequest>,
     ) -> ServiceResult<impl Encodable<management::GetPromptResponse> + Send + use<'a>> {
         let (prompt, versions, usage) = self.0.get(id(request.id)?).await?;

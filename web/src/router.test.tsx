@@ -153,7 +153,7 @@ it("matches agent creation before the dynamic agent route", async () => {
   expect(rpc.getAgent).not.toHaveBeenCalled();
 });
 
-it.each(["/connections", "/chat", "/auth/callback"])("no longer serves %s", async (path) => {
+it.each(["/connections", "/chat"])("no longer serves %s", async (path) => {
   await open(path);
   await screen.findByRole("heading", { name: "Page not found" });
 });
@@ -205,11 +205,20 @@ it("keeps the header tabs linked to their panels and supports keyboard navigatio
   expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(selected.id);
 });
 
-it("names the section and the create page in the breadcrumb", async () => {
-  await open("/agent/new");
-  const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-  expect(within(breadcrumb).getByRole("link", { name: "Agent Registry" })).toBeTruthy();
-  expect((await within(breadcrumb).findByText("Create agent")).getAttribute("aria-current")).toBe(
-    "page",
-  );
+it("names the section in the breadcrumb on every top-level page and its create pages", async () => {
+  for (const [path, section, current] of [
+    ["/agent/new", "Agent Registry", "Create agent"],
+  ] as const) {
+    await open(path);
+    const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    if (current) {
+      expect(within(breadcrumb).getByRole("link", { name: section })).toBeTruthy();
+      expect((await within(breadcrumb).findByText(current)).getAttribute("aria-current")).toBe(
+        "page",
+      );
+    } else {
+      expect(within(breadcrumb).getByText(section).getAttribute("aria-current")).toBe("page");
+    }
+    cleanup();
+  }
 });

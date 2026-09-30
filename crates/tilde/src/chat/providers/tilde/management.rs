@@ -17,7 +17,7 @@ pub(crate) fn router(chat: Chat) -> axum::Router {
 impl TildeChatProviderService for Rpc {
     async fn get_credentials<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::GetCredentialsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::GetCredentialsResponse> + Send + use<'a>>
     {
@@ -31,7 +31,7 @@ impl TildeChatProviderService for Rpc {
     }
     async fn rotate_credentials<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::RotateCredentialsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::RotateCredentialsResponse> + Send + use<'a>>
     {

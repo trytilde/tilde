@@ -307,12 +307,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         router = router.merge(tilde::deployment::rpc::sidecar_router(deployments.clone()));
     }
     if serve.management {
-        // Unauthenticated: operators put their own proxy in front of the management group.
+        let trace_router = tilde::telemetry::tracing::viewer::router(trace_reader)
+            .merge(tilde::telemetry::logs::viewer::router(logs.reader.clone()));
         router = router
             .merge(
                 tilde::iam::listeners::management_router(agents, chat.clone(), connections.clone())
-                    .merge(tilde::telemetry::tracing::viewer::router(trace_reader))
-                    .merge(tilde::telemetry::logs::viewer::router(logs.reader.clone())),
+                    .merge(trace_router),
             )
             .merge(tilde::connections::assets::router(
                 config.connection_ui_dev_url.clone(),

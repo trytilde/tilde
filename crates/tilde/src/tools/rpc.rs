@@ -98,7 +98,7 @@ fn host_wire(h: ToolHost) -> management::ToolHost {
 impl ToolService for Rpc {
     async fn list_provider_tools<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListProviderToolsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListProviderToolsResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -133,7 +133,7 @@ impl ToolService for Rpc {
     }
     async fn refresh_connection_tools<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RefreshConnectionToolsRequest>,
     ) -> ServiceResult<impl Encodable<management::RefreshConnectionToolsResponse> + Send + use<'a>>
     {
@@ -147,7 +147,7 @@ impl ToolService for Rpc {
     }
     async fn list_tool_sources<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListToolSourcesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListToolSourcesResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -183,7 +183,7 @@ impl ToolService for Rpc {
     }
     async fn add_tool_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::AddToolSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::AddToolSourceResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -197,7 +197,7 @@ impl ToolService for Rpc {
     }
     async fn get_tool_mode<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetToolModeRequest>,
     ) -> ServiceResult<impl Encodable<management::GetToolModeResponse> + Send + use<'a>> {
         let agent = id(&request.to_owned_message().agent_id)?;
@@ -208,7 +208,7 @@ impl ToolService for Rpc {
     }
     async fn list_bundled_tools<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListBundledToolsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListBundledToolsResponse> + Send + use<'a>> {
         let agent = id(&request.to_owned_message().agent_id)?;
@@ -226,7 +226,7 @@ impl ToolService for Rpc {
     /// One mode covers all the agent's tools; it applies from the agent's next invocation.
     async fn set_tool_mode<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetToolModeRequest>,
     ) -> ServiceResult<impl Encodable<management::SetToolModeResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -240,7 +240,7 @@ impl ToolService for Rpc {
     }
     async fn remove_tool_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RemoveToolSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::RemoveToolSourceResponse> + Send + use<'a>> {
         let source = self.0.source(id(&request.to_owned_message().id)?).await?;
@@ -249,7 +249,7 @@ impl ToolService for Rpc {
     }
     async fn set_agent_tool<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetAgentToolRequest>,
     ) -> ServiceResult<impl Encodable<management::SetAgentToolResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -268,7 +268,7 @@ impl ToolService for Rpc {
     }
     async fn remove_agent_tool<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RemoveAgentToolRequest>,
     ) -> ServiceResult<impl Encodable<management::RemoveAgentToolResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -281,7 +281,7 @@ impl ToolService for Rpc {
     }
     async fn list_mcp_server_health<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListMcpServerHealthRequest>,
     ) -> ServiceResult<impl Encodable<management::ListMcpServerHealthResponse> + Send + use<'a>>
     {
@@ -305,7 +305,7 @@ impl ToolService for Rpc {
 impl ToolHostRegistryService for HostRpc {
     async fn list_tool_hosts<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListToolHostsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListToolHostsResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -323,7 +323,7 @@ impl ToolHostRegistryService for HostRpc {
     }
     async fn register_tool_host<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RegisterToolHostRequest>,
     ) -> ServiceResult<impl Encodable<management::RegisterToolHostResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -346,7 +346,7 @@ impl ToolHostRegistryService for HostRpc {
     }
     async fn rotate_tool_host_token<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RotateToolHostTokenRequest>,
     ) -> ServiceResult<impl Encodable<management::RotateToolHostTokenResponse> + Send + use<'a>>
     {
@@ -359,7 +359,7 @@ impl ToolHostRegistryService for HostRpc {
     }
     async fn refresh_tool_host<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RefreshToolHostRequest>,
     ) -> ServiceResult<impl Encodable<management::RefreshToolHostResponse> + Send + use<'a>> {
         let host = id(&request.to_owned_message().id)?;
@@ -371,7 +371,7 @@ impl ToolHostRegistryService for HostRpc {
     }
     async fn delete_tool_host<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteToolHostRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteToolHostResponse> + Send + use<'a>> {
         let host = id(&request.to_owned_message().id)?;

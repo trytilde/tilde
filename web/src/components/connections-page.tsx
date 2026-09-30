@@ -82,6 +82,7 @@ function parseQuery(query: string) {
  */
 export function ConnectionsPage() {
   const navigate = useNavigate();
+  let empty = "No connections yet. Add one from the Tilde Catalog or a remote server.";
   const [groups, setGroups] = useState<Group[]>([]);
   // Agents using each connection, by connection ID.
   const [users, setUsers] = useState<Map<string, string[]>>(() => new Map());
@@ -207,14 +208,14 @@ export function ConnectionsPage() {
         </div>
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap gap-3">
-          <Pill
-            icon={<LayoutGridIcon />}
-            label="Tilde Catalog"
-            onClick={() => void navigate({ to: "/tools/catalog" })}
-          />
-          <AddServers existing onChanged={reload} />
-        </div>
+          <div className="flex flex-wrap gap-3">
+            <Pill
+              icon={<LayoutGridIcon />}
+              label="Tilde Catalog"
+              onClick={() => void navigate({ to: "/tools/catalog" })}
+            />
+            <AddServers existing onChanged={reload} />
+          </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -350,7 +351,7 @@ export function ConnectionsPage() {
                         ? "Unable to load connections."
                         : filtered
                           ? "No connections match your search."
-                          : "No connections yet. Add one from the Tilde Catalog or a remote server."}
+                          : empty}
                   </TableCell>
                 </TableRow>
               )}
@@ -399,7 +400,8 @@ function ConnectionActions({
   }
   return (
     <span className="flex items-center gap-1">
-      <DropdownMenu>
+      <DropdownMenu
+      >
         <DropdownMenuTrigger
           disabled={busy}
           render={

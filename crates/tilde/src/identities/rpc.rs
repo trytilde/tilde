@@ -21,7 +21,7 @@ fn size(value: u32) -> usize {
 impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     async fn create_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::CreateIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::CreateIdentityResponse> + Send + use<'a>>
     {
@@ -33,7 +33,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn get_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::GetIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::GetIdentityResponse> + Send + use<'a>> {
         let identity = self.get(parse_id(r.id)?).await?;
@@ -44,7 +44,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn list_identities<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::ListIdentitiesRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::ListIdentitiesResponse> + Send + use<'a>>
     {
@@ -66,7 +66,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn create_root_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::CreateRootIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::CreateRootIdentityResponse> + Send + use<'a>>
     {
@@ -87,7 +87,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn get_root_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::GetRootIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::GetRootIdentityResponse> + Send + use<'a>>
     {
@@ -99,7 +99,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn list_root_identities<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::ListRootIdentitiesRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::ListRootIdentitiesResponse> + Send + use<'a>>
     {
@@ -114,7 +114,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn link_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::LinkIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::LinkIdentityResponse> + Send + use<'a>>
     {
@@ -133,7 +133,7 @@ impl crate::services::tilde::management::v1::IdentitiesService for Identities {
     }
     async fn unlink_identity<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, wire::UnlinkIdentityRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<wire::UnlinkIdentityResponse> + Send + use<'a>>
     {

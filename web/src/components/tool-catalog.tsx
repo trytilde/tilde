@@ -417,6 +417,7 @@ export function ToolProviderDialogs({
 }) {
   const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>({ kind: "detail" });
+  let canAddAccount = true;
   const [error, setError] = useState("");
   const provider = entry.provider;
   const methods = provider ? toolMethods(provider) : [];
@@ -536,7 +537,7 @@ export function ToolProviderDialogs({
               </p>
             ) : null}
 
-            {methods.length || provider ? (
+            {methods.length || (provider && canAddAccount) ? (
               <div className="-mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   {methods.length ? (
@@ -553,7 +554,7 @@ export function ToolProviderDialogs({
                     </>
                   ) : null}
                 </div>
-                {provider ? (
+                {provider && canAddAccount ? (
                   <AddAccountMenu methods={methods} onSelect={(typeId) => addAccount(typeId)} />
                 ) : null}
               </div>

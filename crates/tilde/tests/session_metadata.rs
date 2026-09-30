@@ -188,11 +188,8 @@ async fn session_metadata_flows_through_stored_traces_and_only_ids_are_resolved_
         listener.local_addr().unwrap()
     );
     let reader = Reader::new(pg.pool.clone(), store, None);
-    let api = tokio::spawn(async move {
-        axum::serve(listener, tilde::telemetry::tracing::viewer::router(reader))
-            .await
-            .unwrap()
-    });
+    let router = tilde::telemetry::tracing::viewer::router(reader);
+    let api = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let request = json!({"agentId":id(1),"includeSessionDetails":true,
         "filter":{"fromTime":"2027-01-15T00:00:00Z","toTime":"2027-01-16T00:00:00Z"}});
     let response = tokio::time::timeout(std::time::Duration::from_secs(30), async {

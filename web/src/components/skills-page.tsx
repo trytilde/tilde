@@ -77,6 +77,10 @@ export function SkillsPage() {
     () => sources.filter((source) => source.kind === SkillSourceKind.EDITOR),
     [sources],
   );
+  // The editor groups skills can be added to.
+  let editable = editorGroups;
+  let empty =
+    "No skills yet. Enable a group from the Tilde Catalog, add a Git repository or create one in the editor.";
   // Catalog groups show their provider's logo, as on the catalog page.
   const [icons, setIcons] = useState<Map<string, string>>(() => new Map());
   // Names and avatars for the Agents column.
@@ -204,22 +208,22 @@ export function SkillsPage() {
         </div>
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap gap-3">
-          <Pill
-            icon={<LayoutGridIcon />}
-            label="Tilde Catalog"
-            onClick={() => void navigate({ to: "/skills/catalog" })}
-          />
-          <Pill icon={<GitBranchIcon />} label="Add from Git" onClick={() => setDialog("git")} />
-          <Pill
-            icon={<SquarePenIcon />}
-            label="Create in editor"
-            onClick={() => {
-              setEditorGroup(undefined);
-              setDialog("editor");
-            }}
-          />
-        </div>
+          <div className="flex flex-wrap gap-3">
+            <Pill
+              icon={<LayoutGridIcon />}
+              label="Tilde Catalog"
+              onClick={() => void navigate({ to: "/skills/catalog" })}
+            />
+            <Pill icon={<GitBranchIcon />} label="Add from Git" onClick={() => setDialog("git")} />
+            <Pill
+              icon={<SquarePenIcon />}
+              label="Create in editor"
+              onClick={() => {
+                setEditorGroup(undefined);
+                setDialog("editor");
+              }}
+            />
+          </div>
         {failing.length > 0 && (
           <p
             role="status"
@@ -254,7 +258,7 @@ export function SkillsPage() {
               {groups.length ? (
                 groups.map((group) => {
                   const expanded = !collapsed.has(group.id);
-                  const addable = group.kind === SkillSourceKind.EDITOR;
+                  const addable = editable.some((source) => source.id === group.id);
                   return (
                     <Fragment key={group.id}>
                       <TableRow
@@ -372,7 +376,7 @@ export function SkillsPage() {
                                     })
                                   }
                                 />
-                                {group.kind === SkillSourceKind.EDITOR && (
+                                {addable && (
                                   <span onClick={(event) => event.stopPropagation()}>
                                     <RemoveButton
                                       label={`Delete ${skill.name}`}
@@ -416,7 +420,7 @@ export function SkillsPage() {
                       ? "Unable to load skills."
                       : filtered
                         ? "No skills match your search."
-                        : "No skills yet. Enable a group from the Tilde Catalog, add a Git repository or create one in the editor."}
+                        : empty}
                   </TableCell>
                 </TableRow>
               )}
@@ -436,7 +440,7 @@ export function SkillsPage() {
         />
         <EditorSkillDialog
           open={dialog === "editor"}
-          groups={editorGroups}
+          groups={editable}
           group={editorGroup}
           onOpenChange={(open) => setDialog(open ? "editor" : null)}
         />

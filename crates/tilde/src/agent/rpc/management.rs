@@ -17,7 +17,7 @@ pub fn router(agents: Agents) -> axum::Router {
 impl AgentService for Rpc {
     async fn upload_agent_avatar<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UploadAgentAvatarRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::UploadAgentAvatarResponse> + Send + use<'a>,
@@ -35,7 +35,7 @@ impl AgentService for Rpc {
 
     async fn create_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::CreateAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::CreateAgentResponse> + Send + use<'a>>
     {
@@ -68,7 +68,7 @@ impl AgentService for Rpc {
     }
     async fn get_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::GetAgentResponse> + Send + use<'a>>
     {
@@ -80,7 +80,7 @@ impl AgentService for Rpc {
     }
     async fn list_agents<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListAgentsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::ListAgentsResponse> + Send + use<'a>>
     {
@@ -114,7 +114,7 @@ impl AgentService for Rpc {
     }
     async fn update_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UpdateAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::UpdateAgentResponse> + Send + use<'a>>
     {
@@ -144,7 +144,7 @@ impl AgentService for Rpc {
     }
     async fn pause_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::PauseAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::PauseAgentResponse> + Send + use<'a>>
     {
@@ -156,7 +156,7 @@ impl AgentService for Rpc {
     }
     async fn resume_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ResumeAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::ResumeAgentResponse> + Send + use<'a>>
     {
@@ -168,7 +168,7 @@ impl AgentService for Rpc {
     }
     async fn delete_agent<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteAgentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::DeleteAgentResponse> + Send + use<'a>>
     {

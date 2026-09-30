@@ -365,14 +365,14 @@ pub fn router(reader: Reader) -> axum::Router {
 impl LogsService for Reader {
     async fn get_log_metrics<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::GetLogMetricsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::GetLogMetricsResponse> + Send + use<'a>> {
         Response::ok(self.metrics(r.to_owned_message()).await?)
     }
     async fn list_logs<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::ListLogsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::ListLogsResponse> + Send + use<'a>> {
         Response::ok(self.list(r.to_owned_message()).await?)

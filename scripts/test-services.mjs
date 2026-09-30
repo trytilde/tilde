@@ -5,6 +5,8 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { resolve } from "node:path";
 assert(process.env.TEST_DATABASE_URL, "TEST_DATABASE_URL required");
+// Served management routes answer requests without credentials.
+const expected = { management: 200 };
 const seed = randomBytes(32).toString("base64");
 for (const management of [true, false])
   for (const web of [true, false]) {
@@ -49,8 +51,7 @@ for (const management of [true, false])
         ),
       );
       const origin = `http://${logs.match(/ address=(127\.0\.0\.1:\d+)/)[1]}`;
-      // Agent runtime routes require an invocation token; management routes exist only when
-      // served and are unauthenticated (operators put their own proxy in front).
+      // Agent runtime routes require an invocation token; management routes exist only when served.
       assert.equal(
         (
           await fetch(`${origin}/tilde.runtime.v1.ChatService/ListGoals`, {
@@ -69,7 +70,7 @@ for (const management of [true, false])
             body: "{}",
           })
         ).status,
-        management ? 200 : 404,
+        management ? expected.management : 404,
       );
       assert.equal(
         (

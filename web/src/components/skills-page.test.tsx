@@ -313,7 +313,8 @@ it("syncs and deletes a group from its row", async () => {
   const table = await screen.findByRole("table", { name: "Skills" });
   const support = await within(table).findByRole("row", { name: "Group Support playbooks" });
   fireEvent.click(within(support).getByRole("button", { name: "Support playbooks actions" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Sync now" }));
+  const sync = await screen.findByRole("menuitem", { name: "Sync now" });
+  fireEvent.click(sync);
   await waitFor(() => expect(rpc.skills.syncSkillSource).toHaveBeenCalledWith({ id: "src-git" }));
 
   fireEvent.click(within(support).getByRole("button", { name: "Support playbooks actions" }));

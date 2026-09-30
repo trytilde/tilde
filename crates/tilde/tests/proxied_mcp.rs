@@ -155,7 +155,7 @@ async fn discovered_mcp_tools_are_called_through_tilde_with_the_connection_crede
     );
     // The provider's catalog entry lists what its connections discovered.
     assert_eq!(
-        agent_tools.catalog_tools("tracker").await.unwrap()[0].name,
+        agent_tools.catalog_tools("tracker",).await.unwrap()[0].name,
         "get_issue"
     );
     assert!(
@@ -379,7 +379,7 @@ async fn the_provider_catalog_never_shows_a_personal_connections_discovery() {
         tools.into_iter().map(|t| t.name).collect::<Vec<_>>()
     };
     assert_eq!(
-        names(agent_tools.catalog_tools("tracker").await.unwrap()),
+        names(agent_tools.catalog_tools("tracker",).await.unwrap()),
         ["get_issue"]
     );
     server.abort();

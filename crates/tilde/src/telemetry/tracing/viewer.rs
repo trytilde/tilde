@@ -510,7 +510,7 @@ pub fn router(reader: Reader) -> axum::Router {
 impl TracingService for Reader {
     async fn get_trace_object_url<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::GetTraceObjectUrlRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::GetTraceObjectUrlResponse> + Send + use<'a>>
     {
@@ -522,7 +522,7 @@ impl TracingService for Reader {
     }
     async fn list_observations<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::ListObservationsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::ListObservationsResponse> + Send + use<'a>>
     {
@@ -548,7 +548,7 @@ impl TracingService for Reader {
 
     async fn get_observation_metrics<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::GetObservationMetricsRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::GetObservationMetricsResponse> + Send + use<'a>>
     {
@@ -560,7 +560,7 @@ impl TracingService for Reader {
     }
     async fn get_trace<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::GetTraceRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::GetTraceResponse> + Send + use<'a>> {
         if r.trace_id.is_empty() {
@@ -583,7 +583,7 @@ impl TracingService for Reader {
     }
     async fn get_session<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, pb::GetSessionRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<pb::GetSessionResponse> + Send + use<'a>> {
         let r = r.to_owned_message();

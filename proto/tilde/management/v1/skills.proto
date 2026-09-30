@@ -66,7 +66,10 @@ message ListSkillsRequest { string source_id = 1; }
 message ListSkillsResponse { repeated tilde.types.v1.Skill skills = 1; }
 message GetSkillRequest { string id = 1; }
 // Versions newest first, without their files.
-message GetSkillResponse { tilde.types.v1.Skill skill = 1; repeated tilde.types.v1.SkillVersion versions = 2; }
+message GetSkillResponse {
+  tilde.types.v1.Skill skill = 1;
+  repeated tilde.types.v1.SkillVersion versions = 2;
+}
 message GetSkillVersionRequest { string id = 1; }
 message GetSkillVersionResponse { tilde.types.v1.SkillVersion version = 1; }
 message CreateSkillRequest { string source_id = 1; string name = 2; repeated tilde.types.v1.SkillFile files = 3; }

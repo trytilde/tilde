@@ -241,10 +241,10 @@ export function AgentRegistry({
       </div>
       <section className="flex flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
         <div className="flex items-center justify-end gap-4">
-          <Button onClick={onCreate}>
-            <PlusIcon />
-            Create agent
-          </Button>
+            <Button onClick={onCreate}>
+              <PlusIcon />
+              Create agent
+            </Button>
         </div>
         {page.error && (
           <div

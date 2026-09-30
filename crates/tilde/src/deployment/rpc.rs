@@ -27,7 +27,7 @@ pub fn sidecar_router(service: Deployments) -> axum::Router {
 impl DeploymentService for Rpc {
     async fn missing_deployment_files<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::MissingDeploymentFilesRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::MissingDeploymentFilesResponse> + Send + use<'a>,
@@ -40,7 +40,7 @@ impl DeploymentService for Rpc {
     }
     async fn upload_deployment_file<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::UploadDeploymentFileRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::UploadDeploymentFileResponse> + Send + use<'a>,
@@ -53,7 +53,7 @@ impl DeploymentService for Rpc {
     }
     async fn get_deployment_contents<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::GetDeploymentContentsRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::GetDeploymentContentsResponse> + Send + use<'a>,
@@ -63,7 +63,7 @@ impl DeploymentService for Rpc {
     }
     async fn get_deployment<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::GetDeploymentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::GetDeploymentResponse> + Send + use<'a>>
     {
@@ -77,7 +77,7 @@ impl DeploymentService for Rpc {
     }
     async fn set_deployment_weights<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::SetDeploymentWeightsRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetDeploymentWeightsResponse> + Send + use<'a>,
@@ -98,7 +98,7 @@ impl DeploymentService for Rpc {
     }
     async fn set_deployment<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::SetDeploymentRequest>,
     ) -> ServiceResult<impl connectrpc::Encodable<management::SetDeploymentResponse> + Send + use<'a>>
     {
@@ -119,7 +119,7 @@ impl DeploymentService for Rpc {
     }
     async fn issue_deployment_token<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::IssueDeploymentTokenRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::IssueDeploymentTokenResponse> + Send + use<'a>,
@@ -135,7 +135,7 @@ impl DeploymentService for Rpc {
     }
     async fn register_deployment<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::RegisterDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RegisterDeploymentResponse> + Send + use<'a>,
@@ -172,7 +172,7 @@ impl DeploymentService for Rpc {
     }
     async fn promote_deployment<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::PromoteDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::PromoteDeploymentResponse> + Send + use<'a>,
@@ -188,7 +188,7 @@ impl DeploymentService for Rpc {
     }
     async fn retire_deployment<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::RetireDeploymentRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RetireDeploymentResponse> + Send + use<'a>,
@@ -204,7 +204,7 @@ impl DeploymentService for Rpc {
     }
     async fn issue_ingress_token<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         r: ServiceRequest<'_, management::IssueIngressTokenRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::IssueIngressTokenResponse> + Send + use<'a>,

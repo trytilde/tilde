@@ -39,7 +39,7 @@ fn size(value: u32) -> u32 {
 impl AgentAccessService for Management {
     async fn list_channel_access<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListChannelAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::ListChannelAccessResponse> + Send + use<'a>,
@@ -61,7 +61,7 @@ impl AgentAccessService for Management {
     }
     async fn set_channel_access<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetChannelAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetChannelAccessResponse> + Send + use<'a>,
@@ -80,7 +80,7 @@ impl AgentAccessService for Management {
     }
     async fn list_channel_identities<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListChannelIdentitiesRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::ListChannelIdentitiesResponse> + Send + use<'a>,
@@ -104,7 +104,7 @@ impl AgentAccessService for Management {
     }
     async fn set_identity_access<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetIdentityAccessRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::SetIdentityAccessResponse> + Send + use<'a>,
@@ -122,7 +122,7 @@ impl AgentAccessService for Management {
     }
     async fn request_identity_verification<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RequestIdentityVerificationRequest>,
     ) -> ServiceResult<
         impl connectrpc::Encodable<management::RequestIdentityVerificationResponse> + Send + use<'a>,

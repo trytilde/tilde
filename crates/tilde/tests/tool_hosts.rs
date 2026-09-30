@@ -237,7 +237,7 @@ async fn lambda_host_is_listed_and_invoked_synchronously() {
     assert!(
         agent_tools
             .hosts
-            .register("bad", Some("not-an-arn"))
+            .register("bad", Some("not-an-arn"),)
             .await
             .is_err()
     );
@@ -696,7 +696,7 @@ async fn host_published_oauth_cannot_reach_private_endpoints() {
                 "authorizationUrl":"https://accounts.example.com/authorize","client":client}}}]})
     };
 
-    let (_, token) = hosts.register("attacker", None).await.unwrap();
+    let (_host, token) = hosts.register("attacker", None).await.unwrap();
     let bearer = token.unwrap().expose_secret().to_owned();
     // A host's endpoints must be HTTPS, and its token endpoint a public address when called.
     let (frame, _) = watch(

@@ -126,6 +126,7 @@ export function AddMcpServer({
 }) {
   const navigate = useNavigate();
   const [settingUp, setSettingUp] = useState<Provider>();
+  let canAddAccount = true;
   return (
     <>
       <AddMcpServerDialog
@@ -135,7 +136,7 @@ export function AddMcpServer({
         onOpenChange={onOpenChange}
         onAdded={(provider) => {
           onChanged();
-          setSettingUp(provider);
+          if (canAddAccount) setSettingUp(provider);
         }}
       />
       {settingUp ? (

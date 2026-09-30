@@ -270,8 +270,10 @@ impl ToolHosts {
             .is_none()
             .then(crate::deployment::secrets::random_secret);
         let hash = token.as_ref().map(|t| digest(t.expose_secret()));
+        let mut client = self.connections.pool.get().await?;
+        let tx = client.transaction().await?;
         if db::host_insert_execute(
-            &self.connections.pool.get().await?,
+            &tx,
             id,
             name,
             if function_arn.is_some() {
@@ -287,6 +289,8 @@ impl ToolHosts {
         {
             return Err(Error::Conflict);
         }
+        tx.commit().await?;
+        drop(client);
         let host = match function_arn {
             Some(_) => self.refresh(id).await?,
             None => self.get(id).await?,

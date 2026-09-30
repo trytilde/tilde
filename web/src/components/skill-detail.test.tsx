@@ -108,7 +108,10 @@ function transfer() {
 }
 
 it("manages files like VS Code's explorer and saves them as the next version", async () => {
-  rpc.skills.getSkill.mockResolvedValue({ skill, versions: [v2, v1] });
+  rpc.skills.getSkill.mockResolvedValue({
+    skill,
+    versions: [v2, v1],
+  });
   rpc.skills.getSkillVersion.mockImplementation(async ({ id }: { id: "v1" | "v2" }) => ({
     version: create(SkillVersionSchema, { id, files: files[id] }),
   }));
@@ -194,7 +197,10 @@ it("manages files like VS Code's explorer and saves them as the next version", a
 });
 
 it("autosaves an edit once, and again only for the next real change", async () => {
-  rpc.skills.getSkill.mockResolvedValue({ skill, versions: [v2, v1] });
+  rpc.skills.getSkill.mockResolvedValue({
+    skill,
+    versions: [v2, v1],
+  });
   rpc.skills.getSkillVersion.mockImplementation(async ({ id }: { id: "v1" | "v2" }) => ({
     version: create(SkillVersionSchema, { id, files: files[id] }),
   }));
@@ -220,7 +226,10 @@ it("autosaves an edit once, and again only for the next real change", async () =
 it("edits the name and description inline, saving SKILL.md's front matter as the next version", async () => {
   const md =
     "---\nname: refunds\ndescription: >-\n  Handle refunds\n  within policy.\n---\nBe kind.\n";
-  rpc.skills.getSkill.mockResolvedValue({ skill, versions: [v2, v1] });
+  rpc.skills.getSkill.mockResolvedValue({
+    skill,
+    versions: [v2, v1],
+  });
   rpc.skills.getSkillVersion.mockResolvedValue({
     version: create(SkillVersionSchema, {
       id: "v2",
@@ -302,7 +311,10 @@ it("never saves one skill's files over the next skill opened", async () => {
   const other = create(SkillSchema, { ...skill, id: "s2", name: "billing", latest: v1 });
   rpc.skills.getSkill.mockImplementation(async ({ id }: { id: string }) =>
     id === "s1"
-      ? { skill, versions: [v2] }
+      ? {
+          skill,
+          versions: [v2],
+        }
       : {
           skill: other,
           versions: [create(SkillVersionSchema, { id: "b1", number: 1 })],

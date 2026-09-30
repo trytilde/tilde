@@ -1,6 +1,7 @@
 import { defineConfig } from "vite-plus";
 
-// One root check policy covers the frontend, provider iframes, SDK, examples and scripts.
+// One root check policy covers the frontend, provider iframes and scripts, plus the SDK and
+// examples where the repository has them.
 // Scan the repository, not just web/: catalog ui.tsx entries live under crates/tilde/src/connections.
 // Generated contracts and build outputs are verified by their generators, not reformatted.
 const generated = [

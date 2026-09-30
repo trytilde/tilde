@@ -1,5 +1,5 @@
 //! Complete API surfaces for each listener. Agent RPCs and trace ingestion authenticate their own
-//! tokens; management routes are unauthenticated and belong behind the operator's proxy.
+//! tokens.
 use crate::{agent::Agents, chat::Chat};
 use axum::{
     Router,

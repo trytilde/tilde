@@ -60,7 +60,8 @@ export function SkillGroupActions({
           {error}
         </span>
       )}
-      <DropdownMenu>
+      <DropdownMenu
+      >
         <DropdownMenuTrigger
           disabled={busy}
           render={<Button variant="ghost" size="icon-sm" aria-label={`${group.name} actions`} />}

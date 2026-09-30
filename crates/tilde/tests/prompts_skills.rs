@@ -261,10 +261,8 @@ async fn deployments_ship_prompts_and_skills_that_calls_and_invocations_resolve(
     )
     .with_inference(gateway.clone());
     let deployments = deployments(&db.pool, encryption.clone(), connections.clone());
-    let management = serve(tilde::deployment::rpc::management_router(
-        deployments.clone(),
-    ))
-    .await;
+    let management = tilde::deployment::rpc::management_router(deployments.clone());
+    let management = serve(management).await;
     let runtime = serve(tilde::iam::listeners::agent_rpc_router(
         agents.clone(),
         chat.clone(),
@@ -617,14 +615,14 @@ async fn skill_sources_sync_version_and_reach_agents_directly_and_through_connec
     assert!(!created && again == runtime);
     // Concurrent enables of one group agree on a single source.
     let (a, b) = tokio::join!(
-        skills.enable_catalog("tilde-working-style"),
-        skills.enable_catalog("tilde-working-style")
+        skills.enable_catalog("tilde-working-style",),
+        skills.enable_catalog("tilde-working-style",)
     );
     let (a, b) = (a.unwrap(), b.unwrap());
     assert!(a.0 == b.0 && a.1 != b.1, "{a:?} {b:?}");
     skills.delete_source(a.0).await.unwrap();
     assert_eq!(skills.source(runtime).await.unwrap().skill_count, 4);
-    assert_eq!(skills.skills(None).await.unwrap().len(), 4);
+    assert_eq!(skills.skills(None,).await.unwrap().len(), 4);
     // Catalog skills follow the catalog: even the source's editor cannot change or delete them.
     let first = skills.skills(Some(runtime)).await.unwrap()[0].row.id;
     assert!(
@@ -705,7 +703,7 @@ async fn skill_sources_sync_version_and_reach_agents_directly_and_through_connec
     }
     assert!(
         skills
-            .add_git("Docs", "https://example.com/acme/skills", "main", "")
+            .add_git("Docs", "https://example.com/acme/skills", "main", "",)
             .await
             .is_err(),
         "only GitHub URLs"
@@ -738,7 +736,7 @@ async fn skill_sources_sync_version_and_reach_agents_directly_and_through_connec
     let names =
         |list: Vec<tilde::skills::Skill>| list.into_iter().map(|s| s.row.name).collect::<Vec<_>>();
     assert_eq!(
-        names(skills.skills(Some(git)).await.unwrap()),
+        names(skills.skills(Some(git),).await.unwrap()),
         ["docx", "pdf"]
     );
     let pdf = skills
@@ -775,7 +773,7 @@ async fn skill_sources_sync_version_and_reach_agents_directly_and_through_connec
     skills.sync(git).await.unwrap();
     let pdf = skills.skill(pdf.row.id).await.unwrap();
     assert_eq!(skills.versions(pdf.row.id).await.unwrap().len(), 2);
-    assert_eq!(names(skills.skills(Some(git)).await.unwrap()), ["pdf"]);
+    assert_eq!(names(skills.skills(Some(git),).await.unwrap()), ["pdf"]);
     // A failing sync keeps the last good skills and says why.
     repo.lock().unwrap().broken = true;
     skills.sync(git).await.unwrap();
@@ -1076,7 +1074,7 @@ async fn skill_sources_sync_version_and_reach_agents_directly_and_through_connec
     let connection = connect(&connections, helper, &provider().await).await;
     skills.link_source(connection, runtime, true).await.unwrap();
     assert_eq!(
-        skills.connection_sources(connection).await.unwrap().len(),
+        skills.connection_sources(connection,).await.unwrap().len(),
         1
     );
     let learner = create_agent(&agents).await;
@@ -1152,7 +1150,8 @@ async fn managed_providers_sync_only_skills_within_their_scopes() {
     let skills = Skills::new(db.pool.clone()).with_github(
         tilde::skills::github::GitHub::new(&stub, &format!("{stub}/raw"), None).unwrap(),
     );
-    let management = serve(tilde::skills::rpc::management_router(skills.clone())).await;
+    let management = tilde::skills::rpc::management_router(skills.clone());
+    let management = serve(management).await;
     let http = reqwest::Client::new();
     let catalog = || async {
         let groups: serde_json::Value = http
@@ -1252,11 +1251,11 @@ async fn managed_providers_sync_only_skills_within_their_scopes() {
     assert_eq!(source.sync_error, None);
     assert_eq!(source.commit_sha, Some(format!("{:040x}", 1)));
     assert_eq!(
-        names(skills.skills(Some(zoom_source)).await.unwrap()),
+        names(skills.skills(Some(zoom_source),).await.unwrap()),
         ["meetings"]
     );
     assert_eq!(
-        names(skills.skills(Some(cursor_source)).await.unwrap()),
+        names(skills.skills(Some(cursor_source),).await.unwrap()),
         ["meetings", "other"]
     );
     let zoom = entry(&catalog().await, "zoom");

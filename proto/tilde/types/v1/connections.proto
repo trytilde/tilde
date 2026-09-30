@@ -34,7 +34,11 @@ message OAuthConfiguration {
 // client ID and secret of their own app.
 // DYNAMIC: registered with the server at setup (OAuth dynamic client registration), with the
 // authorization and token endpoints discovered from it; only MCP-backed types can use it.
-enum OAuthClient { O_AUTH_CLIENT_UNSPECIFIED = 0; O_AUTH_CLIENT_FORM = 1; O_AUTH_CLIENT_DYNAMIC = 3; }
+enum OAuthClient {
+  O_AUTH_CLIENT_UNSPECIFIED = 0;
+  O_AUTH_CLIENT_FORM = 1;
+  O_AUTH_CLIENT_DYNAMIC = 3;
+}
 
 // The MCP server at `url` that serves a connection type's tools. The credential says how the
 // connection's secret reaches the server: BEARER sends the OAuth access token (or `api_key`) as

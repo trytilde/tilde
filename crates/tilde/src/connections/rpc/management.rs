@@ -17,7 +17,7 @@ use base64::Engine;
 impl ConnectionsService for Rpc {
     async fn assign_capability<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::AssignCapabilityRequest>,
     ) -> ServiceResult<impl Encodable<management::AssignCapabilityResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -39,7 +39,7 @@ impl ConnectionsService for Rpc {
     }
     async fn unassign_capability<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UnassignCapabilityRequest>,
     ) -> ServiceResult<impl Encodable<management::UnassignCapabilityResponse> + Send + use<'a>>
     {
@@ -99,7 +99,7 @@ impl ConnectionsService for Rpc {
     }
     async fn register_provider<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::RegisterProviderRequest>,
     ) -> ServiceResult<impl Encodable<management::RegisterProviderResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -121,7 +121,7 @@ impl ConnectionsService for Rpc {
     }
     async fn start_connection<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::StartConnectionRequest>,
     ) -> ServiceResult<impl Encodable<management::StartConnectionResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -155,7 +155,7 @@ impl ConnectionsService for Rpc {
     }
     async fn get_connection<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetConnectionRequest>,
     ) -> ServiceResult<impl Encodable<management::GetConnectionResponse> + Send + use<'a>> {
         let connection = self
@@ -170,7 +170,7 @@ impl ConnectionsService for Rpc {
     }
     async fn list_connections<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListConnectionsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListConnectionsResponse> + Send + use<'a>> {
         let after = if request.page_token.is_empty() {
@@ -224,7 +224,7 @@ impl ConnectionsService for Rpc {
     }
     async fn reconnect<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ReconnectRequest>,
     ) -> ServiceResult<impl Encodable<management::ReconnectResponse> + Send + use<'a>> {
         let target = id(request.id)?;
@@ -238,7 +238,7 @@ impl ConnectionsService for Rpc {
     }
     async fn disconnect<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DisconnectRequest>,
     ) -> ServiceResult<impl Encodable<management::DisconnectResponse> + Send + use<'a>> {
         let target = id(request.id)?;

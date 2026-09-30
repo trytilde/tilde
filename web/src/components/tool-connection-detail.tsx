@@ -167,63 +167,63 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {source.kind === "connection" && (
-                <>
-                  {source.provider?.connectionTypes.find(
-                    (type) => type.id === source.connection.typeId,
-                  )?.mcpServer &&
-                    source.connection.status === "ready" && (
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() =>
-                          void act(async () => {
-                            const result = await toolsClient.refreshConnectionTools({
-                              connectionId: id,
-                            });
-                            setNotice(
-                              result.changed
-                                ? `Tools updated: ${result.tools.length} available.`
-                                : "The server describes the same tools as before.",
-                            );
-                          })
-                        }
-                      >
-                        <RefreshCwIcon />
-                        Refresh tools
-                      </Button>
-                    )}
+                {source.kind === "connection" && (
+                  <>
+                    {source.provider?.connectionTypes.find(
+                      (type) => type.id === source.connection.typeId,
+                    )?.mcpServer &&
+                      source.connection.status === "ready" && (
+                        <Button
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              const result = await toolsClient.refreshConnectionTools({
+                                connectionId: id,
+                              });
+                              setNotice(
+                                result.changed
+                                  ? `Tools updated: ${result.tools.length} available.`
+                                  : "The server describes the same tools as before.",
+                              );
+                            })
+                          }
+                        >
+                          <RefreshCwIcon />
+                          Refresh tools
+                        </Button>
+                      )}
+                    <Button
+                      variant="outline"
+                      disabled={busy || !source.provider}
+                      onClick={() => setForm("reconnect")}
+                    >
+                      {source.connection.status === "ready" ? "Reconnect" : "Finish setup"}
+                    </Button>
+                  </>
+                )}
+                {source.kind === "host" && source.host.type === ToolHostType.LAMBDA && (
                   <Button
                     variant="outline"
-                    disabled={busy || !source.provider}
-                    onClick={() => setForm("reconnect")}
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        await toolHosts.refreshToolHost({ id });
+                      })
+                    }
                   >
-                    {source.connection.status === "ready" ? "Reconnect" : "Finish setup"}
+                    <RefreshCwIcon />
+                    Refresh tools
                   </Button>
-                </>
-              )}
-              {source.kind === "host" && source.host.type === ToolHostType.LAMBDA && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(async () => {
-                      await toolHosts.refreshToolHost({ id });
-                    })
-                  }
-                >
-                  <RefreshCwIcon />
-                  Refresh tools
+                )}
+                {source.kind === "host" && source.host.type === ToolHostType.CONNECTED && (
+                  <Button variant="outline" disabled={busy} onClick={() => setConfirm("rotate")}>
+                    Rotate token
+                  </Button>
+                )}
+                <Button variant="destructive" disabled={busy} onClick={() => setConfirm("delete")}>
+                  {source.kind === "connection" ? "Disconnect" : "Delete"}
                 </Button>
-              )}
-              {source.kind === "host" && source.host.type === ToolHostType.CONNECTED && (
-                <Button variant="outline" disabled={busy} onClick={() => setConfirm("rotate")}>
-                  Rotate token
-                </Button>
-              )}
-              <Button variant="destructive" disabled={busy} onClick={() => setConfirm("delete")}>
-                {source.kind === "connection" ? "Disconnect" : "Delete"}
-              </Button>
             </div>
           </header>
 

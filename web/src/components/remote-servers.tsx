@@ -180,11 +180,11 @@ export function RemoteServersPage() {
           id: "agents",
           header: "Agents",
           cell: ({ row }) => (
-            <AgentStack
-              ids={row.original.agentIds}
-              registry={registry}
-              onOpen={() => setViewing(row.original)}
-            />
+              <AgentStack
+                ids={row.original.agentIds}
+                registry={registry}
+                onOpen={() => setViewing(row.original)}
+              />
           ),
         }),
       ]),
@@ -192,6 +192,12 @@ export function RemoteServersPage() {
   );
   const open = openId ? entries.get(openId) : undefined;
   const table = useTable({ features, columns, data, getRowId: (row) => row.id });
+  let empty =
+    kind === "all"
+      ? "No remote servers yet. Add one to serve your own tools."
+      : kind === "mcp"
+        ? "No MCP servers yet."
+        : "No Tilde tool servers yet.";
   return (
     <div className="flex flex-col">
       <div
@@ -219,12 +225,12 @@ export function RemoteServersPage() {
         <CatalogSearchField label="Search remote servers" value={query} onChange={setQuery} />
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap gap-3">
-          <AddServers
-            existing={false}
-            onChanged={() => void refresh().catch((e) => setError(message(e)))}
-          />
-        </div>
+          <div className="flex flex-wrap gap-3">
+            <AddServers
+              existing={false}
+              onChanged={() => void refresh().catch((e) => setError(message(e)))}
+            />
+          </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -270,11 +276,7 @@ export function RemoteServersPage() {
                         ? "Unable to load remote servers."
                         : search
                           ? "No remote servers match this search."
-                          : kind === "all"
-                            ? "No remote servers yet. Add one to serve your own tools."
-                            : kind === "mcp"
-                              ? "No MCP servers yet."
-                              : "No Tilde tool servers yet."}
+                          : empty}
                   </TableCell>
                 </TableRow>
               )}

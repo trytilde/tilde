@@ -86,7 +86,7 @@ impl InferenceService for Rpc {
     /// Per-connection totals for the window, the daily series and the agent's all-time spend.
     async fn get_usage<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetUsageRequest>,
     ) -> ServiceResult<impl Encodable<management::GetUsageResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -168,7 +168,7 @@ impl InferenceService for Rpc {
     /// Budgets, optionally filtered by scope and scope id.
     async fn list_budgets<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListBudgetsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListBudgetsResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -186,7 +186,7 @@ impl InferenceService for Rpc {
     /// Create or replace the budget for (scope, scope id, period, connection); settles at once.
     async fn set_budget<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetBudgetRequest>,
     ) -> ServiceResult<impl Encodable<management::SetBudgetResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
@@ -208,7 +208,7 @@ impl InferenceService for Rpc {
     /// Remove a budget; its scope is unblocked at the next token renewal.
     async fn delete_budget<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteBudgetRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteBudgetResponse> + Send + use<'a>> {
         budgets::delete(&self.0, id(request.id)?).await?;

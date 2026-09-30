@@ -138,7 +138,7 @@ pub fn management_router(skills: Skills) -> axum::Router {
 impl ManagementSkillService for Management {
     async fn list_catalog<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         _: ServiceRequest<'_, management::ListCatalogRequest>,
     ) -> ServiceResult<impl Encodable<management::ListCatalogResponse> + Send + use<'a>> {
         Response::ok(management::ListCatalogResponse {
@@ -154,7 +154,7 @@ impl ManagementSkillService for Management {
     }
     async fn get_catalog_group<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetCatalogGroupRequest>,
     ) -> ServiceResult<impl Encodable<management::GetCatalogGroupResponse> + Send + use<'a>> {
         Response::ok(management::GetCatalogGroupResponse {
@@ -164,7 +164,7 @@ impl ManagementSkillService for Management {
     }
     async fn list_skill_sources<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         _: ServiceRequest<'_, management::ListSkillSourcesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListSkillSourcesResponse> + Send + use<'a>> {
         let listed = self.0.sources().await?;
@@ -186,7 +186,7 @@ impl ManagementSkillService for Management {
     }
     async fn get_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::GetSkillSourceResponse> + Send + use<'a>> {
         let source = id(request.id)?;
@@ -213,11 +213,11 @@ impl ManagementSkillService for Management {
     }
     async fn enable_catalog_group<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::EnableCatalogGroupRequest>,
     ) -> ServiceResult<impl Encodable<management::EnableCatalogGroupResponse> + Send + use<'a>>
     {
-        let (source, _) = self.0.enable_catalog(request.group).await?;
+        let (source, _created) = self.0.enable_catalog(request.group).await?;
         Response::ok(management::EnableCatalogGroupResponse {
             source: source_wire(self.0.source(source).await?).into(),
             ..Default::default()
@@ -225,7 +225,7 @@ impl ManagementSkillService for Management {
     }
     async fn add_git_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::AddGitSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::AddGitSourceResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -240,7 +240,7 @@ impl ManagementSkillService for Management {
     }
     async fn create_editor_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::CreateEditorSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::CreateEditorSourceResponse> + Send + use<'a>>
     {
@@ -252,7 +252,7 @@ impl ManagementSkillService for Management {
     }
     async fn sync_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SyncSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::SyncSkillSourceResponse> + Send + use<'a>> {
         let source = id(request.id)?;
@@ -264,7 +264,7 @@ impl ManagementSkillService for Management {
     }
     async fn delete_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteSkillSourceResponse> + Send + use<'a>> {
         let source = id(request.id)?;
@@ -273,7 +273,7 @@ impl ManagementSkillService for Management {
     }
     async fn list_skills<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListSkillsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListSkillsResponse> + Send + use<'a>> {
         let source = if request.source_id.is_empty() {
@@ -300,7 +300,7 @@ impl ManagementSkillService for Management {
     }
     async fn get_skill<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetSkillRequest>,
     ) -> ServiceResult<impl Encodable<management::GetSkillResponse> + Send + use<'a>> {
         let skill = self.0.skill(id(request.id)?).await?;
@@ -316,7 +316,7 @@ impl ManagementSkillService for Management {
     }
     async fn get_skill_version<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::GetSkillVersionRequest>,
     ) -> ServiceResult<impl Encodable<management::GetSkillVersionResponse> + Send + use<'a>> {
         let version = self.0.version(id(request.id)?).await?;
@@ -342,7 +342,7 @@ impl ManagementSkillService for Management {
     }
     async fn create_skill<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::CreateSkillRequest>,
     ) -> ServiceResult<impl Encodable<management::CreateSkillResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -358,7 +358,7 @@ impl ManagementSkillService for Management {
     }
     async fn update_skill<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UpdateSkillRequest>,
     ) -> ServiceResult<impl Encodable<management::UpdateSkillResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
@@ -371,7 +371,7 @@ impl ManagementSkillService for Management {
     }
     async fn delete_skill<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteSkillRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteSkillResponse> + Send + use<'a>> {
         let skill = self.0.skill(id(request.id)?).await?;
@@ -380,7 +380,7 @@ impl ManagementSkillService for Management {
     }
     async fn list_agent_skills<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListAgentSkillsRequest>,
     ) -> ServiceResult<impl Encodable<management::ListAgentSkillsResponse> + Send + use<'a>> {
         let agent = id(request.agent_id)?;
@@ -429,7 +429,7 @@ impl ManagementSkillService for Management {
     }
     async fn assign_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::AssignSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::AssignSkillSourceResponse> + Send + use<'a>> {
         let (agent, source) = (id(request.agent_id)?, id(request.source_id)?);
@@ -438,7 +438,7 @@ impl ManagementSkillService for Management {
     }
     async fn unassign_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UnassignSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::UnassignSkillSourceResponse> + Send + use<'a>>
     {
@@ -448,7 +448,7 @@ impl ManagementSkillService for Management {
     }
     async fn set_skill_source_enabled<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetSkillSourceEnabledRequest>,
     ) -> ServiceResult<impl Encodable<management::SetSkillSourceEnabledResponse> + Send + use<'a>>
     {
@@ -458,7 +458,7 @@ impl ManagementSkillService for Management {
     }
     async fn set_skill_enabled<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::SetSkillEnabledRequest>,
     ) -> ServiceResult<impl Encodable<management::SetSkillEnabledResponse> + Send + use<'a>> {
         let (agent, skill) = (id(request.agent_id)?, id(request.skill_id)?);
@@ -467,7 +467,7 @@ impl ManagementSkillService for Management {
     }
     async fn unassign_skill<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UnassignSkillRequest>,
     ) -> ServiceResult<impl Encodable<management::UnassignSkillResponse> + Send + use<'a>> {
         let (agent, skill) = (id(request.agent_id)?, id(request.skill_id)?);
@@ -476,7 +476,7 @@ impl ManagementSkillService for Management {
     }
     async fn link_connection_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::LinkConnectionSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::LinkConnectionSkillSourceResponse> + Send + use<'a>>
     {
@@ -486,7 +486,7 @@ impl ManagementSkillService for Management {
     }
     async fn unlink_connection_skill_source<'a>(
         &'a self,
-        _: RequestContext,
+        _ctx: RequestContext,
         request: ServiceRequest<'_, management::UnlinkConnectionSkillSourceRequest>,
     ) -> ServiceResult<
         impl Encodable<management::UnlinkConnectionSkillSourceResponse> + Send + use<'a>,

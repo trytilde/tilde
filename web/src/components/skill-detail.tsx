@@ -108,7 +108,8 @@ function SkillEditor({ id }: { id: string }) {
         });
     return () => abort.abort();
   }, [version, contents]);
-  const editable = skill?.sourceKind === SkillSourceKind.EDITOR;
+  const editable =
+    skill?.sourceKind === SkillSourceKind.EDITOR;
   const stored = version ? contents[version.id] : undefined;
   const files: DraftFile[] = useMemo(() => draft ?? (stored ?? []).map(toDraft), [draft, stored]);
   const file = files.find((f) => f.path === path) ?? files[0];

@@ -208,7 +208,14 @@ impl Skills {
     }
     /// `None` when a unique slug or catalog group is already taken.
     async fn create_source(&self, source: db::NewSource<'_>) -> Result<Option<Uuid>, Error> {
-        Ok(db::source_insert_opt(&self.pool.get().await?, source).await?)
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        let id = source.id;
+        if db::source_insert_opt(&tx, source).await?.is_none() {
+            return Ok(None);
+        }
+        tx.commit().await?;
+        Ok(Some(id))
     }
     /// Any source but an agent's bundled source, which is reached through its agent only.
     pub async fn source(&self, id: Uuid) -> Result<db::SourceRow, Error> {
@@ -450,9 +457,12 @@ impl Skills {
     /// Remove the source, its skills and their assignments.
     pub async fn delete_source(&self, id: Uuid) -> Result<(), Error> {
         self.source(id).await?;
-        if db::source_delete_execute(&self.pool.get().await?, id).await? == 0 {
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        if db::source_delete_execute(&tx, id).await? == 0 {
             return Err(Error::NotFound);
         }
+        tx.commit().await?;
         Ok(())
     }
 

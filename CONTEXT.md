@@ -1,16 +1,18 @@
 
 ## Release version
 
-The Rust workspace and the TypeScript and Python SDK packages share one Changie release version.
-`VERSION`, Cargo workspace/package lock entries, and `sdk/ts/packages/*` versions
-must agree. Internal SDK dependencies use unversioned pnpm workspace protocols;
-pnpm resolves published ranges, while a shared release bumps every SDK package.
-Private frontend and example packages are not independently released. Changie
-records release intent and updates manifests; it does not infer dependency impact.
-Release PRs batch that intent. A manual release of the merged default-branch commit
-checks and builds it before tagging, publishes the SDK to npm and PyPI and the binary
-image to GHCR, and exposes GitHub release artifacts only when publishing succeeds. Tags
-identify the checked commit; a partially published release is retried at that commit.
+The Rust workspace is released at one Changie version: `VERSION` and the Cargo workspace/lock
+entries must agree. Changie records release intent and updates manifests; it does not infer
+dependency impact. Release PRs batch that intent. Tags identify the checked commit; a partially
+published release is retried at that commit.
+
+Open-source Tilde's TypeScript and Python SDK packages share its release version: `VERSION` and
+`sdk/ts/packages/*` versions must agree. Internal SDK dependencies use unversioned pnpm workspace
+protocols; pnpm resolves published ranges, while a shared release bumps every SDK package.
+Private frontend and example packages are not independently released. A manual release of the
+merged default-branch commit checks and builds it before tagging, publishes the SDK to npm and
+PyPI and the binary image to GHCR, and exposes GitHub release artifacts only when publishing
+succeeds.
 
 ## Connections
 
@@ -862,13 +864,12 @@ results rather than all stored history.
 
 ## IAM
 
-- Principal: a registered agent acting under one invocation. Management callers are not
-  principals: the open-source build has no management users, sessions, API keys, roles or
-  groups.
-- Management API: the listener serving the browser UI and management RPCs. It is
-  unauthenticated and every caller can do everything; operators put their own authenticating
-  proxy in front of it. Lists return every row their filters keep, creation grants nothing
-  and deletion purges nothing beyond the resource itself.
+- Principal: a registered agent acting under one invocation. In the open-source build management
+  callers are not principals: it has no management users, sessions, API keys, roles or groups.
+- Management API: the listener serving the browser UI and management RPCs. In the open-source
+  build it is unauthenticated and every caller can do everything; operators put their own
+  authenticating proxy in front of it. Lists return every row their filters keep, creation grants
+  nothing and deletion purges nothing beyond the resource itself.
 - Agent runtime API: a separate listener in the same process. It accepts only
   signed agent connect bearer tokens. It exposes agent registry operations,
   current-thread reads and invocation, and agent session callbacks. It has no
@@ -895,10 +896,11 @@ results rather than all stored history.
   grant_capabilities. Thread reads, work reads/writes, own-run updates and tool
   invocation are separate capabilities. Any thread/work grant still stays inside
   the invocation's thread/agent scope. Tool targets are catalog tool names.
-- Granting authority: creation grants no capabilities by default. Management callers may
-  set any capability. An agent setting grants at runtime needs explicit grant_capabilities
-  authority over the target and cannot exceed its invocation capabilities. Endpoint changes also require
-  authority at least as broad as the target agent's current capabilities.
+- Granting authority: creation grants no capabilities by default. In the open-source build
+  management callers may set any capability. An agent setting grants at runtime needs explicit
+  grant_capabilities authority over the target and cannot exceed its invocation capabilities.
+  Endpoint changes also require authority at least as broad as the target agent's current
+  capabilities.
 
 The installation signing key for agent connect tokens is encrypted through the encryption
 module.

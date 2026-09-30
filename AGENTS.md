@@ -7,8 +7,6 @@ Tilde's goal is to be the ubiqutous harness for AI agents. We want to focus on a
 - Chat: all of the primitives to manage agent conversations, including sessions (threads, or conversations), identities (user and agent identities, often created by external providers for example a whatsapp phone number of the user you're interacting with), events (things that happen in sessions), providers (integrations with third party chat platforms)
 - Connection: A primitive representing managed credentials to a third party API. these will be used for chat providers and in future, as credentials for invoking 
 
-In the future, we plan to broaden the offering to support Tools via MCP, skills registries and more.
-
 # Dos
 
 - Wrap cloud/on-prem-only code in `CLOUD ONLY`, a description, and `END CLOUD ONLY` comments using the language's comment syntax to guide OSS ports.
@@ -31,4 +29,4 @@ In the future, we plan to broaden the offering to support Tools via MCP, skills 
 - no overuse of generics & dynamic trait implementations
 - dont over document or comment code. dont document every function. Document complex function, public API's. leave short inline comments where edge cases are handled and context is unclear.
 - no slop tests designed for coverage increase or simple checks or things with zero complexity (like testing a field setter) bad test = assert agent.created_at = today
-- Use shadcn primitives and React Hook Form for React forms. Provider setup helpers belong in `sdk/ts/packages/connection-ui`; keep them small. Static credentials and standard OAuth use shared forms; only custom setup flows have provider-owned `ui.tsx` files. Provider HTML is generated from the shared template, not copied into each catalog folder.
+- Use shadcn primitives and React Hook Form for React forms. Provider setup helpers belong in `sdk/ts/packages/connection-ui` (open-source Tilde); keep them small. Static credentials and standard OAuth use shared forms; only custom setup flows have provider-owned `ui.tsx` files. Provider HTML is generated from the shared template, not copied into each catalog folder.

@@ -431,11 +431,11 @@ async fn the_catalog_lists_what_a_provider_offers_before_any_connection() {
     };
     // Before any connection: what the server lists without credentials, else its snapshot.
     assert_eq!(
-        names(tools.catalog_tools("linear").await.unwrap()),
+        names(tools.catalog_tools("linear",).await.unwrap()),
         ["list_issues"]
     );
-    assert!(names(tools.catalog_tools("notion").await.unwrap()).contains(&"post-search".into()));
-    assert_eq!(tools.catalog_tools("google_mail").await.unwrap().len(), 11);
+    assert!(names(tools.catalog_tools("notion",).await.unwrap()).contains(&"post-search".into()));
+    assert_eq!(tools.catalog_tools("google_mail",).await.unwrap().len(), 11);
     // Built-in and MCP-served types of one provider are listed together.
     let stripe = names(tools.catalog_tools("stripe").await.unwrap());
     assert!(stripe.contains(&"process_refund".into()) && stripe.contains(&"create_refund".into()));

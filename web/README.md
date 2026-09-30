@@ -9,7 +9,8 @@ TanStack Router uses file-based routing in `src/routes`. Add routes with
 Commit the generated tree, but do not edit it by hand. `_app/route.tsx` owns the
 dashboard layout; public connection brokering sits outside it. The shared
 `_app/agent/$agentId/route.tsx` editor stays mounted as its child tab routes change.
-Agent routes are grouped under `_app/agent/`, with tab routes in `$agentId/`. The standalone Connections and Chat pages are not exposed.
+Agent routes are grouped under `_app/agent/`, with tab routes in `$agentId/`. The
+standalone Connections and Chat pages are not exposed.
 
 `use-cursor-page.ts` sends the server's opaque `nextPageToken` as the next request's
 `pageToken`. Previous reuses visited page-start cursors. Page-size changes restart
@@ -24,8 +25,7 @@ square-and-horizontal-stroke brand guidance. Fonts and assets are bundled locall
 Run `pnpm --dir web test` for cursor and table interaction tests, and
 `pnpm --dir web build` for type checking and the production bundle.
 
-The management API is unauthenticated; operators put their own proxy in front of
-it. The agent editor supports default-deny capabilities with Any or explicit target
+The agent editor supports default-deny capabilities with Any or explicit target
 lists where supported.
 
 Public connection setup and identity verification hosts live under

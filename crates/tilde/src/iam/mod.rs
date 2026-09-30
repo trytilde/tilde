@@ -1,5 +1,5 @@
 //! Agent runtime authorization: typed capability grants and signed, invocation-scoped agent
-//! credentials. Management listeners are unauthenticated; operators put their own proxy in front.
+//! credentials.
 pub mod capabilities;
 pub mod db;
 pub mod listeners;

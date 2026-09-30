@@ -5,7 +5,7 @@ use crate::proto::tilde::management::v1 as wire;
 use tilde_queries::queries::identities as q;
 use uuid::Uuid;
 pub async fn get(db: &impl GenericClient, id: Uuid) -> DbResult<Option<wire::Identity>> {
-    Ok(q::get::run()
+    let identity = q::get::run()
         .bind(db, &id)
         .opt()
         .await?
@@ -20,7 +20,8 @@ pub async fn get(db: &impl GenericClient, id: Uuid) -> DbResult<Option<wire::Ide
             verified_at: r.verified_at.map(timestamp).into(),
             attested_at: r.attested_at.map(timestamp).into(),
             ..Default::default()
-        }))
+        });
+    Ok(identity)
 }
 pub async fn list(
     db: &impl GenericClient,
@@ -29,7 +30,7 @@ pub async fn list(
     root: Option<Uuid>,
     connection: Option<Uuid>,
 ) -> DbResult<Vec<wire::Identity>> {
-    Ok(q::list::run()
+    let identities = q::list::run()
         .bind(db, &after, &root, &connection, &limit)
         .all()
         .await?
@@ -46,7 +47,8 @@ pub async fn list(
             attested_at: r.attested_at.map(timestamp).into(),
             ..Default::default()
         })
-        .collect())
+        .collect::<Vec<_>>();
+    Ok(identities)
 }
 pub async fn lock(db: &impl GenericClient, id: Uuid) -> DbResult<Option<q::lock::Record>> {
     Ok(q::lock::run().bind(db, &id).opt().await?)

@@ -887,8 +887,8 @@ async fn generated_client_and_native_callback_use_the_same_durable_broker() {
     )
     .unwrap();
     service.seed().await.unwrap();
-    let router = tilde::connections::rpc::management::router(service.clone())
-        .merge(tilde::connections::rpc::setup::router(service));
+    let management = tilde::connections::rpc::management::router(service.clone());
+    let router = management.merge(tilde::connections::rpc::setup::router(service));
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let script = std::path::Path::new(file!())
         .parent()
@@ -1124,7 +1124,8 @@ async fn remote_provider_sdk_drafts_callbacks_assets_and_cancel_are_end_to_end()
         "https://ingress.example".into(),
     )
     .unwrap();
-    let router = tilde::connections::rpc::management::router(service.clone())
+    let management = tilde::connections::rpc::management::router(service.clone());
+    let router = management
         .merge(tilde::connections::rpc::setup::router(service.clone()))
         .merge(tilde::connections::assets::router(None, Some(service.clone())).unwrap())
         .layer(axum::middleware::from_fn_with_state(

@@ -6,14 +6,10 @@ import { useDashboardBreadcrumbs } from "./dashboard-breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Top-level sections by path prefix; anything under them gets a second crumb. */
-const sections: {
-  prefix: string;
-  label: string;
-  to: "/" | "/skills" | "/tools/connections";
-}[] = [
+const sections = [
   { prefix: "/skills", label: "Skills", to: "/skills" },
   { prefix: "/tools", label: "Tools", to: "/tools/connections" },
-];
+] as const;
 export function SiteHeader() {
   const { agentId } = useParams({ strict: false });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -23,7 +19,7 @@ export function SiteHeader() {
     (candidate) => pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`),
   ) ?? { prefix: "/", label: "Agent Registry", to: "/" as const };
   const named = page?.path === pathname ? page : undefined;
-  const current = creating
+  let current: string | null | undefined = creating
     ? "Create agent"
     : pathname === "/tools/remote-servers"
       ? "Remote servers"

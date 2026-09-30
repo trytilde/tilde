@@ -60,6 +60,8 @@ const tavily = create(ProviderSchema, {
     },
   ],
 });
+// A client registered at setup (dynamic) needs no client fields.
+let linearClient = OAuthClient.DYNAMIC;
 const linear = create(ProviderSchema, {
   id: "linear",
   name: "Linear",
@@ -74,7 +76,7 @@ const linear = create(ProviderSchema, {
         case: "oauth",
         value: {
           grant: OAuthGrant.AUTHORIZATION_CODE,
-          configuration: { client: OAuthClient.DYNAMIC, tokenUrl: "https://linear.test/token" },
+          configuration: { client: linearClient, tokenUrl: "https://linear.test/token" },
         },
       },
     },
@@ -259,7 +261,7 @@ it("opens the authorization page for OAuth and waits for it to complete", async 
     state: state({ action: { case: "redirect", value: { url: "https://linear.test/auth" } } }),
   });
   const setup = await openSetup("Linear");
-  // A client registered at setup (dynamic) needs no client fields.
+  // Linear's OAuth client needs no client fields.
   expect(within(setup).queryByLabelText(/Client ID/)).toBeNull();
   fireEvent.change(within(setup).getByLabelText(/^Account name/), { target: { value: "Work" } });
   fireEvent.click(within(setup).getByRole("button", { name: "Continue" }));
