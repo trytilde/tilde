@@ -2,11 +2,8 @@
   <img alt="Tilde" src=".github/assets/tilde-banner.png" width="100%">
 </p>
 <p align="center">
-  <a href="https://github.com/trytilde/tilde/graphs/contributors"><img alt="GitHub contributors" src="https://img.shields.io/github/contributors/trytilde/tilde"/></a>
   <a href="http://makeapullrequest.com"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=shields"/></a>
   <a href="https://github.com/trytilde/tilde/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/trytilde/tilde"/></a>
-  <a href="https://github.com/trytilde/tilde/commits/main"><img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/trytilde/tilde"/></a>
-  <a href="https://github.com/trytilde/tilde/issues?q=is%3Aissue%20state%3Aclosed"><img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/trytilde/tilde"/></a>
 </p>
 
 <p align="center">
