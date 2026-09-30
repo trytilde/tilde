@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trytilde.ai/docs">Docs</a> - <a href="https://discord.gg/a9eUdFZca">Community</a> - <a href="https://trytilde.ai/why-tilde">Why Tilde?</a> - <a href="https://github.com/trytilde/tilde/blob/main/CHANGELOG.md">Changelog</a> - <a href="https://github.com/trytilde/tilde/issues/new">Bug reports</a>
+  <a href="https://trytilde.ai/docs">Docs</a> - <a href="https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss">Tilde Cloud waitlist</a> - <a href="https://discord.gg/a9eUdFZca">Community</a> - <a href="https://trytilde.ai/why-tilde">Why Tilde?</a> - <a href="https://github.com/trytilde/tilde/blob/main/CHANGELOG.md">Changelog</a> - <a href="https://github.com/trytilde/tilde/issues/new">Bug reports</a>
 </p>
 
 ## Tilde is the open-source agent registry for AI-native enterprises
@@ -27,7 +27,7 @@
 - [Routing](https://trytilde.ai/docs/routing): Choose which deployment receives new conversations, with latest or weighted routing, conversation pinning, and sidecar failover.
 - [Sessions](https://trytilde.ai/docs/sessions) and [traces](https://trytilde.ai/docs/traces): Review every conversation, model call, and tool call, with logs, token usage, cost, and errors, stored in Tilde and forwardable over OTLP.
 
-Get started with [Tilde Cloud](https://trytilde.ai), or run it yourself from this repository.
+[Join the Tilde Cloud waitlist](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss), or run it yourself from this repository.
 
 ## Table of contents
 
@@ -45,7 +45,7 @@ Get started with [Tilde Cloud](https://trytilde.ai), or run it yourself from thi
 
 ### Tilde Cloud (recommended)
 
-The fastest and most reliable way to get started is [Tilde Cloud](https://trytilde.ai). We run the gateway, its databases, and upgrades, so you only deploy your agents.
+The fastest and most reliable way to get started will be [Tilde Cloud](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss). We run the gateway, its databases, and upgrades, so you only deploy your agents. [Join the waitlist](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss) to get access.
 
 ### Self-hosting Tilde (advanced)
 
