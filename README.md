@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trytilde.ai/docs">Docs</a> - <a href="https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss">Tilde Cloud waitlist</a> - <a href="https://discord.gg/a9eUdFZca">Community</a> - <a href="https://trytilde.ai/why-tilde">Why Tilde?</a> - <a href="https://github.com/trytilde/tilde/blob/main/CHANGELOG.md">Changelog</a> - <a href="https://github.com/trytilde/tilde/issues/new">Bug reports</a>
+  <a href="https://trytilde.ai/docs">Docs</a> - <a href="https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss">Tilde Cloud waitlist</a> - <a href="https://discord.gg/a9eUdFZca">Community</a> - <a href="https://github.com/trytilde/tilde/blob/main/CHANGELOG.md">Changelog</a> - <a href="https://github.com/trytilde/tilde/issues/new">Bug reports</a>
 </p>
 
 ## Tilde is the open-source agent registry for AI-native enterprises
@@ -69,7 +69,7 @@ Agents in other languages or frameworks use the core SDKs directly. See [Anatomy
 
 ## Learning more about Tilde
 
-Read the [documentation](https://trytilde.ai/docs) for every feature, and [why Tilde exists](https://trytilde.ai/why-tilde). For how this repository fits together, see [architecture](docs/architecture.md), [code structure](docs/code-structure.md), and [patterns](docs/patterns.md).
+Read the [documentation](https://trytilde.ai/docs) for every feature. For how this repository fits together, see [architecture](docs/architecture.md), [code structure](docs/code-structure.md), and [patterns](docs/patterns.md).
 
 ## Contributing
 
