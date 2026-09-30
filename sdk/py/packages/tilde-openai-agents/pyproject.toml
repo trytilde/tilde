@@ -1,6 +1,6 @@
 [project]
 name = "trytilde-openai-agents"
-version = "3.0.0"
+version = "3.0.1"
 description = "Tilde adapter for the OpenAI Agents SDK: typed history to Responses input items and channel tools to function tools"
 readme = "README.md"
 license = "Apache-2.0"
