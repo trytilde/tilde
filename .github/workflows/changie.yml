@@ -1,14 +1,18 @@
 name: Changie
-# Pull requests cover branches; push runs only for main so a PR push does not run twice.
+# Runs on pull requests that are ready for review, and when a release calls it. Draft PRs and
+# pushes to main run nothing, to save Actions time; a newer push to a PR cancels the older run.
 on:
-  push:
-    branches: [main]
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_call:
+concurrency:
+  group: changie-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
   changeset:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
