@@ -13,9 +13,9 @@
   <a href="https://trytilde.ai/docs">Docs</a> - <a href="https://discord.gg/a9eUdFZca">Community</a> - <a href="https://trytilde.ai/why-tilde">Why Tilde?</a> - <a href="https://github.com/trytilde/tilde/blob/main/CHANGELOG.md">Changelog</a> - <a href="https://github.com/trytilde/tilde/issues/new">Bug reports</a>
 </p>
 
-## Tilde is the open-source harness for AI agents
+## Tilde is the open-source agent registry for AI-native enterprises
 
-[Tilde](https://trytilde.ai) runs everything around your agents, so the agents themselves can be written in any language or framework. Your agent connects to the Tilde gateway through our SDKs, and Tilde handles the rest:
+[Tilde](https://trytilde.ai) gives your agents a home. Register every agent your company builds, in any language or framework, and govern, deploy, monitor and manage them from one place. Your agent connects to the Tilde gateway through our SDKs, and Tilde handles the rest:
 
 - [Agent registry](https://trytilde.ai/docs/agent-registry): Register agents built in any framework, deploy them, check their health, and pause or retire them from one place.
 - [Chat channels](https://trytilde.ai/docs/chat-channels): Route messages from Slack, WhatsApp, email, SMS and iMessage, GitHub, and your own apps to agents, with sessions, identities, and access control.
@@ -31,7 +31,7 @@ Get started with [Tilde Cloud](https://trytilde.ai), or run it yourself from thi
 
 ## Table of contents
 
-- [Tilde is the open-source harness for AI agents](#tilde-is-the-open-source-harness-for-ai-agents)
+- [Tilde is the open-source agent registry for AI-native enterprises](#tilde-is-the-open-source-agent-registry-for-ai-native-enterprises)
 - [Table of contents](#table-of-contents)
 - [Getting started with Tilde](#getting-started-with-tilde)
   - [Tilde Cloud (recommended)](#tilde-cloud-recommended)

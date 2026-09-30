@@ -1,6 +1,6 @@
 # Architecture
 
-Tilde is a harness for AI agents. It runs everything around an agent: the registry,
+Tilde is an agent registry for AI-native enterprises. It runs everything around an agent: the registry,
 chat channels, credentials, tools, model access, prompts, skills and telemetry. Agents
 are written in any language or framework and connect to Tilde through an SDK
 (`sdk/ts`, `sdk/py`).
