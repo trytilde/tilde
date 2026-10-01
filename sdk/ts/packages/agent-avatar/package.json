@@ -2,6 +2,11 @@
   "name": "@trytilde/agent-avatar",
   "version": "3.1.0",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trytilde/tilde",
+    "directory": "sdk/ts/packages/agent-avatar"
+  },
   "files": [
     "dist",
     "LICENSE"

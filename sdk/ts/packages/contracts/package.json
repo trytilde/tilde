@@ -3,6 +3,11 @@
   "version": "3.1.0",
   "description": "Generated TypeScript Protobuf and ConnectRPC contracts for Tilde",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trytilde/tilde",
+    "directory": "sdk/ts/packages/contracts"
+  },
   "files": [
     "gen"
   ],
