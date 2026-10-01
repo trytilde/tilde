@@ -108,7 +108,9 @@ From `AGENTS.md`:
 - Run tests that need a database through `scripts/with-postgres.sh`. It starts a
   disposable PostgreSQL container on a random loopback port, exports `DATABASE_URL`
   and `TEST_DATABASE_URL`, runs the command and removes the container. For example:
-  `scripts/with-postgres.sh cargo test -p tilde --test deployments`.
+  `scripts/with-postgres.sh cargo nextest run -p tilde --test deployments`. Run Rust tests with
+  `cargo nextest run`, never `cargo test`; `.config/nextest.toml` holds the profiles (`--profile ci`
+  in `task test`).
 - `task test` runs the full suite. Focused tasks such as `task test:chat`,
   `task test:sidecar` and `task test:traces` start what they need.
 

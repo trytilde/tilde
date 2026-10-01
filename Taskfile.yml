@@ -42,7 +42,7 @@ tasks:
     dotenv: [".env.test.local", ".env.test"]
     cmds:
       - task: generate:py
-      - cargo build --bin tilde
+      - scripts/with-sccache.sh cargo build --bin tilde
       - ENGINE_TEST_BINARY="{{.ROOT_DIR}}/target/debug/tilde" scripts/with-postgres.sh uv --directory sdk/py run --no-sync pytest -q -m integration packages/tilde/tests/test_engine_integration.py
 
   generate:
@@ -60,7 +60,7 @@ tasks:
   test:session-metadata:
     desc: Verify session metadata through trace delivery and session reads
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test session_metadata --test trace_store
+      - scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test session_metadata --test trace_store
 
   test:deployment-action:
     desc: Test the standalone GitHub deployment action
@@ -77,7 +77,7 @@ tasks:
   dev:sidecar:
     desc: Run a sidecar beside a local agent from ENGINE_SIDECAR_* configuration
     cmds:
-      - cargo run --bin tilde-sidecar
+      - scripts/with-sccache.sh cargo run --bin tilde-sidecar
 
   bench:inference:
     desc: Compare inference gateway overhead with LiteLLM and Bifrost against a shared mock upstream (append -- --requests N)
@@ -87,7 +87,7 @@ tasks:
   test:sidecar:
     desc: Exercise two in-process sidecar replicas, gateway projection, forwarding and failover
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test sidecars
+      - scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test sidecars
 
   build:
     desc: Build the complete release binary with the React UI embedded
@@ -97,7 +97,7 @@ tasks:
       - task: build:chat-ui
       - pnpm --dir web build
       - task: build:chat
-      - cargo build --locked --release --features embedded-web --bins
+      - scripts/with-sccache.sh cargo build --locked --release --features embedded-web --bins
 
   dev:
     desc: Run the local engine and optional example agent
@@ -158,7 +158,7 @@ tasks:
         TEST_CLICKHOUSE_USER="${ENGINE_CLICKHOUSE_USER:-tilde}"
         TEST_CLICKHOUSE_PASSWORD="${ENGINE_CLICKHOUSE_PASSWORD:-tilde-logs-dev}"
         TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
-        scripts/with-postgres.sh cargo test -p tilde --test logs -- --include-ignored
+        scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test logs --run-ignored all
       - pnpm --dir web exec vitest run src/features/logs/agent-logs.test.tsx
 
   dev:logs:
@@ -191,7 +191,7 @@ tasks:
     desc: Validate the native provider, proxy, Next adapter and mounted chat components
     cmds:
       - task: build:chat
-      - cargo build -p tilde --bin tilde
+      - scripts/with-sccache.sh cargo build -p tilde --bin tilde
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
       - pnpm --dir web exec vitest run src/chat-ui.test.tsx
 
@@ -235,13 +235,13 @@ tasks:
     desc: Verify agent uploads against local MinIO and disposable Postgres
     cmds:
       - task: dev:s3
-      - scripts/with-postgres.sh cargo test -p tilde --test agent_avatar
+      - scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test agent_avatar
 
   test:chat:
     desc: Test all six chat providers against local HTTP fixtures and disposable Postgres
     dotenv: [".env.test.local", ".env.test"]
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test chat_connections_audit --test chat_tools
+      - scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test chat_connections_audit --test chat_tools
 
   test:
     desc: Run Rust and generated-client tests with disposable Postgres
@@ -268,8 +268,8 @@ tasks:
       - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk/test/prompts.test.mjs sdk/ts/packages/sdk/test/deploy.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs sdk/ts/examples/langchain-example-agent/test/*.test.mjs sdk/ts/examples/openai-agents-example-agent/test/*.test.mjs
       - task: test:sdk:py
       - pnpm --dir sdk/ts exec tsc --noEmit --strict --skipLibCheck --target ES2023 --module NodeNext packages/sdk/test/channel-types.ts
-      - cargo test --workspace
-      - cargo build --features embedded-web
+      - scripts/with-sccache.sh cargo nextest run --workspace --profile ci
+      - scripts/with-sccache.sh cargo build --features embedded-web
       - node web/scripts/test-client.mjs
       - scripts/with-postgres.sh node scripts/test-services.mjs
       - scripts/with-postgres.sh node .github/actions/register-deployment/integration.mjs
@@ -319,7 +319,7 @@ tasks:
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
       - cargo fmt --all --check
-      - cargo clippy --all-targets --all-features -- -D warnings
+      - scripts/with-sccache.sh cargo clippy --all-targets --all-features -- -D warnings
 
   change:
     desc: Add a Changie change fragment (append -- for CLI options)
@@ -375,7 +375,7 @@ tasks:
   test:tracing:
     desc: Verify embedded Rotel forwarding and SDK trace propagation
     cmds:
-      - scripts/with-postgres.sh cargo test -p tilde --test tracing
+      - scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test tracing
       - pnpm --dir sdk/ts build
       - node --test sdk/ts/packages/sdk/test/tracing.test.mjs
 
@@ -407,5 +407,5 @@ tasks:
       - >-
         TEST_CLICKHOUSE_URL="http://127.0.0.1:${ENGINE_CLICKHOUSE_PORT:-18123}"
         TEST_S3_ENDPOINT="http://${ADDRESS:-127.0.0.1}:${MINIO_PORT:-19000}"
-        scripts/with-postgres.sh cargo test -p tilde --test trace_store --test session_metadata --test tracing --test metrics
+        scripts/with-postgres.sh scripts/with-sccache.sh cargo nextest run -p tilde --test trace_store --test session_metadata --test tracing --test metrics
       - pnpm --dir web exec vitest run src/features/tracing/agent-tracing.test.tsx

@@ -23,10 +23,37 @@ runs:
     - uses: astral-sh/setup-uv@v6
       with:
         version: "0.12.13"
+        enable-cache: true
+        cache-dependency-glob: sdk/py/uv.lock
     - uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: 1.98.1
         components: rustfmt, clippy
+    # Depot runners point sccache at Depot Cache (SCCACHE_WEBDAV_ENDPOINT and a per-job token), so
+    # Rust compiles through it there. On any other runner the job builds without sccache.
+    - uses: mozilla-actions/sccache-action@v0.0.9
+    - name: Compile Rust through sccache on Depot Cache
+      shell: bash
+      run: |
+        if [ -n "${SCCACHE_WEBDAV_ENDPOINT:-}" ]; then
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        else
+          echo "No Depot Cache on this runner; building without sccache."
+        fi
+    # The Cargo registry and installed tools (cornucopia); sccache covers compiled crates. On Depot
+    # runners this and every other GitHub Actions cache below is stored in Depot Cache.
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: tilde
+        cache-targets: false
+    # Pinned code generators that `pnpm tools` downloads.
+    - uses: actions/cache@v4
+      with:
+        path: .tools
+        key: codegen-${{ runner.os }}-${{ hashFiles('scripts/install-codegen.mjs') }}
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-nextest
     # protoc: the vendored Rotel crate compiles its Datadog protos at build time.
     - name: Install Linux build dependencies
       if: runner.os == 'Linux'

@@ -73,7 +73,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 612345)) IS NULL AS locked",
+        "SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || '/' || $1, 612345)) IS NULL AS locked",
         None,
     )
 }

@@ -13,7 +13,9 @@ permissions:
 jobs:
   check:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-24.04
+    # Fork pull requests run on GitHub's runners: Depot runners cost money and carry a Depot Cache
+    # token that could write poisoned compiler output.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'depot-ubuntu-24.04-8' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
