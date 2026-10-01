@@ -16,12 +16,6 @@ COPY scripts/install-codegen.mjs scripts/install-codegen.mjs
 RUN pnpm tools && pnpm generate && pnpm --dir sdk/ts build && pnpm --dir web build && pnpm --dir web exec tsc -p tsconfig.connections.json && pnpm --dir web exec vite build --config vite.connections.config.ts
 
 FROM rust:1.98.1-bookworm AS rust
-ARG TARGETARCH
-ARG SCCACHE_VERSION=0.15.0
-# .cargo/config.toml compiles through sccache; its cache mount below keeps crates between local builds.
-RUN arch="$([ "$TARGETARCH" = arm64 ] && echo aarch64 || echo x86_64)" && \
-    curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${arch}-unknown-linux-musl.tar.gz" \
-    | tar -xz --strip-components=1 -C /usr/local/bin "sccache-v${SCCACHE_VERSION}-${arch}-unknown-linux-musl/sccache"
 WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends cmake git pkg-config libssl-dev libsystemd-dev protobuf-compiler && apt-get clean
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
@@ -33,8 +27,7 @@ COPY .cargo .cargo
 COPY --from=web /src/crates/tilde/src/generated crates/tilde/src/generated
 COPY --from=web /src/web/dist web/dist
 COPY --from=web /src/web/provider-dist web/provider-dist
-RUN --mount=type=cache,target=/root/.cache/sccache --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --locked --release --features embedded-web --bins && sccache --show-stats
+RUN cargo build --locked --release --features embedded-web --bins
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 libsystemd0 && apt-get clean && useradd --uid 10001 --create-home tilde

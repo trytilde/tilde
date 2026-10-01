@@ -13,6 +13,7 @@ try {
   await copyFile(new URL("../Taskfile.yml", import.meta.url), join(root, "Taskfile.yml"));
   await copyFile(new URL("./dev-ngrok.sh", import.meta.url), join(root, "scripts/dev-ngrok.sh"));
   await copyFile(new URL("./dev-api.sh", import.meta.url), join(root, "scripts/dev-api.sh"));
+  await copyFile(new URL("./with-sccache.sh", import.meta.url), join(root, "scripts/with-sccache.sh"));
   await copyFile(new URL("./dev.py", import.meta.url), join(root, "scripts/dev.py"));
   await copyFile(new URL("./dev-logs.py", import.meta.url), join(root, "scripts/dev-logs.py"));
   await copyFile(

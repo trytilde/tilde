@@ -7,4 +7,4 @@ if [[ "${NGROK_ENABLED:-false}" == true ]]; then
   export ENGINE_INGRESS_PUBLIC_URL="https://${NGROK_DOMAIN:?Set NGROK_DOMAIN}"
 fi
 
-exec cargo run --bin tilde -- "$@"
+exec scripts/with-sccache.sh cargo run --bin tilde -- "$@"

@@ -29,12 +29,33 @@ runs:
       with:
         toolchain: 1.98.1
         components: rustfmt, clippy
-    # .cargo/config.toml compiles through sccache; here it caches in the GitHub Actions cache, so
-    # jobs reuse compiled crates instead of rebuilding the workspace and vendored Rotel.
+    # Rust compiles through sccache with the team S3 cache when the job can assume the build cache
+    # role (it needs `id-token: write`). Without it, for example on a fork's pull request, the job
+    # builds without sccache. The server starts with the role's credentials and keeps them, so
+    # later steps, tests included, never see AWS credentials.
     - uses: mozilla-actions/sccache-action@v0.0.9
-    - name: Use the GitHub Actions cache for sccache
+    - id: build-cache
+      uses: aws-actions/configure-aws-credentials@v4
+      continue-on-error: true
+      with:
+        role-to-assume: arn:aws:iam::914788356809:role/github-build-cache
+        aws-region: us-east-1
+        output-credentials: true
+        output-env-credentials: false
+    - name: Start sccache on the S3 cache
+      if: steps.build-cache.outcome == 'success'
       shell: bash
-      run: echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ steps.build-cache.outputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ steps.build-cache.outputs.aws-secret-access-key }}
+        AWS_SESSION_TOKEN: ${{ steps.build-cache.outputs.aws-session-token }}
+        SCCACHE_BUCKET: tilde-sccache-prod
+        SCCACHE_REGION: us-east-1
+        SCCACHE_S3_KEY_PREFIX: ${{ github.event.repository.name }}/
+        SCCACHE_IDLE_TIMEOUT: "0"
+      run: |
+        sccache --start-server
+        echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
     # The Cargo registry and installed tools (cornucopia); sccache covers compiled crates.
     - uses: Swatinem/rust-cache@v2
       with:
