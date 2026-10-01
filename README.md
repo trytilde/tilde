@@ -46,12 +46,20 @@ The fastest and most reliable way to get started will be [Tilde Cloud](https://t
 
 ### Self-hosting Tilde (advanced)
 
-The gateway is one container image, `ghcr.io/trytilde/tilde`. It needs PostgreSQL, ClickHouse, and S3-compatible storage. [`compose.yaml`](compose.yaml) starts those dependencies and is a good starting point for a single machine. See [Deploy the gateway](https://trytilde.ai/docs/deployment/gateway) for configuration and network exposure.
+The gateway is one container image, `ghcr.io/trytilde/tilde`, which needs PostgreSQL, ClickHouse, and S3-compatible storage. [`quickstart/compose.yaml`](quickstart/compose.yaml) runs the latest image with all three on your machine:
+
+```bash
+git clone https://github.com/trytilde/tilde.git && cd tilde/quickstart
+echo "TILDE_ENCRYPTION_KEY=$(openssl rand -base64 32)" > .env
+docker compose up -d
+```
+
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and register your first agent. Keep `.env`: the key encrypts the credentials Tilde stores. Set `TILDE_VERSION` in `.env` to pin a release instead of `latest`. See [Deploy the gateway](https://trytilde.ai/docs/deployment/gateway) for production configuration and network exposure.
 
 > [!WARNING]
 > Open-source Tilde has no operator sign-in. The web UI and management API accept every request that reaches them. You must put a reverse proxy or another authentication method in front of them before anyone else can reach the gateway.
 
-We _do not_ provide customer support or offer guarantees for self-hosted deployments. For production, we recommend [Tilde Cloud or Tilde Enterprise](https://trytilde.ai/docs/editions).
+Please compare [Tilde editions](https://trytilde.ai/docs/editions) for more information.
 
 ## Setting up Tilde
 
