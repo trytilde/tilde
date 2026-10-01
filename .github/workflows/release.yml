@@ -14,7 +14,7 @@ concurrency:
 jobs:
   version:
     if: github.ref_name == github.event.repository.default_branch
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
@@ -102,7 +102,7 @@ jobs:
   # --repository trytilde/tilde --allow-publish`.
   npm:
     needs: [version, changie, check, build]
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write
     steps:
@@ -132,7 +132,7 @@ jobs:
   # token is stored. Attestations need a public repository; enable them once it is public.
   pypi:
     needs: [version, changie, check, build]
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -167,7 +167,7 @@ jobs:
   # The tag and release are created last, once the image and every package are published.
   release:
     needs: [version, container, npm, pypi]
-    runs-on: depot-ubuntu-24.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
