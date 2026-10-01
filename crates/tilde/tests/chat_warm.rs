@@ -136,11 +136,20 @@ async fn priming_serves_tools_credentials_and_history_from_memory_until_invalida
     let thread = Uuid::parse_str(&thread.id).unwrap();
     let invocation = Uuid::parse_str(&run.invocation_id).unwrap();
     db.pool.get().await.unwrap().execute("UPDATE chat_invocations SET status='running',lease_expires_at=NOW()+INTERVAL '5 minutes' WHERE id=$1", &[&invocation]).await.unwrap();
-    // Wait for the run's own activity notification to pass, then prime as the claim does.
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert!(chat.warm.channels(agent, thread).is_none());
-    chat.clone().prime(agent, thread).await;
-    let rows = chat.warm.channels(agent, thread).expect("catalog primed");
+    // Prime as the claim does. The run's own activity notification can land after priming and
+    // invalidate it, later under load, so prime until the catalog stays primed.
+    let rows = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            chat.clone().prime(agent, thread).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            if let Some(rows) = chat.warm.channels(agent, thread) {
+                break rows;
+            }
+        }
+    })
+    .await
+    .expect("catalog primed");
     assert!(rows.iter().any(|r| r.id == Some(connection)));
 
     // Credentials were decrypted by priming: the ciphertext can go and resolve still answers.
