@@ -1,0 +1,119 @@
+# Run open-source Tilde locally from the published image:
+#
+#   cd quickstart
+#   echo "TILDE_ENCRYPTION_KEY=$(openssl rand -base64 32)" > .env
+#   docker compose up -d
+#
+# Then open http://127.0.0.1:8080. Every port binds to 127.0.0.1 only: the web UI and management
+# API have no sign-in, so put a reverse proxy or another authentication method in front of
+# them before exposing Tilde to anyone else. Keep .env: the key encrypts stored credentials.
+name: tilde
+
+services:
+  tilde:
+    image: ghcr.io/trytilde/tilde:${TILDE_VERSION:-latest}
+    command: ["--listen", "0.0.0.0:8080", "--allow-network"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DATABASE_URL: postgres://tilde:tilde@postgres:5432/tilde
+      ENGINE_ENCRYPTION_BACKEND: seed
+      ENGINE_ENCRYPTION_KEY: ${TILDE_ENCRYPTION_KEY:?Set TILDE_ENCRYPTION_KEY in quickstart/.env (openssl rand -base64 32)}
+      ENGINE_SERVE: all
+      ENGINE_PUBLIC_URL: http://127.0.0.1:8080
+      ENGINE_S3_ENDPOINT: http://minio:9000
+      # Avatars and trace media are fetched by your browser through this address.
+      ENGINE_S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+      ENGINE_S3_REGION: us-east-1
+      ENGINE_S3_ACCESS_KEY_ID: tilde
+      ENGINE_S3_SECRET_ACCESS_KEY: tilde-quickstart
+      ENGINE_S3_BUCKET: tilde-avatars
+      ENGINE_LOGS_S3_BUCKET: tilde-logs
+      ENGINE_TRACES_S3_BUCKET: tilde-traces
+      ENGINE_METRICS_S3_BUCKET: tilde-metrics
+      ENGINE_MEDIA_S3_BUCKET: tilde-media
+      ENGINE_SKILLS_S3_BUCKET: tilde-skills
+      ENGINE_CLICKHOUSE_URL: http://clickhouse:8123
+      ENGINE_CLICKHOUSE_DATABASE: tilde_telemetry
+      ENGINE_CLICKHOUSE_USER: tilde
+      ENGINE_CLICKHOUSE_PASSWORD: tilde-quickstart
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tilde
+      POSTGRES_PASSWORD: tilde
+      POSTGRES_DB: tilde
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tilde -d tilde"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12
+    environment:
+      CLICKHOUSE_DB: tilde_telemetry
+      CLICKHOUSE_USER: tilde
+      CLICKHOUSE_PASSWORD: tilde-quickstart
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: tilde
+      MINIO_ROOT_PASSWORD: tilde-quickstart
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Creates the buckets once; telemetry queue buckets expire their batches after a day.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mc alias set tilde http://minio:9000 tilde tilde-quickstart > /dev/null
+        for bucket in tilde-avatars tilde-logs tilde-traces tilde-metrics tilde-media tilde-skills; do
+          mc mb --ignore-existing "tilde/$$bucket"
+        done
+        for bucket in tilde-logs tilde-traces tilde-metrics; do
+          mc ilm rule ls "tilde/$$bucket" > /dev/null 2>&1 || mc ilm rule add --expire-days 1 "tilde/$$bucket"
+        done
+    depends_on:
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres:
+  clickhouse:
+  minio:
