@@ -29,34 +29,19 @@ runs:
       with:
         toolchain: 1.98.1
         components: rustfmt, clippy
-    # Rust compiles through sccache with the team S3 cache when the job can assume the build cache
-    # role (it needs `id-token: write`). Without it, for example on a fork's pull request, the job
-    # builds without sccache. The server starts with the role's credentials and keeps them, so
-    # later steps, tests included, never see AWS credentials.
+    # Depot runners point sccache at Depot Cache (SCCACHE_WEBDAV_ENDPOINT and a per-job token), so
+    # Rust compiles through it there. On any other runner the job builds without sccache.
     - uses: mozilla-actions/sccache-action@v0.0.9
-    - id: build-cache
-      uses: aws-actions/configure-aws-credentials@v4
-      continue-on-error: true
-      with:
-        role-to-assume: arn:aws:iam::914788356809:role/github-build-cache
-        aws-region: us-east-1
-        output-credentials: true
-        output-env-credentials: false
-    - name: Start sccache on the S3 cache
-      if: steps.build-cache.outcome == 'success'
+    - name: Compile Rust through sccache on Depot Cache
       shell: bash
-      env:
-        AWS_ACCESS_KEY_ID: ${{ steps.build-cache.outputs.aws-access-key-id }}
-        AWS_SECRET_ACCESS_KEY: ${{ steps.build-cache.outputs.aws-secret-access-key }}
-        AWS_SESSION_TOKEN: ${{ steps.build-cache.outputs.aws-session-token }}
-        SCCACHE_BUCKET: tilde-sccache-prod
-        SCCACHE_REGION: us-east-1
-        SCCACHE_S3_KEY_PREFIX: ${{ github.event.repository.name }}/
-        SCCACHE_IDLE_TIMEOUT: "0"
       run: |
-        sccache --start-server
-        echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
-    # The Cargo registry and installed tools (cornucopia); sccache covers compiled crates.
+        if [ -n "${SCCACHE_WEBDAV_ENDPOINT:-}" ]; then
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+        else
+          echo "No Depot Cache on this runner; building without sccache."
+        fi
+    # The Cargo registry and installed tools (cornucopia); sccache covers compiled crates. On Depot
+    # runners this and every other GitHub Actions cache below is stored in Depot Cache.
     - uses: Swatinem/rust-cache@v2
       with:
         shared-key: tilde

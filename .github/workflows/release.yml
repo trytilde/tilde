@@ -14,7 +14,7 @@ concurrency:
 jobs:
   version:
     if: github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
@@ -37,16 +37,13 @@ jobs:
   check:
     needs: version
     uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-      id-token: write
   build:
     needs: version
     uses: ./.github/workflows/build.yml
   # Public image on GHCR. A rerun leaves an already-pushed version alone.
   container:
     needs: [version, changie, check, build]
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 90
     permissions:
       contents: read
@@ -105,7 +102,7 @@ jobs:
   # --repository trytilde/tilde --allow-publish`.
   npm:
     needs: [version, changie, check, build]
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     permissions:
       id-token: write
     steps:
@@ -135,7 +132,7 @@ jobs:
   # token is stored. Attestations need a public repository; enable them once it is public.
   pypi:
     needs: [version, changie, check, build]
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -170,7 +167,7 @@ jobs:
   # The tag and release are created last, once the image and every package are published.
   release:
     needs: [version, container, npm, pypi]
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
     steps:

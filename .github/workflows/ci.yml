@@ -13,11 +13,7 @@ permissions:
 jobs:
   check:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-24.04
-    # id-token: the build cache role for sccache (see .github/actions/setup).
-    permissions:
-      contents: read
-      id-token: write
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
