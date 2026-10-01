@@ -1,3 +1,0 @@
-kind: Changed
-body: "Rust builds go through sccache and tests run with cargo nextest, locally and in CI, and CI caches compiled crates, the Cargo registry, code generators, pnpm and uv. The telemetry queue's admission lock is scoped to the database schema, so installations sharing a database no longer wait on each other's queues."
-time: 2026-10-01T00:23:24+02:00

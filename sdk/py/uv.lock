@@ -5355,7 +5355,7 @@ wheels = [
 
 [[package]]
 name = "trytilde"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde" }
 dependencies = [
     { name = "connectrpc" },
@@ -5390,7 +5390,7 @@ provides-extras = ["fastapi"]
 
 [[package]]
 name = "trytilde-agno"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde-agno" }
 dependencies = [
     { name = "agno" },
@@ -5405,7 +5405,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-crewai"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde-crewai" }
 dependencies = [
     { name = "crewai", marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
@@ -5422,7 +5422,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-langchain"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde-langchain" }
 dependencies = [
     { name = "langchain" },
@@ -5441,7 +5441,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-openai-agents"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde-openai-agents" }
 dependencies = [
     { name = "openai-agents", marker = "extra == 'project-22-trytilde-openai-agents' or extra == 'project-27-example-agent-openai-agents'" },
@@ -5456,7 +5456,7 @@ requires-dist = [
 
 [[package]]
 name = "trytilde-pydantic-ai"
-version = "3.0.1"
+version = "3.1.0"
 source = { editable = "packages/tilde-pydantic-ai" }
 dependencies = [
     { name = "pydantic-ai-slim", version = "2.31.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
