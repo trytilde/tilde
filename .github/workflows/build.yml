@@ -36,16 +36,29 @@ jobs:
           if-no-files-found: error
   container:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: depot-ubuntu-24.04-8
+    # Fork pull requests run on GitHub's runners: Depot runners cost money and carry a Depot Cache
+    # token that could write poisoned compiler output.
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'depot-ubuntu-24.04-8' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # Depot runners expose Depot Cache to sccache; hand it to the image build as secrets. Empty
+      # files (any other runner) make the build compile without sccache.
+      - name: Share Depot Cache with the image build
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/sccache" && chmod 700 "$RUNNER_TEMP/sccache"
+          printf '%s' "${SCCACHE_WEBDAV_ENDPOINT:-}" > "$RUNNER_TEMP/sccache/endpoint"
+          printf '%s' "${SCCACHE_WEBDAV_TOKEN:-${DEPOT_CACHE_TOKEN:-}}" > "$RUNNER_TEMP/sccache/token"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
+          secret-files: |
+            sccache_endpoint=${{ runner.temp }}/sccache/endpoint
+            sccache_token=${{ runner.temp }}/sccache/token
           push: false
           load: true
           tags: tilde:ci
