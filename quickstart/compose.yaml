@@ -36,7 +36,7 @@ services:
     environment:
       DATABASE_URL: postgres://tilde:tilde@postgres:5432/tilde
       ENGINE_ENCRYPTION_BACKEND: seed
-      # Empty unless you supply one: the entrypoint then generates and persists a key.
+      # Empty unless you supply one, and then tilde-init mints and persists a key instead.
       ENGINE_ENCRYPTION_KEY: ${TILDE_ENCRYPTION_KEY:-}
       ENGINE_SERVE: all
       ENGINE_PUBLIC_URL: http://127.0.0.1:8080

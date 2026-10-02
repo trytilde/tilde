@@ -365,8 +365,8 @@ tasks:
       # tilde-cli is skipped: its release wheels carry a prebuilt binary per platform and come
       # from `task cli:pack`, not from its development stand-in pyproject.
       - for package in sdk/py/packages/*/; do
-          case "$package" in *"/tilde-cli/") continue ;; esac;
-          uv build --quiet --out-dir dist/py "$package";
+        case "$package" in *"/tilde-cli/") continue ;; esac;
+        uv build --quiet --out-dir dist/py "$package";
         done
 
   cli:build:
