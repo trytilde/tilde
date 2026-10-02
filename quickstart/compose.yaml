@@ -1,24 +1,43 @@
 # Run open-source Tilde locally from the published image:
 #
 #   cd quickstart
-#   echo "TILDE_ENCRYPTION_KEY=$(openssl rand -base64 32)" > .env
 #   docker compose up -d --wait
 #
 # Then open http://127.0.0.1:8080. Every port binds to 127.0.0.1 only: the web UI and management
 # API have no sign-in, so put a reverse proxy or another authentication method in front of
-# them before exposing Tilde to anyone else. Keep .env: the key encrypts stored credentials.
+# them before exposing Tilde to anyone else.
+#
+# The encryption key is generated on first start and kept in the `state` volume. It encrypts
+# every credential Tilde stores, so `docker compose down -v` discards both together, and nothing
+# that was stored can be read back without it. Set TILDE_ENCRYPTION_KEY to supply your own
+# instead; a real deployment should (see https://trytilde.ai/docs/deployment/gateway).
 name: tilde
 
 services:
   tilde:
     image: ghcr.io/trytilde/tilde:${TILDE_VERSION:-latest}
+    # Read the key tilde-init minted, then hand over to the engine as PID 1.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -eu
+        if [ -z "$${ENGINE_ENCRYPTION_KEY:-}" ]; then
+          ENGINE_ENCRYPTION_KEY="$$(cat /state/encryption-key)"
+          export ENGINE_ENCRYPTION_KEY
+        fi
+        exec /usr/local/bin/tilde "$$@"
+      - tilde
     command: ["--listen", "0.0.0.0:8080", "--allow-network"]
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - state:/state:ro
     environment:
       DATABASE_URL: postgres://tilde:tilde@postgres:5432/tilde
       ENGINE_ENCRYPTION_BACKEND: seed
-      ENGINE_ENCRYPTION_KEY: ${TILDE_ENCRYPTION_KEY:?Set TILDE_ENCRYPTION_KEY in quickstart/.env (openssl rand -base64 32)}
+      # Empty unless you supply one: the entrypoint then generates and persists a key.
+      ENGINE_ENCRYPTION_KEY: ${TILDE_ENCRYPTION_KEY:-}
       ENGINE_SERVE: all
       ENGINE_PUBLIC_URL: http://127.0.0.1:8080
       ENGINE_S3_ENDPOINT: http://minio:9000
@@ -44,6 +63,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      tilde-init:
+        condition: service_completed_successfully
     # /readyz checks the database pool, so `docker compose up -d --wait` returns only once the
     # gateway can actually serve. The image carries no curl or wget, and /bin/sh is dash, so the
     # request goes through bash's own /dev/tcp.
@@ -59,6 +80,34 @@ services:
       timeout: 5s
       retries: 90
     restart: unless-stopped
+
+  # Mints the encryption key once, with `tilde generate-key` from the same image. It runs as
+  # root only so it can hand the file to the unprivileged gateway; the key is written to the
+  # state volume and never passed through another process's environment or printed.
+  tilde-init:
+    image: ghcr.io/trytilde/tilde:${TILDE_VERSION:-latest}
+    user: "0:0"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -eu
+        if [ -n "$${TILDE_ENCRYPTION_KEY:-}" ]; then
+          echo "Using the encryption key from the environment."
+          exit 0
+        fi
+        key_file=/state/encryption-key
+        if [ ! -s "$$key_file" ]; then
+          umask 077
+          /usr/local/bin/tilde generate-key > "$$key_file"
+          echo "Generated an encryption key in the state volume."
+        fi
+        chown 10001:10001 "$$key_file"
+        chmod 400 "$$key_file"
+    environment:
+      TILDE_ENCRYPTION_KEY: ${TILDE_ENCRYPTION_KEY:-}
+    volumes:
+      - state:/state
 
   postgres:
     image: postgres:16-alpine
@@ -128,6 +177,7 @@ services:
         condition: service_healthy
 
 volumes:
+  state:
   postgres:
   clickhouse:
   minio:

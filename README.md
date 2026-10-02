@@ -45,11 +45,12 @@ Three steps: run Tilde, install the CLI, start your agent.
 
 ```bash
 git clone https://github.com/trytilde/tilde.git && cd tilde/quickstart
-echo "TILDE_ENCRYPTION_KEY=$(openssl rand -base64 32)" > .env
 docker compose up -d --wait
 ```
 
-Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and register your first agent, giving it the capabilities, inference and access it needs. Keep `.env`: the key encrypts the credentials Tilde stores. Set `TILDE_VERSION` in `.env` to pin a release instead of `latest`.
+That is the whole setup: the encryption key is generated on first start and kept in a Docker volume. Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and register your first agent, giving it the capabilities, inference and access it needs.
+
+The key encrypts every credential Tilde stores, so `docker compose down -v` discards both together and nothing stored can be read back without it. Set `TILDE_ENCRYPTION_KEY` to supply your own, which a real deployment should, and `TILDE_VERSION` to pin a release instead of `latest`.
 
 **2. Install the CLI.**
 
