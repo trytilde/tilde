@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from tilde import deploy
+from tilde.declarations import main as read_declarations
 
 AGENT = """
 from langchain.agents import create_agent
@@ -56,7 +56,7 @@ def project(tmp_path, monkeypatch):
 
 
 def test_agent_prompts_and_templates_are_declared(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     prompts = {p["name"]: p for p in json.loads(out)["prompts"]}
     assert {name: (p["format"], p["origin"]) for name, p in prompts.items()} == {
@@ -105,7 +105,7 @@ def test_bundled_and_agent_tools_are_declared_as_published(tmp_path, monkeypatch
     (tmp_path / "tools_main.py").write_text(TOOLS_AGENT)
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
-    assert deploy.main(["tools_main.py", "--dry-run"]) == 0
+    assert read_declarations(["tools_main.py"]) == 0
     tools = {t["name"]: t for t in json.loads(capsys.readouterr().out)["tools"]}
     assert set(tools) == {"lookup", "ping"}
     assert tools["lookup"]["summary"] == "Looked up"

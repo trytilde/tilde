@@ -24,7 +24,10 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const version = readFileSync(join(root, "VERSION"), "utf8").trim();
 const targets = JSON.parse(readFileSync(join(root, "packaging/targets.json"), "utf8"));
-const [binaries, output = join(root, "dist/npm")] = process.argv.slice(2);
+const [binaries, requested] = process.argv.slice(2);
+// `npm pack` runs with its cwd set to each staged package, so the destination has to be
+// absolute: a relative one would land inside the package being packed.
+const output = resolve(requested ?? join(root, "dist/npm"));
 if (!binaries) {
   process.stderr.write("Usage: scripts/pack-cli.mjs <binaries-dir> [output-dir]\n");
   process.exit(2);
