@@ -157,7 +157,7 @@ vendor/rotel/              Rotel fork; TILDE.md lists the local changes
 
 | Output | Source | Committed | Regenerate |
 | --- | --- | --- | --- |
-| `crates/tilde/src/generated/` | `proto/` via `buf.gen.yaml` | Yes | `task generate` |
+| `crates/tilde-contracts/src/generated/` | `proto/` via `buf.gen.yaml` | Yes | `task generate` |
 | `sdk/ts/packages/contracts/gen/` | `proto/` | No | `task generate` |
 | Python contracts in `sdk/py/packages/tilde/src/tilde/` | `proto/` | No | `task generate:py` |
 | `crates/queries/` | `queries/` and `migrations/` via Cornucopia 1.0.1 | Yes | `task queries:generate` |

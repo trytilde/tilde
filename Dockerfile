@@ -30,7 +30,7 @@ COPY vendor vendor
 COPY migrations migrations
 COPY queries queries
 COPY .cargo .cargo
-COPY --from=web /src/crates/tilde/src/generated crates/tilde/src/generated
+COPY --from=web /src/crates/tilde-contracts/src/generated crates/tilde-contracts/src/generated
 COPY --from=web /src/web/dist web/dist
 COPY --from=web /src/web/provider-dist web/provider-dist
 # CI passes Depot Cache's endpoint and token as secrets so crates compile through sccache; a build
@@ -44,7 +44,7 @@ RUN --mount=type=secret,id=sccache_endpoint --mount=type=secret,id=sccache_token
       if [ -n "$token" ]; then export SCCACHE_WEBDAV_TOKEN="$token"; fi; \
       sccache --start-server || export RUSTC_WRAPPER=; \
     fi && \
-    cargo build --locked --release --features embedded-web --bins && \
+    cargo build --locked --release --features embedded-web --package tilde --bins && \
     if [ -n "${RUSTC_WRAPPER:-}" ]; then sccache --show-stats; fi
 
 FROM debian:bookworm-slim

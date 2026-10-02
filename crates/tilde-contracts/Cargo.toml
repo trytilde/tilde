@@ -1,0 +1,18 @@
+[package]
+name = "tilde-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Generated Rust Protobuf and ConnectRPC contracts for Tilde"
+
+[lints.rust]
+# Generated code carries its own allow attributes; nothing here is hand-written.
+unused_crate_dependencies = "allow"
+
+[dependencies]
+buffa.workspace = true
+buffa-types.workspace = true
+bytes = "1"
+connectrpc.workspace = true
+serde.workspace = true

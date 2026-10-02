@@ -1,10 +1,7 @@
 //! A single-workspace Tilde engine. Contracts and central migrations are shared by every transport.
-#[rustfmt::skip]
-#[path = "generated/messages/mod.rs"]
-pub mod proto;
-#[rustfmt::skip]
-#[path = "generated/services/mod.rs"]
-pub mod services;
+// Contracts live in their own crate so the CLI builds against the same generated types; the
+// engine's own `crate::proto::…` and `crate::services::…` paths are unchanged by that move.
+pub use tilde_contracts::{proto, services};
 
 pub mod agent;
 pub mod config;

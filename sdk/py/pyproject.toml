@@ -33,6 +33,7 @@ members = ["packages/*", "examples/*"]
 
 [tool.uv.sources]
 trytilde = { workspace = true }
+trytilde-cli = { workspace = true }
 trytilde-langchain = { workspace = true }
 trytilde-pydantic-ai = { workspace = true }
 trytilde-openai-agents = { workspace = true }

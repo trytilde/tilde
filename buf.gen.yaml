@@ -3,15 +3,15 @@ version: v2
 clean: true
 plugins:
   - local: .tools/protoc-gen-buffa
-    out: crates/tilde/src/generated/messages
+    out: crates/tilde-contracts/src/generated/messages
     opt: [views=true, json=true]
   - local: .tools/protoc-gen-buffa-packaging
-    out: crates/tilde/src/generated/messages
+    out: crates/tilde-contracts/src/generated/messages
     strategy: all
   - local: .tools/protoc-gen-connect-rust
-    out: crates/tilde/src/generated/services
+    out: crates/tilde-contracts/src/generated/services
     opt: [buffa_module=crate::proto]
   - local: .tools/protoc-gen-buffa-packaging
-    out: crates/tilde/src/generated/services
+    out: crates/tilde-contracts/src/generated/services
     strategy: all
     opt: [filter=services]

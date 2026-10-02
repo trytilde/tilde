@@ -61,7 +61,9 @@ set `ui-url` or `TILDE_UI_URL` so the summary links to the browser-facing servic
 Lambda requires `function-arn`; deploy the immutable function version before registering.
 
 To ship the prompts and skills your code declares, set `command` to
-`npx tilde deploy dist/index.js --json` (after installing and building). The action runs it
+`npx tilde deploy dist/index.js --json` (after installing and building). That is the
+[Tilde CLI](https://trytilde.ai/docs/cli), which the SDKs ask for at their own version, so no
+separate install step is needed. The action runs it
 with `TILDE_URL`, `TILDE_AGENT_ID` and (when given) `TILDE_API_KEY` set and GitHub metadata in the
 environment, uses its JSON result instead of registering itself, and produces the same
 outputs. Put `--target`, `--function-arn`, `--label` or `--external-id` in the command.

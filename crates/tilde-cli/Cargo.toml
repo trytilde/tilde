@@ -1,0 +1,44 @@
+[package]
+name = "tilde-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# The engine crate already owns the `tilde` binary name. Two workspace packages producing the
+# same binary silently overwrite each other in target/, so the target is `tilde-cli` here and
+# every distribution channel (install.sh, npm, PyPI) installs it under the name `tilde`.
+[[bin]]
+name = "tilde-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+base64.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+connectrpc.workspace = true
+hex.workspace = true
+http = "1"
+# The chat page's proxy forwards opaque Connect bodies, which needs a plain HTTP client.
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tilde-contracts.workspace = true
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "process",
+  "signal",
+  "time",
+  "fs",
+  "io-std",
+] }
+toml = "0.9"
+url.workspace = true
+webpki-roots = "0.26"
+
+[dev-dependencies]
+# Encoding and decoding contract messages in the stand-in gateway the deploy test drives.
+buffa.workspace = true

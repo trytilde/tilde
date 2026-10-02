@@ -477,9 +477,10 @@ There is no generic `message.reply` projection of returned model text.
 
 ## Prompts and skills
 
-Prompts and skills ship with a deployment. `tilde deploy` (the `tilde` bin of
-`@trytilde/sdk`) imports the agent's entry module with `TILDE_DISCOVERY=1`, under which
-`connectAgent` and `createLambdaHandler` start nothing, and registers what its exports
+Prompts and skills ship with a deployment. `tilde deploy` (the [Tilde CLI](https://trytilde.ai/docs/cli),
+which `@trytilde/sdk` asks for at its own version) reads them through this package's
+`tilde-declarations` bin, which imports the agent's entry module with `TILDE_DISCOVERY=1`, under
+which `connectAgent` and `createLambdaHandler` start nothing, and registers what its exports
 declare: `definePrompt`, `defineSkills` and `defineSkill` values, and framework objects an
 installed adapter recognises (`@trytilde/sdk-mastra-node` reads Mastra agents' instructions and
 skills, `@trytilde/sdk-vercel-ai-node` AI SDK `ToolLoopAgent` instructions). Exports are scanned
@@ -498,8 +499,10 @@ export const refunds = defineSkill({ name: "refunds", description: "…", instru
 ```
 
 ```sh
+npx tilde dev                                       # register, run and chat with the agent locally
 TOKEN=$(npx tilde deploy dist/index.js)             # TILDE_URL, TILDE_AGENT_ID (+ TILDE_API_KEY on Tilde Cloud)
 npx tilde deploy dist/index.js --dry-run            # the declarations as JSON; contacts nothing
+npx tilde-declarations dist/index.js                # the same JSON, straight from this package
 ```
 
 Flags: `[ENTRY] --agent-id --url --api-key --target gateway|sidecar|lambda --function-arn

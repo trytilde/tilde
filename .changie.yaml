@@ -35,3 +35,7 @@ replacements:
   - path: sdk/py/packages/*/pyproject.toml
     find: '^version = ".*"$'
     replace: 'version = "{{.VersionNoPrefix}}"'
+  # The Python SDK pins the CLI exactly, so installing it brings the matching binary.
+  - path: sdk/py/packages/tilde/pyproject.toml
+    find: '^  "trytilde-cli==.*",$'
+    replace: '  "trytilde-cli=={{.VersionNoPrefix}}",'

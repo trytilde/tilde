@@ -1,0 +1,3 @@
+kind: Changed
+body: "quickstart/compose.yaml health-checks the gateway against /readyz, so `docker compose up -d --wait` returns only once it can serve instead of racing the next command, and quickstart/.env is gitignored so the encryption key the quickstart asks you to create cannot be committed."
+time: 2026-10-02T18:10:01+02:00

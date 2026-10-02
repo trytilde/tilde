@@ -123,7 +123,7 @@ impl Chat {
         Ok(db::queue(&self.pg()?.get().await?, thread, agent)
             .await?
             .into_iter()
-            .map(Into::into)
+            .map(queued_input)
             .collect())
     }
     pub(crate) async fn change_queue(
@@ -224,14 +224,14 @@ pub(crate) enum QueueChange {
     Before(Option<Uuid>),
     Steer,
 }
-impl From<db::Queue> for types::QueuedInput {
-    fn from(row: db::Queue) -> Self {
-        Self {
-            id: row.id.to_string(),
-            invocation_id: row.invocation_id.to_string(),
-            text: row.text,
-            history_through_message_id: row.history_through_message_id,
-            ..Default::default()
-        }
+/// A free function rather than `From`: both the query row and the contract type now live in
+/// other crates (`tilde-queries` and `tilde-contracts`), so an impl here would be an orphan.
+pub(crate) fn queued_input(row: db::Queue) -> types::QueuedInput {
+    types::QueuedInput {
+        id: row.id.to_string(),
+        invocation_id: row.invocation_id.to_string(),
+        text: row.text,
+        history_through_message_id: row.history_through_message_id,
+        ..Default::default()
     }
 }

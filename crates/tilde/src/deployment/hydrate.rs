@@ -144,7 +144,7 @@ impl Deployments {
             )
             .await?
             .into_iter()
-            .map(Into::into)
+            .map(crate::chat::providers::tilde::sessions::queued_input)
             .collect();
         // A queued message can be older than the normal history window. Retain its
         // attachments and delivery identity when rebuilding the input command.

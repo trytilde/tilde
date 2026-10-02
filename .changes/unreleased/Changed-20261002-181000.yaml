@@ -1,0 +1,3 @@
+kind: Changed
+body: "Generated Rust contracts moved from `crates/tilde/src/generated` into their own `tilde-contracts` crate, so the engine and the `tilde` CLI build against one set of Protobuf messages and ConnectRPC clients instead of the CLI restating the wire shapes by hand. The engine re-exports them as `crate::proto` and `crate::services`, so its own paths are unchanged; `task generate` now writes into the new crate."
+time: 2026-10-02T18:10:00+02:00

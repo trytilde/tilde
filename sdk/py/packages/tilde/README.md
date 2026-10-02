@@ -163,19 +163,28 @@ the next invocation without a redeploy. Frameworks without native skills convert
 their instructions. Framework adapters stamp dynamic prompts with
 `ctx.activate_prompt(name, hash)`.
 
-Prompts and skills are registered with a deployment:
+Prompts and skills are registered with a deployment by the [Tilde CLI](https://trytilde.ai/docs/cli),
+which this package asks for at its own version, so `uv run tilde` is the matching build:
 
 ```sh
-python -m tilde deploy [ENTRY] [--agent-id ID] [--url URL] [--api-key KEY] \
+uv run tilde dev                                   # register, run and chat with the agent locally
+uv run tilde deploy [ENTRY] [--agent-id ID] [--url URL] [--api-key KEY] \
   [--target gateway|sidecar|lambda] [--function-arn ARN] [--external-id ID] [--label L] \
   [--dry-run] [--json]
+```
+
+The CLI reads what the code declares through this package's own entrypoint, which prints the
+`DeploymentDeclarations` JSON and contacts nothing:
+
+```sh
+tilde-declarations [ENTRY] [--allow-empty]         # or: python -m tilde declarations [ENTRY]
 ```
 
 `ENTRY` is a file or dotted module (default `main.py`), imported with `TILDE_DISCOVERY=1`
 (`connect_agent`/`run_connected_agent` then do nothing) and not as `__main__`. The globals of
 the entry and of every module loaded from the working directory are scanned for `define_*`
 objects and offered to framework discoverers (entry point group `tilde.discover`, for example
-`trytilde-crewai`). The inventory goes to stderr; `--dry-run` prints the
+`trytilde-crewai`). The inventory goes to stderr; `tilde deploy --dry-run` prints the
 `DeploymentDeclarations` JSON; otherwise binary or large skill files are uploaded, the
 deployment is registered (`$TILDE_AGENT_ID`, `$TILDE_URL` = management API, and on Tilde Cloud
 `$TILDE_API_KEY`; open-source Tilde needs no key) and stdout is the deployment token (`--json`: `{"deploymentId", "token", "created"}`).

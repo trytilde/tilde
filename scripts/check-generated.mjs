@@ -25,7 +25,7 @@ try {
   else {
     const changed = [];
     // TypeScript contracts are not committed; @trytilde/contracts regenerates them on build.
-    for (const folder of ["crates/tilde/src/generated"]) {
+    for (const folder of ["crates/tilde-contracts/src/generated"]) {
       const names = new Set([...(await files(folder)), ...(await files(join(temp, folder)))]);
       for (const name of names) {
         const [a, b] = await Promise.all([
