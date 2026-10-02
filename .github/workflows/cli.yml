@@ -1,14 +1,30 @@
 name: CLI
 # Cross-compiles the `tilde` CLI for every target in packaging/targets.json and packs the npm and
-# PyPI artifacts plus the archives install.sh downloads. Called by Release; dispatchable on its
-# own to check the cross-builds without releasing.
+# PyPI artifacts plus the archives install.sh downloads. Called by Release, and run on pull
+# requests that touch the CLI or the way it is packaged, which is when a cross-build can break;
+# unrelated pull requests skip it, because five Rust targets are not cheap.
 on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - crates/tilde-cli/**
+      - crates/tilde-contracts/**
+      - packaging/**
+      - scripts/pack-cli.*
+      - install.sh
+      - .github/workflows/cli.yml
+      - Cargo.toml
+      - Cargo.lock
   workflow_call:
   workflow_dispatch:
+concurrency:
+  group: cli-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
   build:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
@@ -82,6 +98,7 @@ jobs:
 
   package:
     needs: build
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
