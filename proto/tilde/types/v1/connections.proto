@@ -4,7 +4,8 @@ import "google/protobuf/timestamp.proto";
 
 // Skills: the agent receives the skills linked to the connection. Every connection offers it.
 // Tool: the connection serves tools; granted by adding it to an agent as a tool source.
-enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; CAPABILITY_SKILLS = 3; CAPABILITY_TOOL = 4; }
+// Signal: the connection's webhooks emit typed events that routines can trigger on.
+enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; CAPABILITY_SKILLS = 3; CAPABILITY_TOOL = 4; CAPABILITY_SIGNAL = 5; }
 
 enum ClientAuthentication { CLIENT_AUTHENTICATION_UNSPECIFIED = 0; CLIENT_AUTHENTICATION_BODY = 1; CLIENT_AUTHENTICATION_BASIC = 2; CLIENT_AUTHENTICATION_NONE = 3; }
 

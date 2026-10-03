@@ -14,6 +14,8 @@ pub enum Capability {
     Skills,
     /// Granted by adding the connection to an agent as a tool source, not by an assignment.
     Tool,
+    /// Webhook events routines trigger on; a routine naming the connection is its use.
+    Signal,
 }
 impl Capability {
     pub fn as_str(self) -> &'static str {
@@ -22,6 +24,7 @@ impl Capability {
             Self::Inference => "inference",
             Self::Skills => "skills",
             Self::Tool => "tool",
+            Self::Signal => "signal",
         }
     }
 }
@@ -396,6 +399,7 @@ pub struct Connection {
     pub channel_capable: bool,
     pub inference_capable: bool,
     pub tool_capable: bool,
+    pub signal_capable: bool,
     pub associated_agents: tokio_postgres::types::Json<Vec<AssociatedAgent>>,
 }
 impl Connection {
@@ -409,6 +413,7 @@ impl Connection {
             Capability::Inference => self.inference_capable,
             Capability::Skills => true,
             Capability::Tool => self.tool_capable,
+            Capability::Signal => self.signal_capable,
         }
     }
 }
@@ -614,14 +619,15 @@ impl ConnectionType {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        // A type is at most one of channel or inference; a channel may also ship tools.
+        // A type is at most one of channel or inference; it may also ship tools and signals.
         let exclusive = self
             .capabilities
             .iter()
-            .filter(|c| **c != Capability::Tool)
+            .filter(|c| !matches!(c, Capability::Tool | Capability::Signal))
             .count();
-        let tools = self.capabilities.len() - exclusive;
-        if self.name.trim().is_empty() || exclusive > 1 || tools > 1 {
+        let repeated = (1..self.capabilities.len())
+            .any(|i| self.capabilities[..i].contains(&self.capabilities[i]));
+        if self.name.trim().is_empty() || exclusive > 1 || repeated {
             return Err(invalid("Invalid connection type"));
         }
         if let CredentialSource::Static { schema } = &self.credential_source {

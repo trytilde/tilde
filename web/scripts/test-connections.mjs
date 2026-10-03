@@ -16,10 +16,10 @@ const client = createClient(ConnectionsService, transport);
 const broker = createClient(ConnectionSetupService, transport);
 const catalog = await client.listProviders({ pageSize: 30 });
 const github = catalog.providers.find((provider) => provider.id === "github");
-// The GitHub App serves chat and tools; tokens and OAuth apps serve tools only.
+// The GitHub App serves chat, tools and signals; tokens and OAuth apps serve tools only.
 const app = github.connectionTypes.find((type) => type.id === "github_app");
 assert.equal(app.credentialSource.case, "custom");
-assert.deepEqual(app.capabilities, [Capability.CHANNEL, Capability.TOOL]);
+assert.deepEqual(app.capabilities, [Capability.CHANNEL, Capability.TOOL, Capability.SIGNAL]);
 const providerId = `custom/sdk-${randomUUID()}`;
 await client.registerProvider({
   provider: {

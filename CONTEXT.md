@@ -118,7 +118,7 @@ update atomically, and builtin definitions reconcile at startup. In-use methods 
 be deleted through registration. Remote authorization has its own opaque encryption
 identity; the migration retains existing ciphertext bindings without versioned providers.
 
-Capabilities are `channel`, `inference` and `tool`. A connection type declares which it offers;
+Capabilities are `channel`, `inference`, `tool` and `signal`. A connection type declares which it offers;
 an assignment grants one capability of one connection to one agent. Chat keeps a single
 owner per connection; an inference connection may be assigned to any number of agents.
 Every connection has a slug, `provider_id/name` (for example `linq/daniel@trytilde.ai`
@@ -329,6 +329,32 @@ native framework tools in a module-level `defineTools` / `define_tools` value, w
 declares with the deployment, and gives its model `withTildeTools` / `with_tilde_tools`: the channel's
 tools, every other Tilde tool of the agent (`ctx.agentTools` / `ctx.agent_tools`, which leave
 bundled tools out) and its bundled tools.
+
+## Routines
+
+- Signal: a typed event a connection's provider emits from a verified webhook delivery, named
+  `{provider}.{object}.{action}` (`github.issue.opened`). The `signal` capability belongs to the
+  connection type; like `tool` it is never assigned through `connection_agents`. The chat adapter
+  that verifies the webhook also lists the provider's signal types and projects each delivery to
+  compact data (`Adapter::signal_types`/`signals`); the raw payload is not kept. GitHub App
+  connections emit issue, pull request, issue comment and review signals for the events their
+  manifest subscribes to; bot senders emit none, so a routine cannot trigger itself.
+- Routine: one agent, a name, a prompt, an enabled flag and exactly one trigger: a five-field
+  cron schedule evaluated in UTC, or one signal type of one signal-capable connection. A
+  deleted (soft-deleted) agent's routines no longer fire; a disconnected connection has no
+  credentials to verify deliveries, so its signal routines stay idle until it is reconnected.
+- Routine run: one firing, recorded once per fire key (the scheduled time, or the signal type and
+  provider delivery ID) in `routine_runs`, so redeliveries and replicas never start a second run.
+  Every firing creates a new thread titled with the routine's name and starts a run whose
+  objective is the prompt, followed for a signal by its type, connection slug and data. The
+  thread is the record; the run row keeps its thread and any error from starting it.
+- Scheduling: a worker on every gateway claims due cron routines with `FOR UPDATE SKIP LOCKED`
+  every 15 seconds and moves each to its next time after now in the same transaction before
+  firing (at most once; missed times are not backfilled). Signals fire synchronously from the
+  webhook ingress after the adapter verifies the delivery, before any chat ingestion.
+- Management: `RoutineService` lists, creates, updates and deletes an agent's routines and lists
+  a connection's signal types. The agent's Routines tab shows them in a table (enabled switch,
+  trigger, next and last run, linked to the thread) with a create/edit dialog.
 
 ## Inference gateway
 

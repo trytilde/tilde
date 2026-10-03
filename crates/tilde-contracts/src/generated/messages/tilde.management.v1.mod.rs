@@ -8,6 +8,7 @@ include!("tilde.management.v1.identities.rs");
 include!("tilde.management.v1.inference.rs");
 include!("tilde.management.v1.logs.rs");
 include!("tilde.management.v1.prompts.rs");
+include!("tilde.management.v1.routines.rs");
 include!("tilde.management.v1.skills.rs");
 include!("tilde.management.v1.tilde_chat.rs");
 include!("tilde.management.v1.tools.rs");
@@ -37,6 +38,7 @@ pub mod __buffa {
         include!("tilde.management.v1.inference.__view.rs");
         include!("tilde.management.v1.logs.__view.rs");
         include!("tilde.management.v1.prompts.__view.rs");
+        include!("tilde.management.v1.routines.__view.rs");
         include!("tilde.management.v1.skills.__view.rs");
         include!("tilde.management.v1.tilde_chat.__view.rs");
         include!("tilde.management.v1.tools.__view.rs");
@@ -45,12 +47,14 @@ pub mod __buffa {
             #[allow(unused_imports)]
             use super::*;
             include!("tilde.management.v1.deployments.__view_oneof.rs");
+            include!("tilde.management.v1.routines.__view_oneof.rs");
         }
     }
     pub mod oneof {
         #[allow(unused_imports)]
         use super::*;
         include!("tilde.management.v1.deployments.__oneof.rs");
+        include!("tilde.management.v1.routines.__oneof.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -171,6 +175,20 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CRON_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__SIGNAL_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__ROUTINE_JSON_ANY);
+        reg.register_json_any(super::__SIGNAL_TYPE_JSON_ANY);
+        reg.register_json_any(super::__LIST_ROUTINES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ROUTINES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ROUTINE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_ROUTINE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ROUTINE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_ROUTINE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_ROUTINE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_ROUTINE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_SIGNAL_TYPES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SIGNAL_TYPES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CATALOG_GROUP_REQUEST_JSON_ANY);
@@ -745,6 +763,62 @@ pub use self::__buffa::view::GetPromptRequestOwnedView;
 pub use self::__buffa::view::GetPromptResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetPromptResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CronTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::CronTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RoutineView;
+#[doc(inline)]
+pub use self::__buffa::view::RoutineOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalTypeView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalTypeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListRoutinesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListRoutinesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListRoutinesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListRoutinesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRoutineRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRoutineRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRoutineResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateRoutineResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateRoutineRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateRoutineRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateRoutineResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateRoutineResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteRoutineRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteRoutineRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteRoutineResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteRoutineResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSignalTypesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSignalTypesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSignalTypesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSignalTypesResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListCatalogRequestView;
 #[doc(inline)]

@@ -30,6 +30,7 @@ import { Route as AppAgentAgentIdIamRouteImport } from './routes/_app/agent/$age
 import { Route as AppAgentAgentIdInferenceRouteImport } from './routes/_app/agent/$agentId/inference'
 import { Route as AppAgentAgentIdLogsRouteImport } from './routes/_app/agent/$agentId/logs'
 import { Route as AppAgentAgentIdPromptsRouteImport } from './routes/_app/agent/$agentId/prompts'
+import { Route as AppAgentAgentIdRoutinesRouteImport } from './routes/_app/agent/$agentId/routines'
 import { Route as AppAgentAgentIdSessionsRouteImport } from './routes/_app/agent/$agentId/sessions'
 import { Route as AppAgentAgentIdSkillsRouteImport } from './routes/_app/agent/$agentId/skills'
 import { Route as AppAgentAgentIdToolsRouteImport } from './routes/_app/agent/$agentId/tools'
@@ -147,6 +148,11 @@ const AppAgentAgentIdPromptsRoute = AppAgentAgentIdPromptsRouteImport.update({
   path: '/prompts',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
+const AppAgentAgentIdRoutinesRoute = AppAgentAgentIdRoutinesRouteImport.update({
+  id: '/routines',
+  path: '/routines',
+  getParentRoute: () => AppAgentAgentIdRouteRoute,
+} as any)
 const AppAgentAgentIdSessionsRoute = AppAgentAgentIdSessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
   '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
+  '/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
   '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
   '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
   '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
+  '/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
   '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
   '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/_app/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
   '/_app/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
   '/_app/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
+  '/_app/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
   '/_app/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
   '/_app/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/_app/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
     | '/agent/$agentId/inference'
     | '/agent/$agentId/logs'
     | '/agent/$agentId/prompts'
+    | '/agent/$agentId/routines'
     | '/agent/$agentId/sessions'
     | '/agent/$agentId/skills'
     | '/agent/$agentId/tools'
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/agent/$agentId/inference'
     | '/agent/$agentId/logs'
     | '/agent/$agentId/prompts'
+    | '/agent/$agentId/routines'
     | '/agent/$agentId/sessions'
     | '/agent/$agentId/skills'
     | '/agent/$agentId/tools'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/_app/agent/$agentId/inference'
     | '/_app/agent/$agentId/logs'
     | '/_app/agent/$agentId/prompts'
+    | '/_app/agent/$agentId/routines'
     | '/_app/agent/$agentId/sessions'
     | '/_app/agent/$agentId/skills'
     | '/_app/agent/$agentId/tools'
@@ -517,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAgentAgentIdPromptsRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
+    '/_app/agent/$agentId/routines': {
+      id: '/_app/agent/$agentId/routines'
+      path: '/routines'
+      fullPath: '/agent/$agentId/routines'
+      preLoaderRoute: typeof AppAgentAgentIdRoutinesRouteImport
+      parentRoute: typeof AppAgentAgentIdRouteRoute
+    }
     '/_app/agent/$agentId/sessions': {
       id: '/_app/agent/$agentId/sessions'
       path: '/sessions'
@@ -577,6 +596,7 @@ interface AppAgentAgentIdRouteRouteChildren {
   AppAgentAgentIdInferenceRoute: typeof AppAgentAgentIdInferenceRoute
   AppAgentAgentIdLogsRoute: typeof AppAgentAgentIdLogsRoute
   AppAgentAgentIdPromptsRoute: typeof AppAgentAgentIdPromptsRoute
+  AppAgentAgentIdRoutinesRoute: typeof AppAgentAgentIdRoutinesRoute
   AppAgentAgentIdSessionsRoute: typeof AppAgentAgentIdSessionsRoute
   AppAgentAgentIdSkillsRoute: typeof AppAgentAgentIdSkillsRoute
   AppAgentAgentIdToolsRoute: typeof AppAgentAgentIdToolsRoute
@@ -592,6 +612,7 @@ const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
   AppAgentAgentIdInferenceRoute: AppAgentAgentIdInferenceRoute,
   AppAgentAgentIdLogsRoute: AppAgentAgentIdLogsRoute,
   AppAgentAgentIdPromptsRoute: AppAgentAgentIdPromptsRoute,
+  AppAgentAgentIdRoutinesRoute: AppAgentAgentIdRoutinesRoute,
   AppAgentAgentIdSessionsRoute: AppAgentAgentIdSessionsRoute,
   AppAgentAgentIdSkillsRoute: AppAgentAgentIdSkillsRoute,
   AppAgentAgentIdToolsRoute: AppAgentAgentIdToolsRoute,

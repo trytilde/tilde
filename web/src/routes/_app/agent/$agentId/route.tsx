@@ -22,6 +22,7 @@ const tabPaths = {
   deployment: "/agent/$agentId/deployment",
   prompts: "/agent/$agentId/prompts",
   skills: "/agent/$agentId/skills",
+  routines: "/agent/$agentId/routines",
 } as const;
 function AgentPage(): JSX.Element {
   const { agentId } = Route.useParams();
@@ -33,27 +34,31 @@ function AgentPage(): JSX.Element {
           ? "prompts"
           : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/skills")
             ? "skills"
-            : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/logs")
-              ? "logs"
-              : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/tracing")
-                ? "tracing"
-                : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/deployment")
-                  ? "deployment"
-                  : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
-                    ? "iam"
-                    : state.matches.some(
-                          (match) => match.routeId === "/_app/agent/$agentId/chat-providers",
-                        )
-                      ? "chat-providers"
+            : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/routines")
+              ? "routines"
+              : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/logs")
+                ? "logs"
+                : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/tracing")
+                  ? "tracing"
+                  : state.matches.some(
+                        (match) => match.routeId === "/_app/agent/$agentId/deployment",
+                      )
+                    ? "deployment"
+                    : state.matches.some((match) => match.routeId === "/_app/agent/$agentId/iam")
+                      ? "iam"
                       : state.matches.some(
-                            (match) => match.routeId === "/_app/agent/$agentId/tools",
+                            (match) => match.routeId === "/_app/agent/$agentId/chat-providers",
                           )
-                        ? "tools"
+                        ? "chat-providers"
                         : state.matches.some(
-                              (match) => match.routeId === "/_app/agent/$agentId/inference",
+                              (match) => match.routeId === "/_app/agent/$agentId/tools",
                             )
-                          ? "inference"
-                          : "capabilities",
+                          ? "tools"
+                          : state.matches.some(
+                                (match) => match.routeId === "/_app/agent/$agentId/inference",
+                              )
+                            ? "inference"
+                            : "capabilities",
   });
   // An open prompt (`?prompt=`) takes the whole page, like the skill editor.
   const promptOpen = useRouterState({

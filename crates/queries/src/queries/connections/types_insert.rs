@@ -48,13 +48,14 @@ pub struct RunParams<
     pub p22: Option<T19>,
     pub p23: T20,
     pub p24: T21,
+    pub p25: bool,
 }
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema,inference_capable=excluded.inference_capable,tool_capable=excluded.tool_capable,mcp_url=excluded.mcp_url,mcp_credential=excluded.mcp_credential,mcp_credential_name=excluded.mcp_credential_name,mcp_credential_prefix=excluded.mcp_credential_prefix,oauth_client=excluded.oauth_client",
+        "INSERT INTO connection_types(provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client,signal_capable) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) ON CONFLICT(provider_id,type_id) DO UPDATE SET name=excluded.name,driver=excluded.driver,channel_capable=excluded.channel_capable,authorization_url=excluded.authorization_url,token_url=excluded.token_url,client_auth=excluded.client_auth,pkce=excluded.pkce,scopes=excluded.scopes,scope_separator=excluded.scope_separator,access_token_path=excluded.access_token_path,refresh_token_path=excluded.refresh_token_path,expires_in_path=excluded.expires_in_path,scope_path=excluded.scope_path,success_path=excluded.success_path,credential_schema=excluded.credential_schema,inference_capable=excluded.inference_capable,tool_capable=excluded.tool_capable,mcp_url=excluded.mcp_url,mcp_credential=excluded.mcp_credential,mcp_credential_name=excluded.mcp_credential_name,mcp_credential_prefix=excluded.mcp_credential_prefix,oauth_client=excluded.oauth_client,signal_capable=excluded.signal_capable",
         None,
     )
 }
@@ -119,13 +120,14 @@ impl RunStmt {
         p22: &'a Option<T19>,
         p23: &'a T20,
         p24: &'a T21,
+        p25: &'a bool,
     ) -> Result<u64, tokio_postgres::Error> {
         client
             .execute(
                 self.0,
                 &[
                     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17,
-                    p18, p19, p20, p21, p22, p23, p24,
+                    p18, p19, p20, p21, p22, p23, p24, p25,
                 ],
             )
             .await
@@ -244,6 +246,7 @@ impl<
             &params.p22,
             &params.p23,
             &params.p24,
+            &params.p25,
         ))
     }
 }

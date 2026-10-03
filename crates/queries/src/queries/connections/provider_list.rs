@@ -114,7 +114,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT provider_id,name,kind,categories FROM connection_providers p WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%' OR instructions ILIKE '%'||$2||'%') AND ($3::TEXT IS NULL OR $3=ANY(categories)) AND ($4::TEXT IS NULL OR EXISTS(SELECT 1 FROM connection_types t WHERE t.provider_id=p.provider_id AND CASE $4 WHEN 'channel' THEN t.channel_capable WHEN 'inference' THEN t.inference_capable WHEN 'tool' THEN t.tool_capable END)) AND ($5::TEXT IS NULL OR provider_source(p.provider_id)=$5) ORDER BY provider_id LIMIT $6",
+        "SELECT provider_id,name,kind,categories FROM connection_providers p WHERE provider_id>$1 AND ($2::TEXT IS NULL OR name ILIKE '%'||$2||'%' OR provider_id ILIKE '%'||$2||'%' OR instructions ILIKE '%'||$2||'%') AND ($3::TEXT IS NULL OR $3=ANY(categories)) AND ($4::TEXT IS NULL OR EXISTS(SELECT 1 FROM connection_types t WHERE t.provider_id=p.provider_id AND CASE $4 WHEN 'channel' THEN t.channel_capable WHEN 'inference' THEN t.inference_capable WHEN 'tool' THEN t.tool_capable WHEN 'signal' THEN t.signal_capable END)) AND ($5::TEXT IS NULL OR provider_source(p.provider_id)=$5) ORDER BY provider_id LIMIT $6",
         None,
     )
 }

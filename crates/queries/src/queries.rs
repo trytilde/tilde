@@ -11,6 +11,7 @@ pub mod iam;
 pub mod identities;
 pub mod inference;
 pub mod prompts;
+pub mod routines;
 pub mod skills;
 pub mod spool;
 pub mod system;

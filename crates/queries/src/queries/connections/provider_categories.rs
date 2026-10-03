@@ -88,7 +88,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT DISTINCT c AS category FROM connection_providers p, unnest(p.categories) c WHERE ($1::TEXT IS NULL OR EXISTS(SELECT 1 FROM connection_types t WHERE t.provider_id=p.provider_id AND CASE $1 WHEN 'channel' THEN t.channel_capable WHEN 'inference' THEN t.inference_capable WHEN 'tool' THEN t.tool_capable END)) AND ($2::TEXT IS NULL OR provider_source(p.provider_id)=$2) ORDER BY category",
+        "SELECT DISTINCT c AS category FROM connection_providers p, unnest(p.categories) c WHERE ($1::TEXT IS NULL OR EXISTS(SELECT 1 FROM connection_types t WHERE t.provider_id=p.provider_id AND CASE $1 WHEN 'channel' THEN t.channel_capable WHEN 'inference' THEN t.inference_capable WHEN 'tool' THEN t.tool_capable WHEN 'signal' THEN t.signal_capable END)) AND ($2::TEXT IS NULL OR provider_source(p.provider_id)=$2) ORDER BY category",
         None,
     )
 }
