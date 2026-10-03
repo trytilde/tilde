@@ -29,6 +29,21 @@ const COLUMNS = 6;
 const when = (routine: Routine) =>
   routine.lastRunAt ? timestampDate(routine.lastRunAt).toLocaleString() : undefined;
 
+// Every page: the picker offers them all and existing routines name theirs by slug.
+async function signalConnections(signal: AbortSignal) {
+  const all: Connection[] = [];
+  let pageToken = "";
+  do {
+    const page = await connections.listConnections(
+      { capability: Capability.SIGNAL, pageSize: 100, pageToken },
+      { signal },
+    );
+    all.push(...page.connections);
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return all;
+}
+
 /**
  * An agent's routines: each prompts the agent on one cron schedule (UTC) or one signal of a
  * signal-capable connection, starting a run in a new thread every time it fires.
@@ -50,12 +65,7 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    void Promise.all([
-      refresh(abort.signal),
-      connections
-        .listConnections({ capability: Capability.SIGNAL, pageSize: 100 }, { signal: abort.signal })
-        .then((page) => setSources(page.connections)),
-    ])
+    void Promise.all([refresh(abort.signal), signalConnections(abort.signal).then(setSources)])
       .catch((e) => {
         if (!abort.signal.aborted) setError(message(e, "Unable to load routines."));
       })
