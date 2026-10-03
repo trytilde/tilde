@@ -95,6 +95,69 @@ impl Adapter for Github {
         })
     }
 
+    fn signal_types(&self) -> &'static [(&'static str, &'static str)] {
+        SIGNALS
+    }
+    /// One signal per subscribed event and action. Bot senders, the installation's own app
+    /// among them, emit none, so a routine that comments cannot trigger itself.
+    fn signals(&self, h: &http::HeaderMap, body: &[u8]) -> Vec<ingress::Signal> {
+        use ingress::*;
+        let (Ok(event), Ok(delivery), Ok(p)) = (
+            header(h, "x-github-event"),
+            header(h, "x-github-delivery"),
+            payload(body),
+        ) else {
+            return vec![];
+        };
+        if at(&p, "/sender/type") == Some("Bot") {
+            return vec![];
+        }
+        let action = at(&p, "/action").unwrap_or_default();
+        let merged = p.pointer("/pull_request/merged") == Some(&Value::Bool(true));
+        let signal_type = match event {
+            "issues" => format!("github.issue.{action}"),
+            "pull_request" if action == "closed" && merged => "github.pull_request.merged".into(),
+            "pull_request" => format!("github.pull_request.{action}"),
+            "issue_comment" => format!("github.issue_comment.{action}"),
+            "pull_request_review" => format!("github.pull_request_review.{action}"),
+            _ => return vec![],
+        };
+        if !SIGNALS.iter().any(|(id, _)| *id == signal_type) {
+            return vec![];
+        }
+        let mut data = json!({
+            "repository": p.pointer("/repository/full_name"),
+            "sender": p.pointer("/sender/login"),
+        });
+        for key in ["issue", "pull_request"] {
+            if let Some(item) = p.get(key) {
+                data[key] = json!({
+                    "number": item["number"],
+                    "title": item["title"],
+                    "state": item["state"],
+                    "url": item["html_url"],
+                    "body": item["body"],
+                    "labels": item["labels"].as_array().map(|labels| {
+                        labels.iter().filter_map(|l| l["name"].as_str()).collect::<Vec<_>>()
+                    }),
+                });
+            }
+        }
+        for key in ["comment", "review"] {
+            if let Some(item) = p.get(key) {
+                data[key] = json!({"body": item["body"], "state": item.get("state"), "url": item["html_url"]});
+            }
+        }
+        if let Some(label) = p.pointer("/label/name") {
+            data["label"] = label.clone();
+        }
+        vec![Signal {
+            event_id: delivery.into(),
+            signal_type,
+            data,
+        }]
+    }
+
     fn tools(&self) -> Vec<types::ToolDefinition> {
         vec![
             tool(
@@ -190,6 +253,50 @@ impl Adapter for Github {
         })
     }
 }
+
+/// Limited to the events the app manifest subscribes to (`catalog/github/manifest.rs`).
+const SIGNALS: &[(&str, &str)] = &[
+    ("github.issue.opened", "An issue was opened"),
+    ("github.issue.edited", "An issue's title or body was edited"),
+    ("github.issue.closed", "An issue was closed"),
+    ("github.issue.reopened", "An issue was reopened"),
+    ("github.issue.labeled", "A label was added to an issue"),
+    ("github.issue.assigned", "An issue was assigned"),
+    ("github.pull_request.opened", "A pull request was opened"),
+    (
+        "github.pull_request.edited",
+        "A pull request's title or body was edited",
+    ),
+    (
+        "github.pull_request.closed",
+        "A pull request was closed without merging",
+    ),
+    ("github.pull_request.merged", "A pull request was merged"),
+    (
+        "github.pull_request.reopened",
+        "A pull request was reopened",
+    ),
+    (
+        "github.pull_request.ready_for_review",
+        "A draft pull request was marked ready for review",
+    ),
+    (
+        "github.pull_request.review_requested",
+        "A review was requested on a pull request",
+    ),
+    (
+        "github.pull_request.synchronize",
+        "New commits were pushed to a pull request",
+    ),
+    (
+        "github.issue_comment.created",
+        "A comment was added to an issue or pull request",
+    ),
+    (
+        "github.pull_request_review.submitted",
+        "A pull request review was submitted",
+    ),
+];
 
 /// Canonical sender values belong to this provider adapter.
 fn provider_identity(raw: &str) -> ToolResult<crate::chat::access::identity::Identity> {

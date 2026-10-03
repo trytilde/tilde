@@ -1,0 +1,3 @@
+kind: Added
+body: "Routines: an agent's Routines tab lists, creates and edits prompts that run the agent on a five-field UTC cron schedule or when a connection emits a signal, each firing in a new thread. Connections gain a `signal` capability; GitHub App connections emit issue, pull request, comment and review signals."
+time: 2026-10-03T12:00:00+02:00

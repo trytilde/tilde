@@ -159,6 +159,7 @@ pub async fn register(
                 .map(|server| server.credential.prefix())
                 .unwrap_or(""),
             typ.oauth().map(|o| o.client).unwrap_or_default().as_str(),
+            typ.capabilities.contains(&Capability::Signal),
         )
         .await?;
         for field in &oauth.result_fields {
@@ -268,6 +269,7 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
                 (row.channel_capable, Capability::Channel),
                 (row.inference_capable, Capability::Inference),
                 (row.tool_capable, Capability::Tool),
+                (row.signal_capable, Capability::Signal),
             ]
             .into_iter()
             .filter_map(|(capable, cap)| capable.then_some(cap))

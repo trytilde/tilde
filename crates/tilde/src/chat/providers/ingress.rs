@@ -46,19 +46,32 @@ pub enum Webhook {
     Challenge(String),
     Messages(Vec<IncomingMessage>),
 }
+/// A typed provider event that routines trigger on (`github.issue.opened`). `data` is the
+/// adapter's compact projection of the delivery, not its raw payload.
+pub struct Signal {
+    pub event_id: String,
+    pub signal_type: String,
+    pub data: Value,
+}
 #[derive(Clone)]
 struct Webhooks {
     chat: Chat,
     connections: Connections,
+    routines: crate::routines::Routines,
 }
 pub fn router(chat: Chat, connections: Connections) -> axum::Router {
+    let routines = crate::routines::Routines::new(connections.pool.clone(), chat.clone());
     axum::Router::new()
         .route(
             "/connections/webhooks/{connection_id}",
             post(receive).get(challenge),
         )
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
-        .with_state(Webhooks { chat, connections })
+        .with_state(Webhooks {
+            chat,
+            connections,
+            routines,
+        })
 }
 #[derive(serde::Deserialize)]
 struct Challenge {
@@ -118,6 +131,12 @@ async fn receive(
             endpoints: s.connections.endpoints.clone(),
         };
         let result = provider.webhook(&access, &headers, &body).await?;
+        if row.capable(crate::connections::model::Capability::Signal) {
+            let signals = provider.signals(&headers, &body);
+            if !signals.is_empty() {
+                s.routines.signal(id, &row.slug(), signals).await;
+            }
+        }
         match result {
             Webhook::Challenge(value) => Ok(Some(value)),
             Webhook::Messages(messages) => {

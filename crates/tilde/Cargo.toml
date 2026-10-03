@@ -48,6 +48,7 @@ buffa.workspace = true
 buffa-types.workspace = true
 tilde-contracts.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
+croner = "4"
 clap = { version = "4", features = ["derive", "env"] }
 connectrpc.workspace = true
 flate2 = "1"

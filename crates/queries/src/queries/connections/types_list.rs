@@ -26,6 +26,7 @@ pub struct Record {
     pub mcp_credential_name: Option<String>,
     pub mcp_credential_prefix: String,
     pub oauth_client: String,
+    pub signal_capable: bool,
 }
 pub struct RecordBorrowed<'a> {
     pub provider_id: &'a str,
@@ -52,6 +53,7 @@ pub struct RecordBorrowed<'a> {
     pub mcp_credential_name: Option<&'a str>,
     pub mcp_credential_prefix: &'a str,
     pub oauth_client: &'a str,
+    pub signal_capable: bool,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -80,6 +82,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             mcp_credential_name,
             mcp_credential_prefix,
             oauth_client,
+            signal_capable,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -107,6 +110,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             mcp_credential_name: mcp_credential_name.map(|v| v.into()),
             mcp_credential_prefix: mcp_credential_prefix.into(),
             oauth_client: oauth_client.into(),
+            signal_capable,
         }
     }
 }
@@ -179,7 +183,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client FROM connection_types WHERE provider_id=$1 ORDER BY type_id",
+        "SELECT provider_id,type_id,name,driver,channel_capable,authorization_url,token_url,client_auth,pkce,scopes,scope_separator,access_token_path,refresh_token_path,expires_in_path,scope_path,success_path,credential_schema,inference_capable,tool_capable,mcp_url,mcp_credential,mcp_credential_name,mcp_credential_prefix,oauth_client,signal_capable FROM connection_types WHERE provider_id=$1 ORDER BY type_id",
         None,
     )
 }
@@ -228,6 +232,7 @@ impl RunStmt {
                         mcp_credential_name: row.try_get(21)?,
                         mcp_credential_prefix: row.try_get(22)?,
                         oauth_client: row.try_get(23)?,
+                        signal_capable: row.try_get(24)?,
                     })
                 },
             mapper: |it| Record::from(it),

@@ -7,6 +7,7 @@ import { DeploymentService } from "@trytilde/contracts/tilde/management/v1/deplo
 import { InferenceService } from "@trytilde/contracts/tilde/management/v1/inference_pb.js";
 import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
 import { PromptService } from "@trytilde/contracts/tilde/management/v1/prompts_pb.js";
+import { RoutineService } from "@trytilde/contracts/tilde/management/v1/routines_pb.js";
 import { SkillService } from "@trytilde/contracts/tilde/management/v1/skills_pb.js";
 import { TildeChatProviderService } from "@trytilde/contracts/tilde/management/v1/tilde_chat_pb.js";
 import {
@@ -29,6 +30,7 @@ export const logs = createClient(LogsService, transport);
 export const inference = createClient(InferenceService, transport);
 export const tildeChat = createClient(TildeChatProviderService, transport);
 export const prompts = createClient(PromptService, transport);
+export const routines = createClient(RoutineService, transport);
 export const skills = createClient(SkillService, transport);
 export const tools = createClient(ToolService, transport);
 export const toolHosts = createClient(ToolHostRegistryService, transport);

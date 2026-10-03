@@ -97,6 +97,14 @@ pub fn management_router(
                     .clone(),
             ),
         ))
+        .merge(crate::routines::rpc::router(
+            crate::routines::Routines::new(
+                chat.pg()
+                    .expect("management routes require Postgres")
+                    .clone(),
+                chat.clone(),
+            ),
+        ))
         .merge(crate::skills::rpc::management_router(
             chat.skills().expect("management routes require Postgres"),
         ))

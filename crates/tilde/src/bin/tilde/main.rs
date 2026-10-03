@@ -259,6 +259,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         chat_shutdown_rx.clone(),
     ));
     let mut health_worker = tokio::spawn(health.run(chat_shutdown_rx.clone()));
+    let _routine_worker = tokio::spawn(
+        tilde::routines::Routines::new(pool.clone(), chat.clone()).worker(chat_shutdown_rx.clone()),
+    );
     let _mcp_health_worker = chat
         .tools
         .clone()

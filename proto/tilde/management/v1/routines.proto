@@ -1,0 +1,48 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+
+// Routines prompt an agent when a cron schedule comes due or a connection emits a signal.
+// Each firing starts a run in a new thread.
+service RoutineService {
+  rpc ListRoutines(ListRoutinesRequest) returns (ListRoutinesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc CreateRoutine(CreateRoutineRequest) returns (CreateRoutineResponse);
+  rpc UpdateRoutine(UpdateRoutineRequest) returns (UpdateRoutineResponse);
+  rpc DeleteRoutine(DeleteRoutineRequest) returns (DeleteRoutineResponse);
+  // The signal types a signal-capable connection emits.
+  rpc ListSignalTypes(ListSignalTypesRequest) returns (ListSignalTypesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+// A five-field cron expression (minute hour day-of-month month day-of-week) evaluated in UTC.
+message CronTrigger { string schedule = 1; }
+// One signal type, such as `github.issue.opened`, of one signal-capable connection.
+message SignalTrigger { string connection_id = 1; string signal_type = 2; }
+message Routine {
+  string id = 1; string agent_id = 2; string name = 3; string prompt = 4; bool enabled = 5;
+  oneof trigger { CronTrigger cron = 6; SignalTrigger signal = 7; }
+  // Set for an enabled cron routine.
+  optional google.protobuf.Timestamp next_run_at = 8;
+  // The latest firing: its time, the thread it started and why it could not start, if it failed.
+  optional google.protobuf.Timestamp last_run_at = 9;
+  optional string last_thread_id = 10;
+  optional string last_error = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+message SignalType { string id = 1; string description = 2; }
+message ListRoutinesRequest { string agent_id = 1; }
+message ListRoutinesResponse { repeated Routine routines = 1; }
+message CreateRoutineRequest {
+  string agent_id = 1; string name = 2; string prompt = 3; bool enabled = 4;
+  oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
+}
+message CreateRoutineResponse { Routine routine = 1; }
+// Replaces every editable field; the agent is fixed.
+message UpdateRoutineRequest {
+  string id = 1; string name = 2; string prompt = 3; bool enabled = 4;
+  oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
+}
+message UpdateRoutineResponse { Routine routine = 1; }
+message DeleteRoutineRequest { string id = 1; }
+message DeleteRoutineResponse {}
+message ListSignalTypesRequest { string connection_id = 1; }
+message ListSignalTypesResponse { repeated SignalType signal_types = 1; }

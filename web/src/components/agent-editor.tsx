@@ -9,6 +9,7 @@ import { AgentAvatar } from "./agent-avatar";
 import { AgentTargetPicker } from "./agent-target-picker";
 import { AgentConnections } from "./agent-connections";
 import { AgentPrompts } from "./agent-prompts";
+import { AgentRoutines } from "./agent-routines";
 import { AgentSkills } from "./agent-skills";
 import { SkillSourcePicker } from "./skill-source-picker";
 import { Capability } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
@@ -153,7 +154,8 @@ export type AgentTab =
   | "tracing"
   | "logs"
   | "prompts"
-  | "skills";
+  | "skills"
+  | "routines";
 
 export function AgentEditor({
   agent,
@@ -678,6 +680,7 @@ export function AgentEditor({
                   <TabsTrigger value="prompts">Prompts</TabsTrigger>
                   <TabsTrigger value="skills">Skills</TabsTrigger>
                   <TabsTrigger value="tools">Tools</TabsTrigger>
+                  <TabsTrigger value="routines">Routines</TabsTrigger>
                   <TabsTrigger value="iam">IAM</TabsTrigger>
                   <TabsTrigger value="sessions">Sessions</TabsTrigger>
                   <TabsTrigger value="tracing">Tracing</TabsTrigger>
@@ -719,6 +722,9 @@ export function AgentEditor({
             </TabsContent>
             <TabsContent value="skills">
               {tab === "skills" && <AgentSkills agentId={agent.id} />}
+            </TabsContent>
+            <TabsContent value="routines">
+              {tab === "routines" && <AgentRoutines agentId={agent.id} />}
             </TabsContent>
           </Tabs>
         ) : (

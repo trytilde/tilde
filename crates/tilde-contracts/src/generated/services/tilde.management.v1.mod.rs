@@ -7,6 +7,7 @@ include!("tilde.management.v1.identities.__connect.rs");
 include!("tilde.management.v1.inference.__connect.rs");
 include!("tilde.management.v1.logs.__connect.rs");
 include!("tilde.management.v1.prompts.__connect.rs");
+include!("tilde.management.v1.routines.__connect.rs");
 include!("tilde.management.v1.skills.__connect.rs");
 include!("tilde.management.v1.tilde_chat.__connect.rs");
 include!("tilde.management.v1.tools.__connect.rs");

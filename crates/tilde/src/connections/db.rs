@@ -89,6 +89,7 @@ fn connection_get_row(
         channel_capable: r.channel_capable,
         inference_capable: r.inference_capable,
         tool_capable: r.tool_capable,
+        signal_capable: r.signal_capable,
         associated_agents: tokio_postgres::types::Json(
             serde_json::from_value(r.associated_agents)
                 .map_err(crate::database::DbError::decode)?,
@@ -138,6 +139,7 @@ fn connection_list_row(
         channel_capable: r.channel_capable,
         inference_capable: r.inference_capable,
         tool_capable: r.tool_capable,
+        signal_capable: r.signal_capable,
         associated_agents: tokio_postgres::types::Json(
             serde_json::from_value(r.associated_agents)
                 .map_err(crate::database::DbError::decode)?,
@@ -791,11 +793,12 @@ pub async fn types_insert_execute(
     p22: Option<&str>,
     p23: &str,
     p24: &str,
+    p25: bool,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::types_insert::run()
         .bind(
             db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12, &p13, &p14, &p15,
-            &p16, &p17, &p18, &p19, &p20, &p21, &p22, &p23, &p24,
+            &p16, &p17, &p18, &p19, &p20, &p21, &p22, &p23, &p24, &p25,
         )
         .await?)
 }
