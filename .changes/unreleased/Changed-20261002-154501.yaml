@@ -1,3 +1,0 @@
-kind: Changed
-body: "The SDKs now only read what an agent declares, and the CLI registers it: `@trytilde/sdk` exposes `tilde-declarations` instead of `tilde`, and the Python SDK `tilde-declarations` (or `python -m tilde declarations`) instead of `python -m tilde deploy`. Both print the DeploymentDeclarations JSON that `tilde deploy` uploads and registers, so registration has one implementation rather than one per SDK. Set `command: npx tilde deploy dist/index.js --json` in the register-deployment action as before."
-time: 2026-10-02T15:45:01+02:00

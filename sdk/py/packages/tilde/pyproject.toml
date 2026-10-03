@@ -1,6 +1,6 @@
 [project]
 name = "trytilde"
-version = "3.1.0"
+version = "3.1.1"
 description = "Tilde agent SDK for Python: dial-in agent hosts, invocation context, channel tools, FastAPI integration and the chat proxy"
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ dependencies = [
   "opentelemetry-sdk>=1.30",
   "opentelemetry-exporter-otlp-proto-common>=1.30",
   # Installing the SDK brings the matching CLI, so `tilde` works in any agent project.
-  "trytilde-cli==3.1.0",
+  "trytilde-cli==3.1.1",
 ]
 
 [project.scripts]

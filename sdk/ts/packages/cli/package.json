@@ -1,6 +1,6 @@
 {
   "name": "@trytilde/cli",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "The Tilde CLI: develop, deploy and inspect Tilde agents",
   "license": "Apache-2.0",
   "repository": {
