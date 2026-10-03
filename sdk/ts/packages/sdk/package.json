@@ -8,7 +8,7 @@
     "directory": "sdk/ts/packages/sdk"
   },
   "bin": {
-    "tilde": "./dist/cli.js"
+    "tilde-declarations": "./dist/cli.js"
   },
   "files": [
     "dist"
@@ -72,6 +72,7 @@
     "zod": "^4.6.1"
   },
   "peerDependencies": {
+    "@trytilde/cli": "workspace:*",
     "zod": "^4.6.1"
   }
 }

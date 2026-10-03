@@ -1,24 +1,24 @@
-"""``python -m tilde deploy``: discover an agent's prompts, skills and bundled tools and register a
-deployment.
+"""``tilde-declarations [ENTRY]``: print the prompts, skills and bundled tools an agent's code
+declares, as protobuf JSON on stdout.
 
 The entry module is imported with ``TILDE_DISCOVERY=1`` (hosts do not dial) under a name
 other than ``__main__``. Its globals, and the globals of every module loaded from under the
 project directory (cwd), are offered to Tilde's own ``define_*`` recognition and to every
 framework discoverer registered in the ``tilde.discover`` entry point group (which also declare
-``define_tools`` values). Flags match the
-TypeScript ``tilde deploy``.
+``define_tools`` values).
+
+Only this interpreter can read declarations out of an agent's own modules, so this is the half
+of ``tilde deploy`` that has to live in the SDK. The ``tilde`` CLI runs it and owns everything
+after: uploading skill files and registering the deployment, once, for every language.
 """
 
 from __future__ import annotations
 
 import argparse
-import asyncio
 import contextlib
-import hashlib
 import importlib
 import importlib.metadata
 import importlib.util
-import json
 import os
 import sys
 import traceback
@@ -27,7 +27,6 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from connectrpc.errors import ConnectError
 from google.protobuf.json_format import MessageToJson
 
 from tilde._tools import BundledTools
@@ -40,15 +39,9 @@ from tilde.discovery import (
 from tilde.management.v1 import deployments_pb2
 from tilde.prompts import PromptDefinition
 from tilde.skills import ENTRYPOINT, SkillDefinition, SkillsDefinition
-from tilde.types.v1 import deployment_pb2
 
 MAX_INLINE_BYTES = 256 * 1024
 Discoverer = Callable[[Any, DiscoveryContext], Discovered | None]
-TARGETS = {
-    "gateway": deployment_pb2.DEPLOYMENT_TARGET_GATEWAY,
-    "sidecar": deployment_pb2.DEPLOYMENT_TARGET_SIDECAR,
-    "lambda": deployment_pb2.DEPLOYMENT_TARGET_LAMBDA,
-}
 FORMATS = {1: "plain", 2: "mustache", 3: "braces", 4: "dynamic"}
 
 
@@ -278,102 +271,27 @@ def inventory(declarations: deployments_pb2.DeploymentDeclarations, warnings: li
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="tilde deploy",
-        description="Register a deployment with the prompts, skills and tools the agent declares.",
+        prog="tilde-declarations",
+        description=(
+            "Print the prompts, skills and tools an agent declares, as protobuf JSON. "
+            "Run `tilde deploy` to register a deployment carrying them."
+        ),
     )
     parser.add_argument("entry", nargs="?", default="main.py", help="file path or dotted module")
-    parser.add_argument("--agent-id", default=os.environ.get("TILDE_AGENT_ID"))
-    parser.add_argument("--url", default=os.environ.get("TILDE_URL"))
-    # Optional: open-source Tilde needs no management credential; Tilde Cloud requires one.
-    parser.add_argument("--api-key", default=os.environ.get("TILDE_API_KEY"))
-    parser.add_argument("--target", choices=sorted(TARGETS), default="gateway")
-    parser.add_argument("--function-arn")
-    parser.add_argument("--external-id")
-    parser.add_argument("--label")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    return parser.parse_args(argv)
-
-
-def _registration(
-    args: argparse.Namespace, declarations: deployments_pb2.DeploymentDeclarations
-) -> deployments_pb2.RegisterDeploymentRequest:
-    env = os.environ
-    ci = bool(env.get("CI") or env.get("GITHUB_ACTIONS"))
-    source = deployment_pb2.DEPLOYMENT_SOURCE_CI if ci else deployment_pb2.DEPLOYMENT_SOURCE_MANUAL
-    request = deployments_pb2.RegisterDeploymentRequest(
-        agent_id=args.agent_id,
-        source=source,
-        target=TARGETS[args.target],
-        declarations=declarations,
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="print empty declarations instead of failing, for an agent that declares nothing",
     )
-    external_id = args.external_id
-    if external_id is None and env.get("GITHUB_REPOSITORY") and env.get("GITHUB_RUN_ID"):
-        external_id = f"{env['GITHUB_REPOSITORY']}:{env['GITHUB_RUN_ID']}"
-    optional = {
-        "target_reference": args.function_arn,
-        "external_id": external_id,
-        "label": args.label,
-        "repository": env.get("GITHUB_REPOSITORY"),
-        "commit_sha": env.get("GITHUB_SHA"),
-        "branch": env.get("GITHUB_REF_NAME"),
-    }
-    for field, value in optional.items():
-        if value:
-            setattr(request, field, value)
-    return request
-
-
-async def register(
-    args: argparse.Namespace, declarations: deployments_pb2.DeploymentDeclarations
-) -> deployments_pb2.RegisterDeploymentResponse:
-    from tilde.clients import create_management_client
-
-    client = create_management_client(args.url, args.api_key).deployments
-    # Files that cannot travel as text go by digest; upload only those Tilde lacks.
-    pending: dict[str, bytes] = {}
-    for skill in declarations.skills:
-        for file in skill.files:
-            if file.WhichOneof("body") == "data":
-                digest = hashlib.sha256(file.data).hexdigest()
-                pending[digest] = file.data
-                file.sha256 = digest
-    if pending:
-        missing = await client.missing_deployment_files(
-            deployments_pb2.MissingDeploymentFilesRequest(
-                agent_id=args.agent_id, sha256=sorted(pending)
-            )
-        )
-        for digest in missing.sha256:
-            uploaded = await client.upload_deployment_file(
-                deployments_pb2.UploadDeploymentFileRequest(
-                    agent_id=args.agent_id, data=pending[digest]
-                )
-            )
-            if uploaded.sha256 != digest:
-                raise DeployError("Tilde stored a skill file under a different digest")
-    return await client.register_deployment(_registration(args, declarations))
+    return parser.parse_args(argv)
 
 
 def run(argv: list[str]) -> int:
     args = parse_args(argv)
-    if not args.dry_run:
-        missing = [
-            flag
-            for flag, value in (
-                ("--agent-id / TILDE_AGENT_ID", args.agent_id),
-                ("--url / TILDE_URL", args.url),
-            )
-            if not value
-        ]
-        if missing:
-            raise DeployError(f"Missing {', '.join(missing)} (or pass --dry-run)")
-        if (args.target == "lambda") != bool(args.function_arn):
-            raise DeployError("--function-arn is required for lambda and only for lambda")
     os.environ["TILDE_DISCOVERY"] = "1"
     root = Path.cwd().resolve()
     warnings: list[str] = []
-    # Stdout carries only the result (`TOKEN=$(tilde deploy)`); agent imports may print.
+    # Stdout carries only the JSON the `tilde` CLI reads; agent imports may print.
     with contextlib.redirect_stdout(sys.stderr):
         # The entry first: an adapter importing its framework must not shadow a project module
         # of the same name (a project `agents.py` beside the OpenAI Agents SDK's `agents`).
@@ -388,24 +306,14 @@ def run(argv: list[str]) -> int:
         modules = project_modules(entry, root)
         declarations = discover(modules, root, discoverers, warnings, imported_packages(modules))
     print(inventory(declarations, warnings), file=sys.stderr)
-    if not declarations.prompts and not declarations.skills and not declarations.tools:
+    if (
+        not args.allow_empty
+        and not declarations.prompts
+        and not declarations.skills
+        and not declarations.tools
+    ):
         raise DeployError(f"Nothing to deploy: {args.entry} declares no prompts, skills or tools")
-    if args.dry_run:
-        print(MessageToJson(declarations))
-        return 0
-    response = asyncio.run(register(args, declarations))
-    if args.json:
-        print(
-            json.dumps(
-                {
-                    "deploymentId": response.deployment.id,
-                    "token": response.token or None,
-                    "created": response.created,
-                }
-            )
-        )
-    else:
-        print(response.token)
+    print(MessageToJson(declarations))
     return 0
 
 
@@ -413,8 +321,5 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return run(sys.argv[1:] if argv is None else argv)
     except DeployError as error:
-        print(f"tilde deploy: {error}", file=sys.stderr)
-        return 1
-    except ConnectError as error:
-        print(f"tilde deploy: {error.code.name.lower()}: {error.message}", file=sys.stderr)
+        print(f"tilde-declarations: {error}", file=sys.stderr)
         return 1

@@ -31,8 +31,7 @@
 - [Tilde is the open-source agent registry for AI-native enterprises](#tilde-is-the-open-source-agent-registry-for-ai-native-enterprises)
 - [Table of contents](#table-of-contents)
 - [Getting started with Tilde](#getting-started-with-tilde)
-  - [Tilde Cloud (recommended)](#tilde-cloud-recommended)
-  - [Self-hosting Tilde (advanced)](#self-hosting-tilde-advanced)
+  - [Deploying](#deploying)
 - [Setting up Tilde](#setting-up-tilde)
 - [Learning more about Tilde](#learning-more-about-tilde)
 - [Contributing](#contributing)
@@ -40,30 +39,51 @@
 
 ## Getting started with Tilde
 
-### Tilde Cloud (recommended)
+Three steps: run Tilde, install the CLI, start your agent.
 
-The fastest and most reliable way to get started will be [Tilde Cloud](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss). We run the gateway, its databases, and upgrades, so you only deploy your agents. [Join the waitlist](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss) to get access.
-
-### Self-hosting Tilde (advanced)
-
-The gateway is one container image, `ghcr.io/trytilde/tilde`, which needs PostgreSQL, ClickHouse, and S3-compatible storage. [`quickstart/compose.yaml`](quickstart/compose.yaml) runs the latest image with all three on your machine:
+**1. Run Tilde.** The gateway is one container image, `ghcr.io/trytilde/tilde`, which needs PostgreSQL, ClickHouse and S3-compatible storage. [`quickstart/compose.yaml`](quickstart/compose.yaml) runs the latest image with all three on your machine:
 
 ```bash
 git clone https://github.com/trytilde/tilde.git && cd tilde/quickstart
-echo "TILDE_ENCRYPTION_KEY=$(openssl rand -base64 32)" > .env
-docker compose up -d
+docker compose up -d --wait
 ```
 
-Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and register your first agent. Keep `.env`: the key encrypts the credentials Tilde stores. Set `TILDE_VERSION` in `.env` to pin a release instead of `latest`. See [Deploy the gateway](https://trytilde.ai/docs/deployment/gateway) for production configuration and network exposure.
+That is the whole setup: the encryption key is generated on first start and kept in a Docker volume. Open [http://127.0.0.1:8080](http://127.0.0.1:8080) and register your first agent, giving it the capabilities, inference and access it needs.
+
+The key encrypts every credential Tilde stores, so `docker compose down -v` discards both together and nothing stored can be read back without it. Set `TILDE_ENCRYPTION_KEY` to supply your own, which a real deployment should, and `TILDE_VERSION` to pin a release instead of `latest`.
+
+**2. Install the CLI.**
+
+```bash
+curl -fsSL https://trytilde.ai/install.sh | sh
+```
+
+It is also on [npm](https://www.npmjs.com/package/@trytilde/cli) and [PyPI](https://pypi.org/project/trytilde-cli/), and the SDKs ask for the matching version, so `npm install @trytilde/sdk` or `uv add trytilde` puts the same `tilde` in your project. Run it there with `npx tilde` or `uv run tilde` to keep the CLI and the SDK on one version.
+
+**3. Start your agent.** In an agent project, with the gateway running:
+
+```bash
+tilde dev
+```
+
+`tilde dev` matches the registered agent with your project's name (`--name` or `--agent-id` to pick another), registers a deployment carrying the prompts, skills and tools your code declares, starts your agent with the credentials it needs, and serves a chat page at [http://127.0.0.1:4242](http://127.0.0.1:4242) to talk to it. Edit a prompt or a skill and save: it registers the next deployment and restarts the agent.
+
+It never creates the agent for you. An agent that exists without its capabilities, inference and access cannot serve an invocation, so registering one stays a deliberate step in the UI. If you have no agent code yet, start from [`sdk/ts/examples`](sdk/ts/examples) or [`sdk/py/examples`](sdk/py/examples), or read [Anatomy of an agent](https://trytilde.ai/docs/anatomy-of-an-agent).
+
+`tilde doctor` explains what is wrong when any of that does not work, and `tilde deploy` is the same registration from CI. Run `tilde --help` for everything else.
 
 > [!WARNING]
-> Open-source Tilde has no operator sign-in. The web UI and management API accept every request that reaches them. You must put a reverse proxy or another authentication method in front of them before anyone else can reach the gateway.
+> Open-source Tilde has no operator sign-in. The web UI and management API accept every request that reaches them. The quickstart binds every port to `127.0.0.1`; put a reverse proxy or another authentication method in front of them before anyone else can reach the gateway.
 
-Please compare [Tilde editions](https://trytilde.ai/docs/editions) for more information.
+### Deploying
+
+The easiest way to run Tilde in production is [Tilde Cloud](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss): we run the gateway, its databases and upgrades, so you only deploy your agents. [Join the waitlist](https://trytilde.ai/waitlist?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss) for access, or [book a call](https://trytilde.ai/enterprise?utm_source=github&utm_medium=readme&utm_campaign=tilde_oss) if you are an enterprise.
+
+To run it yourself, compare [Tilde editions](https://trytilde.ai/docs/editions) and read the [deployment docs](https://trytilde.ai/docs/deployment/gateway).
 
 ## Setting up Tilde
 
-Once you have a gateway, register an agent in the UI and connect it with one of our SDKs. Your agent opens an outbound connection to the gateway and never listens for requests. We have SDKs and adapters for popular agent frameworks:
+Your agent connects with one of our SDKs, opening an outbound connection to the gateway; it never listens for requests. `tilde dev` registers it for you, and the UI can do it by hand. We have SDKs and adapters for popular agent frameworks:
 
 | TypeScript ([`@trytilde/sdk`](sdk/ts)) | Python ([`trytilde`](sdk/py)) |
 | --- | --- |

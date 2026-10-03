@@ -56,6 +56,7 @@ members = [
     "tilde-py-workspace",
     "trytilde",
     "trytilde-agno",
+    "trytilde-cli",
     "trytilde-crewai",
     "trytilde-langchain",
     "trytilde-openai-agents",
@@ -5367,6 +5368,7 @@ dependencies = [
     { name = "pydantic", version = "2.12.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-15-trytilde-crewai' or extra == 'project-20-example-agent-crewai' or (extra != 'project-22-trytilde-openai-agents' and extra != 'project-27-example-agent-openai-agents')" },
     { name = "pydantic", version = "2.13.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'project-22-trytilde-openai-agents' or extra == 'project-27-example-agent-openai-agents'" },
     { name = "pyqwest" },
+    { name = "trytilde-cli" },
 ]
 
 [package.optional-dependencies]
@@ -5385,6 +5387,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5.29" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyqwest", specifier = ">=0.5" },
+    { name = "trytilde-cli", editable = "packages/tilde-cli" },
 ]
 provides-extras = ["fastapi"]
 
@@ -5402,6 +5405,11 @@ requires-dist = [
     { name = "agno", specifier = ">=3,<4" },
     { name = "trytilde", editable = "packages/tilde" },
 ]
+
+[[package]]
+name = "trytilde-cli"
+version = "3.1.0"
+source = { editable = "packages/tilde-cli" }
 
 [[package]]
 name = "trytilde-crewai"

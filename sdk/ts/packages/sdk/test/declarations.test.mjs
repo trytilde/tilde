@@ -1,20 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { once } from "node:events";
 import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { fromJsonString } from "@bufbuild/protobuf";
-import { connectNodeAdapter } from "@connectrpc/connect-node";
-import {
-  DeploymentDeclarationsSchema,
-  DeploymentService,
-} from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
-import { DeploymentSource } from "@trytilde/contracts/tilde/types/v1/deployment_pb.js";
+import { DeploymentDeclarationsSchema } from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
 import { ToolDisplay } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 import { PromptFormat, promptHash } from "../dist/index.js";
 
@@ -24,7 +16,7 @@ const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff
 
 /** An agent project: core declarations, a framework object and a stand-in Mastra adapter. */
 async function project() {
-  const dir = await mkdtemp(join(tmpdir(), "tilde-deploy-"));
+  const dir = await mkdtemp(join(tmpdir(), "tilde-declarations-"));
   await writeFile(join(dir, "package.json"), '{"type":"module","main":"src/index.mjs"}');
   await mkdir(join(dir, "src"));
   await writeFile(
@@ -84,24 +76,20 @@ connectAgent({ run: async () => {} });
 }
 async function run(dir, args, env = {}) {
   try {
-    const { stdout, stderr } = await promisify(execFile)(
-      process.execPath,
-      [cli, "deploy", ...args],
-      {
-        cwd: dir,
-        env: { PATH: process.env.PATH, ...env },
-      },
-    );
+    const { stdout, stderr } = await promisify(execFile)(process.execPath, [cli, ...args], {
+      cwd: dir,
+      env: { PATH: process.env.PATH, ...env },
+    });
     return { code: 0, stdout, stderr };
   } catch (error) {
     return { code: error.code, stdout: error.stdout, stderr: error.stderr };
   }
 }
 
-test("tilde deploy discovers declarations, uploads binaries and registers the deployment", async () => {
+test("tilde-declarations reports every prompt, skill and tool the entry declares", async () => {
   const dir = await project();
 
-  const dry = await run(dir, ["src/index.mjs", "--dry-run"]);
+  const dry = await run(dir, ["src/index.mjs"]);
   assert.equal(dry.code, 0, dry.stderr);
   assert.match(
     dry.stderr,
@@ -170,82 +158,13 @@ test("tilde deploy discovers declarations, uploads binaries and registers the de
     ],
   );
 
-  const clash = await run(dir, ["src/index.mjs", "--dry-run"], { CLASH: "1" });
+  const clash = await run(dir, ["src/index.mjs"], { CLASH: "1" });
   assert.equal(clash.code, 1);
   assert.match(clash.stderr, /Prompt respond is declared twice with different content/);
-  const toolClash = await run(dir, ["src/index.mjs", "--dry-run"], { TOOL_CLASH: "1" });
+  const toolClash = await run(dir, ["src/index.mjs"], { TOOL_CLASH: "1" });
   assert.equal(toolClash.code, 1);
   assert.match(
     toolClash.stderr,
     /Tool ping is declared twice with different definitions \(src\/index\.mjs#again\.tools\.ping, src\/index\.mjs#toolClash\.tools\.ping\)/,
   );
-
-  const calls = [];
-  const server = createServer(
-    connectNodeAdapter({
-      routes(router) {
-        router.service(DeploymentService, {
-          async missingDeploymentFiles(request, ctx) {
-            calls.push(["missing", request.sha256, ctx.requestHeader.get("authorization")]);
-            return { sha256: request.sha256 };
-          },
-          async uploadDeploymentFile(request) {
-            const sha256 = createHash("sha256").update(request.data).digest("hex");
-            calls.push(["upload", sha256]);
-            return { sha256 };
-          },
-          async registerDeployment(request) {
-            calls.push(["register", request]);
-            return {
-              deployment: { id: "11111111-2222-4333-8444-555555555555" },
-              token: "deployment-token",
-              created: true,
-            };
-          },
-        });
-      },
-    }),
-  );
-  server.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  try {
-    const env = {
-      TILDE_URL: `http://127.0.0.1:${server.address().port}`,
-      TILDE_API_KEY: "api-key",
-      TILDE_AGENT_ID: "agent-1",
-    };
-    const deployed = await run(dir, ["--label", "v1"], env);
-    assert.equal(deployed.code, 0, deployed.stderr);
-    assert.equal(deployed.stdout, "deployment-token\n");
-    const digest = createHash("sha256").update(png).digest("hex");
-    assert.deepEqual(calls.slice(0, 2), [
-      ["missing", [digest], "Bearer api-key"],
-      ["upload", digest],
-    ]);
-    const request = calls[2][1];
-    assert.equal(request.agentId, "agent-1");
-    assert.equal(request.source, DeploymentSource.MANUAL);
-    assert.equal(request.label, "v1");
-    assert.equal(request.externalId, undefined);
-    assert.deepEqual(
-      request.declarations.tools.map((t) => t.name),
-      ["ping"],
-    );
-    const logo = request.declarations.skills
-      .find((s) => s.name === "greet")
-      .files.find((f) => f.path === "logo.png");
-    assert.deepEqual(logo.body, { case: "sha256", value: digest });
-
-    // Open-source Tilde needs no management credential; none is sent without one.
-    const { TILDE_API_KEY: _, ...withoutKey } = env;
-    const json = await run(dir, ["src/index.mjs", "--json"], withoutKey);
-    assert.equal(calls.findLast(([kind]) => kind === "missing")[2], null);
-    assert.deepEqual(JSON.parse(json.stdout), {
-      deploymentId: "11111111-2222-4333-8444-555555555555",
-      token: "deployment-token",
-      created: true,
-    });
-  } finally {
-    server.close();
-  }
 });

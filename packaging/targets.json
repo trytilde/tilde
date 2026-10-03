@@ -1,0 +1,43 @@
+[
+  {
+    "rust": "x86_64-unknown-linux-musl",
+    "asset": "linux-x86_64",
+    "npm": "linux-x64",
+    "os": "linux",
+    "cpu": "x64",
+    "wheels": ["manylinux_2_17_x86_64.manylinux2014_x86_64", "musllinux_1_2_x86_64"]
+  },
+  {
+    "rust": "aarch64-unknown-linux-musl",
+    "asset": "linux-arm64",
+    "npm": "linux-arm64",
+    "os": "linux",
+    "cpu": "arm64",
+    "wheels": ["manylinux_2_17_aarch64.manylinux2014_aarch64", "musllinux_1_2_aarch64"]
+  },
+  {
+    "rust": "x86_64-apple-darwin",
+    "asset": "darwin-x86_64",
+    "npm": "darwin-x64",
+    "os": "darwin",
+    "cpu": "x64",
+    "wheels": ["macosx_10_12_x86_64"]
+  },
+  {
+    "rust": "aarch64-apple-darwin",
+    "asset": "darwin-arm64",
+    "npm": "darwin-arm64",
+    "os": "darwin",
+    "cpu": "arm64",
+    "wheels": ["macosx_11_0_arm64"]
+  },
+  {
+    "rust": "x86_64-pc-windows-msvc",
+    "asset": "windows-x86_64",
+    "npm": "win32-x64",
+    "os": "win32",
+    "cpu": "x64",
+    "exe": ".exe",
+    "wheels": ["win_amd64"]
+  }
+]

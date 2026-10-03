@@ -1,0 +1,168 @@
+name: CLI
+# Cross-compiles the `tilde` CLI for every target in packaging/targets.json and packs the npm and
+# PyPI artifacts plus the archives install.sh downloads. Called by Release, and run on pull
+# requests that touch the CLI or the way it is packaged, which is when a cross-build can break;
+# unrelated pull requests skip it, because five Rust targets are not cheap.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - crates/tilde-cli/**
+      - crates/tilde-contracts/**
+      - packaging/**
+      - scripts/pack-cli.*
+      - install.sh
+      - .github/workflows/cli.yml
+      - Cargo.toml
+      - Cargo.lock
+  workflow_call:
+  workflow_dispatch:
+concurrency:
+  group: cli-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            asset: linux-x86_64
+            runner: ubuntu-24.04
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            asset: linux-arm64
+            runner: ubuntu-24.04
+            cross: true
+          - target: x86_64-apple-darwin
+            asset: darwin-x86_64
+            runner: macos-14
+          - target: aarch64-apple-darwin
+            asset: darwin-arm64
+            runner: macos-14
+          - target: x86_64-pc-windows-msvc
+            asset: windows-x86_64
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: cli-${{ matrix.target }}
+          workspaces: . -> target
+      # `cross` carries a complete musl toolchain in a container; ring compiles C and assembly,
+      # so the target needs a real cross compiler rather than only a Rust target.
+      - uses: taiki-e/install-action@v2
+        if: matrix.cross
+        with:
+          tool: cross
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --locked --release -p tilde-cli --target ${{ matrix.target }}
+          else
+            cargo build --locked --release -p tilde-cli --target ${{ matrix.target }}
+          fi
+      # The in-repo target is `tilde-cli` because the engine owns the name `tilde`; every
+      # distribution channel ships it as `tilde`.
+      - name: Stage the binary under its published name
+        shell: bash
+        run: |
+          mkdir -p "staging/${{ matrix.target }}"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "target/${{ matrix.target }}/release/tilde-cli.exe" "staging/${{ matrix.target }}/tilde.exe"
+          else
+            cp "target/${{ matrix.target }}/release/tilde-cli" "staging/${{ matrix.target }}/tilde"
+            chmod +x "staging/${{ matrix.target }}/tilde"
+          fi
+      - name: Check the binary runs
+        if: "!matrix.cross"
+        shell: bash
+        run: test "$(staging/${{ matrix.target }}/tilde${{ runner.os == 'Windows' && '.exe' || '' }} --version)" = "tilde $(cat VERSION)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: staging/${{ matrix.target }}
+          if-no-files-found: error
+
+  package:
+    needs: build
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: staging
+      # download-artifact names each directory after its artifact (cli-<target>); the packers and
+      # the archive step expect one directory per Rust target.
+      - name: Lay the binaries out by target
+        run: |
+          mkdir -p binaries
+          for dir in staging/cli-*; do
+            mv "$dir" "binaries/$(basename "$dir" | sed 's/^cli-//')"
+          done
+          find binaries -type f | sort
+      - run: node scripts/pack-cli.mjs binaries dist/npm
+      - run: python3 scripts/pack-cli.py binaries dist/py
+      # Archives for install.sh, named by the asset field in packaging/targets.json, plus the
+      # checksums file the installer verifies every download against.
+      - name: Build release archives
+        run: |
+          mkdir -p dist/archives
+          python3 - <<'PY'
+          import json, pathlib, subprocess, tarfile, zipfile
+          targets = json.loads(pathlib.Path("packaging/targets.json").read_text())
+          out = pathlib.Path("dist/archives")
+          for target in targets:
+              exe = target.get("exe", "")
+              binary = pathlib.Path("binaries") / target["rust"] / f"tilde{exe}"
+              if not binary.is_file():
+                  raise SystemExit(f"missing {binary}")
+              if exe:
+                  with zipfile.ZipFile(out / f"tilde-{target['asset']}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+                      archive.write(binary, f"tilde{exe}")
+              else:
+                  with tarfile.open(out / f"tilde-{target['asset']}.tar.gz", "w:gz") as archive:
+                      info = archive.gettarinfo(binary, arcname="tilde")
+                      info.mode = 0o755
+                      with binary.open("rb") as handle:
+                          archive.addfile(info, handle)
+          PY
+          cd dist/archives && sha256sum * > checksums.txt && cat checksums.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-npm-packages
+          path: dist/npm/*.tgz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-python-packages
+          path: dist/py/*.whl
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-archives
+          path: dist/archives/*
+          if-no-files-found: error

@@ -1,4 +1,4 @@
-"""`python -m tilde deploy --dry-run` against a small project: entry loading, module scanning,
+"""`tilde-declarations` against a small project: entry loading, module scanning,
 core define_* recognition, entry point discoverers and the proto JSON it prints."""
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import textwrap
 
 import pytest
 
-from tilde import deploy
+from tilde.declarations import main as read_declarations
 
 ENTRY = """
 import tilde
@@ -107,8 +107,8 @@ def project(tmp_path, monkeypatch):
     os.environ.pop("TILDE_DISCOVERY", None)
 
 
-def test_dry_run_prints_every_declaration_as_proto_json(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+def test_prints_every_declaration_as_proto_json(project, capsys):
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     declarations = json.loads(out)
 
@@ -148,13 +148,13 @@ def test_dry_run_prints_every_declaration_as_proto_json(project, capsys):
     assert "warning: framework tools are not declared" in err
 
 
-def test_conflicting_prompts_fail_the_deploy(project, capsys):
+def test_conflicting_prompts_fail_the_read(project, capsys):
     (project / "other.py").write_text(
         "import tilde\nGREETING = tilde.define_prompt('greeting', template='Hi')\n"
     )
     with open(project / "main.py", "a") as entry:
         entry.write("import other\n")
-    assert deploy.main(["main.py", "--dry-run"]) == 1
+    assert read_declarations(["main.py"]) == 1
     assert "Prompt greeting is declared twice with different content" in capsys.readouterr().err
 
 
@@ -170,15 +170,15 @@ def test_tools_nobody_recognises_warn_and_conflicting_tools_fail(project, capsys
     (project / "stray.py").write_text("import tilde\nTOOLS = tilde.define_tools([print])\n")
     with open(project / "main.py", "a") as entry:
         entry.write("import stray\n")
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     assert json.loads(out).get("tools", []) == []
     assert "no installed adapter recognises these tools" in err
 
-    # The same tool name declared with two different definitions fails the deploy.
+    # The same tool name declared with two different definitions is refused.
     (project / "tools_a.py").write_text(TOOL_CLASS + "LOOKUP = Tool('lookup', 'Find it.')\n")
     (project / "tools_b.py").write_text(TOOL_CLASS + "LOOKUP = Tool('lookup', 'Look it up.')\n")
     with open(project / "main.py", "a") as entry:
         entry.write("import tools_a\nimport tools_b\n")
-    assert deploy.main(["main.py", "--dry-run"]) == 1
+    assert read_declarations(["main.py"]) == 1
     assert "Tool lookup is declared twice with different definitions" in capsys.readouterr().err

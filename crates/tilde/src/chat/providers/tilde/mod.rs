@@ -6,7 +6,7 @@ pub(crate) mod credentials;
 pub(crate) mod db;
 mod management;
 pub mod rpc;
-mod sessions;
+pub(crate) mod sessions;
 pub use adapter::Tilde;
 pub(crate) use management::router as management_router;
 pub(crate) use sessions::QueueChange;

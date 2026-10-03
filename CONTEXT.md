@@ -756,6 +756,81 @@ examples run with the workspace interpreter directly so stopping the launcher ne
 them. Python packages share the Changie release version; contracts are generated
 by `sdk/py/scripts/generate.py` and not committed.
 
+## Generated contracts
+
+`crates/tilde-contracts` holds the Rust Protobuf messages (`proto`) and ConnectRPC service
+definitions (`services`) generated from `proto/` by `buf.gen.yaml`; `task generate` rewrites both
+trees and nothing in them is hand-written. It is its own crate so the engine and the `tilde` CLI
+build against one set of contracts: the engine re-exports it as `crate::proto` and
+`crate::services`, which keeps every existing path working, and the message module is named
+`proto` inside the crate because the service generator refers to it as `crate::proto`
+(`buffa_module`). `buffa`, `buffa-types` and `connectrpc` are workspace dependencies so the
+generated code and the engine cannot drift apart on the codegen runtime.
+
+Moving the contracts out made conversions between a query row and a contract type orphan impls,
+since both sides are now foreign; `queued_input` in the Tilde chat provider is a free function
+for that reason rather than a `From`. Pulling the crate in costs about a minute of compile time
+on a cold build, which is why the CLI depends on it rather than the engine.
+
+## The tilde CLI
+
+`crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy` and `doctor`. The engine
+crate already owns the binary name `tilde` and two workspace packages producing one binary name
+silently overwrite each other in `target/`, so the in-repo target is `tilde-cli` and every
+distribution channel installs it as `tilde`. It calls the management API through the
+generated clients in `tilde-contracts`, the same crate the engine serves from, so the wire
+shapes are checked by the compiler instead of being written out by hand; the default protobuf
+codec is used, and `reqwest` remains only for the chat page's opaque body proxying.
+
+Declarations are the split that shapes the whole design. Prompts, skills and bundled tools are
+values in the agent's own modules, so only that language's runtime can read them: each SDK
+exposes a declarations-only entrypoint (`tilde-declarations`, the `tilde-declarations` bin of
+`@trytilde/sdk` and the console script of `trytilde`, also `python -m tilde declarations`) that
+imports the entry with `TILDE_DISCOVERY=1` and prints `DeploymentDeclarations` as protobuf JSON.
+The CLI resolves that reader by looking for it (`node_modules/.bin`, then the installed module;
+`VIRTUAL_ENV`, then the nearest `.venv`, which in a uv workspace sits above the project) rather
+than by running something and reading an exit code, so "the SDK is not installed" stays
+distinguishable from "the declarations are broken". Everything after discovery — turning inline
+`data` into content-addressed uploads and registering the deployment — lives in the CLI, so
+registration has one implementation instead of one per SDK. The reader's protobuf JSON
+deserialises straight into `DeploymentDeclarations`, so the CLI never restates those fields. `--allow-empty` lets `dev` run an
+agent that declares nothing, while `deploy` still refuses an empty release.
+
+`tilde dev` resolves the agent by exact name (or `--agent-id`) and fails with the gateway's
+`/agent/new` link when there is none: it never creates one, because an agent without
+capabilities, inference and channel access looks registered and then fails the first invocation
+with `permission_denied`. It registers a deployment whose external id carries the declaration digest, and reuses that deployment on an unchanged restart; because
+registration returns a token only on creation, it then mints one with `IssueDeploymentToken`,
+which invalidates the previous token, so two concurrent `dev` sessions on identical declarations
+fight over it. It starts the agent with `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN`, polls
+the mtimes of the files the declarations came from, and on a change re-reads them, registers the
+next deployment when the digest moved (a deployment's contents are immutable) and restarts the
+agent. Ctrl-C and SIGTERM both stop the child, or it outlives `dev` and keeps holding its token.
+
+The local chat page is a single embedded HTML file served with a reverse proxy to the agent's
+Tilde chat ingress: the application key stays in the CLI exactly as a real application's server
+keeps it, and the browser only talks to 127.0.0.1. The page polls `ListMessages` instead of
+streaming `WatchThread`, which is enough for a dev loop and needs no Connect stream framing in
+the browser. Every agent owns one built-in `tilde/application` connection whose channel is
+private, so `dev` admits the single `dev` identity on it: a refused ingress call still records
+the identity, which is what makes it addressable, and `SetIdentityAccess` then allows exactly
+that one without touching the channel's mode.
+
+Distribution is driven by `packaging/targets.json`, the single source of truth for each target's
+Rust triple, release asset name, npm platform package and Python wheel tags. `.github/workflows/cli.yml`
+cross-compiles every target (`cross` for the musl ones, because ring compiles C and assembly),
+then `scripts/pack-cli.mjs` writes one `@trytilde/cli-<platform>` package per target and packs
+`@trytilde/cli` with those as exact `optionalDependencies`, and `scripts/pack-cli.py` writes one
+`trytilde-cli` wheel per tag carrying the binary in `.data/scripts` so pip installs the real
+executable with no Python wrapper. The platform packages are generated at pack time, never
+committed, so installing this repository never has to resolve a version that is not published
+yet. `install.sh` downloads the release archive and verifies it against the release's
+`checksums.txt`. Both SDKs declare the CLI at their own version — the TypeScript SDK as a peer
+dependency, because package managers install peers at the project root where `npx tilde`
+resolves, while a transitive dependency's bin is not linked there. `sdk/py/packages/tilde-cli`
+is a development stand-in that runs the binary built by cargo so `uv` can resolve
+`trytilde-cli` inside this repository; `task sdk:py:pack` skips it.
+
 ## Tracing
 
 Tilde is its own trace store. Spans live in one append-only ClickHouse table,

@@ -362,7 +362,27 @@ tasks:
     desc: Build sdists and wheels for the Python SDK packages (not the examples) into dist/py
     cmds:
       - task: version:check
-      - for package in sdk/py/packages/*/; do uv build --quiet --out-dir dist/py "$package"; done
+      # tilde-cli is skipped: its release wheels carry a prebuilt binary per platform and come
+      # from `task cli:pack`, not from its development stand-in pyproject.
+      - for package in sdk/py/packages/*/; do
+        case "$package" in *"/tilde-cli/") continue ;; esac;
+        uv build --quiet --out-dir dist/py "$package";
+        done
+
+  cli:build:
+    desc: Build the CLI for this machine into target/release
+    cmds:
+      - scripts/with-sccache.sh cargo build --locked --release -p tilde-cli
+
+  cli:pack:
+    desc: Pack CLI binaries from a directory of per-target builds into dist/npm and dist/py
+    preconditions:
+      - sh: test -n '{{.CLI_ARGS}}'
+        msg: Supply the directory holding one subdirectory per Rust target after --
+    cmds:
+      - task: version:check
+      - node scripts/pack-cli.mjs '{{.CLI_ARGS}}' dist/npm
+      - python3 scripts/pack-cli.py '{{.CLI_ARGS}}' dist/py
 
   agent:example:
     desc: Run the example agent; it dials in with TILDE_GATEWAY_URL and TILDE_DEPLOYMENT_TOKEN

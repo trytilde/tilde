@@ -1,0 +1,3 @@
+kind: Added
+body: "The `tilde` CLI: `tilde dev` matches this project's name against an agent you registered (it never creates one), registers a deployment carrying the prompts, skills and tools the code declares, runs the agent with the credentials it needs and serves a local chat page to talk to it, re-registering and restarting when a declaration changes; `tilde deploy` is the same registration for CI and `tilde doctor` checks the project, its SDK and the gateway. Install it with `curl -fsSL https://trytilde.ai/install.sh | sh`, from npm as @trytilde/cli or from PyPI as trytilde-cli; both SDKs ask for the matching version, so `npx tilde` and `uv run tilde` keep the CLI and the SDK on one version."
+time: 2026-10-02T15:45:00+02:00

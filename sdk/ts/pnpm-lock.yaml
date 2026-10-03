@@ -290,6 +290,8 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
 
+  packages/cli: {}
+
   packages/connection-ui:
     dependencies:
       '@base-ui/react':
@@ -390,6 +392,9 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: ^2.11.0
         version: 2.11.0(@opentelemetry/api@1.9.1)
+      '@trytilde/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@trytilde/contracts':
         specifier: workspace:*
         version: link:../contracts

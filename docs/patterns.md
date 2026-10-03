@@ -44,7 +44,7 @@ From `AGENTS.md`:
   its number and name. CI runs `buf breaking` against the base branch on pull
   requests.
 - Run `task generate` after editing a `.proto` file and commit
-  `crates/tilde/src/generated/`. Mount services through the domain's `rpc.rs` or
+  `crates/tilde-contracts/src/generated/`. Mount services through the domain's `rpc.rs` or
   `rpc/` module and the route group composition in `crates/tilde/src/iam/listeners.rs`.
 
 ## Secrets

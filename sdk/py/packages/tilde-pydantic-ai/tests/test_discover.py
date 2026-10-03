@@ -13,7 +13,7 @@ from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.toolsets import FunctionToolset
 
-from tilde import deploy
+from tilde.declarations import main as read_declarations
 from tilde_pydantic_ai import TildeInvocation
 
 AGENTS = """
@@ -65,7 +65,7 @@ def project(tmp_path, monkeypatch):
 
 
 async def test_agent_prompts_are_declared_and_dynamic_ones_stamped(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     prompts = {
         p["name"]: (p["format"], p["template"], p["origin"], p["hash"])
         for p in json.loads(capsys.readouterr().out)["prompts"]
@@ -101,7 +101,7 @@ async def test_agent_prompts_are_declared_and_dynamic_ones_stamped(project, caps
 
 
 def test_bundled_and_agent_tools_are_declared_as_published(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     tools = {t["name"]: t for t in json.loads(out)["tools"]}
     assert tools == {

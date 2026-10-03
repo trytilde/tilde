@@ -36,5 +36,22 @@ for name, package in packages.items():
 for manifest in sorted((root / "sdk/py/packages").glob("*/pyproject.toml")):
     project = tomllib.loads(manifest.read_text())["project"]
     assert project["version"] == version, f"{manifest.relative_to(root)} version differs from VERSION"
+    # An exact pin between Tilde's own Python packages (the SDK on the CLI) must move with the
+    # release; ranges between the SDK and its adapters are deliberate and left alone.
+    for dependency in project.get("dependencies", []):
+        name, exact, pin = dependency.partition("==")
+        if exact and name.strip().startswith("trytilde"):
+            assert pin == version, (
+                f"{manifest.relative_to(root)} pins {name.strip()} at {pin}, not {version}"
+            )
+
+# The platform packages the CLI publishes are generated at pack time, so the only thing to keep
+# in step here is the launcher and the target table both existing.
+targets = json.loads((root / "packaging/targets.json").read_text())
+assert targets, "packaging/targets.json lists no targets"
+for target in targets:
+    for field in ("rust", "asset", "npm", "os", "cpu", "wheels"):
+        assert field in target, f"packaging/targets.json entry {target} is missing {field}"
+assert "@trytilde/cli" in packages, "sdk/ts/packages/cli must be a workspace package"
 
 print(f"Release versions agree: {version}")

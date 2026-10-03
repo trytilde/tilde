@@ -1,6 +1,8 @@
 [workspace]
 members = [
   "crates/tilde",
+  "crates/tilde-cli",
+  "crates/tilde-contracts",
   "crates/queries",
   "crates/client-aws-config",
   "crates/client-aws-sigv4",
@@ -28,6 +30,18 @@ strip = true
 
 [workspace.dependencies]
 client-aws-config = { path = "crates/client-aws-config" }
+tilde-contracts = { path = "crates/tilde-contracts" }
+# The generated contracts and the engine must agree exactly on the codegen runtime.
+buffa = { version = "=0.9.1", features = ["json"] }
+buffa-types = { version = "=0.9.1", features = ["json"] }
+connectrpc = { version = "=0.9.0", default-features = false, features = [
+  "axum",
+  # Standard Connect clients (Python, Go, gRPC) compress request bodies with gzip.
+  "gzip",
+  "json",
+  "client",
+  "client-tls",
+] }
 client-aws-sigv4 = { path = "crates/client-aws-sigv4" }
 client-aws-kms = { path = "crates/client-aws-kms" }
 base64 = "0.22"

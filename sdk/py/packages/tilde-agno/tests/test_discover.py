@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from tilde import deploy
 from tilde._cancel import Cancellation
+from tilde.declarations import main as read_declarations
 from tilde_agno import tilde_agno
 
 AGENTS = """
@@ -88,7 +88,7 @@ def project(tmp_path, monkeypatch):
 
 
 async def test_agent_prompts_and_skills_are_declared_and_dynamic_ones_stamped(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     declarations = json.loads(capsys.readouterr().out)
     prompts = {
         p["name"]: (p["format"], p["template"], p["origin"], p["hash"])
@@ -139,7 +139,7 @@ async def test_agent_prompts_and_skills_are_declared_and_dynamic_ones_stamped(pr
 
 
 def test_bundled_plain_functions_and_agent_tools_are_declared_as_published(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     tools = {t["name"]: t for t in json.loads(capsys.readouterr().out)["tools"]}
     assert tools == {
         "lookup": {

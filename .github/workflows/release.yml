@@ -40,6 +40,10 @@ jobs:
   build:
     needs: version
     uses: ./.github/workflows/build.yml
+  # Cross-compiles `tilde` for every target and packs its npm packages, wheels and archives.
+  cli:
+    needs: version
+    uses: ./.github/workflows/cli.yml
   # Public image on GHCR. A rerun leaves an already-pushed version alone.
   container:
     needs: [version, changie, check, build]
@@ -112,7 +116,7 @@ jobs:
   # published once by hand, then trusted with `npm trust github <package> --file release.yml
   # --repository trytilde/tilde --allow-publish`.
   npm:
-    needs: [version, changie, check, build]
+    needs: [version, changie, check, build, cli]
     runs-on: ubuntu-24.04
     permissions:
       id-token: write
@@ -127,6 +131,10 @@ jobs:
         with:
           name: npm-packages
           path: dist/npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-npm-packages
+          path: dist/npm
       - name: Publish unpublished SDK packages
         run: |
           for tarball in dist/npm/*.tgz; do
@@ -139,16 +147,17 @@ jobs:
           done
   # PyPI trusted publishing: each project trusts this repository's release.yml in its own
   # environment, pypi-<project>. PyPI allows one pending publisher per owner, repository,
-  # workflow and environment, so the environment is what tells the six projects apart. No
+  # workflow and environment, so the environment is what tells the seven projects apart. No
   # token is stored. Attestations need a public repository; enable them once it is public.
   pypi:
-    needs: [version, changie, check, build]
+    needs: [version, changie, check, build, cli]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         project:
           - trytilde
+          - trytilde-cli
           - trytilde-langchain
           - trytilde-pydantic-ai
           - trytilde-openai-agents
@@ -161,6 +170,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: python-packages
+          path: dist/all
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-python-packages
           path: dist/all
       # Wheels and sdists name the project with underscores (trytilde_langchain-3.0.0...).
       - name: Select this project's distributions
@@ -177,7 +190,7 @@ jobs:
           attestations: false
   # The tag and release are created last, once the image and every package are published.
   release:
-    needs: [version, container, npm, pypi]
+    needs: [version, container, npm, pypi, cli]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -190,6 +203,12 @@ jobs:
           pattern: "*-packages"
           path: dist/packages
           merge-multiple: true
+      # install.sh resolves `tilde-<os>-<arch>` from the release and verifies it against
+      # checksums.txt, so both have to be attached to every release.
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-archives
+          path: dist/packages
       - name: Tag and publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

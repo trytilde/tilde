@@ -15,7 +15,13 @@ dependencies = [
   "opentelemetry-api>=1.30",
   "opentelemetry-sdk>=1.30",
   "opentelemetry-exporter-otlp-proto-common>=1.30",
+  # Installing the SDK brings the matching CLI, so `tilde` works in any agent project.
+  "trytilde-cli==3.1.0",
 ]
+
+[project.scripts]
+# The `tilde` CLI runs this to read what the agent's code declares.
+tilde-declarations = "tilde.declarations:main"
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.115"]

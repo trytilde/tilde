@@ -10,7 +10,7 @@ import textwrap
 
 import pytest
 
-from tilde import deploy
+from tilde.declarations import main as read_declarations
 
 CREW = """
 from crewai.project import CrewBase
@@ -70,7 +70,7 @@ def project(tmp_path, monkeypatch):
 
 
 def test_crewbase_yaml_prompts_and_skills_are_declared(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     declarations = json.loads(out)
     prompts = {
@@ -129,7 +129,7 @@ def test_bundled_tools_are_declared_under_the_name_crewai_shows(tmp_path, monkey
     (tmp_path / "tools_main.py").write_text(TOOLS_MAIN)
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
-    assert deploy.main(["tools_main.py", "--dry-run"]) == 0
+    assert read_declarations(["tools_main.py"]) == 0
     (declared,) = json.loads(capsys.readouterr().out)["tools"]
     # CrewAI shows the model a sanitized name; options stay keyed by the tool's own name.
     assert declared["name"] == "lookup_order"

@@ -11,7 +11,7 @@ import textwrap
 
 import pytest
 
-from tilde import deploy
+from tilde.declarations import main as read_declarations
 
 MAIN = """
 from agents import Agent, ShellTool, function_tool, handoff
@@ -105,7 +105,7 @@ def project(tmp_path, monkeypatch):
 
 
 def test_reachable_agents_prompts_and_skills_are_declared(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     out, err = capsys.readouterr()
     declarations = json.loads(out)
     prompts = {p["name"]: p for p in declarations["prompts"]}
@@ -135,7 +135,7 @@ def test_reachable_agents_prompts_and_skills_are_declared(project, capsys):
 
 
 def test_bundled_and_agent_function_tools_are_declared_as_published(project, capsys):
-    assert deploy.main(["main.py", "--dry-run"]) == 0
+    assert read_declarations(["main.py"]) == 0
     tools = {t["name"]: t for t in json.loads(capsys.readouterr().out)["tools"]}
     assert {name: tool["origin"] for name, tool in tools.items()} == {
         "lookup": "main.py#TOOLS.tools.lookup",
