@@ -318,6 +318,16 @@ pub struct Routine {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub enabled: bool,
+    /// Empty titles each thread with the routine's name.
+    ///
+    /// Field 14: `thread_title`
+    #[serde(
+        rename = "threadTitle",
+        alias = "thread_title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub thread_title: ::buffa::alloc::string::String,
     /// Set for an enabled cron routine.
     ///
     /// Field 8: `next_run_at`
@@ -390,6 +400,7 @@ impl ::core::fmt::Debug for Routine {
             .field("name", &self.name)
             .field("prompt", &self.prompt)
             .field("enabled", &self.enabled)
+            .field("thread_title", &self.thread_title)
             .field("next_run_at", &self.next_run_at)
             .field("last_run_at", &self.last_run_at)
             .field("last_thread_id", &self.last_thread_id)
@@ -522,6 +533,9 @@ impl ::buffa::Message for Routine {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if !self.thread_title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -604,6 +618,9 @@ impl ::buffa::Message for Routine {
                 buf,
             );
             self.updated_at.write_to(__cache, buf);
+        }
+        if !self.thread_title.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -761,6 +778,13 @@ impl ::buffa::Message for Routine {
                     ctx,
                 )?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.thread_title, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -781,6 +805,7 @@ impl ::buffa::Message for Routine {
         self.last_error = ::core::option::Option::None;
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
+        self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -819,6 +844,9 @@ impl<'de> serde::Deserialize<'de> for Routine {
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_enabled: ::core::option::Option<bool> = None;
+                let mut __f_thread_title: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
                 let mut __f_next_run_at: ::core::option::Option<
                     ::buffa::MessageField<
                         ::buffa_types::google::protobuf::Timestamp,
@@ -936,6 +964,24 @@ impl<'de> serde::Deserialize<'de> for Routine {
                                         d: D,
                                     ) -> ::core::result::Result<bool, D::Error> {
                                         ::buffa::json_helpers::proto_bool::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "threadTitle" | "thread_title" => {
+                            __f_thread_title = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -1070,6 +1116,9 @@ impl<'de> serde::Deserialize<'de> for Routine {
                 if let ::core::option::Option::Some(v) = __f_enabled {
                     __r.enabled = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_thread_title {
+                    __r.thread_title = v;
+                }
                 if let ::core::option::Option::Some(v) = __f_next_run_at {
                     __r.next_run_at = v;
                 }
@@ -1123,6 +1172,7 @@ pub mod routine {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::routine::Trigger as TriggerView;
 }
+/// `default_thread_title` is the thread title template a new routine on this signal starts with.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1141,6 +1191,21 @@ pub struct SignalType {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub description: ::buffa::alloc::string::String,
+    /// Field 3: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 4: `default_thread_title`
+    #[serde(
+        rename = "defaultThreadTitle",
+        alias = "default_thread_title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub default_thread_title: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1150,6 +1215,8 @@ impl ::core::fmt::Debug for SignalType {
         f.debug_struct("SignalType")
             .field("id", &self.id)
             .field("description", &self.description)
+            .field("name", &self.name)
+            .field("default_thread_title", &self.default_thread_title)
             .finish()
     }
 }
@@ -1186,6 +1253,15 @@ impl ::buffa::Message for SignalType {
         if !self.description.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
         }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.default_thread_title.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.default_thread_title)
+                        as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1201,6 +1277,12 @@ impl ::buffa::Message for SignalType {
         }
         if !self.description.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.description, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.name, buf);
+        }
+        if !self.default_thread_title.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.default_thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1229,6 +1311,20 @@ impl ::buffa::Message for SignalType {
                 )?;
                 ::buffa::types::merge_string(&mut self.description, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.default_thread_title, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1239,6 +1335,8 @@ impl ::buffa::Message for SignalType {
     fn clear(&mut self) {
         self.id.clear();
         self.description.clear();
+        self.name.clear();
+        self.default_thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1269,6 +1367,177 @@ pub const __SIGNAL_TYPE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
     type_url: "type.googleapis.com/tilde.management.v1.SignalType",
     to_json: ::buffa::type_registry::any_to_json::<SignalType>,
     from_json: ::buffa::type_registry::any_from_json::<SignalType>,
+    is_wkt: false,
+};
+/// A path in a signal's context a template may name, with an example value.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SignalVariable {
+    /// Field 1: `key`
+    #[serde(
+        rename = "key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub key: ::buffa::alloc::string::String,
+    /// Field 2: `description`
+    #[serde(
+        rename = "description",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub description: ::buffa::alloc::string::String,
+    /// Field 3: `example`
+    #[serde(
+        rename = "example",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub example: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SignalVariable {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SignalVariable")
+            .field("key", &self.key)
+            .field("description", &self.description)
+            .field("example", &self.example)
+            .finish()
+    }
+}
+impl SignalVariable {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SignalVariable";
+}
+::buffa::impl_default_instance!(SignalVariable);
+impl ::buffa::MessageName for SignalVariable {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SignalVariable";
+    const FULL_NAME: &'static str = "tilde.management.v1.SignalVariable";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SignalVariable";
+}
+impl ::buffa::Message for SignalVariable {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.key.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.key) as u64;
+        }
+        if !self.description.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
+        }
+        if !self.example.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.example) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.key.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.key, buf);
+        }
+        if !self.description.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.description, buf);
+        }
+        if !self.example.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.example, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.key, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.description, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.example, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.key.clear();
+        self.description.clear();
+        self.example.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SignalVariable {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SignalVariable";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SignalVariable {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SIGNAL_VARIABLE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SignalVariable",
+    to_json: ::buffa::type_registry::any_to_json::<SignalVariable>,
+    from_json: ::buffa::type_registry::any_from_json::<SignalVariable>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]
@@ -1568,6 +1837,14 @@ pub struct CreateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub enabled: bool,
+    /// Field 7: `thread_title`
+    #[serde(
+        rename = "threadTitle",
+        alias = "thread_title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub thread_title: ::buffa::alloc::string::String,
     #[serde(flatten)]
     pub trigger: ::core::option::Option<__buffa::oneof::create_routine_request::Trigger>,
     #[serde(skip)]
@@ -1581,6 +1858,7 @@ impl ::core::fmt::Debug for CreateRoutineRequest {
             .field("name", &self.name)
             .field("prompt", &self.prompt)
             .field("enabled", &self.enabled)
+            .field("thread_title", &self.thread_title)
             .field("trigger", &self.trigger)
             .finish()
     }
@@ -1644,6 +1922,9 @@ impl ::buffa::Message for CreateRoutineRequest {
                 }
             }
         }
+        if !self.thread_title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1685,6 +1966,9 @@ impl ::buffa::Message for CreateRoutineRequest {
                     x.write_to(__cache, buf);
                 }
             }
+        }
+        if !self.thread_title.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1771,6 +2055,13 @@ impl ::buffa::Message for CreateRoutineRequest {
                     );
                 }
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.thread_title, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1784,6 +2075,7 @@ impl ::buffa::Message for CreateRoutineRequest {
         self.prompt.clear();
         self.enabled = false;
         self.trigger = ::core::option::Option::None;
+        self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1821,6 +2113,9 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_enabled: ::core::option::Option<bool> = None;
+                let mut __f_thread_title: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
                 let mut __oneof_trigger: ::core::option::Option<
                     __buffa::oneof::create_routine_request::Trigger,
                 > = None;
@@ -1895,6 +2190,24 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "threadTitle" | "thread_title" => {
+                            __f_thread_title = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "cron" => {
                             let v: ::core::option::Option<CronTrigger> = map
                                 .next_value_seed(
@@ -1960,6 +2273,9 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_enabled {
                     __r.enabled = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_thread_title {
+                    __r.thread_title = v;
                 }
                 __r.trigger = __oneof_trigger;
                 Ok(__r)
@@ -2166,6 +2482,14 @@ pub struct UpdateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub enabled: bool,
+    /// Field 7: `thread_title`
+    #[serde(
+        rename = "threadTitle",
+        alias = "thread_title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub thread_title: ::buffa::alloc::string::String,
     #[serde(flatten)]
     pub trigger: ::core::option::Option<__buffa::oneof::update_routine_request::Trigger>,
     #[serde(skip)]
@@ -2179,6 +2503,7 @@ impl ::core::fmt::Debug for UpdateRoutineRequest {
             .field("name", &self.name)
             .field("prompt", &self.prompt)
             .field("enabled", &self.enabled)
+            .field("thread_title", &self.thread_title)
             .field("trigger", &self.trigger)
             .finish()
     }
@@ -2242,6 +2567,9 @@ impl ::buffa::Message for UpdateRoutineRequest {
                 }
             }
         }
+        if !self.thread_title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2283,6 +2611,9 @@ impl ::buffa::Message for UpdateRoutineRequest {
                     x.write_to(__cache, buf);
                 }
             }
+        }
+        if !self.thread_title.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2369,6 +2700,13 @@ impl ::buffa::Message for UpdateRoutineRequest {
                     );
                 }
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.thread_title, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2382,6 +2720,7 @@ impl ::buffa::Message for UpdateRoutineRequest {
         self.prompt.clear();
         self.enabled = false;
         self.trigger = ::core::option::Option::None;
+        self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2417,6 +2756,9 @@ impl<'de> serde::Deserialize<'de> for UpdateRoutineRequest {
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_enabled: ::core::option::Option<bool> = None;
+                let mut __f_thread_title: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
                 let mut __oneof_trigger: ::core::option::Option<
                     __buffa::oneof::update_routine_request::Trigger,
                 > = None;
@@ -2491,6 +2833,24 @@ impl<'de> serde::Deserialize<'de> for UpdateRoutineRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "threadTitle" | "thread_title" => {
+                            __f_thread_title = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "cron" => {
                             let v: ::core::option::Option<CronTrigger> = map
                                 .next_value_seed(
@@ -2556,6 +2916,9 @@ impl<'de> serde::Deserialize<'de> for UpdateRoutineRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_enabled {
                     __r.enabled = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_thread_title {
+                    __r.thread_title = v;
                 }
                 __r.trigger = __oneof_trigger;
                 Ok(__r)
@@ -3084,6 +3447,7 @@ pub const __LIST_SIGNAL_TYPES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<ListSignalTypesRequest>,
     is_wkt: false,
 };
+/// `variables` apply to every signal type of the connection; a key absent from a delivery renders empty.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3096,6 +3460,13 @@ pub struct ListSignalTypesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub signal_types: ::buffa::alloc::vec::Vec<SignalType>,
+    /// Field 2: `variables`
+    #[serde(
+        rename = "variables",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub variables: ::buffa::alloc::vec::Vec<SignalVariable>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3104,6 +3475,7 @@ impl ::core::fmt::Debug for ListSignalTypesResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("ListSignalTypesResponse")
             .field("signal_types", &self.signal_types)
+            .field("variables", &self.variables)
             .finish()
     }
 }
@@ -3142,6 +3514,14 @@ impl ::buffa::Message for ListSignalTypesResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.variables {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3155,6 +3535,14 @@ impl ::buffa::Message for ListSignalTypesResponse {
         for v in &self.signal_types {
             ::buffa::types::put_len_delimited_header(
                 1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.variables {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -3185,6 +3573,18 @@ impl ::buffa::Message for ListSignalTypesResponse {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.signal_types.push(elem);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.variables.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3194,6 +3594,7 @@ impl ::buffa::Message for ListSignalTypesResponse {
     }
     fn clear(&mut self) {
         self.signal_types.clear();
+        self.variables.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

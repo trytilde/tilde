@@ -557,7 +557,7 @@ impl Connections {
                     .as_str()
                     .map(str::to_owned)
             }),
-            webhook_url: connection.channel_capable.then(|| {
+            webhook_url: (connection.channel_capable || connection.signal_capable).then(|| {
                 format!(
                     "{}/connections/webhooks/{}",
                     self.public_event_ingress_url, connection.id

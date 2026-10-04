@@ -4,12 +4,14 @@
 ALTER TABLE connection_types ADD COLUMN signal_capable BOOLEAN NOT NULL DEFAULT false;
 
 -- A routine is one trigger and a prompt for its agent: a UTC cron schedule, or one signal type of
--- one connection. Each firing starts a run in a new thread.
+-- one connection. Each firing starts a run in a new thread titled by `thread_title` (the routine's
+-- name when empty). Prompt and title are `{{ variable }}` templates rendered at each firing.
 CREATE TABLE routines (
  id UUID PRIMARY KEY,
  agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
  prompt TEXT NOT NULL CHECK (length(prompt) BETWEEN 1 AND 8000),
+ thread_title TEXT NOT NULL CHECK (length(thread_title) <= 500),
  enabled BOOLEAN NOT NULL,
  schedule TEXT,
  connection_id UUID REFERENCES connections(id) ON DELETE CASCADE,

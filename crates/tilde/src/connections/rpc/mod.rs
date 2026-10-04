@@ -315,8 +315,7 @@ pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection
         };
     let slug = c.slug();
     types::Connection {
-        webhook_url: c
-            .channel_capable
+        webhook_url: (c.channel_capable || c.signal_capable)
             .then(|| format!("{base}/connections/webhooks/{}", c.id)),
         id: c.id.to_string(),
         name: c.name,

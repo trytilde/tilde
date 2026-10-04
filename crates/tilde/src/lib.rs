@@ -19,6 +19,7 @@ pub mod iam;
 pub mod inference;
 pub mod prompts;
 pub mod routines;
+pub mod signals;
 pub mod skills;
 pub mod tools;
 

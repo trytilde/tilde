@@ -100,14 +100,6 @@ pub trait Adapter: Send + Sync {
         headers: &'a http::HeaderMap,
         body: &'a [u8],
     ) -> BoxFuture<'a, ToolResult<ingress::Webhook>>;
-    /// The signal types this provider's webhooks emit, with a description for routine pickers.
-    fn signal_types(&self) -> &'static [(&'static str, &'static str)] {
-        &[]
-    }
-    /// The signals in a delivery `webhook` has already verified.
-    fn signals(&self, _headers: &http::HeaderMap, _body: &[u8]) -> Vec<ingress::Signal> {
-        vec![]
-    }
     fn invoke<'a>(
         &'a self,
         access: &'a Access,

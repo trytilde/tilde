@@ -263,7 +263,9 @@ pub const ROUTINE_SERVICE_LIST_SIGNAL_TYPES_SPEC: ::connectrpc::Spec = ::connect
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Routines prompt an agent when a cron schedule comes due or a connection emits a signal.
-/// Each firing starts a run in a new thread.
+/// Each firing starts a run in a new thread. The prompt and thread title are templates: each
+/// `{{ key }}` is replaced with that path of the signal's context (see ListSignalTypes) or, for a
+/// cron routine, `scheduled_at`.
 ///
 /// # Implementing handlers
 ///

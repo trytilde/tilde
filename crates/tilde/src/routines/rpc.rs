@@ -48,6 +48,7 @@ fn routine_wire(r: Routine) -> management::Routine {
         agent_id: r.agent_id.to_string(),
         name: r.name,
         prompt: r.prompt,
+        thread_title: r.thread_title,
         enabled: r.enabled,
         trigger: Some(match r.trigger {
             Trigger::Cron { schedule } => {
@@ -107,6 +108,7 @@ impl RoutineService for Rpc {
                 RoutineInput {
                     name: request.name,
                     prompt: request.prompt,
+                    thread_title: request.thread_title,
                     enabled: request.enabled,
                     trigger,
                 },
@@ -137,6 +139,7 @@ impl RoutineService for Rpc {
                 RoutineInput {
                     name: request.name,
                     prompt: request.prompt,
+                    thread_title: request.thread_title,
                     enabled: request.enabled,
                     trigger,
                 },
@@ -160,16 +163,29 @@ impl RoutineService for Rpc {
         _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListSignalTypesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListSignalTypesResponse> + Send + use<'a>> {
-        let types = self
+        let source = self
             .0
-            .signal_types(id(&request.to_owned_message().connection_id)?)
+            .signal_source(id(&request.to_owned_message().connection_id)?)
             .await?;
         Response::ok(management::ListSignalTypesResponse {
-            signal_types: types
+            signal_types: source
+                .types()
+                .into_iter()
+                .map(|t| management::SignalType {
+                    id: t.id,
+                    name: t.name,
+                    description: t.description,
+                    default_thread_title: t.title,
+                    ..Default::default()
+                })
+                .collect(),
+            variables: crate::signals::COMMON
                 .iter()
-                .map(|(id, description)| management::SignalType {
-                    id: (*id).into(),
-                    description: (*description).into(),
+                .chain(source.variables())
+                .map(|v| management::SignalVariable {
+                    key: v.key.into(),
+                    description: v.description.into(),
+                    example: v.example.into(),
                     ..Default::default()
                 })
                 .collect(),

@@ -1,19 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link } from "@tanstack/react-router";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { PencilIcon, PlusIcon } from "lucide-react";
-import type { Routine, SignalType } from "@trytilde/contracts/tilde/management/v1/routines_pb.js";
-import { Capability, type Connection } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
+import { CableIcon, ClockIcon, PencilIcon, PlusIcon } from "lucide-react";
+import type {
+  Routine,
+  SignalType,
+  SignalVariable,
+} from "@trytilde/contracts/tilde/management/v1/routines_pb.js";
+import {
+  Capability,
+  type Connection,
+  type Provider,
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { connections, routines } from "@/client";
+import { randomUUID } from "@/lib/browser-crypto";
 import { message } from "./skill-common";
+import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog";
+import { ProviderIcon } from "./provider-icon";
 import { RemoveButton } from "./remove-button";
 import { TableSkeletonRows } from "./table-skeleton";
+import { TemplateInput, VariableBadge, type TemplateVariable } from "./template-input";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
-import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import {
@@ -24,37 +35,59 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 const COLUMNS = 6;
+/** What a cron routine's templates may name; rendered by the server (`routines::tick`). */
+const CRON_VARIABLES: TemplateVariable[] = [
+  {
+    key: "scheduled_at",
+    description: "The time this run was scheduled for, in UTC.",
+    example: "2026-10-05T09:00:00+00:00",
+  },
+];
 const when = (routine: Routine) =>
   routine.lastRunAt ? timestampDate(routine.lastRunAt).toLocaleString() : undefined;
+const signalMethods = (provider: Provider) =>
+  provider.connectionTypes.filter((type) => type.capabilities.includes(Capability.SIGNAL));
 
-// Every page: the picker offers them all and existing routines name theirs by slug.
-async function signalConnections(signal: AbortSignal) {
-  const all: Connection[] = [];
+async function all<T>(page: (pageToken: string) => Promise<{ items: T[]; next: string }>) {
+  const items: T[] = [];
   let pageToken = "";
   do {
-    const page = await connections.listConnections(
-      { capability: Capability.SIGNAL, pageSize: 100, pageToken },
-      { signal },
-    );
-    all.push(...page.connections);
-    pageToken = page.nextPageToken;
+    const result = await page(pageToken);
+    items.push(...result.items);
+    pageToken = result.next;
   } while (pageToken);
-  return all;
+  return items;
 }
+
+/** Which routine the dialog edits, or the trigger a new one starts with. */
+type Editing = { routine: Routine } | { kind: "cron" } | { kind: "signal"; connectionId: string };
 
 /**
  * An agent's routines: each prompts the agent on one cron schedule (UTC) or one signal of a
- * signal-capable connection, starting a run in a new thread every time it fires.
+ * signal-capable connection, starting a run in a new thread every time it fires. New routines
+ * start from the pills above the table: a provider's signals, through an existing connection or
+ * a new one, or a schedule.
  */
 export function AgentRoutines({ agentId }: { agentId: string }) {
   const [list, setList] = useState<Routine[]>([]);
   const [sources, setSources] = useState<Connection[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // `null` creates a routine; a routine edits it.
-  const [editing, setEditing] = useState<Routine | null>();
+  const [editing, setEditing] = useState<Editing>();
+  const [setup, setSetup] = useState<(Brokering & { connectionId: string }) | null>(null);
+  const [setupError, setSetupError] = useState("");
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       const response = await routines.listRoutines({ agentId }, { signal });
@@ -62,10 +95,32 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
     },
     [agentId],
   );
+  const loadSources = useCallback(async (signal?: AbortSignal) => {
+    const found = await all((pageToken) =>
+      connections
+        .listConnections({ capability: Capability.SIGNAL, pageSize: 100, pageToken }, { signal })
+        .then((page) => ({ items: page.connections, next: page.nextPageToken })),
+    );
+    if (!signal?.aborted) setSources(found);
+    return found;
+  }, []);
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    void Promise.all([refresh(abort.signal), signalConnections(abort.signal).then(setSources)])
+    void Promise.all([
+      refresh(abort.signal),
+      loadSources(abort.signal),
+      all((pageToken) =>
+        connections
+          .listProviders(
+            { capability: Capability.SIGNAL, pageSize: 100, pageToken },
+            { signal: abort.signal },
+          )
+          .then((page) => ({ items: page.providers, next: page.nextPageToken })),
+      ).then((found) => {
+        if (!abort.signal.aborted) setProviders(found);
+      }),
+    ])
       .catch((e) => {
         if (!abort.signal.aborted) setError(message(e, "Unable to load routines."));
       })
@@ -73,7 +128,26 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
         if (!abort.signal.aborted) setLoading(false);
       });
     return () => abort.abort();
-  }, [refresh]);
+  }, [refresh, loadSources]);
+  // A finished setup opens the new routine on the connection it created.
+  useEffect(() => {
+    if (!setup?.url) return;
+    const origin = new URL(setup.url).origin;
+    const completed = (event: MessageEvent) => {
+      if (
+        event.origin !== origin ||
+        event.data?.connectionId !== setup.connectionId ||
+        event.data?.type !== "tilde.connection.complete"
+      )
+        return;
+      setSetup(null);
+      void loadSources()
+        .then(() => setEditing({ kind: "signal", connectionId: setup.connectionId }))
+        .catch((e) => setError(message(e, "Unable to load connections.")));
+    };
+    window.addEventListener("message", completed);
+    return () => window.removeEventListener("message", completed);
+  }, [setup, loadSources]);
   async function act(work: () => Promise<unknown>, fallback: string) {
     setError("");
     try {
@@ -83,7 +157,30 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
       setError(message(e, fallback));
     }
   }
+  async function connect(provider: Provider, typeId: string) {
+    const connectionId = randomUUID();
+    const title = `Connect ${provider.name}`;
+    setSetupError("");
+    setSetup({ title, url: "", connectionId });
+    try {
+      const started = await connections.startConnection({
+        id: connectionId,
+        name: provider.name,
+        providerId: provider.id,
+        typeId,
+        assignments: [],
+      });
+      const url = new URL(started.brokeringUrl);
+      if (!["https:", "http:"].includes(url.protocol))
+        throw new Error("Unable to open connection setup.");
+      setSetup({ title, url: url.href, connectionId });
+    } catch (e) {
+      setSetupError(message(e, "Unable to start the connection setup."));
+    }
+  }
   const slugOf = (id: string) => sources.find((c) => c.id === id)?.slug ?? "Unknown connection";
+  const pill =
+    "h-[45px] w-[205px] max-w-full cursor-pointer gap-2 rounded-full border-border bg-background px-4 text-sm font-semibold shadow-sm hover:bg-muted/50";
   return (
     <section className="space-y-5" aria-label="Routines">
       {error && (
@@ -91,14 +188,70 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
           {error}
         </p>
       )}
-      <div className="flex justify-end">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Add a routine">
+        {providers.map((provider) => {
+          const existing = sources.filter((c) => c.providerId === provider.id);
+          const methods = signalMethods(provider);
+          return (
+            <DropdownMenu key={provider.id}>
+              <DropdownMenuTrigger
+                disabled={loading}
+                render={<Button variant="outline" className={pill} />}
+              >
+                <ProviderIcon iconUrl={provider.iconUrl} />
+                <span className="min-w-0 truncate" title={provider.name}>
+                  {provider.name}
+                </span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-56">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Use existing connection</DropdownMenuLabel>
+                  {existing.length ? (
+                    existing.map((connection) => (
+                      <DropdownMenuItem
+                        key={connection.id}
+                        onClick={() => setEditing({ kind: "signal", connectionId: connection.id })}
+                      >
+                        <CableIcon />
+                        {connection.slug}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>No connections yet</DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                {methods.length === 1 ? (
+                  <DropdownMenuItem onClick={() => void connect(provider, methods[0].id)}>
+                    <PlusIcon />
+                    Set up new connection
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Or set up new</DropdownMenuLabel>
+                    {methods.map((method) => (
+                      <DropdownMenuItem
+                        key={method.id}
+                        onClick={() => void connect(provider, method.id)}
+                      >
+                        <PlusIcon />
+                        {method.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        })}
         <Button
-          className="cursor-pointer gap-2"
+          variant="outline"
+          className={pill}
           disabled={loading}
-          onClick={() => setEditing(null)}
+          onClick={() => setEditing({ kind: "cron" })}
         >
-          <PlusIcon />
-          New routine
+          <ClockIcon className="size-5 text-muted-foreground" />
+          Scheduled routine
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border">
@@ -119,8 +272,8 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
             ) : list.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={COLUMNS} className="py-10 text-center text-muted-foreground">
-                  No routines yet. A routine prompts this agent on a schedule or when a connection
-                  emits a signal.
+                  No routines yet. Pick a provider above to run this agent when it emits a signal,
+                  or add a scheduled routine.
                 </TableCell>
               </TableRow>
             ) : (
@@ -137,6 +290,7 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
                               id: routine.id,
                               name: routine.name,
                               prompt: routine.prompt,
+                              threadTitle: routine.threadTitle,
                               enabled,
                               trigger: routine.trigger,
                             }),
@@ -194,7 +348,7 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
                         variant="ghost"
                         size="icon-sm"
                         aria-label={`Edit ${routine.name}`}
-                        onClick={() => setEditing(routine)}
+                        onClick={() => setEditing({ routine })}
                       >
                         <PencilIcon />
                       </Button>
@@ -218,10 +372,10 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
           </TableBody>
         </Table>
       </div>
-      {editing !== undefined && (
+      {editing && (
         <RoutineDialog
           agentId={agentId}
-          routine={editing ?? undefined}
+          editing={editing}
           sources={sources}
           onClose={() => setEditing(undefined)}
           onSaved={() => {
@@ -230,6 +384,14 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
           }}
         />
       )}
+      <ConnectionSetupDialog
+        setup={setup}
+        error={setupError}
+        onClose={() => {
+          setSetup(null);
+          void loadSources().catch((e) => setError(message(e, "Unable to load connections.")));
+        }}
+      />
     </section>
   );
 }
@@ -237,67 +399,98 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
 type RoutineForm = {
   name: string;
   prompt: string;
+  threadTitle: string;
   enabled: boolean;
-  kind: "cron" | "signal";
   schedule: string;
   connectionId: string;
   signalType: string;
 };
-const kinds = [
-  { value: "cron", label: "Schedule" },
-  { value: "signal", label: "Signal" },
-];
+type TemplateField = "prompt" | "threadTitle";
 
+/**
+ * Creates or edits one routine. The form is on the left; the variables its templates may use
+ * (the chosen connection's signal variables, or the schedule's) are on the right, where clicking
+ * one inserts it into the template field last focused.
+ */
 function RoutineDialog({
   agentId,
-  routine,
+  editing,
   sources,
   onClose,
   onSaved,
 }: {
   agentId: string;
-  routine?: Routine;
+  editing: Editing;
   sources: Connection[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const routine = "routine" in editing ? editing.routine : undefined;
+  const trigger = routine?.trigger;
+  const kind = "kind" in editing ? editing.kind : trigger?.case === "signal" ? "signal" : "cron";
   const [error, setError] = useState("");
   const [signalTypes, setSignalTypes] = useState<SignalType[]>([]);
-  const trigger = routine?.trigger;
+  const [signalVariables, setSignalVariables] = useState<SignalVariable[]>([]);
+  const [target, setTarget] = useState<TemplateField>("prompt");
   const form = useForm<RoutineForm>({
     defaultValues: {
       name: routine?.name ?? "",
       prompt: routine?.prompt ?? "",
+      threadTitle: routine?.threadTitle ?? "",
       enabled: routine?.enabled ?? true,
-      kind: trigger?.case === "signal" ? "signal" : "cron",
       schedule: trigger?.case === "cron" ? trigger.value.schedule : "0 9 * * 1-5",
-      connectionId: trigger?.case === "signal" ? trigger.value.connectionId : "",
+      connectionId:
+        trigger?.case === "signal"
+          ? trigger.value.connectionId
+          : "connectionId" in editing
+            ? editing.connectionId
+            : "",
       signalType: trigger?.case === "signal" ? trigger.value.signalType : "",
     },
   });
   const { errors, isSubmitting } = form.formState;
-  const kind = form.watch("kind");
   const connectionId = form.watch("connectionId");
+  const signalType = form.watch("signalType");
+  const connection = sources.find((c) => c.id === connectionId);
   useEffect(() => {
     setSignalTypes([]);
-    if (!connectionId) return;
+    setSignalVariables([]);
+    if (kind !== "signal" || !connectionId) return;
     const abort = new AbortController();
     routines
       .listSignalTypes({ connectionId }, { signal: abort.signal })
-      .then((response) => setSignalTypes(response.signalTypes))
+      .then((response) => {
+        setSignalTypes(response.signalTypes);
+        setSignalVariables(response.variables);
+      })
       .catch((e) => {
         if (!abort.signal.aborted) setError(message(e, "Unable to load signal types."));
       });
     return () => abort.abort();
-  }, [connectionId]);
+  }, [kind, connectionId]);
+  // Choosing a signal fills an untouched thread title with that signal's default.
+  const defaultTitle = useRef("");
+  useEffect(() => {
+    const chosen = signalTypes.find((t) => t.id === signalType);
+    if (!chosen) return;
+    const title = form.getValues("threadTitle");
+    if (!title || title === defaultTitle.current)
+      form.setValue("threadTitle", chosen.defaultThreadTitle);
+    defaultTitle.current = chosen.defaultThreadTitle;
+  }, [signalType, signalTypes, form]);
+  const variables: TemplateVariable[] = kind === "cron" ? CRON_VARIABLES : signalVariables;
+  function insert(variable: TemplateVariable) {
+    form.setValue(target, `${form.getValues(target)}{{ ${variable.key} }}`, { shouldDirty: true });
+  }
   async function submit(values: RoutineForm) {
     setError("");
     const fields = {
       name: values.name.trim(),
       prompt: values.prompt,
+      threadTitle: values.threadTitle.trim(),
       enabled: values.enabled,
       trigger:
-        values.kind === "cron"
+        kind === "cron"
           ? { case: "cron" as const, value: { schedule: values.schedule.trim() } }
           : {
               case: "signal" as const,
@@ -313,189 +506,246 @@ function RoutineDialog({
     }
   }
   const required = (label: string) => (v: string) => !!v.trim() || `Enter ${label}.`;
+  const title = routine
+    ? "Edit routine"
+    : kind === "cron"
+      ? "New scheduled routine"
+      : `New ${connection?.slug ?? "signal"} routine`;
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{routine ? "Edit routine" : "New routine"}</DialogTitle>
-          <DialogDescription>
-            Each time the trigger fires, the agent starts a run in a new thread with this prompt.
-          </DialogDescription>
-        </DialogHeader>
-        <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
-          <div className="grid gap-2">
-            <Label htmlFor="routine-name">Name</Label>
-            <Input
-              id="routine-name"
-              placeholder="Daily digest"
-              aria-invalid={!!errors.name}
-              {...form.register("name", { validate: required("a name") })}
-            />
-            {errors.name && <p className="m-0 text-xs text-destructive">{errors.name.message}</p>}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="routine-kind">Trigger</Label>
-            <Controller
-              control={form.control}
-              name="kind"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} items={kinds}>
-                  <SelectTrigger id="routine-kind">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {kinds.map((k) => (
-                      <SelectItem key={k.value} value={k.value}>
-                        {k.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          {kind === "cron" ? (
-            <div className="grid gap-2">
-              <Label htmlFor="routine-schedule">Cron schedule (UTC)</Label>
-              <Input
-                id="routine-schedule"
-                className="font-mono"
-                placeholder="0 9 * * 1-5"
-                aria-invalid={!!errors.schedule}
-                {...form.register("schedule", {
-                  validate: (v) =>
-                    v.trim().split(/\s+/).length === 5 ||
-                    "Enter five fields: minute hour day-of-month month day-of-week.",
-                })}
-              />
-              {errors.schedule ? (
-                <p className="m-0 text-xs text-destructive">{errors.schedule.message}</p>
+      <DialogContent className="max-h-[min(860px,calc(100dvh-2rem))] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <form
+          className="grid max-h-[inherit] grid-rows-[auto_minmax(0,1fr)_auto]"
+          onSubmit={form.handleSubmit(submit)}
+        >
+          <DialogHeader className="border-b p-5">
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              {kind === "cron"
+                ? "On each scheduled time the agent starts a run in a new thread with this prompt."
+                : "Each time the signal arrives the agent starts a run in a new thread with this prompt, followed by the signal's details."}{" "}
+              Type <code className="rounded bg-muted px-1 font-mono">{"{{"}</code> in the thread
+              title or prompt to insert a variable.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid min-h-0 md:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid content-start gap-4 overflow-y-auto p-5">
+              <div className="grid gap-2">
+                <Label htmlFor="routine-name">Name</Label>
+                <Input
+                  id="routine-name"
+                  placeholder={kind === "cron" ? "Daily digest" : "Triage new issues"}
+                  aria-invalid={!!errors.name}
+                  {...form.register("name", { validate: required("a name") })}
+                />
+                {errors.name && (
+                  <p className="m-0 text-xs text-destructive">{errors.name.message}</p>
+                )}
+              </div>
+              {kind === "cron" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="routine-schedule">Cron schedule (UTC)</Label>
+                  <Input
+                    id="routine-schedule"
+                    className="font-mono"
+                    placeholder="0 9 * * 1-5"
+                    aria-invalid={!!errors.schedule}
+                    {...form.register("schedule", {
+                      validate: (v) =>
+                        v.trim().split(/\s+/).length === 5 ||
+                        "Enter five fields: minute hour day-of-month month day-of-week.",
+                    })}
+                  />
+                  {errors.schedule ? (
+                    <p className="m-0 text-xs text-destructive">{errors.schedule.message}</p>
+                  ) : (
+                    <p className="m-0 text-xs text-muted-foreground">
+                      For example <code>0 9 * * 1-5</code> runs at 09:00 UTC on weekdays and{" "}
+                      <code>*/30 * * * *</code> every half hour.
+                    </p>
+                  )}
+                </div>
               ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="routine-connection">Connection</Label>
+                    <Controller
+                      control={form.control}
+                      name="connectionId"
+                      rules={{ validate: required("a connection") }}
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue("signalType", "");
+                          }}
+                          items={sources.map((c) => ({ value: c.id, label: c.slug }))}
+                        >
+                          <SelectTrigger
+                            id="routine-connection"
+                            className="w-full"
+                            aria-invalid={!!errors.connectionId}
+                          >
+                            <SelectValue placeholder="Choose" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sources.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.slug}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="routine-signal">When this signal arrives</Label>
+                    <Controller
+                      control={form.control}
+                      name="signalType"
+                      rules={{ validate: required("a signal") }}
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          disabled={!connectionId}
+                          items={signalTypes.map((s) => ({ value: s.id, label: s.name }))}
+                        >
+                          <SelectTrigger
+                            id="routine-signal"
+                            className="w-full"
+                            aria-invalid={!!errors.signalType}
+                          >
+                            <SelectValue placeholder="Choose" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {signalTypes.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                <span className="grid">
+                                  <span>{s.name}</span>
+                                  <span className="font-mono text-[11px] text-muted-foreground">
+                                    {s.id}
+                                  </span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                  {(errors.connectionId || errors.signalType) && (
+                    <p className="m-0 text-xs text-destructive sm:col-span-2">
+                      {errors.connectionId?.message ?? errors.signalType?.message}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="routine-thread-title">Thread title</Label>
+                <Controller
+                  control={form.control}
+                  name="threadTitle"
+                  render={({ field }) => (
+                    <TemplateInput
+                      id="routine-thread-title"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onFocus={() => setTarget("threadTitle")}
+                      variables={variables}
+                      placeholder="The routine's name"
+                    />
+                  )}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="routine-prompt">Prompt</Label>
+                <Controller
+                  control={form.control}
+                  name="prompt"
+                  rules={{ validate: required("a prompt") }}
+                  render={({ field }) => (
+                    <TemplateInput
+                      id="routine-prompt"
+                      multiline
+                      value={field.value}
+                      onChange={field.onChange}
+                      onFocus={() => setTarget("prompt")}
+                      variables={variables}
+                      invalid={!!errors.prompt}
+                      placeholder={
+                        kind === "cron"
+                          ? "Summarise yesterday's activity and post it to the team."
+                          : "Triage this and reply with next steps."
+                      }
+                    />
+                  )}
+                />
+                {errors.prompt && (
+                  <p className="m-0 text-xs text-destructive">{errors.prompt.message}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Controller
+                  control={form.control}
+                  name="enabled"
+                  render={({ field }) => (
+                    <Switch
+                      id="routine-enabled"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <Label htmlFor="routine-enabled">Enabled</Label>
+              </div>
+              {error && (
+                <p role="alert" className="m-0 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
+            <aside
+              aria-label="Variables"
+              className="flex min-h-0 flex-col border-t bg-muted/30 md:border-t-0 md:border-l"
+            >
+              <div className="border-b px-4 py-3">
+                <h3 className="m-0 text-sm font-medium">Variables</h3>
                 <p className="m-0 text-xs text-muted-foreground">
-                  For example <code>0 9 * * 1-5</code> runs at 09:00 UTC on weekdays and{" "}
-                  <code>*/30 * * * *</code> every half hour.
+                  Click one to add it to the {target === "prompt" ? "prompt" : "thread title"}.
                 </p>
-              )}
-            </div>
-          ) : sources.length === 0 ? (
-            <p className="m-0 text-sm text-muted-foreground">
-              No connection emits signals yet. Connect a GitHub App on the{" "}
-              <Link className="underline underline-offset-4" to="/tools/connections">
-                Connections
-              </Link>{" "}
-              page, or as one of this agent's chat providers.
-            </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="routine-connection">Connection</Label>
-                <Controller
-                  control={form.control}
-                  name="connectionId"
-                  rules={{ validate: required("a connection") }}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        form.setValue("signalType", "");
-                      }}
-                      items={sources.map((c) => ({ value: c.id, label: c.slug }))}
-                    >
-                      <SelectTrigger id="routine-connection" aria-invalid={!!errors.connectionId}>
-                        <SelectValue placeholder="Choose" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sources.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.slug}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="routine-signal">Signal</Label>
-                <Controller
-                  control={form.control}
-                  name="signalType"
-                  rules={{ validate: required("a signal") }}
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={!connectionId}
-                      items={signalTypes.map((s) => ({ value: s.id, label: s.id }))}
-                    >
-                      <SelectTrigger id="routine-signal" aria-invalid={!!errors.signalType}>
-                        <SelectValue placeholder="Choose" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {signalTypes.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <span className="grid">
-                              <span className="font-mono text-xs">{s.id}</span>
-                              <span className="text-xs text-muted-foreground">{s.description}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-              {(errors.connectionId || errors.signalType) && (
-                <p className="col-span-2 m-0 text-xs text-destructive">
-                  {errors.connectionId?.message ?? errors.signalType?.message}
-                </p>
-              )}
-              <p className="col-span-2 m-0 text-xs text-muted-foreground">
-                The signal's details are appended to the prompt.
-              </p>
-            </div>
-          )}
-          <div className="grid gap-2">
-            <Label htmlFor="routine-prompt">Prompt</Label>
-            <Textarea
-              id="routine-prompt"
-              rows={6}
-              placeholder="Summarise yesterday's activity and post it to the team."
-              aria-invalid={!!errors.prompt}
-              {...form.register("prompt", { validate: required("a prompt") })}
-            />
-            {errors.prompt && (
-              <p className="m-0 text-xs text-destructive">{errors.prompt.message}</p>
-            )}
+              <ul className="m-0 grid list-none content-start gap-1 overflow-y-auto p-2">
+                {kind === "signal" && !connectionId ? (
+                  <li className="p-2 text-xs text-muted-foreground">
+                    Choose a connection to see its variables.
+                  </li>
+                ) : (
+                  variables.map((variable) => (
+                    <li key={variable.key}>
+                      <button
+                        type="button"
+                        className="grid w-full cursor-pointer gap-1 rounded-lg p-2 text-left hover:bg-muted"
+                        onClick={() => insert(variable)}
+                      >
+                        <VariableBadge variable={variable} />
+                        <span className="text-xs text-muted-foreground">
+                          {variable.description}
+                        </span>
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </aside>
           </div>
-          <div className="flex items-center gap-2">
-            <Controller
-              control={form.control}
-              name="enabled"
-              render={({ field }) => (
-                <Switch
-                  id="routine-enabled"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
-              )}
-            />
-            <Label htmlFor="routine-enabled">Enabled</Label>
-          </div>
-          {error && (
-            <p role="alert" className="m-0 text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <DialogFooter>
+          <DialogFooter className="m-0 border-t p-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || (kind === "signal" && sources.length === 0)}
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {routine ? "Save" : "Create routine"}
             </Button>
           </DialogFooter>

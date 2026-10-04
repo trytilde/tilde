@@ -3,7 +3,9 @@ package tilde.management.v1;
 import "google/protobuf/timestamp.proto";
 
 // Routines prompt an agent when a cron schedule comes due or a connection emits a signal.
-// Each firing starts a run in a new thread.
+// Each firing starts a run in a new thread. The prompt and thread title are templates: each
+// `{{ key }}` is replaced with that path of the signal's context (see ListSignalTypes) or, for a
+// cron routine, `scheduled_at`.
 service RoutineService {
   rpc ListRoutines(ListRoutinesRequest) returns (ListRoutinesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc CreateRoutine(CreateRoutineRequest) returns (CreateRoutineResponse);
@@ -19,6 +21,8 @@ message SignalTrigger { string connection_id = 1; string signal_type = 2; }
 message Routine {
   string id = 1; string agent_id = 2; string name = 3; string prompt = 4; bool enabled = 5;
   oneof trigger { CronTrigger cron = 6; SignalTrigger signal = 7; }
+  // Empty titles each thread with the routine's name.
+  string thread_title = 14;
   // Set for an enabled cron routine.
   optional google.protobuf.Timestamp next_run_at = 8;
   // The latest firing: its time, the thread it started and why it could not start, if it failed.
@@ -28,21 +32,27 @@ message Routine {
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }
-message SignalType { string id = 1; string description = 2; }
+// `default_thread_title` is the thread title template a new routine on this signal starts with.
+message SignalType { string id = 1; string description = 2; string name = 3; string default_thread_title = 4; }
+// A path in a signal's context a template may name, with an example value.
+message SignalVariable { string key = 1; string description = 2; string example = 3; }
 message ListRoutinesRequest { string agent_id = 1; }
 message ListRoutinesResponse { repeated Routine routines = 1; }
 message CreateRoutineRequest {
   string agent_id = 1; string name = 2; string prompt = 3; bool enabled = 4;
   oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
+  string thread_title = 7;
 }
 message CreateRoutineResponse { Routine routine = 1; }
 // Replaces every editable field; the agent is fixed.
 message UpdateRoutineRequest {
   string id = 1; string name = 2; string prompt = 3; bool enabled = 4;
   oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
+  string thread_title = 7;
 }
 message UpdateRoutineResponse { Routine routine = 1; }
 message DeleteRoutineRequest { string id = 1; }
 message DeleteRoutineResponse {}
 message ListSignalTypesRequest { string connection_id = 1; }
-message ListSignalTypesResponse { repeated SignalType signal_types = 1; }
+// `variables` apply to every signal type of the connection; a key absent from a delivery renders empty.
+message ListSignalTypesResponse { repeated SignalType signal_types = 1; repeated SignalVariable variables = 2; }

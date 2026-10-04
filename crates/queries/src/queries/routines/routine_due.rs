@@ -6,6 +6,7 @@ pub struct Record {
     pub agent_id: uuid::Uuid,
     pub name: String,
     pub prompt: String,
+    pub thread_title: String,
     pub schedule: Option<String>,
     pub next_run_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -14,6 +15,7 @@ pub struct RecordBorrowed<'a> {
     pub agent_id: uuid::Uuid,
     pub name: &'a str,
     pub prompt: &'a str,
+    pub thread_title: &'a str,
     pub schedule: Option<&'a str>,
     pub next_run_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -24,6 +26,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             name,
             prompt,
+            thread_title,
             schedule,
             next_run_at,
         }: RecordBorrowed<'a>,
@@ -33,6 +36,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             name: name.into(),
             prompt: prompt.into(),
+            thread_title: thread_title.into(),
             schedule: schedule.map(|v| v.into()),
             next_run_at,
         }
@@ -107,7 +111,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT r.id,r.agent_id,r.name,r.prompt,r.schedule,r.next_run_at FROM routines r JOIN agents a ON a.id=r.agent_id AND a.deleted_at IS NULL WHERE r.next_run_at<=NOW() ORDER BY r.next_run_at LIMIT $1 FOR UPDATE OF r SKIP LOCKED",
+        "SELECT r.id,r.agent_id,r.name,r.prompt,r.thread_title,r.schedule,r.next_run_at FROM routines r JOIN agents a ON a.id=r.agent_id AND a.deleted_at IS NULL WHERE r.next_run_at<=NOW() ORDER BY r.next_run_at LIMIT $1 FOR UPDATE OF r SKIP LOCKED",
         None,
     )
 }
@@ -136,8 +140,9 @@ impl RunStmt {
                         agent_id: row.try_get(1)?,
                         name: row.try_get(2)?,
                         prompt: row.try_get(3)?,
-                        schedule: row.try_get(4)?,
-                        next_run_at: row.try_get(5)?,
+                        thread_title: row.try_get(4)?,
+                        schedule: row.try_get(5)?,
+                        next_run_at: row.try_get(6)?,
                     })
                 },
             mapper: |it| Record::from(it),

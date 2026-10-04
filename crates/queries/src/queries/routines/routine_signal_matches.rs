@@ -11,12 +11,14 @@ pub struct Record {
     pub agent_id: uuid::Uuid,
     pub name: String,
     pub prompt: String,
+    pub thread_title: String,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub agent_id: uuid::Uuid,
     pub name: &'a str,
     pub prompt: &'a str,
+    pub thread_title: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -25,6 +27,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             name,
             prompt,
+            thread_title,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -32,6 +35,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             name: name.into(),
             prompt: prompt.into(),
+            thread_title: thread_title.into(),
         }
     }
 }
@@ -104,7 +108,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT r.id,r.agent_id,r.name,r.prompt FROM routines r JOIN agents a ON a.id=r.agent_id AND a.deleted_at IS NULL WHERE r.connection_id=$1 AND r.signal_type=$2 AND r.enabled",
+        "SELECT r.id,r.agent_id,r.name,r.prompt,r.thread_title FROM routines r JOIN agents a ON a.id=r.agent_id AND a.deleted_at IS NULL WHERE r.connection_id=$1 AND r.signal_type=$2 AND r.enabled",
         None,
     )
 }
@@ -134,6 +138,7 @@ impl RunStmt {
                         agent_id: row.try_get(1)?,
                         name: row.try_get(2)?,
                         prompt: row.try_get(3)?,
+                        thread_title: row.try_get(4)?,
                     })
                 },
             mapper: |it| Record::from(it),

@@ -46,13 +46,6 @@ pub enum Webhook {
     Challenge(String),
     Messages(Vec<IncomingMessage>),
 }
-/// A typed provider event that routines trigger on (`github.issue.opened`). `data` is the
-/// adapter's compact projection of the delivery, not its raw payload.
-pub struct Signal {
-    pub event_id: String,
-    pub signal_type: String,
-    pub data: Value,
-}
 #[derive(Clone)]
 struct Webhooks {
     chat: Chat,
@@ -122,17 +115,31 @@ async fn receive(
 ) -> Response {
     let result: ToolResult<Option<String>> = async {
         let row = s.connections.get(id).await?;
-        let provider = adapter(&row.provider_id, &row.type_id)
-            .ok_or_else(|| ConnectError::not_found("Unknown channel"))?;
+        let provider = adapter(&row.provider_id, &row.type_id);
+        let source = crate::signals::source(&row.provider_id, &row.type_id)
+            .filter(|_| row.capable(crate::connections::model::Capability::Signal));
+        if provider.is_none() && source.is_none() {
+            return Err(ConnectError::not_found("Unknown channel"));
+        }
         let access = Access {
             connection_id: id,
             values: s.connections.resolve(id).await?,
             http: s.connections.http.clone(),
             endpoints: s.connections.endpoints.clone(),
         };
-        let result = provider.webhook(&access, &headers, &body).await?;
-        if row.capable(crate::connections::model::Capability::Signal) {
-            let signals = provider.signals(&headers, &body);
+        // A chat adapter authenticates its provider's deliveries; signal-only providers are
+        // authenticated by the signals module.
+        let result = match provider {
+            Some(provider) => provider.webhook(&access, &headers, &body).await?,
+            None => {
+                crate::signals::verify(&row.provider_id, &access, &headers, &body)?;
+                Webhook::Messages(vec![])
+            }
+        };
+        if let Some(source) = source
+            && let Ok(payload) = serde_json::from_slice::<Value>(&body)
+        {
+            let signals = source.signals(&headers, &payload);
             if !signals.is_empty() {
                 s.routines.signal(id, &row.slug(), signals).await;
             }

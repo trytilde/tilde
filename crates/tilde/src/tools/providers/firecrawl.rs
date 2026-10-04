@@ -32,9 +32,10 @@ pub fn definition() -> model::Provider {
             id: "api".into(),
             name: "Firecrawl API".into(),
             credential_source: model::CredentialSource::Static {
-                schema: json!({"type":"object","properties":{"api_key":{"type":"string","title":"API key","minLength":1,"writeOnly":true}},"required":["api_key"],"additionalProperties":false}),
+                schema: json!({"type":"object","properties":{"api_key":{"type":"string","title":"API key","minLength":1,"writeOnly":true},"webhook_secret":{"type":"string","title":"Webhook secret","description":"Optional. To receive monitor results as signals, give monitors this connection's webhook URL and paste the webhook secret from your Firecrawl account settings here.","writeOnly":true}},"required":["api_key"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            // Monitor webhooks, signed with the account's webhook secret.
+            capabilities: vec![model::Capability::Tool, model::Capability::Signal],
         }],
     }
 }

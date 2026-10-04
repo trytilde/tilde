@@ -179,6 +179,7 @@ pub mod __buffa {
         reg.register_json_any(super::__SIGNAL_TRIGGER_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_TYPE_JSON_ANY);
+        reg.register_json_any(super::__SIGNAL_VARIABLE_JSON_ANY);
         reg.register_json_any(super::__LIST_ROUTINES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_ROUTINES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_ROUTINE_REQUEST_JSON_ANY);
@@ -779,6 +780,10 @@ pub use self::__buffa::view::RoutineOwnedView;
 pub use self::__buffa::view::SignalTypeView;
 #[doc(inline)]
 pub use self::__buffa::view::SignalTypeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalVariableView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalVariableOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListRoutinesRequestView;
 #[doc(inline)]

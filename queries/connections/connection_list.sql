@@ -15,7 +15,7 @@ SELECT c.id,c.name,c.provider_id,c.type_id,c.status,c.account_label,c.token_expi
   OR (:p5='inference' AND t.inference_capable)
   OR :p5='skills'
   OR (:p5='tool' AND t.tool_capable)
-  OR (:p5='signal' AND t.signal_capable))
+  OR (:p5='signal' AND t.signal_capable AND c.owner_user_id IS NULL))
  AND (:p6::TEXT IS NULL OR c.name ILIKE '%'||:p6||'%' OR c.account_label ILIKE '%'||:p6||'%'
   OR EXISTS(SELECT 1 FROM connection_providers p WHERE p.provider_id=c.provider_id AND p.name ILIKE '%'||:p6||'%'))
  AND (:p7::TEXT IS NULL OR c.provider_id=:p7)

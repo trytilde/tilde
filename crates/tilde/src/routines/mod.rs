@@ -1,7 +1,8 @@
 //! Routines prompt an agent when one trigger fires: a five-field UTC cron schedule, or one signal
-//! type of one signal-capable connection. Every firing starts a run in a new thread titled with
-//! the routine's name; `routine_runs` records it once per fire key, so a redelivered webhook or a
-//! second replica claiming the same due time starts nothing.
+//! type of one signal-capable connection. Every firing starts a run in a new thread; the prompt and
+//! thread title are `{{ key }}` templates rendered against the signal's context (`signals::context`)
+//! or, for a cron routine, `scheduled_at`. `routine_runs` records each firing once per fire key, so
+//! a redelivered webhook or a second replica claiming the same due time starts nothing.
 //!
 //! Cron routines are claimed and rescheduled in one transaction before they fire, which makes a
 //! firing at most once: a crash between the commit and the run loses that firing rather than
@@ -10,18 +11,22 @@
 pub mod db;
 pub mod rpc;
 
-use crate::chat::{Chat, ChatError, CreateThread, StartRun, providers::ingress::Signal};
+use crate::chat::{Chat, ChatError, CreateThread, StartRun};
 use crate::connections::model::Capability;
 use crate::database::Pool;
 use crate::error::Error;
+use crate::signals::{self, Signal};
 use chrono::{DateTime, Utc};
 use std::time::Duration;
 use uuid::Uuid;
 
 const TICK: Duration = Duration::from_secs(15);
 const DUE_BATCH: i64 = 25;
-/// The run objective's limit (`chat::text`) minus room for the prompt and the signal header.
+/// A run objective holds at most 16384 bytes (`chat::text`): the rendered prompt, then the
+/// signal's summary and data.
+const PROMPT_BYTES: usize = 8000;
 const SIGNAL_DATA_BYTES: usize = 7000;
+const TITLE_CHARS: usize = 200;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Trigger {
@@ -38,6 +43,7 @@ pub struct Routine {
     pub agent_id: Uuid,
     pub name: String,
     pub prompt: String,
+    pub thread_title: String,
     pub enabled: bool,
     pub trigger: Trigger,
     pub next_run_at: Option<DateTime<Utc>>,
@@ -51,6 +57,8 @@ pub struct Routine {
 pub struct RoutineInput {
     pub name: String,
     pub prompt: String,
+    /// Empty titles each thread with the routine's name.
+    pub thread_title: String,
     pub enabled: bool,
     pub trigger: Trigger,
 }
@@ -106,6 +114,7 @@ impl Routines {
             agent,
             input.name.trim(),
             &input.prompt,
+            input.thread_title.trim(),
             input.enabled,
             schedule,
             connection,
@@ -125,6 +134,7 @@ impl Routines {
             id,
             input.name.trim(),
             &input.prompt,
+            input.thread_title.trim(),
             input.enabled,
             schedule,
             connection,
@@ -141,11 +151,11 @@ impl Routines {
         db::routine_delete_execute(&self.pool.get().await?, id).await?;
         Ok(())
     }
-    /// The signal types a signal-capable connection's provider emits, with descriptions.
-    pub async fn signal_types(
+    /// The signal source of a signal-capable connection: its types and template variables.
+    pub async fn signal_source(
         &self,
         connection: Uuid,
-    ) -> Result<&'static [(&'static str, &'static str)], Error> {
+    ) -> Result<&'static dyn signals::Source, Error> {
         let row = crate::connections::db::connection_get_opt(&self.pool.get().await?, connection)
             .await?
             .ok_or_else(|| Error::Invalid("Connection not found".into()))?;
@@ -154,11 +164,8 @@ impl Routines {
                 "This connection type does not emit signals".into(),
             ));
         }
-        Ok(
-            crate::chat::providers::adapter(&row.provider_id, &row.type_id)
-                .map(|adapter| adapter.signal_types())
-                .unwrap_or_default(),
-        )
+        signals::source(&row.provider_id, &row.type_id)
+            .ok_or_else(|| Error::Invalid("This connection type does not emit signals".into()))
     }
     /// Checks the input and returns the next run time it should be stored with.
     async fn validate(&self, input: &RoutineInput) -> Result<Option<DateTime<Utc>>, Error> {
@@ -167,8 +174,13 @@ impl Routines {
             return Err(Error::Invalid("Name must contain 1-200 characters".into()));
         }
         // Bytes, not characters: the prompt and a signal's data must fit one run objective.
-        if input.prompt.trim().is_empty() || input.prompt.len() > 8000 {
+        if input.prompt.trim().is_empty() || input.prompt.len() > PROMPT_BYTES {
             return Err(Error::Invalid("Prompt must contain 1-8000 bytes".into()));
+        }
+        if input.thread_title.chars().count() > 500 {
+            return Err(Error::Invalid(
+                "Thread title is limited to 500 characters".into(),
+            ));
         }
         match &input.trigger {
             Trigger::Cron { schedule } => {
@@ -180,10 +192,11 @@ impl Routines {
                 signal_type,
             } => {
                 if !self
-                    .signal_types(*connection_id)
+                    .signal_source(*connection_id)
                     .await?
+                    .types()
                     .iter()
-                    .any(|(id, _)| id == signal_type)
+                    .any(|t| t.id == *signal_type)
                 {
                     return Err(Error::Invalid(
                         "This connection does not emit that signal type".into(),
@@ -196,8 +209,8 @@ impl Routines {
 
     /// Fires every enabled routine waiting on one of these verified signals. Failures are
     /// recorded on the routine's run; the provider's delivery is acknowledged regardless.
-    pub async fn signal(&self, connection: Uuid, slug: &str, signals: Vec<Signal>) {
-        for signal in signals {
+    pub async fn signal(&self, connection: Uuid, slug: &str, batch: Vec<Signal>) {
+        for signal in batch {
             let matches = async {
                 Ok::<_, Error>(
                     db::routine_signal_matches_all(
@@ -216,10 +229,21 @@ impl Routines {
                     continue;
                 }
             };
+            let context = signals::context(&signal);
             for r in matches {
-                let objective = signal_objective(&r.prompt, slug, &signal);
+                let objective = format!(
+                    "{}\n\nSignal `{}` from connection `{slug}`: {}\n```json\n{}\n```",
+                    cut(signals::render(&r.prompt, &context), PROMPT_BYTES),
+                    signal.signal_type,
+                    signal.summary,
+                    cut(
+                        serde_json::to_string_pretty(&signal.data).unwrap_or_default(),
+                        SIGNAL_DATA_BYTES
+                    ),
+                );
+                let title = title(&r.thread_title, &r.name, &context);
                 let key = format!("{}:{}", signal.signal_type, signal.event_id);
-                self.fire(r.id, r.agent_id, &r.name, &key, objective).await;
+                self.fire(r.id, r.agent_id, title, &key, objective).await;
             }
         }
     }
@@ -236,8 +260,18 @@ impl Routines {
         tx.commit().await?;
         drop(client);
         futures::future::join_all(due.into_iter().map(|r| async move {
-            let key = format!("cron:{}", r.next_run_at.unwrap_or(now).to_rfc3339());
-            self.fire(r.id, r.agent_id, &r.name, &key, r.prompt).await
+            let scheduled = r.next_run_at.unwrap_or(now).to_rfc3339();
+            let context = serde_json::json!({ "scheduled_at": scheduled });
+            let objective = cut(signals::render(&r.prompt, &context), PROMPT_BYTES);
+            let title = title(&r.thread_title, &r.name, &context);
+            self.fire(
+                r.id,
+                r.agent_id,
+                title,
+                &format!("cron:{scheduled}"),
+                objective,
+            )
+            .await
         }))
         .await;
         Ok(())
@@ -259,7 +293,7 @@ impl Routines {
         }
     }
     /// Starts the agent's run in a new thread once per fire key and records the outcome.
-    async fn fire(&self, routine: Uuid, agent: Uuid, name: &str, key: &str, objective: String) {
+    async fn fire(&self, routine: Uuid, agent: Uuid, title: String, key: &str, objective: String) {
         let run = Uuid::new_v4();
         let claimed = async {
             Ok::<_, Error>(db::run_claim_opt(&self.pool.get().await?, run, routine, key).await?)
@@ -278,7 +312,7 @@ impl Routines {
             let created = self
                 .chat
                 .create_thread(CreateThread {
-                    title: name.into(),
+                    title,
                     participants: vec![crate::proto::tilde::types::v1::ParticipantRef {
                         agent_id: Some(agent.to_string()),
                         ..Default::default()
@@ -339,6 +373,7 @@ fn routine_model(r: db::RoutineRow) -> Routine {
         agent_id: r.agent_id,
         name: r.name,
         prompt: r.prompt,
+        thread_title: r.thread_title,
         enabled: r.enabled,
         trigger,
         next_run_at: r.next_run_at,
@@ -349,19 +384,24 @@ fn routine_model(r: db::RoutineRow) -> Routine {
         updated_at: r.updated_at,
     }
 }
-/// The routine's prompt followed by the signal's data, cut to fit a run objective.
-fn signal_objective(prompt: &str, slug: &str, signal: &Signal) -> String {
-    let mut data = serde_json::to_string_pretty(&signal.data).unwrap_or_default();
-    if data.len() > SIGNAL_DATA_BYTES {
-        let mut end = SIGNAL_DATA_BYTES;
-        while !data.is_char_boundary(end) {
+/// The rendered thread title, else the routine's name, at most [`TITLE_CHARS`] characters.
+fn title(template: &str, name: &str, context: &serde_json::Value) -> String {
+    let rendered = signals::render(template, context);
+    let title = match rendered.trim() {
+        "" => name,
+        rendered => rendered,
+    };
+    title.chars().take(TITLE_CHARS).collect()
+}
+/// Cuts text to at most `bytes`, marking the cut.
+fn cut(mut text: String, bytes: usize) -> String {
+    if text.len() > bytes {
+        let mut end = bytes;
+        while !text.is_char_boundary(end) {
             end -= 1;
         }
-        data.truncate(end);
-        data.push_str("\n… (truncated)");
+        text.truncate(end);
+        text.push_str("\n… (truncated)");
     }
-    format!(
-        "{prompt}\n\nSignal `{}` from connection `{slug}`:\n```json\n{data}\n```",
-        signal.signal_type
-    )
+    text
 }

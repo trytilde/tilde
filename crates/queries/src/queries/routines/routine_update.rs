@@ -6,13 +6,15 @@ pub struct RunParams<
     T2: crate::StringSql,
     T3: crate::StringSql,
     T4: crate::StringSql,
+    T5: crate::StringSql,
 > {
     pub name: T1,
     pub prompt: T2,
+    pub thread_title: T3,
     pub enabled: bool,
-    pub schedule: Option<T3>,
+    pub schedule: Option<T4>,
     pub connection: Option<uuid::Uuid>,
-    pub signal_type: Option<T4>,
+    pub signal_type: Option<T5>,
     pub next_run_at: Option<chrono::DateTime<chrono::Utc>>,
     pub id: uuid::Uuid,
 }
@@ -21,7 +23,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "UPDATE routines SET name=$1,prompt=$2,enabled=$3,schedule=$4,connection_id=$5, signal_type=$6,next_run_at=$7,updated_at=NOW() WHERE id=$8",
+        "UPDATE routines SET name=$1,prompt=$2,thread_title=$3,enabled=$4,schedule=$5,connection_id=$6, signal_type=$7,next_run_at=$8,updated_at=NOW() WHERE id=$9",
         None,
     )
 }
@@ -42,15 +44,17 @@ impl RunStmt {
         T2: crate::StringSql,
         T3: crate::StringSql,
         T4: crate::StringSql,
+        T5: crate::StringSql,
     >(
         &'s self,
         client: &'c C,
         name: &'a T1,
         prompt: &'a T2,
+        thread_title: &'a T3,
         enabled: &'a bool,
-        schedule: &'a Option<T3>,
+        schedule: &'a Option<T4>,
         connection: &'a Option<uuid::Uuid>,
-        signal_type: &'a Option<T4>,
+        signal_type: &'a Option<T5>,
         next_run_at: &'a Option<chrono::DateTime<chrono::Utc>>,
         id: &'a uuid::Uuid,
     ) -> Result<u64, tokio_postgres::Error> {
@@ -60,6 +64,7 @@ impl RunStmt {
                 &[
                     name,
                     prompt,
+                    thread_title,
                     enabled,
                     schedule,
                     connection,
@@ -78,12 +83,13 @@ impl<
     T2: crate::StringSql,
     T3: crate::StringSql,
     T4: crate::StringSql,
+    T5: crate::StringSql,
 >
     crate::client::async_::Params<
         'a,
         'a,
         'a,
-        RunParams<T1, T2, T3, T4>,
+        RunParams<T1, T2, T3, T4, T5>,
         std::pin::Pin<
             Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
         >,
@@ -93,7 +99,7 @@ impl<
     fn params(
         &'a self,
         client: &'a C,
-        params: &'a RunParams<T1, T2, T3, T4>,
+        params: &'a RunParams<T1, T2, T3, T4, T5>,
     ) -> std::pin::Pin<
         Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
     > {
@@ -101,6 +107,7 @@ impl<
             client,
             &params.name,
             &params.prompt,
+            &params.thread_title,
             &params.enabled,
             &params.schedule,
             &params.connection,
