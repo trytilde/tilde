@@ -363,9 +363,10 @@ bundled tools out) and its bundled tools.
   synchronously from the webhook ingress after the delivery is authenticated, before any chat
   ingestion.
 - Management: `RoutineService` lists, creates, updates and deletes an agent's routines and lists
-  a connection's signal types and variables. The agent's Routines tab starts new routines from
-  provider pills (use an existing signal-capable connection or set up a new one) and a
-  "Scheduled routine" pill, above a table of the agent's routines. The routine dialog has the
+  a connection's signal types and variables. The agent's Routines tab starts new routines from two
+  pills above a table of the agent's routines: "Tilde catalog", which searches either the ready
+  signal-capable connections or the catalog of providers that emit signals (the new connection's
+  setup then opens the routine on it), and "Scheduled routine". The routine dialog has the
   form on the left and the template variables on the right; template fields show variables as
   inline badges (`components/template-input.tsx`).
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link } from "@tanstack/react-router";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { CableIcon, ClockIcon, PencilIcon, PlusIcon } from "lucide-react";
+import { CableIcon, ChevronDownIcon, ClockIcon, PencilIcon, PlusIcon, ZapIcon } from "lucide-react";
 import type {
   Routine,
   SignalType,
@@ -15,9 +15,9 @@ import {
 } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { connections, routines } from "@/client";
 import { randomUUID } from "@/lib/browser-crypto";
-import { message } from "./skill-common";
+import { message, pillClass } from "./skill-common";
+import { ChooseDialog } from "./choose-dialog";
 import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog";
-import { ProviderIcon } from "./provider-icon";
 import { RemoveButton } from "./remove-button";
 import { TableSkeletonRows } from "./table-skeleton";
 import { TemplateInput, VariableBadge, type TemplateVariable } from "./template-input";
@@ -38,9 +38,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -56,8 +54,8 @@ const CRON_VARIABLES: TemplateVariable[] = [
 ];
 const when = (routine: Routine) =>
   routine.lastRunAt ? timestampDate(routine.lastRunAt).toLocaleString() : undefined;
-const signalMethods = (provider: Provider) =>
-  provider.connectionTypes.filter((type) => type.capabilities.includes(Capability.SIGNAL));
+/** A provider's way to connect that emits signals; the catalog shows one card per method. */
+type SignalMethod = { provider: Provider; typeId: string };
 
 async function all<T>(page: (pageToken: string) => Promise<{ items: T[]; next: string }>) {
   const items: T[] = [];
@@ -76,13 +74,13 @@ type Editing = { routine: Routine } | { kind: "cron" } | { kind: "signal"; conne
 /**
  * An agent's routines: each prompts the agent on one cron schedule (UTC) or one signal of a
  * signal-capable connection, starting a run in a new thread every time it fires. New routines
- * start from the pills above the table: a provider's signals, through an existing connection or
- * a new one, or a schedule.
+ * start from two pills above the table: the Tilde catalog (an existing signal-capable connection,
+ * or a new one set up from the catalog of providers that emit signals) or a schedule.
  */
 export function AgentRoutines({ agentId }: { agentId: string }) {
   const [list, setList] = useState<Routine[]>([]);
   const [sources, setSources] = useState<Connection[]>([]);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [choosing, setChoosing] = useState<"existing" | "new">();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<Editing>();
@@ -107,20 +105,7 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    void Promise.all([
-      refresh(abort.signal),
-      loadSources(abort.signal),
-      all((pageToken) =>
-        connections
-          .listProviders(
-            { capability: Capability.SIGNAL, pageSize: 100, pageToken },
-            { signal: abort.signal },
-          )
-          .then((page) => ({ items: page.providers, next: page.nextPageToken })),
-      ).then((found) => {
-        if (!abort.signal.aborted) setProviders(found);
-      }),
-    ])
+    void Promise.all([refresh(abort.signal), loadSources(abort.signal)])
       .catch((e) => {
         if (!abort.signal.aborted) setError(message(e, "Unable to load routines."));
       })
@@ -179,8 +164,6 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
     }
   }
   const slugOf = (id: string) => sources.find((c) => c.id === id)?.slug ?? "Unknown connection";
-  const pill =
-    "h-[45px] w-[205px] max-w-full cursor-pointer gap-2 rounded-full border-border bg-background px-4 text-sm font-semibold shadow-sm hover:bg-muted/50";
   return (
     <section className="space-y-5" aria-label="Routines">
       {error && (
@@ -189,71 +172,124 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
         </p>
       )}
       <div className="flex flex-wrap gap-2" role="group" aria-label="Add a routine">
-        {providers.map((provider) => {
-          const existing = sources.filter((c) => c.providerId === provider.id);
-          const methods = signalMethods(provider);
-          return (
-            <DropdownMenu key={provider.id}>
-              <DropdownMenuTrigger
-                disabled={loading}
-                render={<Button variant="outline" className={pill} />}
-              >
-                <ProviderIcon iconUrl={provider.iconUrl} />
-                <span className="min-w-0 truncate" title={provider.name}>
-                  {provider.name}
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="min-w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Use existing connection</DropdownMenuLabel>
-                  {existing.length ? (
-                    existing.map((connection) => (
-                      <DropdownMenuItem
-                        key={connection.id}
-                        onClick={() => setEditing({ kind: "signal", connectionId: connection.id })}
-                      >
-                        <CableIcon />
-                        {connection.slug}
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <DropdownMenuItem disabled>No connections yet</DropdownMenuItem>
-                  )}
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                {methods.length === 1 ? (
-                  <DropdownMenuItem onClick={() => void connect(provider, methods[0].id)}>
-                    <PlusIcon />
-                    Set up new connection
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel>Or set up new</DropdownMenuLabel>
-                    {methods.map((method) => (
-                      <DropdownMenuItem
-                        key={method.id}
-                        onClick={() => void connect(provider, method.id)}
-                      >
-                        <PlusIcon />
-                        {method.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuGroup>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        })}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            disabled={loading}
+            render={<Button variant="outline" className={pillClass} />}
+          >
+            <ZapIcon />
+            Tilde catalog
+            <ChevronDownIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-64">
+            <DropdownMenuItem onClick={() => setChoosing("existing")}>
+              <CableIcon />
+              Use existing connection
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setChoosing("new")}>
+              <PlusIcon />
+              Set up new connection
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant="outline"
-          className={pill}
+          className={pillClass}
           disabled={loading}
           onClick={() => setEditing({ kind: "cron" })}
         >
-          <ClockIcon className="size-5 text-muted-foreground" />
+          <ClockIcon />
           Scheduled routine
         </Button>
       </div>
+      <ChooseDialog<Connection>
+        open={choosing === "existing"}
+        title="Use an existing connection"
+        description="Connections whose provider emits signals. Next, choose the signal that runs this agent."
+        searchLabel="Search connections"
+        listLabel="Signal connections"
+        empty={(search) =>
+          search
+            ? "No signal connections match your search."
+            : "No connections emit signals yet. Set up a new one from the Tilde catalog."
+        }
+        busy={false}
+        load={async (search, signal) => {
+          // Connections carry no icon; their providers do.
+          const providers = await connections.listProviders(
+            { capability: Capability.SIGNAL, pageSize: 100 },
+            { signal },
+          );
+          const icons = new Map(providers.providers.map((p) => [p.id, p.iconUrl]));
+          return (
+            await all((pageToken) =>
+              connections
+                .listConnections(
+                  {
+                    capability: Capability.SIGNAL,
+                    search,
+                    status: "ready",
+                    pageSize: 100,
+                    pageToken,
+                  },
+                  { signal },
+                )
+                .then((page) => ({ items: page.connections, next: page.nextPageToken })),
+            )
+          ).map((connection) => ({
+            id: connection.id,
+            name: connection.slug,
+            detail: connection.accountLabel ?? connection.name,
+            iconUrl: icons.get(connection.providerId),
+            value: connection,
+          }));
+        }}
+        onClose={() => setChoosing(undefined)}
+        onChoose={async (choice) => {
+          setChoosing(undefined);
+          setEditing({ kind: "signal", connectionId: choice.value.id });
+        }}
+      />
+      <ChooseDialog<SignalMethod>
+        open={choosing === "new"}
+        title="Connect a provider"
+        description="Providers whose connections emit signals. Set one up, then choose the signal that runs this agent."
+        searchLabel="Search the catalog"
+        listLabel="Signal providers"
+        empty={(search) =>
+          search ? "No signal providers match your search." : "No providers emit signals."
+        }
+        busy={false}
+        load={async (search, signal) =>
+          (
+            await all((pageToken) =>
+              connections
+                .listProviders(
+                  { capability: Capability.SIGNAL, search, pageSize: 100, pageToken },
+                  { signal },
+                )
+                .then((page) => ({ items: page.providers, next: page.nextPageToken })),
+            )
+          ).flatMap((provider) => {
+            const methods = provider.connectionTypes.filter((type) =>
+              type.capabilities.includes(Capability.SIGNAL),
+            );
+            return methods.map((method) => ({
+              id: `${provider.id}/${method.id}`,
+              name: provider.name,
+              detail: methods.length > 1 ? method.name : (provider.instructions ?? method.name),
+              iconUrl: provider.iconUrl,
+              value: { provider, typeId: method.id },
+            }));
+          })
+        }
+        onClose={() => setChoosing(undefined)}
+        onChoose={async (choice) => {
+          setChoosing(undefined);
+          void connect(choice.value.provider, choice.value.typeId);
+        }}
+      />
       <div className="overflow-hidden rounded-xl border">
         <Table aria-label="Routines">
           <TableHeader className="bg-background">
@@ -272,8 +308,8 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
             ) : list.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={COLUMNS} className="py-10 text-center text-muted-foreground">
-                  No routines yet. Pick a provider above to run this agent when it emits a signal,
-                  or add a scheduled routine.
+                  No routines yet. Use the Tilde catalog to run this agent when a connection emits a
+                  signal, or add a scheduled routine.
                 </TableCell>
               </TableRow>
             ) : (
@@ -478,7 +514,13 @@ function RoutineDialog({
       form.setValue("threadTitle", chosen.defaultThreadTitle);
     defaultTitle.current = chosen.defaultThreadTitle;
   }, [signalType, signalTypes, form]);
-  const variables: TemplateVariable[] = kind === "cron" ? CRON_VARIABLES : signalVariables;
+  // The chosen signal is the example of `signal_type`.
+  const variables: TemplateVariable[] =
+    kind === "cron"
+      ? CRON_VARIABLES
+      : signalVariables.map((v) =>
+          v.key === "signal_type" && signalType ? { ...v, example: signalType } : v,
+        );
   function insert(variable: TemplateVariable) {
     form.setValue(target, `${form.getValues(target)}{{ ${variable.key} }}`, { shouldDirty: true });
   }

@@ -59,12 +59,12 @@ pub const COMMON: &[Variable] = &[
     Variable {
         key: "signal_type",
         description: "Normalized Tilde signal type.",
-        example: "github.issue.opened",
+        example: "provider.object.action",
     },
     Variable {
         key: "summary",
         description: "Human-readable summary of the event.",
-        example: "GitHub issue opened: acme/app#12 - Login fails",
+        example: "A one-line description of the event",
     },
 ];
 
