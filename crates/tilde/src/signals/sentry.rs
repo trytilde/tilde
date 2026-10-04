@@ -19,7 +19,7 @@ impl Source for Sentry {
                 id: format!("sentry.issue.{action}"),
                 name: (*name).into(),
                 description: format!("A Sentry issue was {action}."),
-                title: "{{ data.issue.shortId }} {{ data.issue.title }}".into(),
+                default_thread_title: "{{ data.issue.shortId }} {{ data.issue.title }}".into(),
             })
             .collect()
     }

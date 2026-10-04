@@ -10,13 +10,13 @@ impl Source for Slack {
                 id: "slack.app_mention".into(),
                 name: "App mention".into(),
                 description: "The Slack app was mentioned in a conversation.".into(),
-                title: "Slack mention in {{ event.channel }}".into(),
+                default_thread_title: "Slack mention in {{ event.channel }}".into(),
             },
             SignalType {
                 id: "slack.message.posted".into(),
                 name: "Message posted".into(),
                 description: "A message was posted in a conversation the app is in.".into(),
-                title: "Slack message in {{ event.channel }}".into(),
+                default_thread_title: "Slack message in {{ event.channel }}".into(),
             },
         ]
     }

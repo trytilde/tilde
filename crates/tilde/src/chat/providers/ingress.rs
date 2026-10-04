@@ -116,8 +116,7 @@ async fn receive(
     let result: ToolResult<Option<String>> = async {
         let row = s.connections.get(id).await?;
         let provider = adapter(&row.provider_id, &row.type_id);
-        let source = crate::signals::source(&row.provider_id, &row.type_id)
-            .filter(|_| row.capable(crate::connections::model::Capability::Signal));
+        let source = crate::signals::source(&row.provider_id, &row.type_id);
         if provider.is_none() && source.is_none() {
             return Err(ConnectError::not_found("Unknown channel"));
         }

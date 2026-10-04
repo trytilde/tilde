@@ -313,97 +313,98 @@ export function AgentRoutines({ agentId }: { agentId: string }) {
                 </TableCell>
               </TableRow>
             ) : (
-              list.map((routine) => (
-                <TableRow key={routine.id}>
-                  <TableCell className="px-5">
-                    <Switch
-                      aria-label={`${routine.enabled ? "Disable" : "Enable"} ${routine.name}`}
-                      checked={routine.enabled}
-                      onCheckedChange={(enabled) =>
-                        void act(
-                          () =>
-                            routines.updateRoutine({
-                              id: routine.id,
-                              name: routine.name,
-                              prompt: routine.prompt,
-                              threadTitle: routine.threadTitle,
-                              enabled,
-                              trigger: routine.trigger,
-                            }),
-                          "Unable to update the routine.",
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{routine.name}</TableCell>
-                  <TableCell>
-                    {routine.trigger.case === "cron" ? (
-                      <span>
-                        <code className="font-mono text-xs">{routine.trigger.value.schedule}</code>
-                        <span className="ml-1 text-xs text-muted-foreground">UTC</span>
-                      </span>
-                    ) : routine.trigger.case === "signal" ? (
-                      <span className="grid">
-                        <code className="font-mono text-xs">
-                          {routine.trigger.value.signalType}
-                        </code>
-                        <span className="text-xs text-muted-foreground">
-                          {slugOf(routine.trigger.value.connectionId)}
-                        </span>
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {routine.nextRunAt
-                      ? timestampDate(routine.nextRunAt).toLocaleString()
-                      : routine.trigger.case === "signal"
-                        ? "On signal"
-                        : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {routine.lastError ? (
-                      <span className="text-destructive" title={routine.lastError}>
-                        Failed {when(routine)}
-                      </span>
-                    ) : routine.lastThreadId ? (
-                      <Link
-                        className="underline-offset-4 hover:underline"
-                        to="/agent/$agentId/sessions"
-                        params={{ agentId }}
-                        search={{ inspectSession: routine.lastThreadId }}
-                      >
-                        {when(routine)}
-                      </Link>
-                    ) : (
-                      <span className="text-muted-foreground">Never</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Edit ${routine.name}`}
-                        onClick={() => setEditing({ routine })}
-                      >
-                        <PencilIcon />
-                      </Button>
-                      <RemoveButton
-                        label={`Delete ${routine.name}`}
-                        title="Delete routine?"
-                        description={`${routine.name} stops running. Threads it started are kept.`}
-                        confirmLabel="Delete"
-                        onConfirm={() =>
-                          act(
-                            () => routines.deleteRoutine({ id: routine.id }),
-                            "Unable to delete the routine.",
+              list.map((routine) => {
+                const trigger = routine.trigger?.kind;
+                return (
+                  <TableRow key={routine.id}>
+                    <TableCell className="px-5">
+                      <Switch
+                        aria-label={`${routine.enabled ? "Disable" : "Enable"} ${routine.name}`}
+                        checked={routine.enabled}
+                        onCheckedChange={(enabled) =>
+                          void act(
+                            () =>
+                              routines.updateRoutine({
+                                id: routine.id,
+                                name: routine.name,
+                                prompt: routine.prompt,
+                                threadTitle: routine.threadTitle,
+                                enabled,
+                                trigger: routine.trigger,
+                              }),
+                            "Unable to update the routine.",
                           )
                         }
                       />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="font-medium">{routine.name}</TableCell>
+                    <TableCell>
+                      {trigger?.case === "cron" ? (
+                        <span>
+                          <code className="font-mono text-xs">{trigger.value.schedule}</code>
+                          <span className="ml-1 text-xs text-muted-foreground">UTC</span>
+                        </span>
+                      ) : trigger?.case === "signal" ? (
+                        <span className="grid">
+                          <code className="font-mono text-xs">{trigger.value.signalType}</code>
+                          <span className="text-xs text-muted-foreground">
+                            {slugOf(trigger.value.connectionId)}
+                          </span>
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {routine.nextRunAt
+                        ? timestampDate(routine.nextRunAt).toLocaleString()
+                        : trigger?.case === "signal"
+                          ? "On signal"
+                          : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {routine.lastError ? (
+                        <span className="text-destructive" title={routine.lastError}>
+                          Failed {when(routine)}
+                        </span>
+                      ) : routine.lastThreadId ? (
+                        <Link
+                          className="underline-offset-4 hover:underline"
+                          to="/agent/$agentId/sessions"
+                          params={{ agentId }}
+                          search={{ inspectSession: routine.lastThreadId }}
+                        >
+                          {when(routine)}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">Never</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Edit ${routine.name}`}
+                          onClick={() => setEditing({ routine })}
+                        >
+                          <PencilIcon />
+                        </Button>
+                        <RemoveButton
+                          label={`Delete ${routine.name}`}
+                          title="Delete routine?"
+                          description={`${routine.name} stops running. Threads it started are kept.`}
+                          confirmLabel="Delete"
+                          onConfirm={() =>
+                            act(
+                              () => routines.deleteRoutine({ id: routine.id }),
+                              "Unable to delete the routine.",
+                            )
+                          }
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -461,7 +462,7 @@ function RoutineDialog({
   onSaved: () => void;
 }) {
   const routine = "routine" in editing ? editing.routine : undefined;
-  const trigger = routine?.trigger;
+  const trigger = routine?.trigger?.kind;
   const kind = "kind" in editing ? editing.kind : trigger?.case === "signal" ? "signal" : "cron";
   const [error, setError] = useState("");
   const [signalTypes, setSignalTypes] = useState<SignalType[]>([]);
@@ -486,6 +487,11 @@ function RoutineDialog({
   const connectionId = form.watch("connectionId");
   const signalType = form.watch("signalType");
   const connection = sources.find((c) => c.id === connectionId);
+  // Ready connections, and the routine's own whatever its state.
+  const choices = sources.filter(
+    (c) =>
+      c.status === "ready" || (trigger?.case === "signal" && c.id === trigger.value.connectionId),
+  );
   useEffect(() => {
     setSignalTypes([]);
     setSignalVariables([]);
@@ -528,13 +534,15 @@ function RoutineDialog({
       name: values.name.trim(),
       prompt: values.prompt,
       threadTitle: values.threadTitle.trim(),
-      trigger:
-        kind === "cron"
-          ? { case: "cron" as const, value: { schedule: values.schedule.trim() } }
-          : {
-              case: "signal" as const,
-              value: { connectionId: values.connectionId, signalType: values.signalType },
-            },
+      trigger: {
+        kind:
+          kind === "cron"
+            ? { case: "cron" as const, value: { schedule: values.schedule.trim() } }
+            : {
+                case: "signal" as const,
+                value: { connectionId: values.connectionId, signalType: values.signalType },
+              },
+      },
     };
     try {
       // Enabling is the table's switch; an edit keeps it.
@@ -621,7 +629,7 @@ function RoutineDialog({
                             field.onChange(value);
                             form.setValue("signalType", "");
                           }}
-                          items={sources.map((c) => ({ value: c.id, label: c.slug }))}
+                          items={choices.map((c) => ({ value: c.id, label: c.slug }))}
                         >
                           <SelectTrigger
                             id="routine-connection"
@@ -631,7 +639,7 @@ function RoutineDialog({
                             <SelectValue placeholder="Choose" />
                           </SelectTrigger>
                           <SelectContent>
-                            {sources.map((c) => (
+                            {choices.map((c) => (
                               <SelectItem key={c.id} value={c.id}>
                                 {c.slug}
                               </SelectItem>

@@ -40,14 +40,14 @@ impl Source for Firecrawl {
                 id: format!("firecrawl.monitor.page.{status}"),
                 name: (*name).into(),
                 description: format!("A Firecrawl monitor checked a page: {status}."),
-                title: (*title).into(),
+                default_thread_title: (*title).into(),
             })
             .collect();
         types.push(SignalType {
             id: "firecrawl.monitor.check.completed".into(),
             name: "Monitor check completed".into(),
             description: "A Firecrawl monitor check completed.".into(),
-            title: "Firecrawl check completed: {{ monitor.id }}".into(),
+            default_thread_title: "Firecrawl check completed: {{ monitor.id }}".into(),
         });
         types
     }

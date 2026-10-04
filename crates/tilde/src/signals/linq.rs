@@ -60,7 +60,7 @@ impl Source for Linq {
                 id: format!("linq.{event}"),
                 name: readable(event),
                 description: format!("Linq `{event}` webhook event."),
-                title: format!("Linq {}", readable(event)),
+                default_thread_title: format!("Linq {}", readable(event)),
             })
             .collect()
     }

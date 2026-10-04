@@ -281,6 +281,281 @@ pub const __SIGNAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
+pub struct RoutineTrigger {
+    #[serde(flatten)]
+    pub kind: ::core::option::Option<__buffa::oneof::routine_trigger::Kind>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RoutineTrigger {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RoutineTrigger").field("kind", &self.kind).finish()
+    }
+}
+impl RoutineTrigger {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RoutineTrigger";
+}
+::buffa::impl_default_instance!(RoutineTrigger);
+impl ::buffa::MessageName for RoutineTrigger {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RoutineTrigger";
+    const FULL_NAME: &'static str = "tilde.management.v1.RoutineTrigger";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RoutineTrigger";
+}
+impl ::buffa::Message for RoutineTrigger {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.kind {
+            match v {
+                __buffa::oneof::routine_trigger::Kind::Cron(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+                __buffa::oneof::routine_trigger::Kind::Signal(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.kind {
+            match v {
+                __buffa::oneof::routine_trigger::Kind::Cron(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::routine_trigger::Kind::Signal(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::routine_trigger::Kind::Cron(ref mut existing),
+                ) = self.kind
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.kind = ::core::option::Option::Some(
+                        __buffa::oneof::routine_trigger::Kind::Cron(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::routine_trigger::Kind::Signal(ref mut existing),
+                ) = self.kind
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.kind = ::core::option::Option::Some(
+                        __buffa::oneof::routine_trigger::Kind::Signal(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.kind = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RoutineTrigger {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RoutineTrigger";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for RoutineTrigger {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = RoutineTrigger;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct RoutineTrigger")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<RoutineTrigger, A::Error> {
+                let mut __oneof_kind: ::core::option::Option<
+                    __buffa::oneof::routine_trigger::Kind,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "cron" => {
+                            let v: ::core::option::Option<CronTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            CronTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_kind.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'kind'",
+                                        ),
+                                    );
+                                }
+                                __oneof_kind = Some(
+                                    __buffa::oneof::routine_trigger::Kind::Cron(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "signal" => {
+                            let v: ::core::option::Option<SignalTrigger> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            SignalTrigger,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_kind.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'kind'",
+                                        ),
+                                    );
+                                }
+                                __oneof_kind = Some(
+                                    __buffa::oneof::routine_trigger::Kind::Signal(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <RoutineTrigger as ::core::default::Default>::default();
+                __r.kind = __oneof_kind;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RoutineTrigger {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ROUTINE_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RoutineTrigger",
+    to_json: ::buffa::type_registry::any_to_json::<RoutineTrigger>,
+    from_json: ::buffa::type_registry::any_from_json::<RoutineTrigger>,
+    is_wkt: false,
+};
+pub mod routine_trigger {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::routine_trigger::Kind;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::routine_trigger::Kind as KindView;
+}
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
 pub struct Routine {
     /// Field 1: `id`
     #[serde(
@@ -318,9 +593,15 @@ pub struct Routine {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub enabled: bool,
+    /// Field 6: `trigger`
+    #[serde(
+        rename = "trigger",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub trigger: ::buffa::MessageField<RoutineTrigger, ::buffa::Inline<RoutineTrigger>>,
     /// Empty titles each thread with the routine's name.
     ///
-    /// Field 14: `thread_title`
+    /// Field 7: `thread_title`
     #[serde(
         rename = "threadTitle",
         alias = "thread_title",
@@ -386,8 +667,6 @@ pub struct Routine {
         ::buffa_types::google::protobuf::Timestamp,
         ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
     >,
-    #[serde(flatten)]
-    pub trigger: ::core::option::Option<__buffa::oneof::routine::Trigger>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -400,6 +679,7 @@ impl ::core::fmt::Debug for Routine {
             .field("name", &self.name)
             .field("prompt", &self.prompt)
             .field("enabled", &self.enabled)
+            .field("trigger", &self.trigger)
             .field("thread_title", &self.thread_title)
             .field("next_run_at", &self.next_run_at)
             .field("last_run_at", &self.last_run_at)
@@ -407,7 +687,6 @@ impl ::core::fmt::Debug for Routine {
             .field("last_error", &self.last_error)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
-            .field("trigger", &self.trigger)
             .finish()
     }
 }
@@ -475,25 +754,16 @@ impl ::buffa::Message for Routine {
         if self.enabled {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::routine::Trigger::Cron(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                __buffa::oneof::routine::Trigger::Signal(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-            }
+        if self.trigger.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.trigger.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.thread_title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
         }
         if self.next_run_at.is_set() {
             let __slot = __cache.reserve();
@@ -533,9 +803,6 @@ impl ::buffa::Message for Routine {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
-        if !self.thread_title.is_empty() {
-            size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
-        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -561,25 +828,16 @@ impl ::buffa::Message for Routine {
         if self.enabled {
             ::buffa::types::put_bool_field(5u32, self.enabled, buf);
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::routine::Trigger::Cron(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        6u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::routine::Trigger::Signal(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        7u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-            }
+        if self.trigger.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.trigger.write_to(__cache, buf);
+        }
+        if !self.thread_title.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.thread_title, buf);
         }
         if self.next_run_at.is_set() {
             ::buffa::types::put_len_delimited_header(
@@ -618,9 +876,6 @@ impl ::buffa::Message for Routine {
                 buf,
             );
             self.updated_at.write_to(__cache, buf);
-        }
-        if !self.thread_title.is_empty() {
-            ::buffa::types::put_string_field(14u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -675,40 +930,18 @@ impl ::buffa::Message for Routine {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::routine::Trigger::Cron(ref mut existing),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::routine::Trigger::Cron(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
+                ::buffa::Message::merge_length_delimited(
+                    self.trigger.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::routine::Trigger::Signal(ref mut existing),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::routine::Trigger::Signal(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
+                ::buffa::types::merge_string(&mut self.thread_title, buf)?;
             }
             8u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -778,13 +1011,6 @@ impl ::buffa::Message for Routine {
                     ctx,
                 )?;
             }
-            14u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.thread_title, buf)?;
-            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -798,14 +1024,14 @@ impl ::buffa::Message for Routine {
         self.name.clear();
         self.prompt.clear();
         self.enabled = false;
-        self.trigger = ::core::option::Option::None;
+        self.trigger = ::buffa::MessageField::none();
+        self.thread_title.clear();
         self.next_run_at = ::buffa::MessageField::none();
         self.last_run_at = ::buffa::MessageField::none();
         self.last_thread_id = ::core::option::Option::None;
         self.last_error = ::core::option::Option::None;
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
-        self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -816,332 +1042,6 @@ impl ::buffa::ExtensionSet for Routine {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
-    }
-}
-impl<'de> serde::Deserialize<'de> for Routine {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = Routine;
-            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct Routine")
-            }
-            #[allow(clippy::field_reassign_with_default)]
-            fn visit_map<A: serde::de::MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> ::core::result::Result<Routine, A::Error> {
-                let mut __f_id: ::core::option::Option<::buffa::alloc::string::String> = None;
-                let mut __f_agent_id: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_name: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_prompt: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_enabled: ::core::option::Option<bool> = None;
-                let mut __f_thread_title: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_next_run_at: ::core::option::Option<
-                    ::buffa::MessageField<
-                        ::buffa_types::google::protobuf::Timestamp,
-                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                    >,
-                > = None;
-                let mut __f_last_run_at: ::core::option::Option<
-                    ::buffa::MessageField<
-                        ::buffa_types::google::protobuf::Timestamp,
-                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                    >,
-                > = None;
-                let mut __f_last_thread_id: ::core::option::Option<
-                    ::core::option::Option<::buffa::alloc::string::String>,
-                > = None;
-                let mut __f_last_error: ::core::option::Option<
-                    ::core::option::Option<::buffa::alloc::string::String>,
-                > = None;
-                let mut __f_created_at: ::core::option::Option<
-                    ::buffa::MessageField<
-                        ::buffa_types::google::protobuf::Timestamp,
-                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                    >,
-                > = None;
-                let mut __f_updated_at: ::core::option::Option<
-                    ::buffa::MessageField<
-                        ::buffa_types::google::protobuf::Timestamp,
-                        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                    >,
-                > = None;
-                let mut __oneof_trigger: ::core::option::Option<
-                    __buffa::oneof::routine::Trigger,
-                > = None;
-                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
-                    match key.as_str() {
-                        "id" => {
-                            __f_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "agentId" | "agent_id" => {
-                            __f_agent_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "name" => {
-                            __f_name = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "prompt" => {
-                            __f_prompt = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "enabled" => {
-                            __f_enabled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "threadTitle" | "thread_title" => {
-                            __f_thread_title = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "nextRunAt" | "next_run_at" => {
-                            __f_next_run_at = Some(
-                                map
-                                    .next_value::<
-                                        ::buffa::MessageField<
-                                            ::buffa_types::google::protobuf::Timestamp,
-                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                                        >,
-                                    >()?,
-                            );
-                        }
-                        "lastRunAt" | "last_run_at" => {
-                            __f_last_run_at = Some(
-                                map
-                                    .next_value::<
-                                        ::buffa::MessageField<
-                                            ::buffa_types::google::protobuf::Timestamp,
-                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                                        >,
-                                    >()?,
-                            );
-                        }
-                        "lastThreadId" | "last_thread_id" => {
-                            __f_last_thread_id = Some(
-                                map
-                                    .next_value::<
-                                        ::core::option::Option<::buffa::alloc::string::String>,
-                                    >()?,
-                            );
-                        }
-                        "lastError" | "last_error" => {
-                            __f_last_error = Some(
-                                map
-                                    .next_value::<
-                                        ::core::option::Option<::buffa::alloc::string::String>,
-                                    >()?,
-                            );
-                        }
-                        "createdAt" | "created_at" => {
-                            __f_created_at = Some(
-                                map
-                                    .next_value::<
-                                        ::buffa::MessageField<
-                                            ::buffa_types::google::protobuf::Timestamp,
-                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                                        >,
-                                    >()?,
-                            );
-                        }
-                        "updatedAt" | "updated_at" => {
-                            __f_updated_at = Some(
-                                map
-                                    .next_value::<
-                                        ::buffa::MessageField<
-                                            ::buffa_types::google::protobuf::Timestamp,
-                                            ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
-                                        >,
-                                    >()?,
-                            );
-                        }
-                        "cron" => {
-                            let v: ::core::option::Option<CronTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            CronTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::routine::Trigger::Cron(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "signal" => {
-                            let v: ::core::option::Option<SignalTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            SignalTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::routine::Trigger::Signal(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        _ => {
-                            map.next_value::<serde::de::IgnoredAny>()?;
-                        }
-                    }
-                }
-                let mut __r = <Routine as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_id {
-                    __r.id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_agent_id {
-                    __r.agent_id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_name {
-                    __r.name = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_prompt {
-                    __r.prompt = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_enabled {
-                    __r.enabled = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_thread_title {
-                    __r.thread_title = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_next_run_at {
-                    __r.next_run_at = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_last_run_at {
-                    __r.last_run_at = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_last_thread_id {
-                    __r.last_thread_id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_last_error {
-                    __r.last_error = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_created_at {
-                    __r.created_at = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_updated_at {
-                    __r.updated_at = v;
-                }
-                __r.trigger = __oneof_trigger;
-                Ok(__r)
-            }
-        }
-        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for Routine {
@@ -1164,14 +1064,6 @@ pub const __ROUTINE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
     from_json: ::buffa::type_registry::any_from_json::<Routine>,
     is_wkt: false,
 };
-pub mod routine {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::routine::Trigger;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::routine::Trigger as TriggerView;
-}
 /// `default_thread_title` is the thread title template a new routine on this signal starts with.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -1806,7 +1698,7 @@ pub const __LIST_ROUTINES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
 };
 /// A new routine is enabled.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct CreateRoutineRequest {
     /// Field 1: `agent_id`
@@ -1831,7 +1723,13 @@ pub struct CreateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub prompt: ::buffa::alloc::string::String,
-    /// Field 7: `thread_title`
+    /// Field 4: `trigger`
+    #[serde(
+        rename = "trigger",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub trigger: ::buffa::MessageField<RoutineTrigger, ::buffa::Inline<RoutineTrigger>>,
+    /// Field 5: `thread_title`
     #[serde(
         rename = "threadTitle",
         alias = "thread_title",
@@ -1839,8 +1737,6 @@ pub struct CreateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub thread_title: ::buffa::alloc::string::String,
-    #[serde(flatten)]
-    pub trigger: ::core::option::Option<__buffa::oneof::create_routine_request::Trigger>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1851,8 +1747,8 @@ impl ::core::fmt::Debug for CreateRoutineRequest {
             .field("agent_id", &self.agent_id)
             .field("name", &self.name)
             .field("prompt", &self.prompt)
-            .field("thread_title", &self.thread_title)
             .field("trigger", &self.trigger)
+            .field("thread_title", &self.thread_title)
             .finish()
     }
 }
@@ -1892,25 +1788,13 @@ impl ::buffa::Message for CreateRoutineRequest {
         if !self.prompt.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.prompt) as u64;
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::create_routine_request::Trigger::Cron(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                __buffa::oneof::create_routine_request::Trigger::Signal(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-            }
+        if self.trigger.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.trigger.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         if !self.thread_title.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
@@ -1934,28 +1818,16 @@ impl ::buffa::Message for CreateRoutineRequest {
         if !self.prompt.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.prompt, buf);
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::create_routine_request::Trigger::Cron(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::create_routine_request::Trigger::Signal(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        6u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-            }
+        if self.trigger.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                4u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.trigger.write_to(__cache, buf);
         }
         if !self.thread_title.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.thread_title, buf);
+            ::buffa::types::put_string_field(5u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1991,51 +1863,18 @@ impl ::buffa::Message for CreateRoutineRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.prompt, buf)?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.trigger.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::create_routine_request::Trigger::Cron(
-                        ref mut existing,
-                    ),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::create_routine_request::Trigger::Cron(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::create_routine_request::Trigger::Signal(
-                        ref mut existing,
-                    ),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::create_routine_request::Trigger::Signal(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -2053,7 +1892,7 @@ impl ::buffa::Message for CreateRoutineRequest {
         self.agent_id.clear();
         self.name.clear();
         self.prompt.clear();
-        self.trigger = ::core::option::Option::None;
+        self.trigger = ::buffa::MessageField::none();
         self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -2065,183 +1904,6 @@ impl ::buffa::ExtensionSet for CreateRoutineRequest {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
-    }
-}
-impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = CreateRoutineRequest;
-            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct CreateRoutineRequest")
-            }
-            #[allow(clippy::field_reassign_with_default)]
-            fn visit_map<A: serde::de::MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> ::core::result::Result<CreateRoutineRequest, A::Error> {
-                let mut __f_agent_id: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_name: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_prompt: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_thread_title: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __oneof_trigger: ::core::option::Option<
-                    __buffa::oneof::create_routine_request::Trigger,
-                > = None;
-                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
-                    match key.as_str() {
-                        "agentId" | "agent_id" => {
-                            __f_agent_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "name" => {
-                            __f_name = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "prompt" => {
-                            __f_prompt = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "threadTitle" | "thread_title" => {
-                            __f_thread_title = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "cron" => {
-                            let v: ::core::option::Option<CronTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            CronTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::create_routine_request::Trigger::Cron(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "signal" => {
-                            let v: ::core::option::Option<SignalTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            SignalTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::create_routine_request::Trigger::Signal(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        _ => {
-                            map.next_value::<serde::de::IgnoredAny>()?;
-                        }
-                    }
-                }
-                let mut __r = <CreateRoutineRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_agent_id {
-                    __r.agent_id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_name {
-                    __r.name = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_prompt {
-                    __r.prompt = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_thread_title {
-                    __r.thread_title = v;
-                }
-                __r.trigger = __oneof_trigger;
-                Ok(__r)
-            }
-        }
-        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for CreateRoutineRequest {
@@ -2264,14 +1926,6 @@ pub const __CREATE_ROUTINE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<CreateRoutineRequest>,
     is_wkt: false,
 };
-pub mod create_routine_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::create_routine_request::Trigger;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::create_routine_request::Trigger as TriggerView;
-}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2411,7 +2065,7 @@ pub const __CREATE_ROUTINE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 };
 /// Replaces every editable field; the agent is fixed.
 #[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UpdateRoutineRequest {
     /// Field 1: `id`
@@ -2442,7 +2096,13 @@ pub struct UpdateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub enabled: bool,
-    /// Field 7: `thread_title`
+    /// Field 5: `trigger`
+    #[serde(
+        rename = "trigger",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub trigger: ::buffa::MessageField<RoutineTrigger, ::buffa::Inline<RoutineTrigger>>,
+    /// Field 6: `thread_title`
     #[serde(
         rename = "threadTitle",
         alias = "thread_title",
@@ -2450,8 +2110,6 @@ pub struct UpdateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub thread_title: ::buffa::alloc::string::String,
-    #[serde(flatten)]
-    pub trigger: ::core::option::Option<__buffa::oneof::update_routine_request::Trigger>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2463,8 +2121,8 @@ impl ::core::fmt::Debug for UpdateRoutineRequest {
             .field("name", &self.name)
             .field("prompt", &self.prompt)
             .field("enabled", &self.enabled)
-            .field("thread_title", &self.thread_title)
             .field("trigger", &self.trigger)
+            .field("thread_title", &self.thread_title)
             .finish()
     }
 }
@@ -2507,25 +2165,13 @@ impl ::buffa::Message for UpdateRoutineRequest {
         if self.enabled {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::update_routine_request::Trigger::Cron(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-                __buffa::oneof::update_routine_request::Trigger::Signal(x) => {
-                    let __slot = __cache.reserve();
-                    let inner = x.compute_size(__cache);
-                    __cache.set(__slot, inner);
-                    size
-                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
-                            + inner as u64;
-                }
-            }
+        if self.trigger.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.trigger.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         if !self.thread_title.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.thread_title) as u64;
@@ -2552,28 +2198,16 @@ impl ::buffa::Message for UpdateRoutineRequest {
         if self.enabled {
             ::buffa::types::put_bool_field(4u32, self.enabled, buf);
         }
-        if let ::core::option::Option::Some(ref v) = self.trigger {
-            match v {
-                __buffa::oneof::update_routine_request::Trigger::Cron(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        5u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-                __buffa::oneof::update_routine_request::Trigger::Signal(x) => {
-                    ::buffa::types::put_len_delimited_header(
-                        6u32,
-                        u64::from(__cache.consume_next()),
-                        buf,
-                    );
-                    x.write_to(__cache, buf);
-                }
-            }
+        if self.trigger.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.trigger.write_to(__cache, buf);
         }
         if !self.thread_title.is_empty() {
-            ::buffa::types::put_string_field(7u32, &self.thread_title, buf);
+            ::buffa::types::put_string_field(6u32, &self.thread_title, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2621,46 +2255,13 @@ impl ::buffa::Message for UpdateRoutineRequest {
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::update_routine_request::Trigger::Cron(
-                        ref mut existing,
-                    ),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::update_routine_request::Trigger::Cron(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
+                ::buffa::Message::merge_length_delimited(
+                    self.trigger.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
             }
             6u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                if let ::core::option::Option::Some(
-                    __buffa::oneof::update_routine_request::Trigger::Signal(
-                        ref mut existing,
-                    ),
-                ) = self.trigger
-                {
-                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
-                } else {
-                    let mut val = ::core::default::Default::default();
-                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
-                    self.trigger = ::core::option::Option::Some(
-                        __buffa::oneof::update_routine_request::Trigger::Signal(
-                            ::buffa::alloc::boxed::Box::new(val),
-                        ),
-                    );
-                }
-            }
-            7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::LengthDelimited,
@@ -2679,7 +2280,7 @@ impl ::buffa::Message for UpdateRoutineRequest {
         self.name.clear();
         self.prompt.clear();
         self.enabled = false;
-        self.trigger = ::core::option::Option::None;
+        self.trigger = ::buffa::MessageField::none();
         self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
     }
@@ -2691,200 +2292,6 @@ impl ::buffa::ExtensionSet for UpdateRoutineRequest {
     }
     fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
         &mut self.__buffa_unknown_fields
-    }
-}
-impl<'de> serde::Deserialize<'de> for UpdateRoutineRequest {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl<'de> serde::de::Visitor<'de> for _V {
-            type Value = UpdateRoutineRequest;
-            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                f.write_str("struct UpdateRoutineRequest")
-            }
-            #[allow(clippy::field_reassign_with_default)]
-            fn visit_map<A: serde::de::MapAccess<'de>>(
-                self,
-                mut map: A,
-            ) -> ::core::result::Result<UpdateRoutineRequest, A::Error> {
-                let mut __f_id: ::core::option::Option<::buffa::alloc::string::String> = None;
-                let mut __f_name: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_prompt: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __f_enabled: ::core::option::Option<bool> = None;
-                let mut __f_thread_title: ::core::option::Option<
-                    ::buffa::alloc::string::String,
-                > = None;
-                let mut __oneof_trigger: ::core::option::Option<
-                    __buffa::oneof::update_routine_request::Trigger,
-                > = None;
-                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
-                    match key.as_str() {
-                        "id" => {
-                            __f_id = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "name" => {
-                            __f_name = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "prompt" => {
-                            __f_prompt = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "enabled" => {
-                            __f_enabled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "threadTitle" | "thread_title" => {
-                            __f_thread_title = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::string::String;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::string::String,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "cron" => {
-                            let v: ::core::option::Option<CronTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            CronTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::update_routine_request::Trigger::Cron(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        "signal" => {
-                            let v: ::core::option::Option<SignalTrigger> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(
-                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
-                                            SignalTrigger,
-                                        >::new(),
-                                    ),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_trigger.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'trigger'",
-                                        ),
-                                    );
-                                }
-                                __oneof_trigger = Some(
-                                    __buffa::oneof::update_routine_request::Trigger::Signal(
-                                        ::buffa::alloc::boxed::Box::new(v),
-                                    ),
-                                );
-                            }
-                        }
-                        _ => {
-                            map.next_value::<serde::de::IgnoredAny>()?;
-                        }
-                    }
-                }
-                let mut __r = <UpdateRoutineRequest as ::core::default::Default>::default();
-                if let ::core::option::Option::Some(v) = __f_id {
-                    __r.id = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_name {
-                    __r.name = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_prompt {
-                    __r.prompt = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_enabled {
-                    __r.enabled = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_thread_title {
-                    __r.thread_title = v;
-                }
-                __r.trigger = __oneof_trigger;
-                Ok(__r)
-            }
-        }
-        d.deserialize_map(_V)
     }
 }
 impl ::buffa::json_helpers::ProtoElemJson for UpdateRoutineRequest {
@@ -2907,14 +2314,6 @@ pub const __UPDATE_ROUTINE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<UpdateRoutineRequest>,
     is_wkt: false,
 };
-pub mod update_routine_request {
-    #[allow(unused_imports)]
-    use super::*;
-    #[doc(inline)]
-    pub use super::__buffa::oneof::update_routine_request::Trigger;
-    #[doc(inline)]
-    pub use super::__buffa::view::oneof::update_routine_request::Trigger as TriggerView;
-}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

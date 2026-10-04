@@ -177,6 +177,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_PROMPT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CRON_TRIGGER_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__ROUTINE_TRIGGER_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_TYPE_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_VARIABLE_JSON_ANY);
@@ -772,6 +773,10 @@ pub use self::__buffa::view::CronTriggerOwnedView;
 pub use self::__buffa::view::SignalTriggerView;
 #[doc(inline)]
 pub use self::__buffa::view::SignalTriggerOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RoutineTriggerView;
+#[doc(inline)]
+pub use self::__buffa::view::RoutineTriggerOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::RoutineView;
 #[doc(inline)]

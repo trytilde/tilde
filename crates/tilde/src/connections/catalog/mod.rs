@@ -61,6 +61,15 @@ pub async fn register(
     tool_host: Option<uuid::Uuid>,
 ) -> Result<Provider, Error> {
     provider.validate()?;
+    // A type emits signals exactly when the signals module has a source for it.
+    if provider.connection_types.iter().any(|typ| {
+        typ.capabilities.contains(&Capability::Signal)
+            != crate::signals::source(&provider.id, &typ.id).is_some()
+    }) {
+        return Err(invalid(
+            "The signal capability needs a signal source for the connection type",
+        ));
+    }
     if !builtin
         && (matches!(provider.kind, ProviderKind::BuiltIn)
             || builtins().iter().any(|entry| entry.id == provider.id))

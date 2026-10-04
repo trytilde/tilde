@@ -18,11 +18,12 @@ service RoutineService {
 message CronTrigger { string schedule = 1; }
 // One signal type, such as `github.issue.opened`, of one signal-capable connection.
 message SignalTrigger { string connection_id = 1; string signal_type = 2; }
+message RoutineTrigger { oneof kind { CronTrigger cron = 1; SignalTrigger signal = 2; } }
 message Routine {
   string id = 1; string agent_id = 2; string name = 3; string prompt = 4; bool enabled = 5;
-  oneof trigger { CronTrigger cron = 6; SignalTrigger signal = 7; }
+  RoutineTrigger trigger = 6;
   // Empty titles each thread with the routine's name.
-  string thread_title = 14;
+  string thread_title = 7;
   // Set for an enabled cron routine.
   optional google.protobuf.Timestamp next_run_at = 8;
   // The latest firing: its time, the thread it started and why it could not start, if it failed.
@@ -40,16 +41,12 @@ message ListRoutinesRequest { string agent_id = 1; }
 message ListRoutinesResponse { repeated Routine routines = 1; }
 // A new routine is enabled.
 message CreateRoutineRequest {
-  string agent_id = 1; string name = 2; string prompt = 3; reserved 4;
-  oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
-  string thread_title = 7;
+  string agent_id = 1; string name = 2; string prompt = 3; RoutineTrigger trigger = 4; string thread_title = 5;
 }
 message CreateRoutineResponse { Routine routine = 1; }
 // Replaces every editable field; the agent is fixed.
 message UpdateRoutineRequest {
-  string id = 1; string name = 2; string prompt = 3; bool enabled = 4;
-  oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
-  string thread_title = 7;
+  string id = 1; string name = 2; string prompt = 3; bool enabled = 4; RoutineTrigger trigger = 5; string thread_title = 6;
 }
 message UpdateRoutineResponse { Routine routine = 1; }
 message DeleteRoutineRequest { string id = 1; }

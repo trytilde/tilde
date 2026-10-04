@@ -31,8 +31,8 @@ pub struct SignalType {
     pub id: String,
     pub name: String,
     pub description: String,
-    /// The thread title a new routine on this signal starts with.
-    pub title: String,
+    /// The thread title template a new routine on this signal starts with.
+    pub default_thread_title: String,
 }
 pub struct Variable {
     pub key: &'static str,

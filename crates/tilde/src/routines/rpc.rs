@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::proto::tilde::management::v1 as management;
 use crate::services::tilde::management::v1::RoutineService;
 use connectrpc::{Encodable, RequestContext, Response, ServiceRequest, ServiceResult};
-use management::{create_routine_request, routine, update_routine_request};
+use management::routine_trigger::Kind;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -25,19 +25,16 @@ fn timestamp(date: chrono::DateTime<chrono::Utc>) -> buffa_types::google::protob
         ..Default::default()
     }
 }
-fn trigger_model(
-    cron: Option<&management::CronTrigger>,
-    signal: Option<&management::SignalTrigger>,
-) -> Result<Trigger, Error> {
-    match (cron, signal) {
-        (Some(cron), None) => Ok(Trigger::Cron {
+fn trigger_model(trigger: Option<&management::RoutineTrigger>) -> Result<Trigger, Error> {
+    match trigger.and_then(|t| t.kind.as_ref()) {
+        Some(Kind::Cron(cron)) => Ok(Trigger::Cron {
             schedule: cron.schedule.clone(),
         }),
-        (None, Some(signal)) => Ok(Trigger::Signal {
+        Some(Kind::Signal(signal)) => Ok(Trigger::Signal {
             connection_id: id(&signal.connection_id)?,
             signal_type: signal.signal_type.clone(),
         }),
-        _ => Err(Error::Invalid(
+        None => Err(Error::Invalid(
             "A routine needs a cron or a signal trigger".into(),
         )),
     }
@@ -50,22 +47,24 @@ fn routine_wire(r: Routine) -> management::Routine {
         prompt: r.prompt,
         thread_title: r.thread_title,
         enabled: r.enabled,
-        trigger: Some(match r.trigger {
-            Trigger::Cron { schedule } => {
-                routine::Trigger::Cron(Box::new(management::CronTrigger {
+        trigger: management::RoutineTrigger {
+            kind: Some(match r.trigger {
+                Trigger::Cron { schedule } => Kind::Cron(Box::new(management::CronTrigger {
                     schedule,
                     ..Default::default()
-                }))
-            }
-            Trigger::Signal {
-                connection_id,
-                signal_type,
-            } => routine::Trigger::Signal(Box::new(management::SignalTrigger {
-                connection_id: connection_id.to_string(),
-                signal_type,
-                ..Default::default()
-            })),
-        }),
+                })),
+                Trigger::Signal {
+                    connection_id,
+                    signal_type,
+                } => Kind::Signal(Box::new(management::SignalTrigger {
+                    connection_id: connection_id.to_string(),
+                    signal_type,
+                    ..Default::default()
+                })),
+            }),
+            ..Default::default()
+        }
+        .into(),
         next_run_at: r.next_run_at.map(timestamp).into(),
         last_run_at: r.last_run_at.map(timestamp).into(),
         last_thread_id: r.last_thread_id.map(|t| t.to_string()),
@@ -94,13 +93,7 @@ impl RoutineService for Rpc {
         request: ServiceRequest<'_, management::CreateRoutineRequest>,
     ) -> ServiceResult<impl Encodable<management::CreateRoutineResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
-        let trigger = match &request.trigger {
-            Some(create_routine_request::Trigger::Cron(cron)) => trigger_model(Some(cron), None),
-            Some(create_routine_request::Trigger::Signal(signal)) => {
-                trigger_model(None, Some(signal))
-            }
-            None => trigger_model(None, None),
-        }?;
+        let trigger = trigger_model(request.trigger.as_option())?;
         let routine = self
             .0
             .create(
@@ -125,13 +118,7 @@ impl RoutineService for Rpc {
         request: ServiceRequest<'_, management::UpdateRoutineRequest>,
     ) -> ServiceResult<impl Encodable<management::UpdateRoutineResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
-        let trigger = match &request.trigger {
-            Some(update_routine_request::Trigger::Cron(cron)) => trigger_model(Some(cron), None),
-            Some(update_routine_request::Trigger::Signal(signal)) => {
-                trigger_model(None, Some(signal))
-            }
-            None => trigger_model(None, None),
-        }?;
+        let trigger = trigger_model(request.trigger.as_option())?;
         let routine = self
             .0
             .update(
@@ -175,7 +162,7 @@ impl RoutineService for Rpc {
                     id: t.id,
                     name: t.name,
                     description: t.description,
-                    default_thread_title: t.title,
+                    default_thread_title: t.default_thread_title,
                     ..Default::default()
                 })
                 .collect(),

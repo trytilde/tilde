@@ -28,7 +28,6 @@ const SIGNAL_DATA_BYTES: usize = 7000;
 const SUMMARY_BYTES: usize = 500;
 const TITLE_CHARS: usize = 200;
 
-#[derive(Debug, Clone, PartialEq)]
 pub enum Trigger {
     Cron {
         schedule: String,

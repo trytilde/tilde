@@ -66,7 +66,7 @@ impl Source for Github {
                 id: format!("github.{id}"),
                 name: (*name).into(),
                 description: format!("{name} in a repository the GitHub App is installed on."),
-                title: (*title).into(),
+                default_thread_title: (*title).into(),
             })
             .collect()
     }
@@ -178,10 +178,9 @@ impl Source for Github {
                 "pull_request_review.submitted".into(),
                 format!("GitHub review submitted on {}", item("pull_request")),
             ),
-            ("check_run" | "check_suite", _) => {
-                let Some(check) = p.get("check_run").or_else(|| p.get("check_suite")) else {
-                    return vec![];
-                };
+            // Check runs only: each suite repeats its runs' outcome, so it would fire again.
+            ("check_run", _) => {
+                let check = &p["check_run"];
                 if check["status"] != "completed" {
                     return vec![];
                 }
@@ -191,10 +190,7 @@ impl Source for Github {
                     | "cancelled" => "failed",
                     _ => return vec![],
                 };
-                let name = check["name"]
-                    .as_str()
-                    .or_else(|| check.pointer("/app/name").and_then(Value::as_str))
-                    .unwrap_or("CI check");
+                let name = check["name"].as_str().unwrap_or("CI check");
                 (
                     format!("ci_check.{outcome}"),
                     format!("GitHub CI check {outcome}: {repo} - {name}"),

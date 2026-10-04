@@ -30,7 +30,7 @@ impl Source for Agentmail {
                 id: format!("agentmail.{event}"),
                 name: (*name).into(),
                 description: format!("AgentMail `{event}` webhook event."),
-                title: if *event == "domain.verified" {
+                default_thread_title: if *event == "domain.verified" {
                     "AgentMail domain {{ domain.domain }} verified".into()
                 } else {
                     "AgentMail: {{ message.subject }}".into()

@@ -43,7 +43,7 @@ impl Source for Whatsapp {
                 id: format!("whatsapp.{event}"),
                 name: readable(event),
                 description: (*description).into(),
-                title: format!("WhatsApp {}", readable(event)),
+                default_thread_title: format!("WhatsApp {}", readable(event)),
             })
             .collect()
     }

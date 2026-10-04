@@ -338,14 +338,16 @@ bundled tools out) and its bundled tools.
   `connection_agents`, and personal connections are not signal sources. `signals::Source`
   (`crates/tilde/src/signals/`, ported from trytilde/api's signal providers) lists a provider's
   signal types (each with a default thread title template) and template variables and
-  normalizes deliveries. GitHub App (issues, pull requests, comments, reviews, CI checks), Slack,
+  normalizes deliveries. A built-in type declares the `signal` capability exactly when it has a
+  source; registration refuses a mismatch. GitHub App (issues, pull requests, comments, reviews, CI check runs), Slack,
   AgentMail, Linq, WhatsApp (Meta and Telnyx) connections reuse their chat webhook and its
   verification; Sentry auth-token connections (signed with an internal integration's client
   secret) and Firecrawl connections (signed with the account's webhook secret) have no chat
   adapter and are verified by `signals::verify`. Their secrets are optional setup fields; without
   one, deliveries are refused. Signal-capable setups show the connection's webhook URL. Bot
   senders on GitHub and Slack emit nothing, so a routine cannot trigger itself.
-- Routine: one agent, a name, a prompt, a thread title, an enabled flag and exactly one trigger:
+- Routine: one agent, a name, a prompt, a thread title, an enabled flag (on at creation, toggled
+  from the table) and exactly one trigger:
   a five-field cron schedule evaluated in UTC, or one signal type of one signal-capable
   connection. Prompt and title are `{{ key }}` templates: a signal's context is its data plus
   `provider_delivery_id`, `signal_type` and `summary`; a cron routine's is `scheduled_at`. A
