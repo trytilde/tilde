@@ -81,6 +81,7 @@ async fn priming_serves_tools_credentials_and_history_from_memory_until_invalida
         )
         .await
         .unwrap();
+    let mut values = vec![];
     for (key, value) in [
         ("inbox_id", "warm@agentmail.to"),
         ("api_key", "am-key"),
@@ -97,8 +98,17 @@ async fn priming_serves_tools_credentials_and_history_from_memory_until_invalida
             )
             .unwrap()
             .into_bytes();
-        db.pool.get().await.unwrap().execute("INSERT INTO connection_values(connection_id,field_key,encrypted_value) VALUES($1,$2,$3)", &[&connection, &key, &sealed]).await.unwrap();
+        values.push((key, sealed));
     }
+    let store = |values: Vec<(&'static str, Vec<u8>)>| {
+        let pool = db.pool.clone();
+        async move {
+            for (key, sealed) in values {
+                pool.get().await.unwrap().execute("INSERT INTO connection_values(connection_id,field_key,encrypted_value) VALUES($1,$2,$3)", &[&connection, &key, &sealed]).await.unwrap();
+            }
+        }
+    };
+    store(values.clone()).await;
     db.pool
         .get()
         .await
@@ -153,17 +163,30 @@ async fn priming_serves_tools_credentials_and_history_from_memory_until_invalida
     assert!(rows.iter().any(|r| r.id == Some(connection)));
 
     // Credentials were decrypted by priming: the ciphertext can go and resolve still answers.
-    db.pool
-        .get()
-        .await
-        .unwrap()
-        .execute(
-            "DELETE FROM connection_values WHERE connection_id=$1",
-            &[&connection],
-        )
-        .await
-        .unwrap();
-    let values = connections.resolve(connection).await.unwrap();
+    // Notifications are database-wide, so another test's connection change can clear the cache
+    // between priming and the check; then the ciphertext is restored and the round repeated.
+    let values = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            chat.clone().prime(agent, thread).await;
+            db.pool
+                .get()
+                .await
+                .unwrap()
+                .execute(
+                    "DELETE FROM connection_values WHERE connection_id=$1",
+                    &[&connection],
+                )
+                .await
+                .unwrap();
+            let resolved = connections.resolve(connection).await.unwrap();
+            if resolved.contains_key("api_key") {
+                break resolved;
+            }
+            store(values.clone()).await;
+        }
+    })
+    .await
+    .expect("credentials primed");
     assert_eq!(values["api_key"].expose_secret(), "am-key");
     connections.forget_credentials();
     assert!(
