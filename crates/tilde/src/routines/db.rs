@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub use q::routine_due::Record as DueRow;
 pub use q::routine_list::Record as RoutineRow;
 pub use q::routine_signal_matches::Record as MatchRow;
+pub use q::signal_connection::Record as SignalConnectionRow;
 
 pub async fn routine_list_all(
     db: &impl GenericClient,
@@ -117,4 +118,10 @@ pub async fn run_finish_execute(
     error: Option<&str>,
 ) -> DbResult<u64> {
     Ok(q::run_finish::run().bind(db, &thread, &error, &id).await?)
+}
+pub async fn signal_connection_opt(
+    db: &impl GenericClient,
+    id: Uuid,
+) -> DbResult<Option<SignalConnectionRow>> {
+    Ok(q::signal_connection::run().bind(db, &id).opt().await?)
 }

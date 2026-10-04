@@ -50,7 +50,7 @@ impl Source for Slack {
         ]
     }
     /// Bot messages, the app's own replies among them, emit nothing.
-    fn signals(&self, _: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, _: &Access, _: &HeaderMap, p: &Value) -> Vec<Signal> {
         let Some(event) = p.get("event") else {
             return vec![];
         };

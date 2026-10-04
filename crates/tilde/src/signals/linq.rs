@@ -88,7 +88,13 @@ impl Source for Linq {
             },
         ]
     }
-    fn signals(&self, _: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, a: &Access, _: &HeaderMap, p: &Value) -> Vec<Signal> {
+        // Chat events name the line that owns the chat; another line's are not this connection's.
+        if let Some(line) = str_at(p, "/data/chat/owner_handle/handle")
+            && Some(line) != a.secret("phone_number").ok()
+        {
+            return vec![];
+        }
         let (Some(event), Some(event_id)) = (str_at(p, "/event_type"), str_at(p, "/event_id"))
         else {
             return vec![];

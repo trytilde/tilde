@@ -12,7 +12,6 @@ pub mod db;
 pub mod rpc;
 
 use crate::chat::{Chat, ChatError, CreateThread, StartRun};
-use crate::connections::model::Capability;
 use crate::database::Pool;
 use crate::error::Error;
 use crate::signals::{self, Signal};
@@ -26,6 +25,7 @@ const DUE_BATCH: i64 = 25;
 /// signal's summary and data.
 const PROMPT_BYTES: usize = 8000;
 const SIGNAL_DATA_BYTES: usize = 7000;
+const SUMMARY_BYTES: usize = 500;
 const TITLE_CHARS: usize = 200;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -156,14 +156,11 @@ impl Routines {
         &self,
         connection: Uuid,
     ) -> Result<&'static dyn signals::Source, Error> {
-        let row = crate::connections::db::connection_get_opt(&self.pool.get().await?, connection)
+        let row = db::signal_connection_opt(&self.pool.get().await?, connection)
             .await?
-            .ok_or_else(|| Error::Invalid("Connection not found".into()))?;
-        if !row.capable(Capability::Signal) {
-            return Err(Error::Invalid(
-                "This connection type does not emit signals".into(),
-            ));
-        }
+            .ok_or_else(|| {
+                Error::Invalid("Connection not found, or it cannot trigger routines".into())
+            })?;
         signals::source(&row.provider_id, &row.type_id)
             .ok_or_else(|| Error::Invalid("This connection type does not emit signals".into()))
     }
@@ -235,7 +232,7 @@ impl Routines {
                     "{}\n\nSignal `{}` from connection `{slug}`: {}\n```json\n{}\n```",
                     cut(signals::render(&r.prompt, &context), PROMPT_BYTES),
                     signal.signal_type,
-                    signal.summary,
+                    cut(signal.summary.clone(), SUMMARY_BYTES),
                     cut(
                         serde_json::to_string_pretty(&signal.data).unwrap_or_default(),
                         SIGNAL_DATA_BYTES

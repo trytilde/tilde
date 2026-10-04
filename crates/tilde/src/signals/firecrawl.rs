@@ -80,7 +80,7 @@ impl Source for Firecrawl {
             },
         ]
     }
-    fn signals(&self, _: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, _: &Access, _: &HeaderMap, p: &Value) -> Vec<Signal> {
         let metadata = p.get("metadata").cloned().unwrap_or(Value::Null);
         match p["type"].as_str() {
             Some("monitor.page") => p["data"]

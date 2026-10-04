@@ -288,13 +288,18 @@ async fn signals_and_schedules_start_runs_in_new_threads() {
     db.close().await;
 }
 
-/// Sentry has no chat adapter: its issue webhooks are authenticated by the signals module with
-/// the integration's client secret, and a connection without one refuses deliveries.
-#[tokio::test]
-async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
+struct Fixture {
+    db: common::Database,
+    crypto: Arc<Encryption>,
+    agent: Uuid,
+    connections: Connections,
+    chat: Chat,
+    routines: Routines,
+}
+async fn fixture(seed: u8) -> Fixture {
     let db = common::Database::new().await;
     let crypto = Arc::new(
-        Encryption::initialize(&db.pool, common::seed(42))
+        Encryption::initialize(&db.pool, common::seed(seed))
             .await
             .unwrap(),
     );
@@ -303,7 +308,7 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
             description: String::new(),
             concurrency_policy: Default::default(),
             id: Uuid::new_v4(),
-            name: "Oncall".into(),
+            name: "Routines".into(),
             capabilities: Default::default(),
         })
         .await
@@ -320,47 +325,133 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
     let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1".into())
         .with_connections(connections.clone());
     let routines = Routines::new(db.pool.clone(), chat.clone());
-    let connection = connections
-        .start(Uuid::new_v4(), "acme", "sentry", "token", &[])
-        .await
-        .unwrap()
-        .connection
-        .id;
-    let client = db.pool.get().await.unwrap();
-    for (key, value) in [
-        ("auth_token", "sntrys_x"),
-        ("client_secret", "integration-secret"),
-    ] {
-        let sealed = crypto
-            .seal(
-                SecretBinding {
-                    resource_kind: "connection",
-                    resource_id: connection,
-                    name: key,
-                },
-                &SecretString::from(value),
-            )
+    Fixture {
+        db,
+        crypto,
+        agent,
+        connections,
+        chat,
+        routines,
+    }
+}
+impl Fixture {
+    /// A ready connection with these credentials, as if its setup had completed.
+    async fn connection(&self, provider: &str, typ: &str, values: &[(&str, &str)]) -> Uuid {
+        let connection = self
+            .connections
+            .start(Uuid::new_v4(), "acme", provider, typ, &[])
+            .await
             .unwrap()
-            .into_bytes();
+            .connection
+            .id;
+        let client = self.db.pool.get().await.unwrap();
+        for (key, value) in values {
+            let sealed = self
+                .crypto
+                .seal(
+                    SecretBinding {
+                        resource_kind: "connection",
+                        resource_id: connection,
+                        name: key,
+                    },
+                    &SecretString::from(*value),
+                )
+                .unwrap()
+                .into_bytes();
+            client
+                .execute(
+                    "INSERT INTO connection_values(connection_id,field_key,encrypted_value) VALUES($1,$2,$3)",
+                    &[&connection, key, &sealed],
+                )
+                .await
+                .unwrap();
+        }
         client
             .execute(
-                "INSERT INTO connection_values(connection_id,field_key,encrypted_value) VALUES($1,$2,$3)",
-                &[&connection, &key, &sealed],
+                "UPDATE connections SET status='ready' WHERE id=$1",
+                &[&connection],
             )
             .await
             .unwrap();
+        connection
     }
-    client
-        .execute(
-            "UPDATE connections SET status='ready' WHERE id=$1",
-            &[&connection],
+    /// Serves the public webhook ingress; returns its origin.
+    async fn ingress(&self) -> (String, tokio::task::JoinHandle<std::io::Result<()>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(
+            axum::serve(
+                listener,
+                tilde::iam::listeners::public_event_ingress_router(
+                    self.chat.clone(),
+                    self.connections.clone(),
+                ),
+            )
+            .into_future(),
+        );
+        (origin, server)
+    }
+    async fn signal_routine(&self, connection: Uuid, signal_type: &str, prompt: &str) -> Uuid {
+        self.routines
+            .create(
+                self.agent,
+                RoutineInput {
+                    name: "On signal".into(),
+                    prompt: prompt.into(),
+                    thread_title: String::new(),
+                    enabled: true,
+                    trigger: Trigger::Signal {
+                        connection_id: connection,
+                        signal_type: signal_type.into(),
+                    },
+                },
+            )
+            .await
+            .unwrap()
+            .id
+    }
+    async fn objectives(&self) -> Vec<String> {
+        self.db
+            .pool
+            .get()
+            .await
+            .unwrap()
+            .query(
+                "SELECT objective FROM chat_runs WHERE agent_id=$1 ORDER BY objective",
+                &[&self.agent],
+            )
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.get(0))
+            .collect()
+    }
+}
+fn hmac_hex(key: &[u8], body: &[u8]) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).unwrap();
+    mac.update(body);
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Sentry has no chat adapter: its issue webhooks are authenticated by the signals module with
+/// the integration's client secret, and a connection without one refuses deliveries.
+#[tokio::test]
+async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
+    let f = fixture(42).await;
+    let connection = f
+        .connection(
+            "sentry",
+            "token",
+            &[
+                ("auth_token", "sntrys_x"),
+                ("client_secret", "integration-secret"),
+            ],
         )
-        .await
-        .unwrap();
-    drop(client);
-    let routine = routines
+        .await;
+    let routine = f
+        .routines
         .create(
-            agent,
+            f.agent,
             RoutineInput {
                 name: "Investigate new issues".into(),
                 prompt: "Investigate {{ data.issue.shortId }}.".into(),
@@ -374,26 +465,12 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
         )
         .await
         .unwrap();
-
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let origin = format!("http://{}", listener.local_addr().unwrap());
-    let server = tokio::spawn(
-        axum::serve(
-            listener,
-            tilde::iam::listeners::public_event_ingress_router(chat.clone(), connections.clone()),
-        )
-        .into_future(),
-    );
+    let (origin, server) = f.ingress().await;
     let body = serde_json::to_vec(&json!({
         "action": "created",
         "data": {"issue": {"id": "123456", "shortId": "API-123", "title": "request failed"}},
     }))
     .unwrap();
-    let sign = |key: &[u8]| {
-        let mut mac = Hmac::<Sha256>::new_from_slice(key).unwrap();
-        mac.update(&body);
-        hex::encode(mac.finalize().into_bytes())
-    };
     let http = reqwest::Client::new();
     let post = |signature: Option<String>| {
         let mut request = http
@@ -407,25 +484,25 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
         request.send()
     };
     assert_eq!(post(None).await.unwrap().status(), 400);
-    assert_eq!(post(Some(sign(b"wrong"))).await.unwrap().status(), 400);
-    assert!(
-        routines
-            .get(routine.id)
+    assert_eq!(
+        post(Some(hmac_hex(b"wrong", &body)))
             .await
             .unwrap()
-            .last_run_at
-            .is_none()
+            .status(),
+        400
     );
+    assert!(f.objectives().await.is_empty());
     assert_eq!(
-        post(Some(sign(b"integration-secret")))
+        post(Some(hmac_hex(b"integration-secret", &body)))
             .await
             .unwrap()
             .status(),
         204
     );
-    let fired = routines.get(routine.id).await.unwrap();
+    let fired = f.routines.get(routine.id).await.unwrap();
     assert_eq!(fired.last_error, None);
-    let row = db
+    let row = f
+        .db
         .pool
         .get()
         .await
@@ -439,5 +516,62 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
     assert!(row.get::<_, String>(0).starts_with("Investigate API-123."));
     assert_eq!(row.get::<_, String>(1), "API-123 request failed");
     server.abort();
-    db.close().await;
+    f.db.close().await;
+}
+
+/// One Meta app's webhook carries every number it serves; a routine only sees the messages of
+/// its own connection's number.
+#[tokio::test]
+async fn whatsapp_signals_keep_to_the_connections_number() {
+    let f = fixture(43).await;
+    let connection = f
+        .connection(
+            "whatsapp",
+            "meta",
+            &[
+                ("access_token", "token"),
+                ("app_secret", "app-secret"),
+                ("verify_token", "verify"),
+                ("phone_number_id", "PN1"),
+                ("waba_id", "W1"),
+            ],
+        )
+        .await;
+    f.signal_routine(
+        connection,
+        "whatsapp.message.received",
+        "Reply to {{ data.from }}.",
+    )
+    .await;
+    let message = |number: &str, id: &str, from: &str| {
+        json!({"field": "messages", "value": {
+            "metadata": {"phone_number_id": number, "display_phone_number": "15550001111"},
+            "messages": [{"id": id, "from": from, "type": "text", "text": {"body": "Hi"}}],
+        }})
+    };
+    let body = serde_json::to_vec(&json!({
+        "object": "whatsapp_business_account",
+        "entry": [{"id": "W1", "changes": [
+            message("PN1", "wamid.1", "16505550001"),
+            message("PN2", "wamid.2", "16505550002"),
+        ]}],
+    }))
+    .unwrap();
+    let (origin, server) = f.ingress().await;
+    // Without a chat owner the message itself is refused; its signal has already fired.
+    reqwest::Client::new()
+        .post(format!("{origin}/connections/webhooks/{connection}"))
+        .header(
+            "x-hub-signature-256",
+            format!("sha256={}", hmac_hex(b"app-secret", &body)),
+        )
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    let objectives = f.objectives().await;
+    assert_eq!(objectives.len(), 1);
+    assert!(objectives[0].starts_with("Reply to 16505550001."));
+    server.abort();
+    f.db.close().await;
 }

@@ -139,7 +139,7 @@ async fn receive(
         if let Some(source) = source
             && let Ok(payload) = serde_json::from_slice::<Value>(&body)
         {
-            let signals = source.signals(&headers, &payload);
+            let signals = source.signals(&access, &headers, &payload);
             if !signals.is_empty() {
                 s.routines.signal(id, &row.slug(), signals).await;
             }

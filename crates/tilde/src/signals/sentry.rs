@@ -57,7 +57,7 @@ impl Source for Sentry {
             },
         ]
     }
-    fn signals(&self, h: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, _: &Access, h: &HeaderMap, p: &Value) -> Vec<Signal> {
         let action = str_at(p, "/action").unwrap_or_default();
         let resource = h.get("sentry-hook-resource").and_then(|v| v.to_str().ok());
         if resource.is_some_and(|r| r != "issue")

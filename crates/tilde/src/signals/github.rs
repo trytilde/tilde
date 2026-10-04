@@ -136,7 +136,7 @@ impl Source for Github {
     }
     /// Bot senders, the installation's own app among them, emit nothing, so a routine that
     /// comments cannot trigger itself.
-    fn signals(&self, h: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, _: &Access, h: &HeaderMap, p: &Value) -> Vec<Signal> {
         let event = h.get("x-github-event").and_then(|v| v.to_str().ok());
         let delivery = h.get("x-github-delivery").and_then(|v| v.to_str().ok());
         let (Some(event), Some(delivery)) = (event, delivery) else {

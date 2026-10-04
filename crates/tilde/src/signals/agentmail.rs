@@ -72,7 +72,13 @@ impl Source for Agentmail {
             },
         ]
     }
-    fn signals(&self, h: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, a: &Access, h: &HeaderMap, p: &Value) -> Vec<Signal> {
+        // Message events name their inbox; another inbox's are not this connection's.
+        if let Some(inbox) = str_at(p, "/message/inbox_id")
+            && Some(inbox) != a.secret("inbox_id").ok()
+        {
+            return vec![];
+        }
         let Some(event) = str_at(p, "/event_type") else {
             return vec![];
         };

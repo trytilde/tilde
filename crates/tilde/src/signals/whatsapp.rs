@@ -76,16 +76,32 @@ impl Source for Whatsapp {
             },
         ]
     }
-    fn signals(&self, _: &HeaderMap, p: &Value) -> Vec<Signal> {
+    fn signals(&self, a: &Access, _: &HeaderMap, p: &Value) -> Vec<Signal> {
         if let Some(event) = str_at(p, "/data/event_type") {
-            return telnyx(p, event).into_iter().collect();
+            return telnyx(p, event)
+                .filter(|s| {
+                    str_at(&s.data, "/metadata/display_phone_number")
+                        == a.secret("phone_number").ok()
+                })
+                .into_iter()
+                .collect();
         }
+        // One app's webhook carries every business account and number it serves: changes for a
+        // number keep only this connection's number, account-level ones only its account.
+        let (Ok(number), Ok(account)) = (a.secret("phone_number_id"), a.secret("waba_id")) else {
+            return vec![];
+        };
         let mut out = vec![];
         for entry in p["entry"].as_array().into_iter().flatten() {
             let waba = entry["id"].as_str().unwrap_or_default();
             for change in entry["changes"].as_array().into_iter().flatten() {
                 let field = change["field"].as_str().unwrap_or_default();
                 let value = &change["value"];
+                match str_at(value, "/metadata/phone_number_id") {
+                    Some(id) if id != number => continue,
+                    None if waba != account => continue,
+                    _ => {}
+                }
                 let signal = |event: &str, id: String, data: &Value, contacts: &Value| {
                     let payload = json!({
                         "event_type": event,

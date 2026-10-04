@@ -44,8 +44,10 @@ pub trait Source: Sync {
     fn types(&self) -> Vec<SignalType>;
     /// Provider-specific template variables; [`COMMON`] ones are offered for every signal.
     fn variables(&self) -> &'static [Variable];
-    /// Normalizes a delivery the ingress has already authenticated.
-    fn signals(&self, headers: &HeaderMap, payload: &Value) -> Vec<Signal>;
+    /// Normalizes a delivery the ingress has already authenticated. A delivery may carry events
+    /// of other accounts sharing the webhook (another phone number, line or inbox); only the
+    /// connection's own become signals.
+    fn signals(&self, access: &Access, headers: &HeaderMap, payload: &Value) -> Vec<Signal>;
 }
 
 pub const COMMON: &[Variable] = &[

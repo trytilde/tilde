@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ZapIcon } from "lucide-react";
 import { cn } from "cn";
 
@@ -79,9 +79,49 @@ export function VariableBadge({
 }
 
 /**
+ * One run of text between badges, edited in place. Its DOM text is set once and then owned by the
+ * browser, so React re-renders never move the caret.
+ */
+function EditableText({
+  value,
+  multiline,
+  onChange,
+  onBlur,
+  onFocus,
+}: {
+  value: string;
+  multiline?: boolean;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  onFocus?: () => void;
+}) {
+  const span = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (span.current) span.current.textContent = value;
+    // The initial text only: later edits come from the element itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <span
+      ref={span}
+      contentEditable="plaintext-only"
+      suppressContentEditableWarning
+      className="min-w-1 whitespace-pre-wrap outline-none"
+      onInput={(event) => onChange(event.currentTarget.textContent ?? "")}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onKeyDown={(event) => {
+        if (!multiline && event.key === "Enter") event.preventDefault();
+      }}
+    />
+  );
+}
+
+/**
  * A text field whose `{{ key }}` variables render as badges. Typing `{{` searches the variables;
- * picking one, or typing a complete `{{ key }}`, inserts it as a token. Backspace removes a whole
- * token, or takes the text before it back into editing. The value is the serialized template.
+ * picking one, or typing a complete `{{ key }}`, inserts it as a token. Text between badges is
+ * edited in place; Backspace at the end removes a whole token. The value is the serialized
+ * template.
  */
 export function TemplateInput({
   id,
@@ -156,7 +196,9 @@ export function TemplateInput({
           multiline ? "min-h-24 items-start" : "min-h-8",
           invalid && "border-destructive ring-3 ring-destructive/20",
         )}
-        onClick={() => field.current?.focus()}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) field.current?.focus();
+        }}
       >
         {parts.map((part) =>
           part.type === "variable" ? (
@@ -171,9 +213,25 @@ export function TemplateInput({
               }
             />
           ) : (
-            <span key={part.id} className="whitespace-pre-wrap">
-              {part.value}
-            </span>
+            <EditableText
+              key={part.id}
+              value={part.value}
+              multiline={multiline}
+              onFocus={onFocus}
+              onChange={(text) =>
+                commit(
+                  parts.map((p) => (p.id === part.id ? { ...p, value: text } : p)),
+                  draft,
+                )
+              }
+              // A `{{ key }}` typed into the text becomes a badge once the text loses focus.
+              onBlur={() => {
+                if (
+                  parts.some((p) => p.type === "text" && /{{\s*[A-Za-z0-9_.-]+\s*}}/.test(p.value))
+                )
+                  commit(parse(serialize(parts)), draft);
+              }}
+            />
           ),
         )}
         <Field
