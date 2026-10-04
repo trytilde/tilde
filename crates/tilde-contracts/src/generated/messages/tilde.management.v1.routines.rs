@@ -1804,6 +1804,7 @@ pub const __LIST_ROUTINES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<ListRoutinesResponse>,
     is_wkt: false,
 };
+/// A new routine is enabled.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -1830,13 +1831,6 @@ pub struct CreateRoutineRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub prompt: ::buffa::alloc::string::String,
-    /// Field 4: `enabled`
-    #[serde(
-        rename = "enabled",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub enabled: bool,
     /// Field 7: `thread_title`
     #[serde(
         rename = "threadTitle",
@@ -1857,7 +1851,6 @@ impl ::core::fmt::Debug for CreateRoutineRequest {
             .field("agent_id", &self.agent_id)
             .field("name", &self.name)
             .field("prompt", &self.prompt)
-            .field("enabled", &self.enabled)
             .field("thread_title", &self.thread_title)
             .field("trigger", &self.trigger)
             .finish()
@@ -1898,9 +1891,6 @@ impl ::buffa::Message for CreateRoutineRequest {
         }
         if !self.prompt.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.prompt) as u64;
-        }
-        if self.enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
         if let ::core::option::Option::Some(ref v) = self.trigger {
             match v {
@@ -1943,9 +1933,6 @@ impl ::buffa::Message for CreateRoutineRequest {
         }
         if !self.prompt.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.prompt, buf);
-        }
-        if self.enabled {
-            ::buffa::types::put_bool_field(4u32, self.enabled, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.trigger {
             match v {
@@ -2003,13 +1990,6 @@ impl ::buffa::Message for CreateRoutineRequest {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.prompt, buf)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.enabled = ::buffa::types::decode_bool(buf)?;
             }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -2073,7 +2053,6 @@ impl ::buffa::Message for CreateRoutineRequest {
         self.agent_id.clear();
         self.name.clear();
         self.prompt.clear();
-        self.enabled = false;
         self.trigger = ::core::option::Option::None;
         self.thread_title.clear();
         self.__buffa_unknown_fields.clear();
@@ -2112,7 +2091,6 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                 let mut __f_prompt: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
-                let mut __f_enabled: ::core::option::Option<bool> = None;
                 let mut __f_thread_title: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
@@ -2170,21 +2148,6 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_string::deserialize(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "enabled" => {
-                            __f_enabled = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = bool;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<bool, D::Error> {
-                                        ::buffa::json_helpers::proto_bool::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -2270,9 +2233,6 @@ impl<'de> serde::Deserialize<'de> for CreateRoutineRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_prompt {
                     __r.prompt = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_enabled {
-                    __r.enabled = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_thread_title {
                     __r.thread_title = v;

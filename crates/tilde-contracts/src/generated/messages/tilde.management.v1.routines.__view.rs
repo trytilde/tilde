@@ -2491,6 +2491,7 @@ impl ::serde::Serialize for ListRoutinesResponseOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// A new routine is enabled.
 #[derive(Clone, Debug, Default)]
 pub struct CreateRoutineRequestView<'a> {
     /// Field 1: `agent_id`
@@ -2499,8 +2500,6 @@ pub struct CreateRoutineRequestView<'a> {
     pub name: &'a str,
     /// Field 3: `prompt`
     pub prompt: &'a str,
-    /// Field 4: `enabled`
-    pub enabled: bool,
     /// Field 7: `thread_title`
     pub thread_title: &'a str,
     pub trigger: ::core::option::Option<
@@ -2556,13 +2555,6 @@ impl<'a> ::buffa::MessageView<'a> for CreateRoutineRequestView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.prompt = ::buffa::types::borrow_str(&mut cur)?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                view.enabled = ::buffa::types::decode_bool(&mut cur)?;
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -2664,7 +2656,6 @@ impl<'a> ::buffa::MessageView<'a> for CreateRoutineRequestView<'a> {
             agent_id: self.agent_id.to_string(),
             name: self.name.to_string(),
             prompt: self.prompt.to_string(),
-            enabled: self.enabled,
             thread_title: self.thread_title.to_string(),
             trigger: match self.trigger.as_ref() {
                 ::core::option::Option::Some(v) => {
@@ -2713,9 +2704,6 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateRoutineRequestView<'a> {
         if !self.prompt.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.prompt) as u64;
         }
-        if self.enabled {
-            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
-        }
         if let ::core::option::Option::Some(ref v) = self.trigger {
             match v {
                 super::super::__buffa::view::oneof::create_routine_request::Trigger::Cron(
@@ -2762,9 +2750,6 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateRoutineRequestView<'a> {
         }
         if !self.prompt.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.prompt, buf);
-        }
-        if self.enabled {
-            ::buffa::types::put_bool_field(4u32, self.enabled, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.trigger {
             match v {
@@ -2822,9 +2807,6 @@ impl<'__a> ::serde::Serialize for CreateRoutineRequestView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.prompt) {
             __map.serialize_entry("prompt", self.prompt)?;
-        }
-        if self.enabled {
-            __map.serialize_entry("enabled", &self.enabled)?;
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.thread_title) {
             __map.serialize_entry("threadTitle", self.thread_title)?;
@@ -2952,11 +2934,6 @@ impl CreateRoutineRequestOwnedView {
     #[must_use]
     pub fn prompt(&self) -> &'_ str {
         self.0.reborrow().prompt
-    }
-    /// Field 4: `enabled`
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.0.reborrow().enabled
     }
     /// Field 7: `thread_title`
     #[must_use]

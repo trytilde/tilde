@@ -436,7 +436,6 @@ type RoutineForm = {
   name: string;
   prompt: string;
   threadTitle: string;
-  enabled: boolean;
   schedule: string;
   connectionId: string;
   signalType: string;
@@ -473,7 +472,6 @@ function RoutineDialog({
       name: routine?.name ?? "",
       prompt: routine?.prompt ?? "",
       threadTitle: routine?.threadTitle ?? "",
-      enabled: routine?.enabled ?? true,
       schedule: trigger?.case === "cron" ? trigger.value.schedule : "0 9 * * 1-5",
       connectionId:
         trigger?.case === "signal"
@@ -530,7 +528,6 @@ function RoutineDialog({
       name: values.name.trim(),
       prompt: values.prompt,
       threadTitle: values.threadTitle.trim(),
-      enabled: values.enabled,
       trigger:
         kind === "cron"
           ? { case: "cron" as const, value: { schedule: values.schedule.trim() } }
@@ -540,7 +537,9 @@ function RoutineDialog({
             },
     };
     try {
-      if (routine) await routines.updateRoutine({ id: routine.id, ...fields });
+      // Enabling is the table's switch; an edit keeps it.
+      if (routine)
+        await routines.updateRoutine({ id: routine.id, enabled: routine.enabled, ...fields });
       else await routines.createRoutine({ agentId, ...fields });
       onSaved();
     } catch (e) {
@@ -728,20 +727,6 @@ function RoutineDialog({
                 {errors.prompt && (
                   <p className="m-0 text-xs text-destructive">{errors.prompt.message}</p>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Controller
-                  control={form.control}
-                  name="enabled"
-                  render={({ field }) => (
-                    <Switch
-                      id="routine-enabled"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-                <Label htmlFor="routine-enabled">Enabled</Label>
               </div>
               {error && (
                 <p role="alert" className="m-0 text-sm text-destructive">

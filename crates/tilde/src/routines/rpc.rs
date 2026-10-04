@@ -109,7 +109,7 @@ impl RoutineService for Rpc {
                     name: request.name,
                     prompt: request.prompt,
                     thread_title: request.thread_title,
-                    enabled: request.enabled,
+                    enabled: true,
                     trigger,
                 },
             )

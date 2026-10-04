@@ -38,8 +38,9 @@ message SignalType { string id = 1; string description = 2; string name = 3; str
 message SignalVariable { string key = 1; string description = 2; string example = 3; }
 message ListRoutinesRequest { string agent_id = 1; }
 message ListRoutinesResponse { repeated Routine routines = 1; }
+// A new routine is enabled.
 message CreateRoutineRequest {
-  string agent_id = 1; string name = 2; string prompt = 3; bool enabled = 4;
+  string agent_id = 1; string name = 2; string prompt = 3; reserved 4;
   oneof trigger { CronTrigger cron = 5; SignalTrigger signal = 6; }
   string thread_title = 7;
 }
