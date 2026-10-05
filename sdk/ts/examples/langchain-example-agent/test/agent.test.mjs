@@ -74,18 +74,25 @@ function context({ baseURL = "http://127.0.0.1:1", fetch: send = fetch, steering
     cacheConvertedMessages: async () => {},
   };
 }
-/** A chat completions response: the model either calls tools or answers with private text. */
-function response(message) {
+/** A Responses API response: the model either calls tools or answers with private text. */
+function response(output) {
   return {
-    id: "chatcmpl_fixture",
-    object: "chat.completion",
-    created: 1700000000,
-    model: "gpt-4o-mini",
-    choices: [{ index: 0, message, finish_reason: message.tool_calls ? "tool_calls" : "stop" }],
-    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    id: "resp_fixture",
+    object: "response",
+    created_at: 1700000000,
+    status: "completed",
+    model: "gpt-5.6-terra",
+    output,
+    usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
   };
 }
-const privateText = { role: "assistant", content: "Private model completion" };
+const privateText = {
+  id: "msg_private",
+  type: "message",
+  role: "assistant",
+  status: "completed",
+  content: [{ type: "output_text", text: "Private model completion", annotations: [] }],
+};
 
 test("LangChain runs current-channel tools with the model's call ID; steering reaches the model", async () => {
   const requests = [];
@@ -99,29 +106,23 @@ test("LangChain runs current-channel tools with the model's call ID; steering re
       JSON.stringify(
         response(
           requests.length === 1
-            ? {
-                role: "assistant",
-                content: null,
-                tool_calls: [
-                  {
-                    id: "call_send",
-                    type: "function",
-                    function: {
-                      name: "sendMessage",
-                      arguments: JSON.stringify({ text: "Hello through the provider tool" }),
-                    },
-                  },
-                  {
-                    id: "call_time",
-                    type: "function",
-                    function: {
-                      name: "local_time",
-                      arguments: JSON.stringify({ timeZone: "UTC" }),
-                    },
-                  },
-                ],
-              }
-            : privateText,
+            ? [
+                {
+                  id: "fc_send",
+                  type: "function_call",
+                  call_id: "call_send",
+                  name: "sendMessage",
+                  arguments: JSON.stringify({ text: "Hello through the provider tool" }),
+                },
+                {
+                  id: "fc_time",
+                  type: "function_call",
+                  call_id: "call_time",
+                  name: "local_time",
+                  arguments: JSON.stringify({ timeZone: "UTC" }),
+                },
+              ]
+            : [privateText],
         ),
       ),
     );
@@ -139,7 +140,7 @@ test("LangChain runs current-channel tools with the model's call ID; steering re
       [[{ text: "Hello through the provider tool" }, "call_send"]],
     );
     assert.deepEqual(
-      requests[0].tools.map((tool) => tool.function.name),
+      requests[0].tools.map((tool) => tool.name),
       ["sendMessage", "local_time", "roll_dice", "read_skill"],
     );
     // The agent's bundled tools are published to Tilde and their calls audited with the model's ID.
@@ -152,23 +153,23 @@ test("LangChain runs current-channel tools with the model's call ID; steering re
       ],
     );
     assert.deepEqual(
-      requests[0].tools[0].function.parameters,
+      requests[0].tools[0].parameters,
       ctx.channel.current.sendMessage.inputSchema,
     );
     assert(
-      JSON.stringify(requests[0].messages[0]).includes(
+      JSON.stringify(requests[0].input[0]).includes(
         "You have these skills.\\n- faq: Answer FAQs",
       ),
       "the skill summary is appended to the system message",
     );
     assert.equal(requests[0].store, false);
     assert(
-      requests[1].messages.some(
-        (item) => item.role === "tool" && item.tool_call_id === "call_send",
+      requests[1].input.some(
+        (item) => item.type === "function_call_output" && item.call_id === "call_send",
       ),
     );
     assert(
-      requests[1].messages.some(
+      requests[1].input.some(
         (item) =>
           item.role === "user" && JSON.stringify(item.content).includes("Also mention the weather"),
       ),
@@ -183,11 +184,11 @@ test("LangChain runs current-channel tools with the model's call ID; steering re
 });
 
 test("text-only completion and upstream failures do not produce implicit messages", async () => {
-  const json = (message) =>
-    new Response(JSON.stringify(response(message)), {
+  const json = (output) =>
+    new Response(JSON.stringify(response(output)), {
       headers: { "content-type": "application/json" },
     });
-  const ctx = context({ fetch: async () => json(privateText) });
+  const ctx = context({ fetch: async () => json([privateText]) });
   await runWithContext(ctx, () => respond(ctx));
   assert.deepEqual(ctx.sent, []);
   const failing = context({

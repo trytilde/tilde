@@ -141,7 +141,8 @@ test("the model uses current-channel tools; returned model text is never sent", 
       ["sendMessage", "local_time", "roll_dice", "list_skills", "read_skill"],
     );
     const system = requests[0].input[0];
-    assert.equal(system.role, "system");
+    // Reasoning models take the instructions as a developer message.
+    assert.equal(system.role, "developer");
     assert.match(system.content, /^You are Example Agent 1/);
     assert.match(system.content, /- refunds: Handle refunds$/);
     // The agent's own tools are published to Tilde and their calls audited with the model's ID.
