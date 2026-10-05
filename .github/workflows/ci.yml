@@ -1,18 +1,23 @@
 name: Check
-# Runs on pull requests that are ready for review, and when a release calls it. Draft PRs and
+# Runs on pull requests labelled "run ci", and when a release calls it. Other pull requests and
 # pushes to main run nothing, to save Actions time; a newer push to a PR cancels the older run.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, labeled]
   workflow_call:
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  group: ci-${{ (github.event.action == 'labeled' && github.event.label.name != 'run ci') && github.run_id || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
   check:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # Pull requests run only with the "run ci" label (adding it starts a run); releases call this
+    # workflow directly and always run it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'run ci') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'run ci'))
     # Fork pull requests run on GitHub's runners: Depot runners cost money and carry a Depot Cache
     # token that could write poisoned compiler output.
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'depot-ubuntu-24.04-8' || 'ubuntu-24.04' }}

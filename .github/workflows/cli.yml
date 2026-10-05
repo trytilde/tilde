@@ -1,11 +1,11 @@
 name: CLI
 # Cross-compiles the `tilde` CLI for every target in packaging/targets.json and packs the npm and
 # PyPI artifacts plus the archives install.sh downloads. Called by Release, and run on pull
-# requests that touch the CLI or the way it is packaged, which is when a cross-build can break;
-# unrelated pull requests skip it, because five Rust targets are not cheap.
+# requests labelled "run ci" that touch the CLI or the way it is packaged, which is when a
+# cross-build can break; other pull requests skip it, because five Rust targets are not cheap.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, labeled]
     paths:
       - crates/tilde-cli/**
       - crates/tilde-contracts/**
@@ -18,13 +18,18 @@ on:
   workflow_call:
   workflow_dispatch:
 concurrency:
-  group: cli-${{ github.event.pull_request.number || github.run_id }}
+  group: cli-${{ (github.event.action == 'labeled' && github.event.label.name != 'run ci') && github.run_id || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
   build:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # Pull requests run only with the "run ci" label (adding it starts a run); releases call this
+    # workflow directly and always run it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'run ci') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'run ci'))
     strategy:
       fail-fast: false
       matrix:
@@ -98,7 +103,12 @@ jobs:
 
   package:
     needs: build
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # Pull requests run only with the "run ci" label (adding it starts a run); releases call this
+    # workflow directly and always run it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'run ci') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'run ci'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
