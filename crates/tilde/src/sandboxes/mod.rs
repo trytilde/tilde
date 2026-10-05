@@ -747,9 +747,10 @@ impl Sandboxes {
         Ok(())
     }
     /// Keep a running VM from the provider's own pause or end: an E2B VM's TTL is renewed; a
-    /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive,
-    /// once no operation is in flight. Done under the sandbox's lease, so it never resumes a VM
-    /// another process has just put to sleep.
+    /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive:
+    /// once no operation is in flight, or regardless in its last five minutes, when losing its
+    /// files would cost more than the operations still running. Done under the sandbox's lease,
+    /// so it never resumes a VM another process has just put to sleep.
     async fn renew(&self, id: Uuid) -> Result<(), Error> {
         let pool = &self.connections.pool;
         let client = pool.get().await?;
@@ -764,22 +765,29 @@ impl Sandboxes {
             return Ok(());
         };
         drop(client);
-        let (provider, access) = self.access(row.connection_id).await?;
-        if provider == Provider::Modal && !row.busy {
-            return self.sleep(id).await;
-        }
         let renewed = async {
+            let (provider, access) = self.access(row.connection_id).await?;
+            if provider == Provider::Modal && (!row.busy || row.last_chance) {
+                // Sleeping releases the lease itself, however it ends.
+                return Ok::<_, Error>(true);
+            }
             if provider == Provider::E2b
                 && launch::resume(provider, &access, &row.provider_sandbox_id).await?
             {
                 db::sandbox_renewed_execute(&pool.get().await?, id, launch::lifetime(provider))
                     .await?;
             }
-            Ok::<_, Error>(())
+            Ok(false)
         }
         .await;
-        db::sandbox_release_execute(&pool.get().await?, id).await?;
-        renewed
+        match renewed {
+            Ok(true) => self.sleep(id).await,
+            // Every other outcome, failures included, gives the lease back.
+            other => {
+                db::sandbox_release_execute(&pool.get().await?, id).await?;
+                other.map(drop)
+            }
+        }
     }
     /// After a settings change, terminate what it made unwanted without waiting for the timer.
     fn sweep_soon(&self) {

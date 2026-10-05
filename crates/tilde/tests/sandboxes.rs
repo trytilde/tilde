@@ -33,6 +33,8 @@ struct World {
     sessions: BTreeMap<String, String>,
     processes: BTreeMap<String, tokio::task::JoinHandle<()>>,
     paused: Vec<String>,
+    /// Fail the next connect, as an E2B outage would.
+    fail_connect: bool,
 }
 type Shared = Arc<Mutex<World>>;
 
@@ -179,6 +181,10 @@ fn answer(
                 w.templates
                     .push(request["templateID"].as_str().unwrap().to_owned());
                 ok(json!({"sandboxID":"sbx-1"}))
+            }
+            ("POST", "/e2b/sandboxes/sbx-1/connect") if w.fail_connect => {
+                w.fail_connect = false;
+                (503, b"{}".to_vec())
             }
             ("POST", "/e2b/sandboxes/sbx-1/connect") => {
                 if w.paused.pop().is_some() {
@@ -515,8 +521,17 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
     pg.execute("UPDATE sandboxes SET lease_until=NULL", &[])
         .await
         .unwrap();
+    // A failed renewal gives the lease back, so agents are not kept waiting on it.
+    world.lock().unwrap().fail_connect = true;
     sandboxes.sweep().await.unwrap();
-    assert_eq!(connects(&world.lock().unwrap()), before + 1);
+    let leased: bool = pg
+        .query_one("SELECT lease_until IS NOT NULL FROM sandboxes", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert!(!leased, "the lease is released after a failed renewal");
+    sandboxes.sweep().await.unwrap();
+    assert_eq!(connects(&world.lock().unwrap()), before + 2);
     let renewed: bool = pg
         .query_one(
             "SELECT expires_at > NOW()+INTERVAL '50 minutes' FROM sandboxes",

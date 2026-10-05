@@ -6,12 +6,14 @@ pub struct Record {
     pub connection_id: uuid::Uuid,
     pub provider_sandbox_id: String,
     pub busy: bool,
+    pub last_chance: bool,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub connection_id: uuid::Uuid,
     pub provider_sandbox_id: &'a str,
     pub busy: bool,
+    pub last_chance: bool,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -20,6 +22,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             connection_id,
             provider_sandbox_id,
             busy,
+            last_chance,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -27,6 +30,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             connection_id,
             provider_sandbox_id: provider_sandbox_id.into(),
             busy,
+            last_chance,
         }
     }
 }
@@ -99,7 +103,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT s.id,s.connection_id,s.provider_sandbox_id, EXISTS (SELECT 1 FROM sandbox_calls c WHERE c.sandbox_id=s.id) AS busy FROM sandboxes s WHERE s.status='running' AND s.provider_sandbox_id IS NOT NULL AND s.expires_at < NOW() + INTERVAL '20 minutes' AND CASE WHEN $1::UUID IS NULL THEN s.lease_until IS NULL OR s.lease_until <= NOW() ELSE s.id=$1 END LIMIT 50",
+        "SELECT s.id,s.connection_id,s.provider_sandbox_id, EXISTS (SELECT 1 FROM sandbox_calls c WHERE c.sandbox_id=s.id) AS busy, s.expires_at < NOW() + INTERVAL '5 minutes' AS last_chance FROM sandboxes s WHERE s.status='running' AND s.provider_sandbox_id IS NOT NULL AND s.expires_at < NOW() + INTERVAL '20 minutes' AND CASE WHEN $1::UUID IS NULL THEN s.lease_until IS NULL OR s.lease_until <= NOW() ELSE s.id=$1 END LIMIT 50",
         None,
     )
 }
@@ -128,6 +132,7 @@ impl RunStmt {
                         connection_id: row.try_get(1)?,
                         provider_sandbox_id: row.try_get(2)?,
                         busy: row.try_get(3)?,
+                        last_chance: row.try_get(4)?,
                     })
                 },
             mapper: |it| Record::from(it),
