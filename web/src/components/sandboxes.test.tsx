@@ -20,6 +20,7 @@ import {
 import { SandboxesPage } from "./sandboxes";
 
 const rpc = vi.hoisted(() => ({
+  agents: { listAgents: vi.fn() },
   connections: { listConnections: vi.fn(), getProvider: vi.fn() },
   sandboxes: { listSandboxBlueprints: vi.fn(), createSandboxBlueprint: vi.fn() },
 }));
@@ -55,6 +56,13 @@ function renderPage() {
   return render(<RouterProvider router={router} />);
 }
 beforeEach(() => {
+  rpc.agents.listAgents.mockResolvedValue({
+    agents: [
+      { id: "agent-1", name: "Ops bot" },
+      { id: "agent-2", name: "Fixer" },
+    ],
+    nextPageToken: "",
+  });
   rpc.connections.listConnections.mockImplementation(async ({ providerId }) => ({
     connections:
       providerId === "e2b"
@@ -94,24 +102,36 @@ it("lists blueprints and creates one from a ready sandbox connection", async () 
   const row = (await within(table).findByRole("link", { name: "Dev box" })).closest("tr")!;
   await within(row).findByText("E2B prod");
   within(row).getByText("Per agent");
-  within(row).getByText("2");
+  await within(row).findByRole("button", { name: "Agents: Ops bot, Fixer" });
 
+  // New blueprint starts from an existing connection, searched among the ready sandbox ones.
   fireEvent.click(screen.getByRole("button", { name: "New blueprint" }));
-  const dialog = await screen.findByRole("dialog");
-  const connection = within(dialog).getByLabelText("Connection");
-  // A connection that needs attention cannot launch sandboxes.
-  expect(within(connection).queryByText(/E2B expired/)).toBeNull();
+  const menu = await screen.findByRole("menu");
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Use existing connection" }));
+  const existing = await screen.findByRole("dialog", { name: "Use an existing connection" });
+  expect(within(existing).queryByText("E2B expired")).toBeNull();
+  fireEvent.change(within(existing).getByLabelText("Search connections"), {
+    target: { value: "prod" },
+  });
+  expect(within(existing).queryByText("Modal")).toBeNull();
+  fireEvent.click(within(existing).getByRole("button", { name: /E2B prod/ }));
+  const dialog = await screen.findByRole("dialog", { name: "New blueprint" });
+  const connection = within(dialog).getByRole("combobox", { name: "Connection" });
+  await waitFor(() => expect((connection as HTMLInputElement).value).toBe("E2B prod"));
+  within(dialog).getByLabelText("E2B template ID");
+
   fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: " Shared " } });
-  fireEvent.change(connection, { target: { value: "modal-1" } });
-  fireEvent.change(within(dialog).getByLabelText("Template"), {
+  // The connection can be searched for; the template field follows its provider.
+  fireEvent.focus(connection);
+  fireEvent.keyDown(connection, { key: "ArrowDown" });
+  fireEvent.input(connection, { target: { value: "mod" } });
+  fireEvent.click(await screen.findByRole("option", { name: "Modal" }));
+  fireEvent.change(await within(dialog).findByLabelText("Container image"), {
     target: { value: "ghcr.io/acme/sandbox:latest" },
   });
   // The default keeps sessions apart; shared modes warn about what crosses them.
   expect(within(dialog).queryByRole("note")).toBeNull();
-  fireEvent.change(within(dialog).getByLabelText("Reuse"), {
-    target: { value: String(SandboxReuse.GLOBAL) },
-  });
-  within(dialog).getByText("Every agent using this blueprint shares one sandbox.");
+  fireEvent.click(await within(dialog).findByRole("radio", { name: /^Shared by all agents/ }));
   expect(within(dialog).getByRole("note").textContent).toContain(
     "Data crosses agents and sessions",
   );
@@ -132,19 +152,28 @@ it("lists blueprints and creates one from a ready sandbox connection", async () 
   await screen.findByText("Blueprint page");
 });
 
-it("points to the catalog when no sandbox connection is ready", async () => {
+it("sets up a new E2B or Modal connection when none is ready", async () => {
   rpc.connections.listConnections.mockResolvedValue({ connections: [], nextPageToken: "" });
   rpc.sandboxes.listSandboxBlueprints.mockResolvedValue({ blueprints: [] });
   renderPage();
   await screen.findByText("No sandbox blueprints yet.");
   fireEvent.click(screen.getByRole("button", { name: "New blueprint" }));
-  const dialog = await screen.findByRole("dialog");
-  expect(within(dialog).getByRole("link", { name: "E2B" }).getAttribute("href")).toBe(
-    "/tools/catalog/e2b",
-  );
-  fireEvent.click(within(dialog).getByRole("button", { name: "Create blueprint" }));
-  await waitFor(() =>
-    expect(within(dialog).getByLabelText("Connection").getAttribute("aria-invalid")).toBe("true"),
-  );
+  const menu = await screen.findByRole("menu");
+  expect(
+    within(menu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Use existing connection", "Add new connection"]);
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Add new connection" }));
+  // Only the sandbox providers are offered, not the whole catalog.
+  const choose = await screen.findByRole("dialog", { name: "New sandbox connection" });
+  expect(
+    within(choose)
+      .getAllByRole("button")
+      .map((button) => button.textContent)
+      .filter((name) => name !== "Close"),
+  ).toEqual(["E2B", "Modal"]);
+  fireEvent.click(within(choose).getByRole("button", { name: "E2B" }));
+  await screen.findByRole("dialog", { name: /E2B/ });
   expect(rpc.sandboxes.createSandboxBlueprint).not.toHaveBeenCalled();
 });

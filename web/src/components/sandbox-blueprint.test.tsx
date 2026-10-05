@@ -73,9 +73,7 @@ it("saves only what changed and warns that a new reuse mode terminates sandboxes
   renderPage("settings");
   const form = await screen.findByRole("form", { name: "Blueprint settings" });
   expect(within(form).queryByText(/terminates this blueprint's existing sandboxes/)).toBeNull();
-  fireEvent.change(within(form).getByLabelText("Reuse"), {
-    target: { value: String(SandboxReuse.AGENT) },
-  });
+  fireEvent.click(within(form).getByRole("radio", { name: /^Per agent(?! and)/ }));
   within(form).getByText(/terminates this blueprint's existing sandboxes/);
   within(form).getByText(/visible to every other session of the agent/);
   fireEvent.click(within(form).getByRole("button", { name: "Save" }));
@@ -115,9 +113,13 @@ it("warns that moving to another connection terminates the sandboxes on this one
   }));
   renderPage("settings");
   const form = await screen.findByRole("form", { name: "Blueprint settings" });
-  await within(form).findByRole("option", { name: /E2B dev/ });
+  const connection = within(form).getByRole("combobox", { name: "Connection" });
+  await waitFor(() => expect((connection as HTMLInputElement).value).toBe("E2B prod"));
   expect(within(form).queryByText(/terminates this blueprint's existing sandboxes/)).toBeNull();
-  fireEvent.change(within(form).getByLabelText("Connection"), { target: { value: "e2b-2" } });
+  fireEvent.focus(connection);
+  fireEvent.keyDown(connection, { key: "ArrowDown" });
+  fireEvent.input(connection, { target: { value: "dev" } });
+  fireEvent.click(await screen.findByRole("option", { name: "E2B dev" }));
   within(form).getByText(/which run on the current connection/);
 });
 

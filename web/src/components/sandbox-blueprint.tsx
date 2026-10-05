@@ -192,7 +192,7 @@ function BlueprintSettings({
         </div>
       </section>
       <form
-        className="grid max-w-xl gap-4"
+        className="grid max-w-2xl gap-4"
         aria-label="Blueprint settings"
         onSubmit={form.handleSubmit(async (values) => {
           setError("");
@@ -241,7 +241,7 @@ function BlueprintSettings({
           </Button>
         </div>
       </form>
-      <section className="grid max-w-xl gap-3 border-t pt-6" aria-label="Delete blueprint">
+      <section className="grid max-w-2xl gap-3 border-t pt-6" aria-label="Delete blueprint">
         <h3 className="text-sm font-medium">Delete blueprint</h3>
         {used.length ? (
           <div className="text-xs text-muted-foreground">

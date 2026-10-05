@@ -1,25 +1,44 @@
 import { useCallback, useEffect, useState } from "react";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { CableIcon, InfoIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import type { Connection, Provider } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import {
   SandboxReuse,
   type SandboxBlueprint,
 } from "@trytilde/contracts/tilde/management/v1/sandboxes_pb.js";
-import { NativeSelect } from "@trytilde/connection-ui";
 import { connections, sandboxes } from "@/client";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ProviderIcon } from "./provider-icon";
+import { AgentStack, useAgentRegistry } from "./agent-stack";
+import { AccountSetupDialog } from "./tool-account-setup";
+import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog";
 import { CatalogSearchField } from "./tool-catalog";
 import { loadToolConnections, message } from "./tool-connections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
+import { InputGroupAddon } from "@/components/ui/input-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -96,7 +115,6 @@ export function ConnectionCell({ id, available }: { id: string; available: Sandb
     <span className="flex items-center gap-2">
       <ProviderIcon iconUrl={provider?.iconUrl} />
       <span>{connection?.name ?? "Unknown connection"}</span>
-      {provider && <span className="text-xs text-muted-foreground">{provider.name}</span>}
     </span>
   );
 }
@@ -141,12 +159,26 @@ export function BlueprintFields({
   available: SandboxConnections;
   current?: string;
 }) {
-  const { register, watch, formState } = form;
+  const { register, watch, control, formState } = form;
   const offered = available.connections.filter(
     (c: Connection) => c.status === "ready" || c.id === current,
   );
   const chosen = available.connections.find((c) => c.id === watch("connectionId"));
+  const iconOf = (connection?: Connection) =>
+    connection && available.providers.get(connection.providerId)?.iconUrl;
   const reuse = REUSE[Number(watch("reuse")) as Reuse] ?? REUSE[SandboxReuse.THREAD];
+  const template =
+    chosen?.providerId === "modal"
+      ? {
+          label: "Container image",
+          placeholder: "ghcr.io/acme/sandbox:latest",
+          help: "A container image in a registry Modal can pull, such as ghcr.io/acme/sandbox:latest.",
+        }
+      : {
+          label: "E2B template ID",
+          placeholder: "my-template",
+          help: "The ID or name of an E2B template.",
+        };
   return (
     <>
       <div className="space-y-2">
@@ -159,18 +191,46 @@ export function BlueprintFields({
       </div>
       <div className="space-y-2">
         <Label htmlFor="blueprint-connection">Connection</Label>
-        <NativeSelect
-          id="blueprint-connection"
-          aria-invalid={!!formState.errors.connectionId}
-          {...register("connectionId", { required: true })}
-        >
-          <option value="">Choose a connection</option>
-          {offered.map((connection) => (
-            <option key={connection.id} value={connection.id}>
-              {`${connection.name} · ${available.providers.get(connection.providerId)?.name ?? connection.providerId}`}
-            </option>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={control}
+          name="connectionId"
+          rules={{ required: true }}
+          render={({ field, fieldState }) => (
+            <Combobox
+              items={offered}
+              value={offered.find((c) => c.id === field.value) ?? null}
+              onValueChange={(connection: Connection | null) =>
+                field.onChange(connection?.id ?? "")
+              }
+              itemToStringLabel={(connection: Connection) => connection.name}
+              itemToStringValue={(connection: Connection) => connection.id}
+            >
+              <ComboboxInput
+                id="blueprint-connection"
+                placeholder="Search connections"
+                aria-invalid={fieldState.invalid}
+                className="w-full"
+              >
+                {chosen && (
+                  <InputGroupAddon align="inline-start">
+                    <ProviderIcon iconUrl={iconOf(chosen)} />
+                  </InputGroupAddon>
+                )}
+              </ComboboxInput>
+              <ComboboxContent>
+                <ComboboxEmpty>No matching connection.</ComboboxEmpty>
+                <ComboboxList>
+                  {(connection: Connection) => (
+                    <ComboboxItem key={connection.id} value={connection}>
+                      <ProviderIcon iconUrl={iconOf(connection)} />
+                      <span>{connection.name}</span>
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          )}
+        />
         {!offered.length && (
           <p className="text-xs text-muted-foreground">
             No ready E2B or Modal connection. Connect{" "}
@@ -193,43 +253,52 @@ export function BlueprintFields({
           </p>
         )}
       </div>
+      {chosen && (
+        <div className="space-y-2">
+          <Label htmlFor="blueprint-template">{template.label}</Label>
+          <Input
+            id="blueprint-template"
+            aria-describedby="blueprint-template-help"
+            aria-invalid={!!formState.errors.template}
+            placeholder={template.placeholder}
+            {...register("template", { validate: (value) => !!value.trim() })}
+          />
+          <p id="blueprint-template-help" className="text-xs text-muted-foreground">
+            {template.help} It must have the <code>tilde</code> CLI on its PATH: Tilde starts{" "}
+            <code>tilde sandbox connect</code> in it.
+          </p>
+        </div>
+      )}
       <div className="space-y-2">
-        <Label htmlFor="blueprint-template">Template</Label>
-        <Input
-          id="blueprint-template"
-          aria-describedby="blueprint-template-help"
-          aria-invalid={!!formState.errors.template}
-          placeholder={
-            chosen?.providerId === "modal" ? "ghcr.io/acme/sandbox:latest" : "my-template"
-          }
-          {...register("template", { validate: (value) => !!value.trim() })}
+        <Label id="blueprint-reuse">Reuse</Label>
+        <Controller
+          control={control}
+          name="reuse"
+          render={({ field }) => (
+            <RadioGroup
+              aria-labelledby="blueprint-reuse"
+              value={field.value}
+              onValueChange={(value) => field.onChange(String(value))}
+              className="grid gap-2 sm:grid-cols-2"
+            >
+              {Object.entries(REUSE).map(([value, { label, description }]) => (
+                <label
+                  key={value}
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-data-checked:border-primary has-data-checked:bg-primary/5"
+                >
+                  <RadioGroupItem value={value} className="mt-0.5" />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">{label}</span>
+                    <span className="block text-xs text-muted-foreground">{description}</span>
+                  </span>
+                </label>
+              ))}
+            </RadioGroup>
+          )}
         />
-        <p id="blueprint-template-help" className="text-xs text-muted-foreground">
-          E2B: a template ID or name. Modal: a registry image such as{" "}
-          <code>ghcr.io/acme/sandbox:latest</code> or an image ID (<code>im-…</code>). The image
-          must have the <code>tilde</code> CLI on its PATH: Tilde starts{" "}
-          <code>tilde sandbox connect</code> in it.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="blueprint-reuse">Reuse</Label>
-        <NativeSelect
-          id="blueprint-reuse"
-          aria-describedby="blueprint-reuse-help"
-          {...register("reuse")}
-        >
-          {Object.entries(REUSE).map(([value, { label }]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </NativeSelect>
-        <p id="blueprint-reuse-help" className="text-xs text-muted-foreground">
-          {reuse.description}
-        </p>
         {reuse.warning && <Warning>{reuse.warning}</Warning>}
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="blueprint-sleep">Sleep after (minutes)</Label>
           <Input
@@ -268,12 +337,15 @@ export function BlueprintFields({
             {...register("connectTimeoutSeconds", { valueAsNumber: true, min: 10, max: 600 })}
           />
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-3">
+      </div>
+      <Alert>
+        <InfoIcon />
+        <AlertDescription>
           A running sandbox sleeps once unused for the first, and any sandbox is terminated once
           unused for the second. Launching or waking one fails the agent's invocation if its{" "}
           <code>tilde</code> process has not connected within the timeout.
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
     </>
   );
 }
@@ -293,6 +365,7 @@ export function Warning({ children }: { children: React.ReactNode }) {
 /** Sandbox blueprints: how agents' sandboxes are launched, configured and shared. */
 export function SandboxesPage() {
   const navigate = useNavigate();
+  const registry = useAgentRegistry();
   const [blueprints, setBlueprints] = useState<SandboxBlueprint[]>([]);
   const [available, setAvailable] = useState<SandboxConnections>({
     connections: [],
@@ -300,7 +373,10 @@ export function SandboxesPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [creating, setCreating] = useState(false);
+  // The blueprint dialog's connection when it is open; empty when none is chosen yet.
+  const [creating, setCreating] = useState<string | null>(null);
+  const [newConnection, setNewConnection] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [query, setQuery] = useState("");
   const search = useDebouncedValue(query.trim());
   const refresh = useCallback(
@@ -336,15 +412,24 @@ export function SandboxesPage() {
         <CatalogSearchField label="Search blueprints" value={query} onChange={setQuery} />
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            A blueprint launches VMs for agents through an E2B or Modal connection. Give an agent a
-            sandbox in its Capabilities.
-          </p>
-          <Button className="gap-2" onClick={() => setCreating(true)}>
-            <PlusIcon />
-            New blueprint
-          </Button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button className="gap-2" />}>
+              <PlusIcon />
+              New blueprint
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setChoosing(true)}>
+                <CableIcon />
+                Use existing connection
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setNewConnection(true)}>
+                <PlusIcon />
+                Add new connection
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -382,7 +467,18 @@ export function SandboxesPage() {
                       <code className="text-xs">{blueprint.template}</code>
                     </TableCell>
                     <TableCell>{REUSE[reuseOf(blueprint.reuse)].label}</TableCell>
-                    <TableCell>{blueprint.agentIds.length}</TableCell>
+                    <TableCell>
+                      <AgentStack
+                        ids={blueprint.agentIds}
+                        registry={registry}
+                        onOpen={() =>
+                          void navigate({
+                            to: "/sandboxes/$blueprintId/settings",
+                            params: { blueprintId: blueprint.id },
+                          })
+                        }
+                      />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
@@ -402,10 +498,28 @@ export function SandboxesPage() {
           </Table>
         </div>
       </div>
-      <CreateBlueprintDialog
-        open={creating}
+      <ExistingSandboxConnection
+        open={choosing}
         available={available}
-        onOpenChange={setCreating}
+        onClose={() => setChoosing(false)}
+        onChosen={(connectionId) => {
+          setChoosing(false);
+          setCreating(connectionId);
+        }}
+      />
+      <NewSandboxConnection
+        open={newConnection}
+        providers={available.providers}
+        onClose={() => setNewConnection(false)}
+        onConnected={(connectionId) => {
+          void refresh().catch((e) => setError(message(e)));
+          setCreating(connectionId);
+        }}
+      />
+      <CreateBlueprintDialog
+        connectionId={creating}
+        available={available}
+        onClose={() => setCreating(null)}
         onCreated={(blueprint) =>
           void navigate({
             to: "/sandboxes/$blueprintId/settings",
@@ -417,32 +531,180 @@ export function SandboxesPage() {
   );
 }
 
-function CreateBlueprintDialog({
+/** A searchable list of the ready E2B and Modal connections, to launch a blueprint's sandboxes. */
+function ExistingSandboxConnection({
   open,
   available,
-  onOpenChange,
-  onCreated,
+  onClose,
+  onChosen,
 }: {
   open: boolean;
   available: SandboxConnections;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
+  onChosen: (connectionId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const providerName = (connection: Connection) =>
+    available.providers.get(connection.providerId)?.name ?? connection.providerId;
+  const matches = available.connections.filter(
+    (connection) =>
+      connection.status === "ready" &&
+      `${connection.name} ${providerName(connection)}`.toLowerCase().includes(needle),
+  );
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setQuery("");
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Use an existing connection</DialogTitle>
+        </DialogHeader>
+        <Input
+          aria-label="Search connections"
+          placeholder="Search connections"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
+          {matches.length ? (
+            matches.map((connection) => (
+              <Button
+                key={connection.id}
+                variant="outline"
+                className="h-auto w-full justify-start gap-3 py-3 text-left"
+                onClick={() => {
+                  setQuery("");
+                  onChosen(connection.id);
+                }}
+              >
+                <ProviderIcon iconUrl={available.providers.get(connection.providerId)?.iconUrl} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{connection.name}</span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {providerName(connection)}
+                  </span>
+                </span>
+              </Button>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {needle
+                ? "No connection matches this search."
+                : "No ready E2B or Modal connection. Add a new connection from the New blueprint menu."}
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * A new E2B or Modal connection, set up as the catalog sets one up: the provider is chosen here
+ * rather than from the whole catalog. `onConnected` gets the ready connection.
+ */
+function NewSandboxConnection({
+  open,
+  providers,
+  onClose,
+  onConnected,
+}: {
+  open: boolean;
+  providers: Map<string, Provider>;
+  onClose: () => void;
+  onConnected: (connectionId: string) => void;
+}) {
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [frame, setFrame] = useState<{ setup: Brokering; connectionId: string } | null>(null);
+  const offered = SANDBOX_PROVIDERS.flatMap((id) => providers.get(id) ?? []);
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New sandbox connection</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {offered.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                className="flex items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/50"
+                onClick={() => {
+                  onClose();
+                  setProvider(candidate);
+                }}
+              >
+                <ProviderIcon iconUrl={candidate.iconUrl} />
+                <span className="text-sm font-medium">{candidate.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {provider && (
+        <AccountSetupDialog
+          provider={provider}
+          iconId={provider.id}
+          onStarted={() => {}}
+          onComplete={(connectionId) => {
+            setProvider(null);
+            onConnected(connectionId);
+          }}
+          onCustom={(setup, connectionId) => {
+            setProvider(null);
+            setFrame({ setup, connectionId });
+          }}
+          onClose={() => setProvider(null)}
+        />
+      )}
+      {frame && (
+        <ConnectionSetupDialog
+          setup={frame.setup}
+          error=""
+          onClose={() => {
+            onConnected(frame.connectionId);
+            setFrame(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function CreateBlueprintDialog({
+  connectionId,
+  available,
+  onClose,
+  onCreated,
+}: {
+  /** Open with this connection chosen; null keeps it closed. */
+  connectionId: string | null;
+  available: SandboxConnections;
+  onClose: () => void;
   onCreated: (blueprint: SandboxBlueprint) => void;
 }) {
   const form = useForm<BlueprintValues>({ defaultValues: blueprintValues() });
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (connectionId !== null) form.reset({ ...blueprintValues(), connectionId });
+  }, [connectionId, form]);
   function close() {
-    onOpenChange(false);
+    onClose();
     setError("");
-    form.reset(blueprintValues());
   }
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog open={connectionId !== null} onOpenChange={(next) => !next && close()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New blueprint</DialogTitle>
-          <DialogDescription>
-            What Tilde launches for an agent's sandbox, and how sandboxes are shared.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-4"

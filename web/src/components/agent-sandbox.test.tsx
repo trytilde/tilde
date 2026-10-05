@@ -14,6 +14,7 @@ import {
 import { AgentSandbox } from "./agent-sandbox";
 
 const rpc = vi.hoisted(() => ({
+  connections: { listConnections: vi.fn(), getProvider: vi.fn() },
   sandboxes: {
     getAgentSandbox: vi.fn(),
     listSandboxBlueprints: vi.fn(),
@@ -38,6 +39,8 @@ beforeEach(() => {
       create(SandboxBlueprintSchema, { id: "bp-2", name: "Shared", reuse: SandboxReuse.GLOBAL }),
     ],
   });
+  rpc.connections.listConnections.mockResolvedValue({ connections: [], nextPageToken: "" });
+  rpc.connections.getProvider.mockRejectedValue(new Error("unused"));
   rpc.sandboxes.setAgentSandbox.mockResolvedValue({});
   rpc.sandboxes.removeAgentSandbox.mockResolvedValue({});
 });
@@ -51,7 +54,11 @@ it("gives an agent without a sandbox one at once", async () => {
   renderSection();
   const select = await screen.findByRole("combobox", { name: "Sandbox" });
   await waitFor(() => expect(select.hasAttribute("disabled")).toBe(false));
-  fireEvent.change(select, { target: { value: "bp-2" } });
+  fireEvent.focus(select);
+  fireEvent.keyDown(select, { key: "ArrowDown" });
+  fireEvent.input(select, { target: { value: "sha" } });
+  expect(screen.queryByRole("option", { name: "Dev box" })).toBeNull();
+  fireEvent.click(await screen.findByRole("option", { name: "Shared" }));
   await waitFor(() =>
     expect(rpc.sandboxes.setAgentSandbox).toHaveBeenCalledWith({
       agentId: "agent-1",
@@ -70,7 +77,7 @@ it("confirms before removing a sandbox, which terminates the agent's sandboxes",
   });
   renderSection();
   await screen.findByRole("link", { name: "Open Dev box" });
-  fireEvent.change(screen.getByRole("combobox", { name: "Sandbox" }), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   const dialog = await screen.findByRole("alertdialog");
   within(dialog).getByText(/existing sandboxes are terminated/);
   expect(rpc.sandboxes.removeAgentSandbox).not.toHaveBeenCalled();

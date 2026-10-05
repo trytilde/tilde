@@ -492,6 +492,7 @@ export function AgentEditor({
             </p>
           </div>
         </div>
+        {agent && <AgentSandbox agentId={agent.id} />}
       </fieldset>
       {!agent && (
         <div className="flex justify-end">
@@ -693,7 +694,6 @@ export function AgentEditor({
             <TabsContent value="capabilities" keepMounted className="grid gap-8">
               {identityHeader}
               {form}
-              <AgentSandbox agentId={agent.id} />
             </TabsContent>
             <TabsContent value="chat-providers" keepMounted>
               <AgentConnections agentId={agent.id} />
