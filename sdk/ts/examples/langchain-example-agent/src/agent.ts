@@ -23,8 +23,9 @@ export const agent = createAgent({
   model: new ChatOpenAI({
     apiKey,
     configuration: { baseURL, fetch },
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    maxTokens: 600,
+    model: process.env.OPENAI_MODEL ?? "gpt-5.6-terra",
+    // GPT-5.6 takes function tools with reasoning only on the Responses API.
+    useResponsesApi: true,
     maxRetries: 0,
     timeout: 60000,
     modelKwargs: { store: false },

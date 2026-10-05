@@ -2,7 +2,8 @@
 
 #[derive(Clone, Copy, Debug)]
 pub struct RunParams {
-    pub p1: uuid::Uuid,
+    pub p1: Option<uuid::Uuid>,
+    pub p3: Option<uuid::Uuid>,
     pub p2: f64,
 }
 #[derive(Debug, Clone, PartialEq)]
@@ -168,7 +169,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT s.slug,a.name,a.tool_name,a.is_async,a.summary,a.description,a.display,h.id AS tool_host_id,h.execution_type,h.function_arn, c.id AS connection_id,c.type_id AS connection_type, t.description AS tool_description,t.summary AS tool_summary,t.input_schema_json,t.output_schema_json, t.read_only,t.destructive,t.idempotent,t.open_world FROM agent_tool_sources s JOIN agent_tools a ON a.source_id=s.id LEFT JOIN connections c ON c.id=s.connection_id LEFT JOIN connection_providers p ON p.provider_id=c.provider_id JOIN tool_hosts h ON h.id=COALESCE(s.tool_host_id,p.tool_host_id) JOIN tool_host_tools t ON t.tool_host_id=h.id AND t.name=a.tool_name WHERE s.agent_id=$1 AND (h.execution_type='lambda' OR h.connected_at > NOW() - make_interval(secs => $2)) AND CASE WHEN s.tool_host_id IS NOT NULL THEN NOT EXISTS (SELECT 1 FROM connection_providers hp WHERE hp.tool_host_id=h.id) ELSE c.status='ready' AND c.owner_user_id IS NULL END ORDER BY s.slug,a.name",
+        "SELECT s.slug,a.name,a.tool_name,a.is_async,a.summary,a.description,a.display,h.id AS tool_host_id,h.execution_type,h.function_arn, c.id AS connection_id,c.type_id AS connection_type, t.description AS tool_description,t.summary AS tool_summary,t.input_schema_json,t.output_schema_json, t.read_only,t.destructive,t.idempotent,t.open_world FROM agent_tool_sources s JOIN agent_tools a ON a.source_id=s.id LEFT JOIN connections c ON c.id=s.connection_id LEFT JOIN connection_providers p ON p.provider_id=c.provider_id JOIN tool_hosts h ON h.id=COALESCE(s.tool_host_id,p.tool_host_id) JOIN tool_host_tools t ON t.tool_host_id=h.id AND t.name=a.tool_name WHERE (s.agent_id=$1 OR s.sandbox_blueprint_id=$2) AND (h.execution_type='lambda' OR h.connected_at > NOW() - make_interval(secs => $3)) AND CASE WHEN s.tool_host_id IS NOT NULL THEN NOT EXISTS (SELECT 1 FROM connection_providers hp WHERE hp.tool_host_id=h.id) ELSE c.status='ready' AND c.owner_user_id IS NULL END ORDER BY s.slug,a.name",
         None,
     )
 }
@@ -183,12 +184,13 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-        p1: &'a uuid::Uuid,
+        p1: &'a Option<uuid::Uuid>,
+        p3: &'a Option<uuid::Uuid>,
         p2: &'a f64,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
         RecordQuery {
             client,
-            params: [p1, p2],
+            params: [p1, p3, p2],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -221,14 +223,14 @@ impl RunStmt {
     }
 }
 impl<'c, 'a, 's, C: GenericClient>
-    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 2>, C>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 3>, C>
     for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
         params: &'a RunParams,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
-        self.bind(client, &params.p1, &params.p2)
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+        self.bind(client, &params.p1, &params.p3, &params.p2)
     }
 }

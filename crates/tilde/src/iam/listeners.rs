@@ -42,9 +42,11 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     let mut router = router
         .layer(middleware::from_fn_with_state(chat.clone(), agent_guard))
         .merge(crate::chat::controls::router(chat.clone()));
-    // Tool hosts dial in with their own tokens.
+    // Tool hosts and sandbox processes dial in with their own tokens.
     if let Some(tools) = &chat.tools {
-        router = router.merge(crate::tools::hosts::router(tools.hosts.clone()));
+        router = router
+            .merge(crate::tools::hosts::router(tools.hosts.clone()))
+            .merge(crate::sandboxes::rpc::router(tools.clone()));
     }
     // Hosts that dial in: deployment-token Watch/Heartbeat and capability-scoped Report.
     if let Some(deployments) = chat.deployments.clone() {
@@ -80,11 +82,15 @@ pub fn management_router(
         .merge(crate::connections::rpc::management::router(
             connections.clone(),
         ))
-        .merge(crate::tools::rpc::router(
-            chat.tools
+        .merge({
+            // Management never launches a sandbox, so it needs no runtime URL of its own.
+            let tools = chat
+                .tools
                 .clone()
-                .unwrap_or_else(|| crate::tools::Tools::new(connections.clone())),
-        ))
+                .unwrap_or_else(|| crate::tools::Tools::new(connections.clone(), String::new()));
+            crate::sandboxes::rpc::management_router(tools.sandboxes.clone())
+                .merge(crate::tools::rpc::router(tools))
+        })
         .merge(crate::inference::rpc::router(
             chat.pg()
                 .expect("management routes require Postgres")

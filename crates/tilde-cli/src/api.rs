@@ -38,26 +38,31 @@ pub fn options() -> CallOptions {
     CallOptions::default().with_timeout(Duration::from_secs(30))
 }
 
+/// HTTPS with the bundled web roots, or plain HTTP/1.1 for a local gateway. `base` must have
+/// passed [`base_url`].
+pub fn transport(base: &str) -> Result<HttpClient> {
+    let url = url::Url::parse(base).context("base_url validated this")?;
+    if url.scheme() != "https" {
+        // Plain HTTP/1.1: a quickstart gateway behind no proxy does not advertise h2c.
+        return Ok(HttpClient::plaintext());
+    }
+    let roots = connectrpc::rustls::RootCertStore::from_iter(
+        webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
+    );
+    let tls = connectrpc::rustls::ClientConfig::builder_with_provider(Arc::new(
+        connectrpc::rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .context("Could not build a TLS configuration")?
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    Ok(HttpClient::with_tls(Arc::new(tls)))
+}
+
 impl Client {
     pub fn new(base: &str, api_key: Option<String>) -> Result<Self> {
         let base = base_url(base)?;
-        let url = url::Url::parse(&base).expect("base_url validated this");
-        let transport = if url.scheme() == "https" {
-            let roots = connectrpc::rustls::RootCertStore::from_iter(
-                webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
-            );
-            let tls = connectrpc::rustls::ClientConfig::builder_with_provider(Arc::new(
-                connectrpc::rustls::crypto::aws_lc_rs::default_provider(),
-            ))
-            .with_safe_default_protocol_versions()
-            .context("Could not build a TLS configuration")?
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-            HttpClient::with_tls(Arc::new(tls))
-        } else {
-            // Plain HTTP/1.1: a quickstart gateway behind no proxy does not advertise h2c.
-            HttpClient::plaintext()
-        };
+        let transport = transport(&base)?;
         let mut headers = http::HeaderMap::new();
         if let Some(key) = api_key {
             let mut value = http::HeaderValue::from_str(&format!("Bearer {key}"))

@@ -2,7 +2,8 @@
 
 #[derive(Clone, Copy, Debug)]
 pub struct RunParams {
-    pub p1: uuid::Uuid,
+    pub p1: Option<uuid::Uuid>,
+    pub p4: Option<uuid::Uuid>,
     pub p2: Option<uuid::Uuid>,
     pub p3: Option<uuid::Uuid>,
 }
@@ -79,7 +80,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id FROM agent_tool_sources WHERE agent_id=$1 AND (connection_id=$2 OR tool_host_id=$3)",
+        "SELECT id FROM agent_tool_sources WHERE (agent_id=$1 OR sandbox_blueprint_id=$2) AND (connection_id=$3 OR tool_host_id=$4)",
         None,
     )
 }
@@ -94,13 +95,14 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-        p1: &'a uuid::Uuid,
+        p1: &'a Option<uuid::Uuid>,
+        p4: &'a Option<uuid::Uuid>,
         p2: &'a Option<uuid::Uuid>,
         p3: &'a Option<uuid::Uuid>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
         RecordQuery {
             client,
-            params: [p1, p2, p3],
+            params: [p1, p4, p2, p3],
             query: self.0,
             cached: self.1.as_ref(),
             extractor: |row: &tokio_postgres::Row| -> Result<Record, tokio_postgres::Error> {
@@ -113,14 +115,14 @@ impl RunStmt {
     }
 }
 impl<'c, 'a, 's, C: GenericClient>
-    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 3>, C>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 4>, C>
     for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
         params: &'a RunParams,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
-        self.bind(client, &params.p1, &params.p2, &params.p3)
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
+        self.bind(client, &params.p1, &params.p4, &params.p2, &params.p3)
     }
 }

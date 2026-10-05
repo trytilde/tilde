@@ -2106,8 +2106,10 @@ pub const __DELETE_TOOL_HOST_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<DeleteToolHostResponse>,
     is_wkt: false,
 };
-/// One agent's use of one source. Exactly one of connection_id and tool_host_id is set. The slug,
-/// derived from the source's name when it is added, prefixes the catalog names of its tools.
+/// One owner's use of one source. The owner is an agent (`agent_id`) or a sandbox blueprint
+/// (`sandbox_blueprint_id`). Exactly one of connection_id, tool_host_id and sandbox is set;
+/// `sandbox` marks the agent's sandbox, whose tools are the fixed sandbox tools. The slug, derived
+/// from the source's name when it is added, prefixes the catalog names of its tools.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2155,6 +2157,20 @@ pub struct ToolSource {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub tools: ::buffa::alloc::vec::Vec<AgentTool>,
+    /// Field 8: `sandbox_blueprint_id`
+    #[serde(
+        rename = "sandboxBlueprintId",
+        alias = "sandbox_blueprint_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub sandbox_blueprint_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 9: `sandbox`
+    #[serde(
+        rename = "sandbox",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub sandbox: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2168,6 +2184,8 @@ impl ::core::fmt::Debug for ToolSource {
             .field("tool_host_id", &self.tool_host_id)
             .field("slug", &self.slug)
             .field("tools", &self.tools)
+            .field("sandbox_blueprint_id", &self.sandbox_blueprint_id)
+            .field("sandbox", &self.sandbox)
             .finish()
     }
 }
@@ -2197,6 +2215,16 @@ impl ToolSource {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.tool_host_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::sandbox_blueprint_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_sandbox_blueprint_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.sandbox_blueprint_id = Some(value.into());
         self
     }
 }
@@ -2243,6 +2271,12 @@ impl ::buffa::Message for ToolSource {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.sandbox {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2275,6 +2309,12 @@ impl ::buffa::Message for ToolSource {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if self.sandbox {
+            ::buffa::types::put_bool_field(9u32, self.sandbox, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2346,6 +2386,25 @@ impl ::buffa::Message for ToolSource {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.tools.push(elem);
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .sandbox_blueprint_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sandbox = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2360,6 +2419,8 @@ impl ::buffa::Message for ToolSource {
         self.tool_host_id = ::core::option::Option::None;
         self.slug.clear();
         self.tools.clear();
+        self.sandbox_blueprint_id = ::core::option::Option::None;
+        self.sandbox = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2868,7 +2929,8 @@ pub const __PROVIDER_TOOL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
 /// A connection's tools, with `tool_host_id` instead a tool host's, or with `provider_id` the
 /// tools a catalog provider offers before any connection: its built-in tools, its tool host's, or
 /// an MCP server's advertised list (the connected server's own list replaces it once a connection
-/// is ready). `search` matches a tool's name or description case-insensitively.
+/// is ready). `sandbox` lists the fixed sandbox tools. `search` matches a tool's name or
+/// description case-insensitively.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2898,6 +2960,13 @@ pub struct ListProviderToolsRequest {
     /// Field 4: `search`
     #[serde(rename = "search", skip_serializing_if = "::core::option::Option::is_none")]
     pub search: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `sandbox`
+    #[serde(
+        rename = "sandbox",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub sandbox: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2909,6 +2978,7 @@ impl ::core::fmt::Debug for ListProviderToolsRequest {
             .field("provider_id", &self.provider_id)
             .field("tool_host_id", &self.tool_host_id)
             .field("search", &self.search)
+            .field("sandbox", &self.sandbox)
             .finish()
     }
 }
@@ -2984,6 +3054,9 @@ impl ::buffa::Message for ListProviderToolsRequest {
         if let Some(ref v) = self.search {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.sandbox {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3005,6 +3078,9 @@ impl ::buffa::Message for ListProviderToolsRequest {
         }
         if let Some(ref v) = self.search {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if self.sandbox {
+            ::buffa::types::put_bool_field(5u32, self.sandbox, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3060,6 +3136,13 @@ impl ::buffa::Message for ListProviderToolsRequest {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sandbox = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3072,6 +3155,7 @@ impl ::buffa::Message for ListProviderToolsRequest {
         self.provider_id = ::core::option::Option::None;
         self.tool_host_id = ::core::option::Option::None;
         self.search = ::core::option::Option::None;
+        self.sandbox = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3535,7 +3619,8 @@ pub const __REFRESH_CONNECTION_TOOLS_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<RefreshConnectionToolsResponse>,
     is_wkt: false,
 };
-/// Exactly one filter: an agent's sources, or the agents using a connection or tool host.
+/// Exactly one filter: an agent's or a sandbox blueprint's sources, or the sources using a
+/// connection or tool host.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3561,6 +3646,13 @@ pub struct ListToolSourcesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub tool_host_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 4: `sandbox_blueprint_id`
+    #[serde(
+        rename = "sandboxBlueprintId",
+        alias = "sandbox_blueprint_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub sandbox_blueprint_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3571,6 +3663,7 @@ impl ::core::fmt::Debug for ListToolSourcesRequest {
             .field("agent_id", &self.agent_id)
             .field("connection_id", &self.connection_id)
             .field("tool_host_id", &self.tool_host_id)
+            .field("sandbox_blueprint_id", &self.sandbox_blueprint_id)
             .finish()
     }
 }
@@ -3612,6 +3705,16 @@ impl ListToolSourcesRequest {
         self.tool_host_id = Some(value.into());
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::sandbox_blueprint_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_sandbox_blueprint_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.sandbox_blueprint_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(ListToolSourcesRequest);
 impl ::buffa::MessageName for ListToolSourcesRequest {
@@ -3642,6 +3745,9 @@ impl ::buffa::Message for ListToolSourcesRequest {
         if let Some(ref v) = self.tool_host_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3660,6 +3766,9 @@ impl ::buffa::Message for ListToolSourcesRequest {
         }
         if let Some(ref v) = self.tool_host_id {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3710,6 +3819,18 @@ impl ::buffa::Message for ListToolSourcesRequest {
                     buf,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .sandbox_blueprint_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3721,6 +3842,7 @@ impl ::buffa::Message for ListToolSourcesRequest {
         self.agent_id = ::core::option::Option::None;
         self.connection_id = ::core::option::Option::None;
         self.tool_host_id = ::core::option::Option::None;
+        self.sandbox_blueprint_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3894,8 +4016,9 @@ pub const __LIST_TOOL_SOURCES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<ListToolSourcesResponse>,
     is_wkt: false,
 };
-/// Exactly one of connection_id and tool_host_id; an agent uses each at most once. `tool_names`
-/// are the tools the agent starts with.
+/// For an agent (`agent_id`) or a sandbox blueprint (`sandbox_blueprint_id`); exactly one of
+/// connection_id and tool_host_id, and an owner uses each at most once. `tool_names` are the tools
+/// it starts with.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -3930,6 +4053,13 @@ pub struct AddToolSourceRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub tool_names: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 6: `sandbox_blueprint_id`
+    #[serde(
+        rename = "sandboxBlueprintId",
+        alias = "sandbox_blueprint_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub sandbox_blueprint_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3941,6 +4071,7 @@ impl ::core::fmt::Debug for AddToolSourceRequest {
             .field("connection_id", &self.connection_id)
             .field("tool_host_id", &self.tool_host_id)
             .field("tool_names", &self.tool_names)
+            .field("sandbox_blueprint_id", &self.sandbox_blueprint_id)
             .finish()
     }
 }
@@ -3970,6 +4101,16 @@ impl AddToolSourceRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.tool_host_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::sandbox_blueprint_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_sandbox_blueprint_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.sandbox_blueprint_id = Some(value.into());
         self
     }
 }
@@ -4005,6 +4146,9 @@ impl ::buffa::Message for AddToolSourceRequest {
         for v in &self.tool_names {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4026,6 +4170,9 @@ impl ::buffa::Message for AddToolSourceRequest {
         }
         for v in &self.tool_names {
             ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4082,6 +4229,18 @@ impl ::buffa::Message for AddToolSourceRequest {
                 )?;
                 self.tool_names.push(__elem);
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .sandbox_blueprint_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4094,6 +4253,7 @@ impl ::buffa::Message for AddToolSourceRequest {
         self.connection_id = ::core::option::Option::None;
         self.tool_host_id = ::core::option::Option::None;
         self.tool_names.clear();
+        self.sandbox_blueprint_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

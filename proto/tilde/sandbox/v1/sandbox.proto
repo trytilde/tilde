@@ -1,0 +1,43 @@
+syntax = "proto3";
+package tilde.sandbox.v1;
+import "tilde/types/v1/chat.proto";
+
+// The `tilde sandbox connect` process inside a sandbox VM. Like a tool host it is never dialed:
+// Tilde launches the VM with a single-use enrollment token, which the process's first Connect
+// exchanges for a session token that authenticates every later request (including reconnecting
+// Connects, for example after the VM was paused and resumed). Over the Connect stream it receives
+// the agent's sandbox operations as frames and answers each through Respond. Processes inside the
+// VM reach the blueprint's tools through it with ListTools and InvokeTool.
+service SandboxService {
+  rpc Connect(ConnectRequest) returns (stream ConnectResponse);
+  rpc Respond(RespondRequest) returns (RespondResponse);
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
+}
+message ConnectRequest {}
+message ConnectResponse { oneof frame { SandboxRegistered registered = 1; SandboxOperation operation = 2; SandboxPing ping = 3; } }
+// The first frame of every Connect. `session_token` is set only when an enrollment token was
+// exchanged; the process keeps it in memory for reconnects. `env` is the blueprint's environment,
+// current as of this Connect, for every shell in the VM.
+message SandboxRegistered {
+  string sandbox_id = 1;
+  optional string session_token = 2 [debug_redact = true];
+  repeated EnvVar env = 3;
+}
+message EnvVar { string name = 1; string value = 2 [debug_redact = true]; }
+message SandboxPing {}
+// One operation for the process to run: exec, exec_output, read_file, write_file, edit_file,
+// delete_file, list_dir, glob or grep. `input_json` follows the matching agent tool's input schema
+// (delete_file takes `path`; read_file without a limit reads the whole file). Answer with Respond.
+// Commands an exec runs see the operation's `id` as TILDE_SANDBOX_OPERATION, which tool calls they
+// make pass back as InvokeToolRequest.operation_id.
+message SandboxOperation { string id = 1; string name = 2; string input_json = 3 [debug_redact = true]; }
+message RespondRequest { string id = 1; oneof outcome { string output_json = 2 [debug_redact = true]; string error = 3; } }
+message RespondResponse {}
+// The blueprint's tools, as `{source slug}.{tool name}`.
+message ListToolsRequest {}
+message ListToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; }
+// A tool failure is the RPC's error. The call is traced in the agent's invocation: inside the
+// operation `operation_id` names while it runs, else in the sandbox's latest invocation.
+message InvokeToolRequest { string name = 1; string input_json = 2 [debug_redact = true]; optional string operation_id = 3; }
+message InvokeToolResponse { string output_json = 1 [debug_redact = true]; }

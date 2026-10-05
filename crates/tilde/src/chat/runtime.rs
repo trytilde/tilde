@@ -749,6 +749,14 @@ impl Chat {
                 state: state.into(),
                 ..Default::default()
             };
+            // An agent with a sandbox runs only once its sandbox is up and connected.
+            if let Some(tools) = &self.tools {
+                tools
+                    .sandboxes
+                    .ensure(scope.agent_id, scope.thread_id, scope.run_id, invocation)
+                    .await
+                    .map_err(|error| ChatError::Invalid(error.to_string()))?;
+            }
             self.wake(
                 scope.agent_id,
                 scope.thread_id,

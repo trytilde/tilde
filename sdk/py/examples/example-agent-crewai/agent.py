@@ -23,12 +23,13 @@ TIMEOUT_SECONDS = 60
 # each request resolves the invocation running it.
 INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
 llm = LLM(
-    model=f"openai/{os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')}",
+    model=f"openai/{os.environ.get('OPENAI_MODEL', 'gpt-5.6-terra')}",
+    # LiteLLM calls chat completions, where GPT-5.6 takes function tools only without reasoning.
+    reasoning_effort="none",
     base_url=INFERENCE.base_url,
     api_key=INFERENCE.api_key,
     interceptor=inference_interceptor(INFERENCE),
     max_retries=0,
-    max_tokens=600,
 )
 # Shipped with the deployment by `tilde deploy`; CrewAI discovers the folders at runtime.
 SKILLS = tilde.define_skills("skills")

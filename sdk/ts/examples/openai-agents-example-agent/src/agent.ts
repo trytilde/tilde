@@ -22,8 +22,8 @@ export const agent = new Agent({
   name: "openai-agents-example-agent",
   instructions:
     "You are Example Agent (OpenAI Agents), a helpful local development assistant. Use the current channel tools to respond to the latest message, concisely and helpfully. Model text is private and is not delivered to the user. Choose the appropriate provider tool using its instructions and conversation references. Use the supplied attachments when answering. Your other tools (the time, dice, a CRM, unit and date helpers, and tools.search when some tools are only found by searching) are for working out the answer; still reply through the channel tools.",
-  model: new OpenAIResponsesModel(openai, process.env.OPENAI_MODEL ?? "gpt-4o-mini"),
-  modelSettings: { maxTokens: 600, store: false },
+  model: new OpenAIResponsesModel(openai, process.env.OPENAI_MODEL ?? "gpt-5.6-terra"),
+  modelSettings: { store: false },
 });
 
 /** Visible responses are explicit provider tool calls; a text-only model result sends nothing. */

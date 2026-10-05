@@ -1,5 +1,5 @@
 //! Management surface for agents' tools and tool hosts.
-use super::{Filter, Source, Target, ToolSettings, Tools, hosts::ToolHost};
+use super::{Filter, Owner, Source, Target, ToolSettings, Tools, hosts::ToolHost};
 use crate::chat::tools::audit;
 use crate::error::Error;
 use crate::proto::tilde::management::v1 as management;
@@ -50,15 +50,15 @@ fn mode(dynamic: bool) -> management::ToolMode {
     }
 }
 fn wire(s: Source) -> management::ToolSource {
-    let (connection_id, tool_host_id) = match s.target {
-        Target::Connection(id) => (Some(id.to_string()), None),
-        Target::ToolHost(id) => (None, Some(id.to_string())),
-    };
+    let (connection_id, tool_host_id) = s.target.columns();
+    let (agent_id, sandbox_blueprint_id) = s.owner.columns();
     management::ToolSource {
         id: s.id.to_string(),
-        agent_id: s.agent_id.to_string(),
-        connection_id,
-        tool_host_id,
+        agent_id: agent_id.map(|a| a.to_string()).unwrap_or_default(),
+        sandbox_blueprint_id: sandbox_blueprint_id.map(|b| b.to_string()),
+        connection_id: connection_id.map(|c| c.to_string()),
+        tool_host_id: tool_host_id.map(|h| h.to_string()),
+        sandbox: s.target == Target::Sandbox,
         slug: s.slug,
         tools: s
             .tools
@@ -104,6 +104,7 @@ impl ToolService for Rpc {
         let request = request.to_owned_message();
         let search = crate::rpc::search(request.search.as_deref())?.map(str::to_lowercase);
         let tools = match (request.provider_id, request.tool_host_id) {
+            _ if request.sandbox => crate::sandboxes::tools::definitions(),
             (Some(provider), None) => self.0.catalog_tools(&provider).await?,
             (None, Some(host)) => {
                 let host = id(&host)?;
@@ -151,15 +152,21 @@ impl ToolService for Rpc {
         request: ServiceRequest<'_, management::ListToolSourcesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListToolSourcesResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
-        let filter = match (r.agent_id, r.connection_id, r.tool_host_id) {
-            (Some(agent), None, None) => {
-                let agent = id(&agent)?;
-                Filter {
-                    agent: Some(agent),
-                    ..Default::default()
-                }
-            }
-            (None, connection, tool_host) => {
+        let filter = match (
+            r.agent_id,
+            r.sandbox_blueprint_id,
+            r.connection_id,
+            r.tool_host_id,
+        ) {
+            (Some(agent), None, None, None) => Filter {
+                agent: Some(id(&agent)?),
+                ..Default::default()
+            },
+            (None, Some(blueprint), None, None) => Filter {
+                blueprint: Some(id(&blueprint)?),
+                ..Default::default()
+            },
+            (None, None, connection, tool_host) => {
                 let target = target(connection.as_deref(), tool_host.as_deref())?;
                 let (connection, tool_host) = target.columns();
                 Filter {
@@ -187,9 +194,15 @@ impl ToolService for Rpc {
         request: ServiceRequest<'_, management::AddToolSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::AddToolSourceResponse> + Send + use<'a>> {
         let r = request.to_owned_message();
-        let agent = id(&r.agent_id)?;
+        let owner = match r.sandbox_blueprint_id {
+            Some(blueprint) if r.agent_id.is_empty() => Owner::Blueprint(id(&blueprint)?),
+            None => Owner::Agent(id(&r.agent_id)?),
+            Some(_) => {
+                return Err(Error::Invalid("Name an agent or a sandbox blueprint".into()).into());
+            }
+        };
         let target = target(r.connection_id.as_deref(), r.tool_host_id.as_deref())?;
-        let source = self.0.add_source(agent, target, &r.tool_names).await?;
+        let source = self.0.add_source(owner, target, &r.tool_names).await?;
         Response::ok(management::AddToolSourceResponse {
             source: wire(source).into(),
             ..Default::default()
@@ -244,6 +257,13 @@ impl ToolService for Rpc {
         request: ServiceRequest<'_, management::RemoveToolSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::RemoveToolSourceResponse> + Send + use<'a>> {
         let source = self.0.source(id(&request.to_owned_message().id)?).await?;
+        if source.target == Target::Sandbox {
+            return Err(Error::Invalid(
+                "The sandbox's tools go with the agent's sandbox; remove the sandbox instead"
+                    .into(),
+            )
+            .into());
+        }
         self.0.remove_source(source.id).await?;
         Response::ok(management::RemoveToolSourceResponse::default())
     }

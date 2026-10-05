@@ -122,12 +122,7 @@ pub(crate) fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter>
 }
 impl Channels {
     pub(crate) async fn access(&self, connection: Uuid) -> ToolResult<Access> {
-        Ok(Access {
-            connection_id: connection,
-            values: self.connections.resolve(connection).await?,
-            http: self.connections.http.clone(),
-            endpoints: self.connections.endpoints.clone(),
-        })
+        Ok(self.connections.access(connection).await?)
     }
     pub fn new(connections: Connections, warm: Arc<super::warm::Warm>) -> Self {
         Self { connections, warm }

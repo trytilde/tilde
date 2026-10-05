@@ -9,6 +9,7 @@ include!("tilde.management.v1.inference.rs");
 include!("tilde.management.v1.logs.rs");
 include!("tilde.management.v1.prompts.rs");
 include!("tilde.management.v1.routines.rs");
+include!("tilde.management.v1.sandboxes.rs");
 include!("tilde.management.v1.skills.rs");
 include!("tilde.management.v1.tilde_chat.rs");
 include!("tilde.management.v1.tools.rs");
@@ -39,6 +40,7 @@ pub mod __buffa {
         include!("tilde.management.v1.logs.__view.rs");
         include!("tilde.management.v1.prompts.__view.rs");
         include!("tilde.management.v1.routines.__view.rs");
+        include!("tilde.management.v1.sandboxes.__view.rs");
         include!("tilde.management.v1.skills.__view.rs");
         include!("tilde.management.v1.tilde_chat.__view.rs");
         include!("tilde.management.v1.tools.__view.rs");
@@ -191,6 +193,34 @@ pub mod __buffa {
         reg.register_json_any(super::__DELETE_ROUTINE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_SIGNAL_TYPES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SIGNAL_TYPES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SANDBOX_BLUEPRINT_JSON_ANY);
+        reg.register_json_any(super::__SANDBOX_TIMINGS_JSON_ANY);
+        reg.register_json_any(super::__LIST_SANDBOX_BLUEPRINTS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SANDBOX_BLUEPRINTS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_SANDBOX_BLUEPRINT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_SANDBOX_BLUEPRINT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SANDBOX_BLUEPRINT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_SANDBOX_BLUEPRINT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_SANDBOX_BLUEPRINT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_SANDBOX_BLUEPRINT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SANDBOX_BLUEPRINT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SANDBOX_BLUEPRINT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_SANDBOX_ENV_VAR_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_SANDBOX_ENV_VAR_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SANDBOX_ENV_VAR_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SANDBOX_ENV_VAR_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SANDBOX_JSON_ANY);
+        reg.register_json_any(super::__LIST_SANDBOXES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SANDBOXES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TERMINATE_SANDBOX_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__TERMINATE_SANDBOX_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__AGENT_SANDBOX_JSON_ANY);
+        reg.register_json_any(super::__GET_AGENT_SANDBOX_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_AGENT_SANDBOX_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_SANDBOX_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_SANDBOX_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_SANDBOX_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_SANDBOX_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CATALOG_GROUP_REQUEST_JSON_ANY);
@@ -829,6 +859,118 @@ pub use self::__buffa::view::ListSignalTypesRequestOwnedView;
 pub use self::__buffa::view::ListSignalTypesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListSignalTypesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxBlueprintView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxBlueprintOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxTimingsView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxTimingsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxBlueprintsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxBlueprintsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxBlueprintsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxBlueprintsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSandboxBlueprintRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSandboxBlueprintRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSandboxBlueprintResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetSandboxBlueprintResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSandboxBlueprintRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSandboxBlueprintRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSandboxBlueprintResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateSandboxBlueprintResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSandboxBlueprintRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSandboxBlueprintRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSandboxBlueprintResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateSandboxBlueprintResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxBlueprintRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxBlueprintRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxBlueprintResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxBlueprintResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSandboxEnvVarRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSandboxEnvVarRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSandboxEnvVarResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSandboxEnvVarResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxEnvVarRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxEnvVarRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxEnvVarResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSandboxEnvVarResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxView;
+#[doc(inline)]
+pub use self::__buffa::view::SandboxOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSandboxesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateSandboxRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateSandboxRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateSandboxResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::TerminateSandboxResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentSandboxView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentSandboxOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAgentSandboxRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAgentSandboxRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAgentSandboxResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAgentSandboxResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentSandboxRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentSandboxRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentSandboxResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentSandboxResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentSandboxRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentSandboxRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentSandboxResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentSandboxResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListCatalogRequestView;
 #[doc(inline)]

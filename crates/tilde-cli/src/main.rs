@@ -8,6 +8,8 @@ mod discover;
 mod doctor;
 mod project;
 mod registry;
+#[cfg(unix)]
+mod sandbox;
 
 use clap::{Parser, Subcommand};
 
@@ -16,7 +18,7 @@ use clap::{Parser, Subcommand};
     name = "tilde",
     bin_name = "tilde",
     version,
-    about = "Develop, deploy and inspect Tilde agents",
+    about = "Develop, deploy and inspect Tilde agents, and serve Tilde sandbox VMs",
     propagate_version = true
 )]
 struct Args {
@@ -32,6 +34,9 @@ enum Command {
     Deploy(deploy::Deploy),
     /// Check this project, its SDK and the gateway.
     Doctor(doctor::Doctor),
+    /// Inside a sandbox VM: serve the agent's operations, and call the sandbox's tools.
+    #[cfg(unix)]
+    Sandbox(sandbox::Sandbox),
 }
 
 #[tokio::main]
@@ -41,6 +46,8 @@ async fn main() {
         Command::Dev(args) => dev::run(args).await,
         Command::Deploy(args) => deploy::run(args).await,
         Command::Doctor(args) => doctor::run(args).await,
+        #[cfg(unix)]
+        Command::Sandbox(args) => sandbox::run(args).await,
     };
     if let Err(error) = outcome {
         eprintln!("tilde: {error}");

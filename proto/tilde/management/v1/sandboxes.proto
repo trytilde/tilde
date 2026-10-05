@@ -1,0 +1,122 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+
+// Sandboxes are VMs Tilde launches for agents through a sandbox provider connection (E2B or
+// Modal). A blueprint configures them: the connection and template to launch, the environment of
+// every shell, the tools processes inside may call (managed as a blueprint's tool sources through
+// ToolService) and how sandboxes are shared. Calls processes inside make to the blueprint's tools
+// are traced in the agent's invocations like its other tool calls. An agent with a sandbox setting runs every invocation
+// with one, waking or launching it first, and gets the fixed sandbox tools as a tool source.
+service SandboxBlueprintService {
+  rpc ListSandboxBlueprints(ListSandboxBlueprintsRequest) returns (ListSandboxBlueprintsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetSandboxBlueprint(GetSandboxBlueprintRequest) returns (GetSandboxBlueprintResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc CreateSandboxBlueprint(CreateSandboxBlueprintRequest) returns (CreateSandboxBlueprintResponse);
+  // Changing the connection, template or reuse applies to sandboxes launched afterwards; existing
+  // sandboxes of another reuse mode are terminated.
+  rpc UpdateSandboxBlueprint(UpdateSandboxBlueprintRequest) returns (UpdateSandboxBlueprintResponse);
+  // Refused while an agent uses the blueprint; its sandboxes are terminated.
+  rpc DeleteSandboxBlueprint(DeleteSandboxBlueprintRequest) returns (DeleteSandboxBlueprintResponse);
+  // Values are write-only. A sandbox receives the current environment whenever its process connects.
+  rpc SetSandboxEnvVar(SetSandboxEnvVarRequest) returns (SetSandboxEnvVarResponse);
+  rpc DeleteSandboxEnvVar(DeleteSandboxEnvVarRequest) returns (DeleteSandboxEnvVarResponse);
+  rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Terminates the VM at its provider; the next invocation that needs it launches a new one.
+  rpc TerminateSandbox(TerminateSandboxRequest) returns (TerminateSandboxResponse);
+  rpc GetAgentSandbox(GetAgentSandboxRequest) returns (GetAgentSandboxResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Gives the agent a sandbox of the blueprint, replacing any it had, and the sandbox tool source.
+  rpc SetAgentSandbox(SetAgentSandboxRequest) returns (SetAgentSandboxResponse);
+  // Removes the agent's sandbox setting and its sandbox tool source; its sandboxes are terminated.
+  rpc RemoveAgentSandbox(RemoveAgentSandboxRequest) returns (RemoveAgentSandboxResponse);
+}
+// Which sandbox an invocation uses. THREAD: one per agent and thread. AGENT: one for all of an
+// agent's threads. AGENT_IDENTITY: one per agent and person (root identity). GLOBAL: one for every
+// agent using the blueprint. GLOBAL_IDENTITY: one per person, shared by every agent using the
+// blueprint. The person-keyed modes use one per agent and thread when an invocation acts for no
+// verified person. Every mode but THREAD lets data cross threads; the GLOBAL modes also let it
+// cross agents.
+enum SandboxReuse {
+  SANDBOX_REUSE_UNSPECIFIED = 0; SANDBOX_REUSE_THREAD = 1; SANDBOX_REUSE_AGENT = 2;
+  SANDBOX_REUSE_AGENT_IDENTITY = 3; SANDBOX_REUSE_GLOBAL = 4; SANDBOX_REUSE_GLOBAL_IDENTITY = 5;
+}
+message SandboxBlueprint {
+  string id = 1; string name = 2;
+  // An E2B or Modal connection.
+  string connection_id = 3;
+  // E2B: a template ID or name. Modal: a registry image reference or an image ID (im-…). The
+  // image must have the tilde CLI on its PATH.
+  string template = 4;
+  SandboxReuse reuse = 5;
+  // Names of its environment variables; values are never returned.
+  repeated string env_names = 6;
+  // Agents whose sandbox setting uses it.
+  repeated string agent_ids = 7;
+  SandboxTimings timings = 8;
+}
+// When its sandboxes sleep and are terminated, and how long a launch or wake waits for the
+// sandbox's tilde process to connect (failing the invocation after it). A Modal sandbox's sleep
+// snapshot expires a day after `terminate_after_seconds`.
+message SandboxTimings {
+  // A running sandbox sleeps after this long unused: 60 to 86400, default 600.
+  uint32 sleep_after_seconds = 1;
+  // Any sandbox is terminated after this long unused: 3600 to 2592000 and at least
+  // sleep_after_seconds, default 604800.
+  uint32 terminate_after_seconds = 2;
+  // 10 to 600, default 120.
+  uint32 connect_timeout_seconds = 3;
+}
+// `search` matches the name case-insensitively.
+message ListSandboxBlueprintsRequest { optional string search = 1; }
+message ListSandboxBlueprintsResponse { repeated SandboxBlueprint blueprints = 1; }
+message GetSandboxBlueprintRequest { string id = 1; }
+message GetSandboxBlueprintResponse { SandboxBlueprint blueprint = 1; }
+// Unspecified reuse means THREAD; absent timings, or zero fields, take their defaults.
+message CreateSandboxBlueprintRequest {
+  string name = 1; string connection_id = 2; string template = 3; SandboxReuse reuse = 4;
+  optional SandboxTimings timings = 5;
+}
+message CreateSandboxBlueprintResponse { SandboxBlueprint blueprint = 1; }
+// Absent fields, and zero timing fields, keep their value. New timings apply to every sandbox of
+// the blueprint from the sweeper's next turn.
+message UpdateSandboxBlueprintRequest {
+  string id = 1; optional string name = 2; optional string connection_id = 3; optional string template = 4;
+  optional SandboxReuse reuse = 5; optional SandboxTimings timings = 6;
+}
+message UpdateSandboxBlueprintResponse { SandboxBlueprint blueprint = 1; }
+message DeleteSandboxBlueprintRequest { string id = 1; }
+message DeleteSandboxBlueprintResponse {}
+// Adds the variable or replaces its value.
+message SetSandboxEnvVarRequest { string blueprint_id = 1; string name = 2; string value = 3 [debug_redact = true]; }
+message SetSandboxEnvVarResponse { SandboxBlueprint blueprint = 1; }
+message DeleteSandboxEnvVarRequest { string blueprint_id = 1; string name = 2; }
+message DeleteSandboxEnvVarResponse { SandboxBlueprint blueprint = 1; }
+enum SandboxStatus {
+  SANDBOX_STATUS_UNSPECIFIED = 0; SANDBOX_STATUS_STARTING = 1; SANDBOX_STATUS_RUNNING = 2;
+  SANDBOX_STATUS_SLEEPING = 3; SANDBOX_STATUS_FAILED = 4;
+}
+// One VM. `agent_id`, `thread_id` and `identity_id` are what its reuse mode keys it by.
+message Sandbox {
+  string id = 1; string blueprint_id = 2; SandboxReuse reuse = 3;
+  optional string agent_id = 4; optional string thread_id = 5; optional string identity_id = 6;
+  SandboxStatus status = 7;
+  // The provider's ID for the VM.
+  optional string provider_sandbox_id = 8;
+  // Its process has a Connect stream open.
+  bool connected = 9;
+  // Why it failed to launch or wake.
+  string error = 10;
+  google.protobuf.Timestamp last_used_at = 11; google.protobuf.Timestamp created_at = 12;
+}
+// Either filter, or both.
+message ListSandboxesRequest { optional string blueprint_id = 1; optional string agent_id = 2; }
+message ListSandboxesResponse { repeated Sandbox sandboxes = 1; }
+message TerminateSandboxRequest { string id = 1; }
+message TerminateSandboxResponse {}
+message AgentSandbox { string agent_id = 1; string blueprint_id = 2; string tool_source_id = 3; }
+message GetAgentSandboxRequest { string agent_id = 1; }
+// Without a sandbox, when the agent has none.
+message GetAgentSandboxResponse { optional AgentSandbox sandbox = 1; }
+message SetAgentSandboxRequest { string agent_id = 1; string blueprint_id = 2; }
+message SetAgentSandboxResponse { AgentSandbox sandbox = 1; }
+message RemoveAgentSandboxRequest { string agent_id = 1; }
+message RemoveAgentSandboxResponse {}

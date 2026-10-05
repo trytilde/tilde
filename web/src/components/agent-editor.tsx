@@ -11,6 +11,7 @@ import { AgentConnections } from "./agent-connections";
 import { AgentPrompts } from "./agent-prompts";
 import { AgentRoutines } from "./agent-routines";
 import { AgentSkills } from "./agent-skills";
+import { AgentSandbox } from "./agent-sandbox";
 import { SkillSourcePicker } from "./skill-source-picker";
 import { Capability } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { randomUUID } from "@/lib/browser-crypto";
@@ -692,6 +693,7 @@ export function AgentEditor({
             <TabsContent value="capabilities" keepMounted className="grid gap-8">
               {identityHeader}
               {form}
+              <AgentSandbox agentId={agent.id} />
             </TabsContent>
             <TabsContent value="chat-providers" keepMounted>
               <AgentConnections agentId={agent.id} />

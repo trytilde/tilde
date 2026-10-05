@@ -76,7 +76,11 @@ async fn connected_host_publishes_tools_and_answers_calls_over_its_own_stream() 
     assert!(host.available, "an open stream makes the host available");
     assert_eq!(host.tools[0].name, "restart");
     let source = agent_tools
-        .add_source(fx.agent, Target::ToolHost(host.id), &["restart".into()])
+        .add_source(
+            tilde::tools::Owner::Agent(fx.agent),
+            Target::ToolHost(host.id),
+            &["restart".into()],
+        )
         .await
         .unwrap();
     assert_eq!(source.slug, "ops-host");
@@ -255,7 +259,11 @@ async fn lambda_host_is_listed_and_invoked_synchronously() {
         "registration reads the function's tools"
     );
     let source = agent_tools
-        .add_source(fx.agent, Target::ToolHost(host.id), &["restart".into()])
+        .add_source(
+            tilde::tools::Owner::Agent(fx.agent),
+            Target::ToolHost(host.id),
+            &["restart".into()],
+        )
         .await
         .unwrap();
     assert_eq!(source.slug, "lambda-tools");
@@ -564,7 +572,11 @@ async fn provider_host_instances_are_verified_and_called_with_their_own_credenti
     );
     assert!(
         agent_tools
-            .add_source(fx.agent, Target::ToolHost(host.id), &["search".into()])
+            .add_source(
+                tilde::tools::Owner::Agent(fx.agent),
+                Target::ToolHost(host.id),
+                &["search".into()]
+            )
             .await
             .is_err(),
         "its tools need an instance's credentials"

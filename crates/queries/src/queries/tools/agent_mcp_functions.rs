@@ -1,5 +1,10 @@
 // This file was generated with `cornucopia`. Do not modify.
 
+#[derive(Clone, Copy, Debug)]
+pub struct RunParams {
+    pub p1: Option<uuid::Uuid>,
+    pub p2: Option<uuid::Uuid>,
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub slug: String,
@@ -151,7 +156,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT s.slug,a.name,a.tool_name,a.is_async,a.summary,a.description,a.display,c.id AS connection_id,c.provider_id,c.type_id, t.description AS tool_description,t.input_schema_json,t.output_schema_json, t.read_only,t.destructive,t.idempotent,t.open_world FROM agent_tool_sources s JOIN agent_tools a ON a.source_id=s.id JOIN connections c ON c.id=s.connection_id AND c.status='ready' JOIN connection_types ct ON ct.provider_id=c.provider_id AND ct.type_id=c.type_id AND ct.mcp_credential IS NOT NULL JOIN connection_tools t ON t.connection_id=c.id AND t.name=a.tool_name WHERE s.agent_id=$1 ORDER BY s.slug,a.name",
+        "SELECT s.slug,a.name,a.tool_name,a.is_async,a.summary,a.description,a.display,c.id AS connection_id,c.provider_id,c.type_id, t.description AS tool_description,t.input_schema_json,t.output_schema_json, t.read_only,t.destructive,t.idempotent,t.open_world FROM agent_tool_sources s JOIN agent_tools a ON a.source_id=s.id JOIN connections c ON c.id=s.connection_id AND c.status='ready' JOIN connection_types ct ON ct.provider_id=c.provider_id AND ct.type_id=c.type_id AND ct.mcp_credential IS NOT NULL JOIN connection_tools t ON t.connection_id=c.id AND t.name=a.tool_name WHERE (s.agent_id=$1 OR s.sandbox_blueprint_id=$2) ORDER BY s.slug,a.name",
         None,
     )
 }
@@ -166,11 +171,12 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-        p1: &'a uuid::Uuid,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 1> {
+        p1: &'a Option<uuid::Uuid>,
+        p2: &'a Option<uuid::Uuid>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
         RecordQuery {
             client,
-            params: [p1],
+            params: [p1, p2],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -197,5 +203,17 @@ impl RunStmt {
                 },
             mapper: |it| Record::from(it),
         }
+    }
+}
+impl<'c, 'a, 's, C: GenericClient>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 2>, C>
+    for RunStmt
+{
+    fn params(
+        &'s self,
+        client: &'c C,
+        params: &'a RunParams,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+        self.bind(client, &params.p1, &params.p2)
     }
 }

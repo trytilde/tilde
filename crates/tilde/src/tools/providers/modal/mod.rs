@@ -320,6 +320,39 @@ fn failed(result: &Option<GenericResult>) -> Option<String> {
 
 /// The app (created if missing), the default image (built if missing) and the sandbox.
 async fn create(api: &mut Api<'_>, app: &str, timeout_secs: u32) -> ToolResult<Value> {
+    let app = app_id(api, app).await?;
+    let image = image(
+        api,
+        &app,
+        [
+            "FROM python:3.13.3-slim-bookworm",
+            "RUN apt-get update",
+            "RUN apt-get install -y gcc gfortran build-essential",
+            "RUN pip install --upgrade pip wheel uv",
+            "RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections",
+            "CMD [\"sleep\", \"172800\"]",
+        ]
+        .map(String::from)
+        .into(),
+    )
+    .await?;
+    let created: SandboxCreateV2Response = api
+        .unary(
+            "SandboxCreateV2",
+            SandboxCreateV2Request {
+                app_id: app,
+                definition: Some(grpc::Sandbox {
+                    image_id: image,
+                    timeout_secs,
+                    ..Default::default()
+                }),
+            },
+            true,
+        )
+        .await?;
+    Ok(json!({"sandbox_id": created.sandbox_id, "task_id": created.task_id}))
+}
+async fn app_id(api: &mut Api<'_>, app: &str) -> ToolResult<String> {
     let app: AppGetOrCreateResponse = api
         .unary(
             "AppGetOrCreate",
@@ -331,25 +364,20 @@ async fn create(api: &mut Api<'_>, app: &str, timeout_secs: u32) -> ToolResult<V
             false,
         )
         .await?;
+    Ok(app.app_id)
+}
+/// The image these Dockerfile commands build, built if missing.
+async fn image(api: &mut Api<'_>, app: &str, commands: Vec<String>) -> ToolResult<String> {
     let image: ImageGetOrCreateResponse = api
         .unary(
             "ImageGetOrCreate",
             ImageGetOrCreateRequest {
                 image: Some(Image {
-                    dockerfile_commands: [
-                        "FROM python:3.13.3-slim-bookworm",
-                        "RUN apt-get update",
-                        "RUN apt-get install -y gcc gfortran build-essential",
-                        "RUN pip install --upgrade pip wheel uv",
-                        "RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections",
-                        "CMD [\"sleep\", \"172800\"]",
-                    ]
-                    .map(String::from)
-                    .into(),
+                    dockerfile_commands: commands,
                     version: "2025.06".into(),
                     image_registry_config: Some(ImageRegistryConfig::default()),
                 }),
-                app_id: app.app_id.clone(),
+                app_id: app.into(),
                 force_build: false,
                 namespace: 3,
                 builder_version: "2025.06".into(),
@@ -400,20 +428,80 @@ async fn create(api: &mut Api<'_>, app: &str, timeout_secs: u32) -> ToolResult<V
             }
         }
     }
+    Ok(image.image_id)
+}
+
+/// Blueprint sandboxes (`crate::sandboxes`): the app their VMs belong to.
+const SANDBOX_APP: &str = "tilde-sandboxes";
+/// Modal's longest sandbox lifetime. A VM that reaches it without having slept is relaunched
+/// from its template by the next wake.
+const SANDBOX_LIFETIME_SECS: u32 = 86_400;
+/// Launch a blueprint sandbox whose entrypoint is `command`, from `image`: an image ID (im-…,
+/// including a sleeping sandbox's snapshot) or a registry reference. Returns its ID.
+pub async fn launch(access: &Access, image: &str, command: Vec<String>) -> ToolResult<String> {
+    let mut api = Api::new(access)?;
+    let app = app_id(&mut api, SANDBOX_APP).await?;
+    let image_id = if image.starts_with("im-") {
+        image.to_owned()
+    } else {
+        self::image(&mut api, &app, vec![format!("FROM {image}")]).await?
+    };
     let created: SandboxCreateV2Response = api
         .unary(
             "SandboxCreateV2",
             SandboxCreateV2Request {
-                app_id: app.app_id,
+                app_id: app,
                 definition: Some(grpc::Sandbox {
-                    image_id: image.image_id,
-                    timeout_secs,
+                    entrypoint_args: command,
+                    image_id,
+                    timeout_secs: SANDBOX_LIFETIME_SECS,
                 }),
             },
             true,
         )
         .await?;
-    Ok(json!({"sandbox_id": created.sandbox_id, "task_id": created.task_id}))
+    Ok(created.sandbox_id)
+}
+/// Save the sandbox's filesystem as an image, the next launch's starting point. The image
+/// expires after `ttl_secs`.
+pub async fn snapshot(access: &Access, sandbox: &str, ttl_secs: i64) -> ToolResult<String> {
+    let sandbox = Sandbox::open(Api::new(access)?, sandbox).await?;
+    let response: Vec<TaskSnapshotFilesystemResponse> = sandbox
+        .api
+        .router(
+            &sandbox.router,
+            "TaskSnapshotFilesystem",
+            TaskSnapshotFilesystemRequest {
+                task_id: sandbox.task_id.clone(),
+                snapshot_id: uuid::Uuid::new_v4().to_string(),
+                ttl_seconds: Some(ttl_secs),
+            },
+            grpc::UNARY_TIMEOUT,
+        )
+        .await?;
+    response
+        .into_iter()
+        .next()
+        .map(|r| r.image_id)
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| ConnectError::unknown("Modal returned no snapshot image"))
+}
+/// A sandbox Modal no longer has is already gone.
+pub async fn terminate(access: &Access, sandbox: &str) -> ToolResult<()> {
+    let mut api = Api::new(access)?;
+    let terminated: ToolResult<SandboxTerminateResponse> = api
+        .unary(
+            "SandboxTerminateV2",
+            SandboxTerminateRequest {
+                sandbox_id: sandbox.into(),
+            },
+            true,
+        )
+        .await;
+    match terminated {
+        Err(error) if error.code == connectrpc::ErrorCode::NotFound => Ok(()),
+        other => other.map(drop),
+    }
 }
 async fn task(api: &mut Api<'_>, sandbox_id: &str) -> ToolResult<String> {
     let response: SandboxGetTaskIdResponse = api

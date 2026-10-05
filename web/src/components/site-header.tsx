@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const sections = [
   { prefix: "/skills", label: "Skills", to: "/skills" },
   { prefix: "/tools", label: "Tools", to: "/tools/connections" },
+  { prefix: "/sandboxes", label: "Sandboxes", to: "/sandboxes" },
 ] as const;
 export function SiteHeader() {
   const { agentId } = useParams({ strict: false });
@@ -27,7 +28,9 @@ export function SiteHeader() {
         ? "Connections"
         : pathname === "/tools/catalog" || pathname.startsWith("/tools/catalog/")
           ? "Catalog"
-          : pathname.startsWith("/skills/") || pathname.startsWith("/tools/")
+          : pathname.startsWith("/skills/") ||
+              pathname.startsWith("/tools/") ||
+              pathname.startsWith("/sandboxes/")
             ? (named?.label ?? null)
             : agentId
               ? agent?.id === agentId

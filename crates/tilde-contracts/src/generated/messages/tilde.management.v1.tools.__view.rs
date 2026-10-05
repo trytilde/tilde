@@ -3267,8 +3267,10 @@ impl ::serde::Serialize for DeleteToolHostResponseOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
-/// One agent's use of one source. Exactly one of connection_id and tool_host_id is set. The slug,
-/// derived from the source's name when it is added, prefixes the catalog names of its tools.
+/// One owner's use of one source. The owner is an agent (`agent_id`) or a sandbox blueprint
+/// (`sandbox_blueprint_id`). Exactly one of connection_id, tool_host_id and sandbox is set;
+/// `sandbox` marks the agent's sandbox, whose tools are the fixed sandbox tools. The slug, derived
+/// from the source's name when it is added, prefixes the catalog names of its tools.
 #[derive(Clone, Debug, Default)]
 pub struct ToolSourceView<'a> {
     /// Field 1: `id`
@@ -3283,6 +3285,10 @@ pub struct ToolSourceView<'a> {
     pub slug: &'a str,
     /// Field 7: `tools`
     pub tools: ::buffa::RepeatedView<'a, super::super::__buffa::view::AgentToolView<'a>>,
+    /// Field 8: `sandbox_blueprint_id`
+    pub sandbox_blueprint_id: ::core::option::Option<&'a str>,
+    /// Field 9: `sandbox`
+    pub sandbox: bool,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ToolSourceView<'a> {
@@ -3348,6 +3354,20 @@ impl<'a> ::buffa::MessageView<'a> for ToolSourceView<'a> {
                 )?;
                 view.slug = ::buffa::types::borrow_str(&mut cur)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.sandbox_blueprint_id = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.sandbox = ::buffa::types::decode_bool(&mut cur)?;
+            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -3398,6 +3418,8 @@ impl<'a> ::buffa::MessageView<'a> for ToolSourceView<'a> {
                 .iter()
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            sandbox_blueprint_id: self.sandbox_blueprint_id.map(|s| s.to_string()),
+            sandbox: self.sandbox,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -3432,6 +3454,12 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolSourceView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.sandbox {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3465,6 +3493,12 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolSourceView<'a> {
                 buf,
             );
             v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if self.sandbox {
+            ::buffa::types::put_bool_field(9u32, self.sandbox, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3504,6 +3538,12 @@ impl<'__a> ::serde::Serialize for ToolSourceView<'__a> {
         }
         if !self.tools.is_empty() {
             __map.serialize_entry("tools", &*self.tools)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.sandbox_blueprint_id {
+            __map.serialize_entry("sandboxBlueprintId", __v)?;
+        }
+        if self.sandbox {
+            __map.serialize_entry("sandbox", &self.sandbox)?;
         }
         __map.end()
     }
@@ -3627,6 +3667,16 @@ impl ToolSourceOwnedView {
         &self,
     ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::AgentToolView<'_>> {
         &self.0.reborrow().tools
+    }
+    /// Field 8: `sandbox_blueprint_id`
+    #[must_use]
+    pub fn sandbox_blueprint_id(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().sandbox_blueprint_id
+    }
+    /// Field 9: `sandbox`
+    #[must_use]
+    pub fn sandbox(&self) -> bool {
+        self.0.reborrow().sandbox
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ToolSourceView<'static>>>
@@ -4389,7 +4439,8 @@ impl ::serde::Serialize for ProviderToolOwnedView {
 /// A connection's tools, with `tool_host_id` instead a tool host's, or with `provider_id` the
 /// tools a catalog provider offers before any connection: its built-in tools, its tool host's, or
 /// an MCP server's advertised list (the connected server's own list replaces it once a connection
-/// is ready). `search` matches a tool's name or description case-insensitively.
+/// is ready). `sandbox` lists the fixed sandbox tools. `search` matches a tool's name or
+/// description case-insensitively.
 #[derive(Clone, Debug, Default)]
 pub struct ListProviderToolsRequestView<'a> {
     /// Field 1: `connection_id`
@@ -4400,6 +4451,8 @@ pub struct ListProviderToolsRequestView<'a> {
     pub tool_host_id: ::core::option::Option<&'a str>,
     /// Field 4: `search`
     pub search: ::core::option::Option<&'a str>,
+    /// Field 5: `sandbox`
+    pub sandbox: bool,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ListProviderToolsRequestView<'a> {
@@ -4458,6 +4511,13 @@ impl<'a> ::buffa::MessageView<'a> for ListProviderToolsRequestView<'a> {
                 )?;
                 view.search = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.sandbox = ::buffa::types::decode_bool(&mut cur)?;
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -4490,6 +4550,7 @@ impl<'a> ::buffa::MessageView<'a> for ListProviderToolsRequestView<'a> {
             provider_id: self.provider_id.map(|s| s.to_string()),
             tool_host_id: self.tool_host_id.map(|s| s.to_string()),
             search: self.search.map(|s| s.to_string()),
+            sandbox: self.sandbox,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -4514,6 +4575,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ListProviderToolsRequestView<'a> {
         if let Some(ref v) = self.search {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.sandbox {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4536,6 +4600,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ListProviderToolsRequestView<'a> {
         }
         if let Some(ref v) = self.search {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if self.sandbox {
+            ::buffa::types::put_bool_field(5u32, self.sandbox, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4569,6 +4636,9 @@ impl<'__a> ::serde::Serialize for ListProviderToolsRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.search {
             __map.serialize_entry("search", __v)?;
+        }
+        if self.sandbox {
+            __map.serialize_entry("sandbox", &self.sandbox)?;
         }
         __map.end()
     }
@@ -4684,6 +4754,11 @@ impl ListProviderToolsRequestOwnedView {
     #[must_use]
     pub fn search(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().search
+    }
+    /// Field 5: `sandbox`
+    #[must_use]
+    pub fn sandbox(&self) -> bool {
+        self.0.reborrow().sandbox
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ListProviderToolsRequestView<'static>>>
@@ -5575,7 +5650,8 @@ impl ::serde::Serialize for RefreshConnectionToolsResponseOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
-/// Exactly one filter: an agent's sources, or the agents using a connection or tool host.
+/// Exactly one filter: an agent's or a sandbox blueprint's sources, or the sources using a
+/// connection or tool host.
 #[derive(Clone, Debug, Default)]
 pub struct ListToolSourcesRequestView<'a> {
     /// Field 1: `agent_id`
@@ -5584,6 +5660,8 @@ pub struct ListToolSourcesRequestView<'a> {
     pub connection_id: ::core::option::Option<&'a str>,
     /// Field 3: `tool_host_id`
     pub tool_host_id: ::core::option::Option<&'a str>,
+    /// Field 4: `sandbox_blueprint_id`
+    pub sandbox_blueprint_id: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ListToolSourcesRequestView<'a> {
@@ -5635,6 +5713,13 @@ impl<'a> ::buffa::MessageView<'a> for ListToolSourcesRequestView<'a> {
                 )?;
                 view.tool_host_id = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.sandbox_blueprint_id = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -5666,6 +5751,7 @@ impl<'a> ::buffa::MessageView<'a> for ListToolSourcesRequestView<'a> {
             agent_id: self.agent_id.map(|s| s.to_string()),
             connection_id: self.connection_id.map(|s| s.to_string()),
             tool_host_id: self.tool_host_id.map(|s| s.to_string()),
+            sandbox_blueprint_id: self.sandbox_blueprint_id.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -5684,6 +5770,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ListToolSourcesRequestView<'a> {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         if let Some(ref v) = self.tool_host_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -5705,6 +5794,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ListToolSourcesRequestView<'a> {
         }
         if let Some(ref v) = self.tool_host_id {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5735,6 +5827,9 @@ impl<'__a> ::serde::Serialize for ListToolSourcesRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.tool_host_id {
             __map.serialize_entry("toolHostId", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.sandbox_blueprint_id {
+            __map.serialize_entry("sandboxBlueprintId", __v)?;
         }
         __map.end()
     }
@@ -5845,6 +5940,11 @@ impl ListToolSourcesRequestOwnedView {
     #[must_use]
     pub fn tool_host_id(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().tool_host_id
+    }
+    /// Field 4: `sandbox_blueprint_id`
+    #[must_use]
+    pub fn sandbox_blueprint_id(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().sandbox_blueprint_id
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ListToolSourcesRequestView<'static>>>
@@ -6160,8 +6260,9 @@ impl ::serde::Serialize for ListToolSourcesResponseOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
-/// Exactly one of connection_id and tool_host_id; an agent uses each at most once. `tool_names`
-/// are the tools the agent starts with.
+/// For an agent (`agent_id`) or a sandbox blueprint (`sandbox_blueprint_id`); exactly one of
+/// connection_id and tool_host_id, and an owner uses each at most once. `tool_names` are the tools
+/// it starts with.
 #[derive(Clone, Debug, Default)]
 pub struct AddToolSourceRequestView<'a> {
     /// Field 1: `agent_id`
@@ -6172,6 +6273,8 @@ pub struct AddToolSourceRequestView<'a> {
     pub tool_host_id: ::core::option::Option<&'a str>,
     /// Field 5: `tool_names`
     pub tool_names: ::buffa::RepeatedView<'a, &'a str>,
+    /// Field 6: `sandbox_blueprint_id`
+    pub sandbox_blueprint_id: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for AddToolSourceRequestView<'a> {
@@ -6223,6 +6326,13 @@ impl<'a> ::buffa::MessageView<'a> for AddToolSourceRequestView<'a> {
                 )?;
                 view.tool_host_id = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.sandbox_blueprint_id = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -6266,6 +6376,7 @@ impl<'a> ::buffa::MessageView<'a> for AddToolSourceRequestView<'a> {
             connection_id: self.connection_id.map(|s| s.to_string()),
             tool_host_id: self.tool_host_id.map(|s| s.to_string()),
             tool_names: self.tool_names.iter().map(|s| s.to_string()).collect(),
+            sandbox_blueprint_id: self.sandbox_blueprint_id.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -6287,6 +6398,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AddToolSourceRequestView<'a> {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         for v in &self.tool_names {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -6311,6 +6425,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AddToolSourceRequestView<'a> {
         }
         for v in &self.tool_names {
             ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_blueprint_id {
+            ::buffa::types::put_string_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6344,6 +6461,9 @@ impl<'__a> ::serde::Serialize for AddToolSourceRequestView<'__a> {
         }
         if !self.tool_names.is_empty() {
             __map.serialize_entry("toolNames", &*self.tool_names)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.sandbox_blueprint_id {
+            __map.serialize_entry("sandboxBlueprintId", __v)?;
         }
         __map.end()
     }
@@ -6459,6 +6579,11 @@ impl AddToolSourceRequestOwnedView {
     #[must_use]
     pub fn tool_names(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().tool_names
+    }
+    /// Field 6: `sandbox_blueprint_id`
+    #[must_use]
+    pub fn sandbox_blueprint_id(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().sandbox_blueprint_id
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<AddToolSourceRequestView<'static>>>

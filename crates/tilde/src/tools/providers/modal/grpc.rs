@@ -326,6 +326,9 @@ pub(super) struct ImageJoinStreamingResponse {
 }
 #[derive(Clone, PartialEq, prost::Message)]
 pub(super) struct Sandbox {
+    /// Empty runs the image's own command.
+    #[prost(string, repeated, tag = "1")]
+    pub entrypoint_args: Vec<String>,
     #[prost(string, tag = "3")]
     pub image_id: String,
     #[prost(uint32, tag = "7")]
@@ -360,6 +363,22 @@ pub(super) struct SandboxGetTaskIdResponse {
     pub task_id: Option<String>,
     #[prost(message, optional, tag = "2")]
     pub task_result: Option<GenericResult>,
+}
+/// A V2 sandbox's filesystem snapshot, taken through its task command router.
+#[derive(Clone, PartialEq, prost::Message)]
+pub(super) struct TaskSnapshotFilesystemRequest {
+    #[prost(string, tag = "1")]
+    pub task_id: String,
+    /// Idempotency key.
+    #[prost(string, tag = "2")]
+    pub snapshot_id: String,
+    #[prost(int64, optional, tag = "3")]
+    pub ttl_seconds: Option<i64>,
+}
+#[derive(Clone, PartialEq, prost::Message)]
+pub(super) struct TaskSnapshotFilesystemResponse {
+    #[prost(string, tag = "1")]
+    pub image_id: String,
 }
 #[derive(Clone, PartialEq, prost::Message)]
 pub(super) struct SandboxTerminateRequest {

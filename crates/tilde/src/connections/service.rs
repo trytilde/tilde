@@ -917,6 +917,15 @@ impl Connections {
         }
     }
     /// The only runtime credential entry point. Domains share refresh and never handle OAuth themselves.
+    /// A ready connection's credentials with the transport providers call upstream with.
+    pub async fn access(&self, id: Uuid) -> Result<crate::chat::providers::Access, Error> {
+        Ok(crate::chat::providers::Access {
+            connection_id: id,
+            values: self.resolve(id).await?,
+            http: self.http.clone(),
+            endpoints: self.endpoints.clone(),
+        })
+    }
     pub async fn resolve(&self, id: Uuid) -> Result<Values, Error> {
         if let Some(values) = self.cached_credentials(id) {
             return Ok(values);

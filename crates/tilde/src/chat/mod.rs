@@ -226,7 +226,10 @@ impl Chat {
         mut self,
         connections: crate::connections::service::Connections,
     ) -> Self {
-        self.tools = Some(crate::tools::Tools::new(connections.clone()));
+        self.tools = Some(crate::tools::Tools::new(
+            connections.clone(),
+            self.callback_url.clone(),
+        ));
         self.channels = Some(providers::Channels::new(connections, self.warm.clone()));
         self
     }

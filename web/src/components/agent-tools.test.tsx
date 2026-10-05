@@ -16,6 +16,7 @@ import {
   ToolMode,
   ToolSourceSchema,
 } from "@trytilde/contracts/tilde/management/v1/tools_pb.js";
+import { SandboxBlueprintSchema } from "@trytilde/contracts/tilde/management/v1/sandboxes_pb.js";
 import { DeclaredToolSchema } from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
 import {
   AgentDeploymentSchema,
@@ -28,6 +29,7 @@ import { AgentTools } from "./agent-tools";
 const rpc = vi.hoisted(() => ({
   connections: { listProviders: vi.fn(), listConnections: vi.fn() },
   toolHosts: { listToolHosts: vi.fn() },
+  sandboxes: { getAgentSandbox: vi.fn(), getSandboxBlueprint: vi.fn() },
   deployments: { getDeployment: vi.fn(), getDeploymentContents: vi.fn() },
   tools: {
     listToolSources: vi.fn(),
@@ -52,8 +54,8 @@ const tavily = create(ToolSourceSchema, {
   tools: [{ toolName: "search", name: "search", isAsync: true }],
 });
 
-function renderTab() {
-  const root = createRootRoute({ component: () => <AgentTools agentId="agent-1" /> });
+function renderTab(owner: { agentId: string } | { blueprintId: string } = { agentId: "agent-1" }) {
+  const root = createRootRoute({ component: () => <AgentTools {...owner} /> });
   const tools = createRoute({ getParentRoute: () => root, path: "/tools", component: () => null });
   const router = createRouter({
     routeTree: root.addChildren([tools]),
@@ -349,4 +351,80 @@ it("collapses a group's tool rows", async () => {
   expect(screen.queryByLabelText("Use search")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Expand Tavily" }));
   expect(screen.getByLabelText("Use search")).toBeTruthy();
+});
+it("keeps the agent's sandbox tools while its sandbox setting does", async () => {
+  rpc.tools.listToolSources.mockResolvedValue({
+    sources: [
+      tavily,
+      create(ToolSourceSchema, {
+        id: "src-sandbox",
+        agentId: "agent-1",
+        sandbox: true,
+        slug: "sandbox",
+        tools: [{ toolName: "exec" }],
+      }),
+    ],
+  });
+  rpc.tools.listProviderTools.mockImplementation(async ({ sandbox }) => ({
+    tools: sandbox ? [{ name: "exec" }, { name: "read_file" }] : [],
+  }));
+  rpc.sandboxes.getAgentSandbox.mockResolvedValue({
+    sandbox: { agentId: "agent-1", blueprintId: "bp-1", toolSourceId: "src-sandbox" },
+  });
+  rpc.sandboxes.getSandboxBlueprint.mockResolvedValue({
+    blueprint: create(SandboxBlueprintSchema, { id: "bp-1", name: "Dev box" }),
+  });
+  renderTab();
+  const link = await screen.findByRole("link", { name: "Sandbox · Dev box" });
+  expect(link.getAttribute("href")).toBe("/sandboxes/bp-1/settings");
+  expect(screen.getByLabelText("Use read_file").getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(screen.getByLabelText("Use read_file"));
+  await waitFor(() =>
+    expect(rpc.tools.setAgentTool).toHaveBeenCalledWith({
+      sourceId: "src-sandbox",
+      toolName: "read_file",
+    }),
+  );
+  // It goes with the sandbox setting in Capabilities; other sources can still be removed.
+  expect(
+    screen.getByRole("button", { name: "Remove Sandbox · Dev box" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(screen.getByRole("button", { name: "Remove Tavily" }).hasAttribute("disabled")).toBe(
+    false,
+  );
+});
+it("manages a sandbox blueprint's sources without an agent's settings", async () => {
+  renderTab({ blueprintId: "bp-1" });
+  await screen.findByRole("link", { name: "Tavily" });
+  expect(rpc.tools.listToolSources).toHaveBeenCalledWith(
+    { sandboxBlueprintId: "bp-1" },
+    expect.anything(),
+  );
+  // Programs call these tools, so there is no tool mode, bundled group or per-tool setting.
+  expect(rpc.tools.getToolMode).not.toHaveBeenCalled();
+  expect(rpc.deployments.getDeployment).not.toHaveBeenCalled();
+  expect(screen.queryByRole("tablist")).toBeNull();
+  expect(screen.queryByLabelText("Run search in the background")).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Edit/ })).toBeNull();
+  screen.getByText(/tilde sandbox call/);
+
+  fireEvent.click(screen.getByLabelText("Use extract"));
+  await waitFor(() =>
+    expect(rpc.tools.setAgentTool).toHaveBeenCalledWith({
+      sourceId: "src-tavily",
+      toolName: "extract",
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Add tool" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Choose existing" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(await within(dialog).findByText("Linear"));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
+  await waitFor(() =>
+    expect(rpc.tools.addToolSource).toHaveBeenCalledWith({
+      sandboxBlueprintId: "bp-1",
+      connectionId: "c2",
+      toolNames: [],
+    }),
+  );
 });

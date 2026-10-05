@@ -1,4 +1,5 @@
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }));
+vi.mock("@/components/agent-sandbox", () => ({ AgentSandbox: () => null }));
 import { create } from "@bufbuild/protobuf";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";

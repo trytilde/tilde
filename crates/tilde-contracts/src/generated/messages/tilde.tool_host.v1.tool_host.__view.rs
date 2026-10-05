@@ -1303,7 +1303,10 @@ impl ::serde::Serialize for HostPingOwnedView {
 }
 /// `call_id` is the agent's tool call ID: use it for upstream idempotency. `connection_id`,
 /// `connection_type` (the provider method the instance was set up with) and `credentials` are
-/// set when the call is made on an instance of the host's provider.
+/// set when the call is made on an instance of the host's provider. `sandbox_id` is set when a
+/// process inside a sandbox made the call through its blueprint's tools; `agent_id` and
+/// `thread_id` are then those the sandbox was launched for, empty when its reuse mode shares it
+/// across agents or threads.
 #[derive(Clone, Default)]
 pub struct ToolCallRequestView<'a> {
     /// Field 1: `call_id`
@@ -1325,6 +1328,8 @@ pub struct ToolCallRequestView<'a> {
     >,
     /// Field 8: `connection_type`
     pub connection_type: ::core::option::Option<&'a str>,
+    /// Field 9: `sandbox_id`
+    pub sandbox_id: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for ToolCallRequestView<'a> {
@@ -1338,6 +1343,7 @@ impl<'a> ::core::fmt::Debug for ToolCallRequestView<'a> {
             .field("connection_id", &self.connection_id)
             .field("credentials", &self.credentials)
             .field("connection_type", &self.connection_type)
+            .field("sandbox_id", &self.sandbox_id)
             .finish()
     }
 }
@@ -1418,6 +1424,13 @@ impl<'a> ::buffa::MessageView<'a> for ToolCallRequestView<'a> {
                 )?;
                 view.connection_type = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.sandbox_id = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1472,6 +1485,7 @@ impl<'a> ::buffa::MessageView<'a> for ToolCallRequestView<'a> {
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             connection_type: self.connection_type.map(|s| s.to_string()),
+            sandbox_id: self.sandbox_id.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1510,6 +1524,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolCallRequestView<'a> {
                     + inner_size as u64;
         }
         if let Some(ref v) = self.connection_type {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.sandbox_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -1551,6 +1568,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolCallRequestView<'a> {
         }
         if let Some(ref v) = self.connection_type {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_id {
+            ::buffa::types::put_string_field(9u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1596,6 +1616,9 @@ impl<'__a> ::serde::Serialize for ToolCallRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.connection_type {
             __map.serialize_entry("connectionType", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.sandbox_id {
+            __map.serialize_entry("sandboxId", __v)?;
         }
         __map.end()
     }
@@ -1734,6 +1757,11 @@ impl ToolCallRequestOwnedView {
     #[must_use]
     pub fn connection_type(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().connection_type
+    }
+    /// Field 9: `sandbox_id`
+    #[must_use]
+    pub fn sandbox_id(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().sandbox_id
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ToolCallRequestView<'static>>>

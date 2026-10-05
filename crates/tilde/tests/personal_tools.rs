@@ -144,7 +144,7 @@ async fn a_users_own_connection_serves_only_that_users_conversations() {
             .as_ref()
             .unwrap()
             .add_source(
-                fx.agent,
+                tilde::tools::Owner::Agent(fx.agent),
                 tilde::tools::Target::Connection(connection),
                 &["search".into()],
             )

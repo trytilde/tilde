@@ -620,7 +620,16 @@ impl<'a> Envd<'a> {
     /// `process.Process/Start` is server streaming: one request frame, then output and end
     /// events until the process exits.
     async fn exec(&self, cmd: &str, workdir: Option<&str>, timeout_ms: u64) -> ToolResult<Value> {
-        let request = serde_json::to_vec(&json!({"process":{"cmd":"/bin/bash","args":["-l","-c",cmd],"cwd":workdir},"stdin":false}))
+        self.run(cmd, workdir, timeout_ms, &Map::new()).await
+    }
+    async fn run(
+        &self,
+        cmd: &str,
+        workdir: Option<&str>,
+        timeout_ms: u64,
+        envs: &Map<String, Value>,
+    ) -> ToolResult<Value> {
+        let request = serde_json::to_vec(&json!({"process":{"cmd":"/bin/bash","args":["-l","-c",cmd],"cwd":workdir,"envs":envs},"stdin":false}))
             .map_err(|_| ConnectError::internal("Invalid command"))?;
         let mut frame = vec![0];
         frame.extend_from_slice(&(request.len() as u32).to_be_bytes());
@@ -695,6 +704,137 @@ impl<'a> Envd<'a> {
             "stderr":String::from_utf8_lossy(&stderr),
             "timed_out":timed_out
         }))
+    }
+}
+
+/// Blueprint sandboxes (`crate::sandboxes`): a VM from `template` that pauses, rather than being
+/// killed, when its TTL runs out. Returns its ID.
+pub async fn launch(access: &Access, template: &str) -> ToolResult<String> {
+    let spec = spec("", "", "", Verb::Post, "/sandboxes");
+    let request = rest::request(
+        access,
+        "e2b_api",
+        BASE,
+        &spec,
+        json!({"templateID":template,"timeout":LIFECYCLE_TTL_SECS,"autoPause":true}),
+    )?;
+    let created = rest::send(request.header("X-API-Key", access.secret("api_key")?)).await?;
+    created["data"]["sandboxID"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| ConnectError::unknown("E2B returned no sandbox ID"))
+}
+/// The TTL a blueprint sandbox gets at launch and every wake; it pauses when it runs out.
+const LIFECYCLE_TTL_SECS: u64 = 3600;
+/// Resume a paused sandbox (a running one only has its TTL extended). False when E2B no longer
+/// has it.
+pub async fn resume(access: &Access, sandbox: &str) -> ToolResult<bool> {
+    lifecycle(
+        access,
+        Verb::Post,
+        "/sandboxes/{sandbox_id}/connect",
+        json!({"sandbox_id":sandbox,"timeout":LIFECYCLE_TTL_SECS}),
+    )
+    .await
+}
+/// Pause, keeping memory and processes. False when E2B no longer has it.
+pub async fn pause(access: &Access, sandbox: &str) -> ToolResult<bool> {
+    lifecycle(
+        access,
+        Verb::Post,
+        "/sandboxes/{sandbox_id}/pause",
+        json!({"sandbox_id":sandbox}),
+    )
+    .await
+}
+pub async fn kill(access: &Access, sandbox: &str) -> ToolResult<()> {
+    lifecycle(
+        access,
+        Verb::Delete,
+        "/sandboxes/{sandbox_id}",
+        json!({"sandbox_id":sandbox}),
+    )
+    .await
+    .map(drop)
+}
+/// Start a long-running shell command with `envs`, returning once envd reports it started. The
+/// process outlives this call, as E2B's background commands do: the start stream is dropped
+/// without a deadline that would end it.
+pub async fn spawn(
+    access: &Access,
+    sandbox: &str,
+    command: &str,
+    envs: &Map<String, Value>,
+) -> ToolResult<()> {
+    let envd = Envd::connect(access, sandbox).await?;
+    let request = serde_json::to_vec(
+        &json!({"process":{"cmd":"/bin/bash","args":["-l","-c",command],"envs":envs},"stdin":false}),
+    )
+    .map_err(|_| ConnectError::internal("Invalid command"))?;
+    let mut frame = vec![0];
+    frame.extend_from_slice(&(request.len() as u32).to_be_bytes());
+    frame.extend(request);
+    let mut response = envd
+        .request(reqwest::Method::POST, "process.Process/Start")
+        .header("connect-protocol-version", "1")
+        .header("content-type", "application/connect+json")
+        .body(frame)
+        .send()
+        .await
+        .map_err(|_| ConnectError::unavailable("The sandbox could not be reached"))?;
+    if !response.status().is_success() {
+        return Err(ConnectError::unknown(format!(
+            "The sandbox returned {} starting a process",
+            response.status().as_u16()
+        )));
+    }
+    let mut bytes = Vec::new();
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        let chunk = tokio::time::timeout_at(deadline, response.chunk())
+            .await
+            .map_err(|_| ConnectError::deadline_exceeded("The process did not start in time"))?
+            .map_err(|_| ConnectError::unavailable("The sandbox response was interrupted"))?;
+        let Some(chunk) = chunk else {
+            return Err(ConnectError::unknown("The process ended before it started"));
+        };
+        bytes.extend_from_slice(&chunk);
+        while bytes.len() >= 5 {
+            let len = u32::from_be_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]) as usize;
+            if bytes.len() < 5 + len {
+                break;
+            }
+            let end_of_stream = bytes[0] & 0b10 != 0;
+            let message: Value = serde_json::from_slice(&bytes[5..5 + len]).unwrap_or_default();
+            bytes.drain(..5 + len);
+            let event = message.get("event").unwrap_or(&message);
+            if event.get("start").is_some() {
+                return Ok(());
+            }
+            if end_of_stream || event.get("end").is_some() {
+                return Err(ConnectError::unknown(format!(
+                    "The process ended before it started: {}",
+                    message.to_string().chars().take(512).collect::<String>()
+                )));
+            }
+        }
+    }
+}
+/// A lifecycle call: false on 404, and a pause of an already paused sandbox (409) succeeds.
+async fn lifecycle(
+    access: &Access,
+    verb: Verb,
+    path: &'static str,
+    input: Value,
+) -> ToolResult<bool> {
+    let spec = spec("", "", "", verb, path);
+    let request = rest::request(access, "e2b_api", BASE, &spec, input)?;
+    let (status, bytes) =
+        rest::response(request.header("X-API-Key", access.secret("api_key")?)).await?;
+    match status.as_u16() {
+        404 => Ok(false),
+        409 => Ok(true),
+        _ => rest::output(status, &bytes).map(|_| true),
     }
 }
 

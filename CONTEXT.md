@@ -372,6 +372,52 @@ bundled tools out) and its bundled tools.
   form on the left and the template variables on the right; template fields show variables as
   inline badges (`components/template-input.tsx`).
 
+## Sandboxes
+
+- Sandbox blueprint: the configuration of the VMs an agent works in. It names an installation
+  E2B or Modal connection (the provider Tilde launches, sleeps, wakes and terminates VMs with),
+  a template (E2B template, Modal registry image or `im-…` image; the image only needs the
+  `tilde` CLI on its PATH), a reuse mode, encrypted environment variables (write-only, sealed per
+  variable, exported in every shell of its VMs) and tool sources of its own, managed like an
+  agent's (`agent_tool_sources.sandbox_blueprint_id` owner). Provisioning beyond the template is
+  the customer's image; Tilde ships no credential helpers.
+- Agent sandbox: an agent's setting naming one blueprint (`agent_sandboxes`, at most one). It
+  adds the agent's `sandbox` tool source of the fixed sandbox tools (exec, exec_output,
+  read_file, write_file, edit_file, apply_patch, list_dir, glob, grep), all enabled; they are
+  configured like other agent tools, but the source goes only with the setting. Every invocation
+  of such an agent runs once its sandbox is up: the runtime calls `Sandboxes::ensure` before
+  waking the agent, and a sandbox tool call ensures it again (waking it if it slept).
+- Reuse mode (on the blueprint, so agents sharing it agree): thread (one per agent and thread,
+  the default), agent, agent_identity (agent and person), global (one for every agent using the
+  blueprint) and global_identity (one per person across those agents). The person is resolved as
+  personal tools resolve it, rolled up to the root identity; without a verified person the
+  person-keyed modes fall back to one per agent and thread. All modes but thread let data cross
+  threads; the global modes also cross agents.
+- Sandbox: one VM, keyed by blueprint, reuse mode and the agent, thread and person that mode
+  distinguishes, and launched with a recorded connection. Status starting, running, sleeping or
+  failed. Transitions (launch, wake, sleep, terminate) are made by the gateway process holding the
+  row's lease. E2B VMs pause and resume with memory, so their process reconnects by itself; a Modal
+  VM sleeps as a filesystem snapshot and wakes as a new VM from it. The blueprint's timings say
+  when running sandboxes sleep (default ten minutes unused) and when any is terminated (default
+  seven days unused), and how long a launch or wake waits for the process to connect (default two
+  minutes; past it the invocation fails). Sandboxes whose blueprint reuse or
+  connection changed, or whose agent no longer has the blueprint, are terminated by the sweeper
+  (rows are deleted only after their VM is). Terminate is also a management action.
+- Sandbox process: `tilde sandbox connect` in the VM (tilde-cli, Unix only). Tilde starts it with
+  `TILDE_URL` (the runtime URL) and a single-use enrollment token, which its first
+  `SandboxService.Connect` exchanges for a session token held in memory; reconnects use the
+  session. It is never dialed: operations reach it as Connect frames through the transient
+  `sandbox_calls` queue (as tool host calls do) and it answers with Respond. Each registration
+  carries the blueprint's environment, written to `~/.tilde/sandbox.env` and sourced by shell
+  profiles. Processes in the VM call the blueprint's tools through its loopback API
+  (`127.0.0.1:4790/v1/tools`) or `tilde sandbox call`, which forwards to `InvokeTool` with the
+  session; tool hosts receive the call's `sandbox_id` (and the agent and thread when the reuse mode
+  keys by them). Each call is an `execute_tool` span of the agent's invocation, like its other tool
+  calls: commands an exec runs see the operation as `TILDE_SANDBOX_OPERATION`, which
+  `tilde sandbox call` passes back, so the call nests under that `sandbox.exec`; a call outside any
+  operation (a background job's) belongs to the sandbox's latest invocation. Modal snapshots are
+  images that expire a day after the blueprint's terminate-after.
+
 ## Inference gateway
 
 Agents call model providers through `/inference/{provider}/{account}/{*rest}` on the

@@ -5,11 +5,14 @@
 //! only hold credentials and describe their tools: which tools an agent gets is its own
 //! configuration, so two agents can use one connection with different tools.
 //!
+//! A sandbox blueprint owns sources the same way; their tools are called by processes inside its
+//! sandboxes (`crate::sandboxes`). An agent with a sandbox has the sandbox itself as a source of
+//! the fixed sandbox tools, added and removed with the agent's sandbox setting.
+//!
 //! Gateway only for now: sidecar-hosted agents do not yet receive tool sources in their
 //! replicated configuration, so their catalogs contain channel tools alone.
 use crate::chat::{
     Scope,
-    providers::Access,
     tools::{Context, InputStream, Provider, ToolResult},
 };
 use crate::connections::{
@@ -32,25 +35,41 @@ pub mod personal;
 pub mod providers;
 pub mod rpc;
 
-/// One agent's use of one source.
+/// One owner's use of one source.
 pub struct Source {
     pub id: Uuid,
-    pub agent_id: Uuid,
+    pub owner: Owner,
     pub target: Target,
     pub slug: String,
     pub tools: Vec<db::AgentToolRow>,
 }
-/// What an agent's tools come from.
+/// Who uses a source: an agent, or a sandbox blueprint for the processes inside its sandboxes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Owner {
+    Agent(Uuid),
+    Blueprint(Uuid),
+}
+impl Owner {
+    pub(crate) fn columns(self) -> (Option<Uuid>, Option<Uuid>) {
+        match self {
+            Owner::Agent(id) => (Some(id), None),
+            Owner::Blueprint(id) => (None, Some(id)),
+        }
+    }
+}
+/// What a source's tools come from. `Sandbox` is the owning agent's sandbox.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     Connection(Uuid),
     ToolHost(Uuid),
+    Sandbox,
 }
 impl Target {
     pub(crate) fn columns(self) -> (Option<Uuid>, Option<Uuid>) {
         match self {
             Target::Connection(id) => (Some(id), None),
             Target::ToolHost(id) => (None, Some(id)),
+            Target::Sandbox => (None, None),
         }
     }
 }
@@ -84,11 +103,13 @@ pub struct Filter {
     pub agent: Option<Uuid>,
     pub connection: Option<Uuid>,
     pub tool_host: Option<Uuid>,
+    pub blueprint: Option<Uuid>,
 }
 
-/// Prefixes of built-in catalog names; a source with one could shadow them.
-const RESERVED_SLUGS: [&str; 7] = [
-    "tools", "agents", "thread", "user", "goals", "tasks", "channel",
+/// Prefixes of built-in catalog names; a source with one could shadow them. `sandbox` is the
+/// agent's sandbox source.
+const RESERVED_SLUGS: [&str; 8] = [
+    "tools", "agents", "thread", "user", "goals", "tasks", "channel", "sandbox",
 ];
 /// `value` in the catalog-name alphabet: lowercase for slugs, case kept for tool names.
 fn catalog_safe(value: &str, lowercase: bool, max: usize) -> String {
@@ -128,6 +149,35 @@ fn tool_name_for(tool: &str, others: &[(&str, String)]) -> Result<String, Error>
     Ok(name)
 }
 
+/// Insert a source with the first free slug from `base`. Column checks own the slug alphabet; a
+/// slug the owner already uses inserts nothing.
+pub(crate) async fn insert_source(
+    tx: &tokio_postgres::Transaction<'_>,
+    owner: Owner,
+    target: Target,
+    base: &str,
+) -> Result<Uuid, Error> {
+    let (agent, blueprint) = owner.columns();
+    let (connection, tool_host) = target.columns();
+    let sandbox = agent.filter(|_| target == Target::Sandbox);
+    let id = Uuid::new_v4();
+    for n in 1..100 {
+        let slug = if n == 1 {
+            base.to_owned()
+        } else {
+            format!("{base}_{n}")
+        };
+        let inserted = db::source_insert_execute(
+            tx, id, agent, connection, tool_host, &slug, blueprint, sandbox,
+        )
+        .await?;
+        if inserted == 1 {
+            return Ok(id);
+        }
+    }
+    Err(invalid("Too many sources use this name"))
+}
+
 /// Unauthenticated `tools/list` answers by server URL, failures included, so browsing the
 /// catalog doesn't dial a server on every panel open.
 type Probes =
@@ -148,6 +198,7 @@ const CATALOG_TTL: std::time::Duration = std::time::Duration::from_secs(900);
 pub struct Tools {
     pub(crate) connections: Connections,
     pub hosts: hosts::ToolHosts,
+    pub sandboxes: crate::sandboxes::Sandboxes,
     probes: std::sync::Arc<std::sync::Mutex<Probes>>,
     catalogs: std::sync::Arc<std::sync::Mutex<Catalogs>>,
 }
@@ -158,6 +209,15 @@ pub(crate) enum Callee {
     /// A discovered tool of an MCP-served connection: connection, provider, type and tool.
     Mcp(Uuid, String, String, String),
     Host(hosts::Target, String),
+    /// A fixed sandbox tool, run in the invocation's sandbox.
+    Sandbox(String),
+}
+/// Who a call is made for, as tool hosts are told.
+pub(crate) struct Caller {
+    pub call_id: Uuid,
+    pub agent: Option<Uuid>,
+    pub thread: Option<Uuid>,
+    pub sandbox: Option<Uuid>,
 }
 /// Tool text limits in characters, as Postgres `length()` checks them: every definition, agent
 /// override and audit record uses these, so text a setting accepts never fails at audit.
@@ -239,9 +299,11 @@ pub async fn declared(
 }
 
 impl Tools {
-    pub fn new(connections: Connections) -> Self {
+    /// `runtime_url` is the origin sandbox processes dial back to.
+    pub fn new(connections: Connections, runtime_url: String) -> Self {
         Self {
             hosts: hosts::ToolHosts::new(connections.clone()),
+            sandboxes: crate::sandboxes::Sandboxes::new(connections.clone(), runtime_url),
             connections,
             probes: Default::default(),
             catalogs: Default::default(),
@@ -255,6 +317,7 @@ impl Tools {
             filter.agent,
             filter.connection,
             filter.tool_host,
+            filter.blueprint,
         )
         .await?;
         let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
@@ -264,10 +327,15 @@ impl Tools {
                 Ok(Source {
                     tools: tools.extract_if(.., |t| t.source_id == r.id).collect(),
                     id: r.id,
-                    agent_id: r.agent_id,
-                    target: match (r.connection_id, r.tool_host_id) {
-                        (Some(id), None) => Target::Connection(id),
-                        (None, Some(id)) => Target::ToolHost(id),
+                    owner: match (r.agent_id, r.sandbox_blueprint_id) {
+                        (Some(id), None) => Owner::Agent(id),
+                        (None, Some(id)) => Owner::Blueprint(id),
+                        _ => return Err(invalid("Invalid tool source")),
+                    },
+                    target: match (r.connection_id, r.tool_host_id, r.sandbox) {
+                        (Some(id), None, false) => Target::Connection(id),
+                        (None, Some(id), false) => Target::ToolHost(id),
+                        (None, None, true) => Target::Sandbox,
                         _ => return Err(invalid("Invalid tool source")),
                     },
                     slug: r.slug,
@@ -313,16 +381,21 @@ impl Tools {
                 }
                 Ok((host.tools, host.name))
             }
+            Target::Sandbox => Ok((crate::sandboxes::tools::definitions(), "sandbox".into())),
         }
     }
-    /// Give an agent a source with `tool_names`. Its slug comes from the source's name, made
-    /// unique among the agent's sources; an agent uses each source once.
+    /// Give an agent or a sandbox blueprint a source with `tool_names`. Its slug comes from the
+    /// source's name, made unique among the owner's sources; an owner uses each source once. An
+    /// agent's sandbox source comes only with its sandbox setting.
     pub async fn add_source(
         &self,
-        agent: Uuid,
+        owner: Owner,
         target: Target,
         tool_names: &[String],
     ) -> Result<Source, Error> {
+        if target == Target::Sandbox {
+            return Err(invalid("Give the agent a sandbox to add its sandbox tools"));
+        }
         let (offered, name) = self.offered(target).await?;
         let mut named: Vec<(&str, String)> = Vec::new();
         for tool in tool_names {
@@ -334,11 +407,12 @@ impl Tools {
         let (connection, tool_host) = target.columns();
         let mut client = self.connections.pool.get().await?;
         let tx = client.transaction().await?;
-        if db::source_of_agent_opt(&tx, agent, connection, tool_host)
+        let (agent, blueprint) = owner.columns();
+        if db::source_of_agent_opt(&tx, agent, connection, tool_host, blueprint)
             .await?
             .is_some()
         {
-            return Err(invalid("The agent already uses this source"));
+            return Err(invalid("This source is already in use here"));
         }
         let base = match catalog_safe(&name, true, 28) {
             slug if slug.is_empty() || RESERVED_SLUGS.contains(&slug.as_str()) => {
@@ -346,23 +420,7 @@ impl Tools {
             }
             slug => slug,
         };
-        let id = Uuid::new_v4();
-        let mut added = false;
-        for n in 1..100 {
-            let slug = if n == 1 {
-                base.clone()
-            } else {
-                format!("{base}_{n}")
-            };
-            // Column checks own the alphabet; a slug the agent already uses inserts nothing.
-            if db::source_insert_execute(&tx, id, agent, connection, tool_host, &slug).await? == 1 {
-                added = true;
-                break;
-            }
-        }
-        if !added {
-            return Err(invalid("The agent uses too many sources with this name"));
-        }
+        let id = insert_source(&tx, owner, target, &base).await?;
         for (tool, name) in &named {
             db::agent_tool_set_execute(&tx, id, tool, name, &ToolSettings::default()).await?;
         }
@@ -708,28 +766,49 @@ impl Tools {
         if let Some(entries) = cached {
             return Ok(entries);
         }
-        let entries = std::sync::Arc::new(self.load(scope.agent_id).await?);
+        let entries = std::sync::Arc::new(self.load(Owner::Agent(scope.agent_id)).await?);
         let mut catalogs = self.catalogs.lock().unwrap_or_else(|e| e.into_inner());
         catalogs.retain(|_, (at, _)| at.elapsed() < CATALOG_TTL);
         catalogs.insert(scope.id, (std::time::Instant::now(), entries.clone()));
         Ok(entries)
     }
-    /// The agent's tools on ready sources, as catalog definitions paired with what is needed
-    /// to call them.
-    async fn load(&self, agent: Uuid) -> ToolResult<Vec<Entry>> {
-        let dynamic = self.mode(agent).await?;
+    /// An agent's or sandbox blueprint's tools on ready sources, as catalog definitions paired
+    /// with what is needed to call them. A blueprint's are never deferred.
+    pub(crate) async fn load(&self, owner: Owner) -> ToolResult<Vec<Entry>> {
+        let (agent, blueprint) = owner.columns();
+        let dynamic = match agent {
+            Some(agent) => self.mode(agent).await?,
+            None => false,
+        };
         let client = self.connections.pool.get().await.map_err(Error::from)?;
-        let rows = db::agent_functions_all(&client, agent)
+        let rows = db::agent_functions_all(&client, agent, blueprint)
             .await
             .map_err(Error::from)?;
-        let hosted = db::agent_host_functions_all(&client, agent, hosts::LIVENESS_SECS)
+        let hosted = db::agent_host_functions_all(&client, agent, hosts::LIVENESS_SECS, blueprint)
             .await
             .map_err(Error::from)?;
-        let proxied = db::agent_mcp_functions_all(&client, agent)
+        let proxied = db::agent_mcp_functions_all(&client, agent, blueprint)
             .await
             .map_err(Error::from)?;
+        let sandboxed = match agent {
+            Some(agent) => db::agent_sandbox_functions_all(&client, agent)
+                .await
+                .map_err(Error::from)?,
+            None => vec![],
+        };
         drop(client);
         let mut out = Vec::new();
+        let fixed = crate::sandboxes::tools::definitions();
+        for row in sandboxed {
+            let Some(mut definition) = fixed.iter().find(|t| t.name == row.tool_name).cloned()
+            else {
+                continue;
+            };
+            definition.name = format!("{}.{}", row.slug, row.name);
+            definition.detached = row.is_async;
+            apply(&mut definition, row.summary, row.description, &row.display);
+            out.push((definition, Callee::Sandbox(row.tool_name), dynamic));
+        }
         for row in proxied {
             let mut definition = types::ToolDefinition {
                 name: format!("{}.{}", row.slug, row.name),
@@ -809,6 +888,75 @@ impl Tools {
         Ok(out)
     }
 }
+/// Tool input is checked against the tool's own schema before any provider sees it.
+pub(crate) fn validate(definition: &types::ToolDefinition, input: &Value) -> ToolResult<()> {
+    let schema: Value = serde_json::from_str(&definition.input_schema_json)
+        .map_err(|_| ConnectError::internal("Invalid provider schema"))?;
+    if !jsonschema::validator_for(&schema)
+        .map_err(|_| ConnectError::internal("Invalid provider schema"))?
+        .is_valid(input)
+    {
+        return Err(ConnectError::invalid_argument(
+            "Input does not match this tool's schema",
+        ));
+    }
+    Ok(())
+}
+impl Tools {
+    /// Call a connection's, MCP server's or tool host's tool. The caller has authorized the call
+    /// and validated its input.
+    pub(crate) async fn run(
+        &self,
+        callee: Callee,
+        caller: Caller,
+        input: Value,
+    ) -> ToolResult<Value> {
+        let row = match callee {
+            Callee::Connection(row) => row,
+            Callee::Mcp(connection, provider, typ, tool_name) => {
+                let target = self.mcp_target(connection, &provider, &typ).await?;
+                let values = self.connections.resolve(connection).await?;
+                return mcp::call(
+                    &self.connections.endpoints,
+                    &target.server,
+                    &values,
+                    &tool_name,
+                    input,
+                )
+                .await;
+            }
+            Callee::Host(target, tool_name) => {
+                let id = |id: Option<Uuid>| id.map(|id| id.to_string()).unwrap_or_default();
+                return self
+                    .hosts
+                    .call(
+                        &target,
+                        crate::proto::tilde::tool_host::v1::ToolCallRequest {
+                            call_id: caller.call_id.to_string(),
+                            name: tool_name,
+                            input_json: input.to_string(),
+                            agent_id: id(caller.agent),
+                            thread_id: id(caller.thread),
+                            sandbox_id: caller.sandbox.map(|s| s.to_string()),
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+            }
+            Callee::Sandbox(_) => {
+                return Err(ConnectError::internal(
+                    "Sandbox tools run in the invocation",
+                ));
+            }
+        };
+        let provider = providers::provider(&row.provider_id, &row.type_id)
+            .ok_or_else(|| ConnectError::not_found("No installed tool provider"))?;
+        let access = self.connections.access(row.connection_id).await?;
+        provider
+            .invoke(&access, caller.call_id, &row.tool_name, input)
+            .await
+    }
+}
 impl Provider for Tools {
     fn tools<'a>(
         &'a self,
@@ -858,62 +1006,23 @@ impl Provider for Tools {
                 .find(|(definition, _, _)| definition.name == name)
                 .cloned()
                 .ok_or_else(|| ConnectError::not_found("Tool is not available to this agent"))?;
-            let schema: Value = serde_json::from_str(&definition.input_schema_json)
-                .map_err(|_| ConnectError::internal("Invalid provider schema"))?;
-            if !jsonschema::validator_for(&schema)
-                .map_err(|_| ConnectError::internal("Invalid provider schema"))?
-                .is_valid(&input)
-            {
-                return Err(ConnectError::invalid_argument(
-                    "Input does not match this tool's schema",
-                ));
-            }
-            let row = match callee {
-                Callee::Connection(row) => row,
-                Callee::Mcp(connection, provider, typ, tool_name) => {
-                    let target = self.mcp_target(connection, &provider, &typ).await?;
-                    let values = self.connections.resolve(connection).await?;
-                    context.authorize().await?;
-                    return mcp::call(
-                        &self.connections.endpoints,
-                        &target.server,
-                        &values,
-                        &tool_name,
-                        input,
-                    )
-                    .await;
-                }
-                Callee::Host(target, tool_name) => {
-                    context.authorize().await?;
-                    let scope = context.scope();
-                    return self
-                        .hosts
-                        .call(
-                            &target,
-                            crate::proto::tilde::tool_host::v1::ToolCallRequest {
-                                call_id: context.call_id.to_string(),
-                                name: tool_name,
-                                input_json: input.to_string(),
-                                agent_id: scope.agent_id.to_string(),
-                                thread_id: scope.thread_id.to_string(),
-                                ..Default::default()
-                            },
-                        )
-                        .await;
-                }
-            };
-            let provider = providers::provider(&row.provider_id, &row.type_id)
-                .ok_or_else(|| ConnectError::not_found("No installed tool provider"))?;
-            let access = Access {
-                connection_id: row.connection_id,
-                values: self.connections.resolve(row.connection_id).await?,
-                http: self.connections.http.clone(),
-                endpoints: self.connections.endpoints.clone(),
-            };
+            validate(&definition, &input)?;
             context.authorize().await?;
-            provider
-                .invoke(&access, context.call_id, &row.tool_name, input)
-                .await
+            let scope = context.scope();
+            if let Callee::Sandbox(tool_name) = callee {
+                return self.sandboxes.invoke(scope, &tool_name, input).await;
+            }
+            self.run(
+                callee,
+                Caller {
+                    call_id: context.call_id,
+                    agent: Some(scope.agent_id),
+                    thread: Some(scope.thread_id),
+                    sandbox: None,
+                },
+                input,
+            )
+            .await
         })
     }
 }
