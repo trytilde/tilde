@@ -86,7 +86,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id,action FROM ( SELECT s.id, CASE WHEN s.reuse <> b.reuse OR s.connection_id <> b.connection_id OR s.last_used_at < NOW() - make_interval(secs => b.terminate_after_secs) OR (s.status='failed' AND s.last_used_at < NOW() - INTERVAL '1 hour') OR NOT EXISTS (SELECT 1 FROM agent_sandboxes a WHERE a.blueprint_id=s.blueprint_id AND (s.agent_id IS NULL OR a.agent_id=s.agent_id)) THEN 'terminate' WHEN s.status='running' AND s.last_used_at < NOW() - make_interval(secs => b.sleep_after_secs) THEN 'sleep' END AS action FROM sandboxes s JOIN sandbox_blueprints b ON b.id=s.blueprint_id WHERE s.lease_until IS NULL OR s.lease_until <= NOW() ) due WHERE action IS NOT NULL LIMIT 50",
+        "SELECT id,action FROM ( SELECT s.id, CASE WHEN s.reuse <> b.reuse OR s.connection_id <> b.connection_id OR s.last_used_at < NOW() - make_interval(secs => b.terminate_after_secs) OR (s.status='failed' AND s.last_used_at < NOW() - INTERVAL '1 hour') OR NOT EXISTS (SELECT 1 FROM agent_sandboxes a WHERE a.blueprint_id=s.blueprint_id AND (s.agent_id IS NULL OR a.agent_id=s.agent_id)) THEN 'terminate' WHEN s.status='running' AND s.last_used_at < NOW() - make_interval(secs => b.sleep_after_secs) AND NOT EXISTS (SELECT 1 FROM sandbox_calls c WHERE c.sandbox_id=s.id) THEN 'sleep' END AS action FROM sandboxes s JOIN sandbox_blueprints b ON b.id=s.blueprint_id WHERE CASE WHEN $1::UUID IS NULL THEN s.lease_until IS NULL OR s.lease_until <= NOW() ELSE s.id=$1 END ) due WHERE action IS NOT NULL LIMIT 50",
         None,
     )
 }
@@ -101,10 +101,11 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 0> {
+        p1: &'a Option<uuid::Uuid>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 1> {
         RecordQuery {
             client,
-            params: [],
+            params: [p1],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:

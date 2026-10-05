@@ -66,6 +66,9 @@ CREATE TABLE sandboxes (
  -- Held by the gateway process launching, waking, sleeping or terminating the VM. Another
  -- process may take over once it lapses.
  lease_until TIMESTAMPTZ,
+ -- When the provider pauses (E2B, at its TTL) or ends (Modal, at its lifetime) the VM by itself.
+ -- The sweeper renews an E2B VM's TTL in time and puts a Modal VM to sleep before its end.
+ expires_at TIMESTAMPTZ,
  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  -- The latest invocation that used it: calls its processes make outside any operation (from a
  -- background job, say) are traced as part of it.

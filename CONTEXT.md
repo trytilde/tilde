@@ -416,7 +416,9 @@ bundled tools out) and its bundled tools.
   calls: commands an exec runs see the operation as `TILDE_SANDBOX_OPERATION`, which
   `tilde sandbox call` passes back, so the call nests under that `sandbox.exec`; a call outside any
   operation (a background job's) belongs to the sandbox's latest invocation. Modal snapshots are
-  images that expire a day after the blueprint's terminate-after.
+  images kept for 31 days, past the longest terminate-after. The sweeper also renews a running
+  E2B VM's TTL before E2B would pause it, and puts a Modal VM to sleep before its 24-hour
+  lifetime ends; it never sleeps a sandbox with operations in flight, which keep it in use.
 
 ## Inference gateway
 

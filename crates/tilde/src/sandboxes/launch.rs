@@ -23,6 +23,14 @@ impl Provider {
         }
     }
 }
+/// How long the provider keeps a VM from launch or renewal before pausing (E2B) or ending
+/// (Modal) it by itself.
+pub fn lifetime(provider: Provider) -> f64 {
+    match provider {
+        Provider::E2b => e2b::LIFECYCLE_TTL_SECS as f64,
+        Provider::Modal => f64::from(modal::SANDBOX_LIFETIME_SECS),
+    }
+}
 /// What the started process needs to dial back in.
 pub struct Enrollment<'a> {
     pub runtime_url: &'a str,
@@ -106,7 +114,8 @@ pub async fn start(
     .await
     .map_err(failed)
 }
-/// Wake a paused VM. False when it is gone, or the provider cannot resume (Modal).
+/// Wake a paused VM, or renew a running one's lifetime. False when it is gone, or the provider
+/// cannot do either (Modal).
 pub async fn resume(provider: Provider, access: &Access, id: &str) -> Result<bool> {
     match provider {
         Provider::E2b => e2b::resume(access, id).await.map_err(failed),

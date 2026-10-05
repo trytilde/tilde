@@ -10,6 +10,7 @@ pub use q::call_claim::Record as CallRow;
 pub use q::call_take::Record as CallResultRow;
 pub use q::env_all::Record as EnvRow;
 pub use q::launch_connection::Record as LaunchConnectionRow;
+pub use q::renew_due::Record as RenewRow;
 pub use q::sandbox_authenticate::Record as SessionRow;
 pub use q::sandbox_enroll::Record as EnrolledRow;
 pub use q::sandbox_get::Record as SandboxRow;
@@ -196,14 +197,28 @@ pub async fn sandbox_lease_opt(
         .await?
         .map(|r| r.now))
 }
+/// The provider ends or pauses it after `lifetime_secs` unless renewed.
 pub async fn sandbox_launched_execute(
     db: &impl GenericClient,
     id: Uuid,
     provider_sandbox_id: &str,
+    lifetime_secs: f64,
 ) -> DbResult<u64> {
     Ok(q::sandbox_launched::run()
-        .bind(db, &provider_sandbox_id, &id)
+        .bind(db, &provider_sandbox_id, &lifetime_secs, &id)
         .await?)
+}
+pub async fn sandbox_renewed_execute(
+    db: &impl GenericClient,
+    id: Uuid,
+    lifetime_secs: f64,
+) -> DbResult<u64> {
+    Ok(q::sandbox_renewed::run()
+        .bind(db, &lifetime_secs, &id)
+        .await?)
+}
+pub async fn renew_due_all(db: &impl GenericClient) -> DbResult<Vec<RenewRow>> {
+    Ok(q::renew_due::run().bind(db).all().await?)
 }
 pub async fn sandbox_enrollment_execute(
     db: &impl GenericClient,
@@ -268,8 +283,12 @@ pub async fn sandbox_connected_execute(db: &impl GenericClient, id: Uuid) -> DbR
 pub async fn sweep_lock_one(db: &impl GenericClient) -> DbResult<bool> {
     Ok(q::sweep_lock::run().bind(db).one().await?.acquired)
 }
-pub async fn sweep_due_all(db: &impl GenericClient) -> DbResult<Vec<DueRow>> {
-    Ok(q::sweep_due::run().bind(db).all().await?)
+/// Every unleased sandbox due, or whether `leased` (held by the caller) still is.
+pub async fn sweep_due_all(db: &impl GenericClient, leased: Option<Uuid>) -> DbResult<Vec<DueRow>> {
+    Ok(q::sweep_due::run().bind(db, &leased).all().await?)
+}
+pub async fn sandbox_release_execute(db: &impl GenericClient, id: Uuid) -> DbResult<u64> {
+    Ok(q::sandbox_release::run().bind(db, &id).await?)
 }
 /// `trace` is the agent tool call's trace context, which tools called while it runs nest under.
 pub async fn call_insert_execute(

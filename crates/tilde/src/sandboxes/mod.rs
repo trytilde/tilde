@@ -37,6 +37,8 @@ use uuid::Uuid;
 pub(crate) const LIVENESS_SECS: f64 = 30.0;
 /// Covers a launch, an image build included, and the longest wait for the process to register.
 const LEASE_SECS: f64 = 1800.0;
+/// Thirty days, the longest terminate_after, and a day.
+const SNAPSHOT_TTL_SECS: i64 = 31 * 86_400;
 /// How long a woken E2B VM's own process gets to reconnect before another is started.
 const RECONNECT_WAIT: Duration = Duration::from_secs(20);
 const NOTIFY_CHANNEL: &str = "tilde_sandbox_calls";
@@ -453,7 +455,8 @@ impl Sandboxes {
             let row = db::sandbox_get_opt(&client, id, LIVENESS_SECS, chrono::Utc::now())
                 .await?
                 .ok_or(Error::NotFound)?;
-            if row.status == "running" && row.live {
+            // A sandbox another process is sleeping or terminating is waited for.
+            if row.status == "running" && row.live && !row.leased {
                 return Ok(Some(id));
             }
             if let Some(since) = db::sandbox_lease_opt(&client, id, LEASE_SECS).await? {
@@ -550,6 +553,12 @@ impl Sandboxes {
             // A paused E2B VM resumes with its process, which reconnects by itself; otherwise
             // another process is started in it.
             if launch::resume(provider, &access, vm).await? {
+                db::sandbox_renewed_execute(
+                    &self.connections.pool.get().await?,
+                    id,
+                    launch::lifetime(provider),
+                )
+                .await?;
                 if self.registered(id, since, RECONNECT_WAIT).await? {
                     return Ok(());
                 }
@@ -583,7 +592,13 @@ impl Sandboxes {
             },
         )
         .await?;
-        db::sandbox_launched_execute(&self.connections.pool.get().await?, id, &vm).await?;
+        db::sandbox_launched_execute(
+            &self.connections.pool.get().await?,
+            id,
+            &vm,
+            launch::lifetime(provider),
+        )
+        .await?;
         self.wait_registered(id, since, &row).await
     }
     /// Up to the blueprint's connect timeout.
@@ -643,9 +658,9 @@ impl Sandboxes {
                 .as_deref()
                 .ok_or_else(|| invalid("The sandbox has no VM"))?;
             let (provider, access) = self.access(row.connection_id).await?;
-            // A snapshot outlives the sandbox's retention, so a sleeping sandbox can always wake.
-            let snapshot_ttl = i64::from(row.terminate_after_secs) + 86_400;
-            launch::sleep(provider, &access, vm, snapshot_ttl).await
+            // A snapshot outlives the longest retention a blueprint may set, so a sleeping sandbox
+            // can always wake, even after its blueprint's retention is raised.
+            launch::sleep(provider, &access, vm, SNAPSHOT_TTL_SECS).await
         }
         .await;
         let client = pool.get().await?;
@@ -698,17 +713,24 @@ impl Sandboxes {
                 return Ok(());
             }
             db::calls_expire_execute(&tx).await?;
-            let due = db::sweep_due_all(&tx).await?;
+            let due = db::sweep_due_all(&tx, None).await?;
             tx.commit().await?;
             due
         };
         for row in due {
-            if db::sandbox_lease_opt(&pool.get().await?, row.id, LEASE_SECS)
+            let client = pool.get().await?;
+            if db::sandbox_lease_opt(&client, row.id, LEASE_SECS)
                 .await?
                 .is_none()
             {
                 continue;
             }
+            // A call may have used it since the list was read.
+            let Some(row) = db::sweep_due_all(&client, Some(row.id)).await?.pop() else {
+                db::sandbox_release_execute(&client, row.id).await?;
+                continue;
+            };
+            drop(client);
             let done = match row.action.as_str() {
                 "sleep" => self.sleep(row.id).await,
                 _ => self.terminate_leased(row.id).await,
@@ -716,6 +738,28 @@ impl Sandboxes {
             if let Err(error) = done {
                 tracing::warn!(sandbox = %row.id, %error, "Sandbox sweep step failed");
             }
+        }
+        for row in db::renew_due_all(&pool.get().await?).await? {
+            if let Err(error) = self.renew(&row).await {
+                tracing::warn!(sandbox = %row.id, %error, "Sandbox renewal failed");
+            }
+        }
+        Ok(())
+    }
+    /// Keep a running VM from the provider's own pause or end: an E2B VM's TTL is renewed; a
+    /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive.
+    async fn renew(&self, row: &db::RenewRow) -> Result<(), Error> {
+        let (provider, access) = self.access(row.connection_id).await?;
+        let pool = &self.connections.pool;
+        if launch::resume(provider, &access, &row.provider_sandbox_id).await? {
+            db::sandbox_renewed_execute(&pool.get().await?, row.id, launch::lifetime(provider))
+                .await?;
+        } else if provider == Provider::Modal
+            && db::sandbox_lease_opt(&pool.get().await?, row.id, LEASE_SECS)
+                .await?
+                .is_some()
+        {
+            self.sleep(row.id).await?;
         }
         Ok(())
     }
@@ -806,10 +850,15 @@ impl Sandboxes {
                 return serde_json::from_str(&done.output_json)
                     .map_err(|_| ConnectError::unknown("The sandbox returned invalid output"));
             }
-            // The slow tick covers a notification lost to a listener reconnect.
+            // The slow tick covers a notification lost to a listener reconnect, and keeps a
+            // long operation's sandbox counted as in use.
             tokio::select! {
                 _ = changes.changed() => { changes.borrow_and_update(); }
-                _ = tokio::time::sleep(Duration::from_secs(5)) => {}
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    db::sandbox_touch_execute(&pool.get().await.map_err(Error::from)?, sandbox, invocation)
+                        .await
+                        .map_err(Error::from)?;
+                }
                 _ = tokio::time::sleep_until(deadline) => {
                     // The process may still run it; without the row its late Respond finds nothing.
                     db::call_abandon_execute(&pool.get().await.map_err(Error::from)?, id)

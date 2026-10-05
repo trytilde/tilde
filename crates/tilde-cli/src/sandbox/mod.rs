@@ -598,6 +598,32 @@ mod tests {
             read,
             json!({ "content": "2\n", "total_lines": 3, "truncated": false })
         );
+        // grep streams files, so a match deep in a large one still reports its line.
+        let big = format!("{}needle\n", "filler line\n".repeat(100_000));
+        std::fs::write(workdir.path().join("notes/big.log"), big).unwrap();
+        let found = operate(
+            &first,
+            &mut responses,
+            "grep",
+            json!({ "pattern": "needle", "max_results": 1 }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            found["matches"],
+            json!([{ "path": "notes/big.log", "line": 100_001, "text": "needle" }])
+        );
+        // apply_patch's file deletion refuses a directory rather than emptying it.
+        let refused = operate(
+            &first,
+            &mut responses,
+            "delete_file",
+            json!({ "path": "notes" }),
+        )
+        .await
+        .unwrap_err();
+        assert!(refused.contains("is a directory"), "{refused}");
+        assert!(workdir.path().join("notes/a.txt").exists());
 
         let env_file = home.path().join(".tilde/sandbox.env");
         {

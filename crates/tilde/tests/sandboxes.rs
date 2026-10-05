@@ -489,6 +489,39 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
     sandboxes.sweep().await.unwrap();
     let awake = sandboxes.list(Some(blueprint.id), None).await.unwrap();
     assert_eq!(awake[0].status, "running", "20 minutes is within the hour");
+    // A VM E2B would soon pause by itself has its TTL renewed.
+    pg.execute(
+        "UPDATE sandboxes SET expires_at=NOW()+INTERVAL '5 minutes'",
+        &[],
+    )
+    .await
+    .unwrap();
+    let connects = |w: &World| {
+        w.e2b
+            .iter()
+            .filter(|r| *r == "POST /e2b/sandboxes/sbx-1/connect")
+            .count()
+    };
+    let before = connects(&world.lock().unwrap());
+    sandboxes.sweep().await.unwrap();
+    assert_eq!(connects(&world.lock().unwrap()), before + 1);
+    let renewed: bool = pg
+        .query_one(
+            "SELECT expires_at > NOW()+INTERVAL '50 minutes' FROM sandboxes",
+            &[],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert!(renewed, "the new deadline is recorded");
+    // Past a shorter sleep_after it sleeps, but not while an operation is still in flight.
+    pg.execute(
+        "INSERT INTO sandbox_calls(id,sandbox_id,operation,input_json,invocation_id) \
+         SELECT gen_random_uuid(),id,'exec','{}',gen_random_uuid() FROM sandboxes",
+        &[],
+    )
+    .await
+    .unwrap();
     let ten_minutes = Timings {
         sleep_after: 600,
         terminate_after: 0,
@@ -498,7 +531,14 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
         .update_blueprint(blueprint.id, None, None, None, None, Some(ten_minutes))
         .await
         .unwrap();
-    // The change starts a sweep of its own; whichever sweep runs puts the VM to sleep.
+    sandboxes.sweep().await.unwrap();
+    let busy = sandboxes.list(Some(blueprint.id), None).await.unwrap();
+    assert_eq!(
+        busy[0].status, "running",
+        "an operation in flight keeps it awake"
+    );
+    pg.execute("DELETE FROM sandbox_calls", &[]).await.unwrap();
+    // The change started a sweep of its own; whichever sweep runs puts the VM to sleep.
     for _ in 0..50 {
         sandboxes.sweep().await.unwrap();
         if sandboxes.list(Some(blueprint.id), None).await.unwrap()[0].status == "sleeping" {

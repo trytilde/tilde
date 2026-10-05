@@ -435,7 +435,7 @@ async fn image(api: &mut Api<'_>, app: &str, commands: Vec<String>) -> ToolResul
 const SANDBOX_APP: &str = "tilde-sandboxes";
 /// Modal's longest sandbox lifetime. A VM that reaches it without having slept is relaunched
 /// from its template by the next wake.
-const SANDBOX_LIFETIME_SECS: u32 = 86_400;
+pub const SANDBOX_LIFETIME_SECS: u32 = 86_400;
 /// Launch a blueprint sandbox whose entrypoint is `command`, from `image`: an image ID (im-…,
 /// including a sleeping sandbox's snapshot) or a registry reference. Returns its ID.
 pub async fn launch(access: &Access, image: &str, command: Vec<String>) -> ToolResult<String> {

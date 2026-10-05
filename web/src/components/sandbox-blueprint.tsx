@@ -165,6 +165,7 @@ function BlueprintSettings({
   const [busy, setBusy] = useState(false);
   const saved = blueprintValues(blueprint);
   const reuseChanged = form.watch("reuse") !== saved.reuse;
+  const connectionChanged = form.watch("connectionId") !== saved.connectionId;
   const current = form.watch();
   const timingsChanged = JSON.stringify(timingsOf(current)) !== JSON.stringify(timingsOf(saved));
   const used = blueprint.agentIds;
@@ -217,15 +218,17 @@ function BlueprintSettings({
         })}
       >
         <BlueprintFields form={form} available={available} current={blueprint.connectionId} />
-        {reuseChanged && (
+        {(reuseChanged || connectionChanged) && (
           <Warning>
-            Saving terminates this blueprint's existing sandboxes, which were shared{" "}
-            {REUSE[reuseOf(blueprint.reuse)].label.toLowerCase()}. New ones launch as agents need
-            them.
+            Saving terminates this blueprint's existing sandboxes and their files
+            {connectionChanged
+              ? ", which run on the current connection"
+              : `, which were shared ${REUSE[reuseOf(blueprint.reuse)].label.toLowerCase()}`}
+            . New ones launch as agents need them.
           </Warning>
         )}
         <p className="text-xs text-muted-foreground">
-          A new connection or template applies to sandboxes launched afterwards.
+          A new template applies to sandboxes launched afterwards.
         </p>
         {error && (
           <p role="alert" className="text-sm text-destructive">

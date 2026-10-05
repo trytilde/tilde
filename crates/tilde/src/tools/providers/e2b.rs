@@ -384,7 +384,7 @@ impl ToolProvider for E2b {
                 return rest::send(request.header("X-API-Key", access.secret("api_key")?)).await;
             }
             let field = |key: &str| input[key].as_str().unwrap_or_default();
-            let envd = Envd::connect(access, field("sandbox_id")).await?;
+            let envd = Envd::connect(access, field("sandbox_id"), 300).await?;
             match name {
                 "e2b_read_file" => Ok(json!({"contents": envd.read(field("path")).await?})),
                 "e2b_write_file" => {
@@ -458,14 +458,15 @@ struct Envd<'a> {
     token: Option<SecretString>,
 }
 impl<'a> Envd<'a> {
-    async fn connect(access: &'a Access, sandbox: &'a str) -> ToolResult<Self> {
+    /// Connecting also sets the sandbox's TTL to `timeout` seconds.
+    async fn connect(access: &'a Access, sandbox: &'a str, timeout: u64) -> ToolResult<Self> {
         let spec = spec("", "", "", Verb::Post, "/sandboxes/{sandbox_id}/connect");
         let request = rest::request(
             access,
             "e2b_api",
             BASE,
             &spec,
-            json!({"sandbox_id":sandbox,"timeout":300}),
+            json!({"sandbox_id":sandbox,"timeout":timeout}),
         )?;
         let mut connected =
             rest::send(request.header("X-API-Key", access.secret("api_key")?)).await?;
@@ -724,10 +725,10 @@ pub async fn launch(access: &Access, template: &str) -> ToolResult<String> {
         .map(str::to_owned)
         .ok_or_else(|| ConnectError::unknown("E2B returned no sandbox ID"))
 }
-/// The TTL a blueprint sandbox gets at launch and every wake; it pauses when it runs out.
-const LIFECYCLE_TTL_SECS: u64 = 3600;
-/// Resume a paused sandbox (a running one only has its TTL extended). False when E2B no longer
-/// has it.
+/// The TTL a blueprint sandbox gets at launch, every wake and every renewal; it pauses when it
+/// runs out.
+pub const LIFECYCLE_TTL_SECS: u64 = 3600;
+/// Resume a paused sandbox, or renew a running one's TTL. False when E2B no longer has it.
 pub async fn resume(access: &Access, sandbox: &str) -> ToolResult<bool> {
     lifecycle(
         access,
@@ -766,7 +767,7 @@ pub async fn spawn(
     command: &str,
     envs: &Map<String, Value>,
 ) -> ToolResult<()> {
-    let envd = Envd::connect(access, sandbox).await?;
+    let envd = Envd::connect(access, sandbox, LIFECYCLE_TTL_SECS).await?;
     let request = serde_json::to_vec(
         &json!({"process":{"cmd":"/bin/bash","args":["-l","-c",command],"envs":envs},"stdin":false}),
     )

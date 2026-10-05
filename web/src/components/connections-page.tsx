@@ -139,7 +139,8 @@ export function ConnectionsPage() {
           tools.listToolSources({ connectionId: connection.id }, { signal }).then(
             ({ sources }): [string, string[]] => [
               connection.id,
-              [...new Set(sources.map((s) => s.agentId))],
+              // Blueprint-owned sources have no agent; this column lists agents.
+              [...new Set(sources.filter((s) => s.agentId).map((s) => s.agentId))],
             ],
             (): [string, string[]] => [connection.id, []],
           ),

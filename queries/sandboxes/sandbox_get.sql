@@ -8,5 +8,5 @@ SELECT s.id,s.blueprint_id,s.reuse,s.connection_id,s.agent_id,s.thread_id,s.iden
   COALESCE(s.connected_at > NOW() - make_interval(secs => :p2), false) AS live,
   COALESCE(s.connected_at > :p3, false) AS registered,
   COALESCE(s.lease_until > NOW(), false) AS leased,
-  b.template,b.connect_timeout_secs,b.terminate_after_secs
+  b.template,b.connect_timeout_secs
 FROM sandboxes s JOIN sandbox_blueprints b ON b.id=s.blueprint_id WHERE s.id=:p1;

@@ -97,6 +97,30 @@ it("saves only what changed and warns that a new reuse mode terminates sandboxes
   );
 });
 
+it("warns that moving to another connection terminates the sandboxes on this one", async () => {
+  rpc.connections.listConnections.mockImplementation(async ({ providerId }) => ({
+    connections:
+      providerId === "e2b"
+        ? [
+            create(ConnectionSchema, {
+              id: "e2b-1",
+              name: "E2B prod",
+              providerId,
+              status: "ready",
+            }),
+            create(ConnectionSchema, { id: "e2b-2", name: "E2B dev", providerId, status: "ready" }),
+          ]
+        : [],
+    nextPageToken: "",
+  }));
+  renderPage("settings");
+  const form = await screen.findByRole("form", { name: "Blueprint settings" });
+  await within(form).findByRole("option", { name: /E2B dev/ });
+  expect(within(form).queryByText(/terminates this blueprint's existing sandboxes/)).toBeNull();
+  fireEvent.change(within(form).getByLabelText("Connection"), { target: { value: "e2b-2" } });
+  within(form).getByText(/which run on the current connection/);
+});
+
 it("replaces an environment variable's value without ever showing it", async () => {
   rpc.sandboxes.setSandboxEnvVar.mockResolvedValue({ blueprint: devBox });
   renderPage("environment");

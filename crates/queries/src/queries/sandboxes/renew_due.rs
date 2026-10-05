@@ -1,86 +1,28 @@
 // This file was generated with `cornucopia`. Do not modify.
 
-#[derive(Clone, Copy, Debug)]
-pub struct RunParams {
-    pub p2: f64,
-    pub p3: chrono::DateTime<chrono::Utc>,
-    pub p1: uuid::Uuid,
-}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub id: uuid::Uuid,
-    pub blueprint_id: uuid::Uuid,
-    pub reuse: String,
     pub connection_id: uuid::Uuid,
-    pub agent_id: Option<uuid::Uuid>,
-    pub thread_id: Option<uuid::Uuid>,
-    pub identity_id: Option<uuid::Uuid>,
-    pub status: String,
-    pub provider_sandbox_id: Option<String>,
-    pub snapshot_id: Option<String>,
-    pub error: String,
-    pub live: bool,
-    pub registered: bool,
-    pub leased: bool,
-    pub template: String,
-    pub connect_timeout_secs: i32,
+    pub provider_sandbox_id: String,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
-    pub blueprint_id: uuid::Uuid,
-    pub reuse: &'a str,
     pub connection_id: uuid::Uuid,
-    pub agent_id: Option<uuid::Uuid>,
-    pub thread_id: Option<uuid::Uuid>,
-    pub identity_id: Option<uuid::Uuid>,
-    pub status: &'a str,
-    pub provider_sandbox_id: Option<&'a str>,
-    pub snapshot_id: Option<&'a str>,
-    pub error: &'a str,
-    pub live: bool,
-    pub registered: bool,
-    pub leased: bool,
-    pub template: &'a str,
-    pub connect_timeout_secs: i32,
+    pub provider_sandbox_id: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
         RecordBorrowed {
             id,
-            blueprint_id,
-            reuse,
             connection_id,
-            agent_id,
-            thread_id,
-            identity_id,
-            status,
             provider_sandbox_id,
-            snapshot_id,
-            error,
-            live,
-            registered,
-            leased,
-            template,
-            connect_timeout_secs,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
             id,
-            blueprint_id,
-            reuse: reuse.into(),
             connection_id,
-            agent_id,
-            thread_id,
-            identity_id,
-            status: status.into(),
-            provider_sandbox_id: provider_sandbox_id.map(|v| v.into()),
-            snapshot_id: snapshot_id.map(|v| v.into()),
-            error: error.into(),
-            live,
-            registered,
-            leased,
-            template: template.into(),
-            connect_timeout_secs,
+            provider_sandbox_id: provider_sandbox_id.into(),
         }
     }
 }
@@ -153,7 +95,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT s.id,s.blueprint_id,s.reuse,s.connection_id,s.agent_id,s.thread_id,s.identity_id,s.status,s.provider_sandbox_id,s.snapshot_id,s.error, COALESCE(s.connected_at > NOW() - make_interval(secs => $1), false) AS live, COALESCE(s.connected_at > $2, false) AS registered, COALESCE(s.lease_until > NOW(), false) AS leased, b.template,b.connect_timeout_secs FROM sandboxes s JOIN sandbox_blueprints b ON b.id=s.blueprint_id WHERE s.id=$3",
+        "SELECT id,connection_id,provider_sandbox_id FROM sandboxes WHERE status='running' AND provider_sandbox_id IS NOT NULL AND expires_at < NOW() + INTERVAL '20 minutes' AND (lease_until IS NULL OR lease_until <= NOW()) LIMIT 50",
         None,
     )
 }
@@ -168,49 +110,21 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-        p2: &'a f64,
-        p3: &'a chrono::DateTime<chrono::Utc>,
-        p1: &'a uuid::Uuid,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 0> {
         RecordQuery {
             client,
-            params: [p2, p3, p1],
+            params: [],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
                 |row: &tokio_postgres::Row| -> Result<RecordBorrowed, tokio_postgres::Error> {
                     Ok(RecordBorrowed {
                         id: row.try_get(0)?,
-                        blueprint_id: row.try_get(1)?,
-                        reuse: row.try_get(2)?,
-                        connection_id: row.try_get(3)?,
-                        agent_id: row.try_get(4)?,
-                        thread_id: row.try_get(5)?,
-                        identity_id: row.try_get(6)?,
-                        status: row.try_get(7)?,
-                        provider_sandbox_id: row.try_get(8)?,
-                        snapshot_id: row.try_get(9)?,
-                        error: row.try_get(10)?,
-                        live: row.try_get(11)?,
-                        registered: row.try_get(12)?,
-                        leased: row.try_get(13)?,
-                        template: row.try_get(14)?,
-                        connect_timeout_secs: row.try_get(15)?,
+                        connection_id: row.try_get(1)?,
+                        provider_sandbox_id: row.try_get(2)?,
                     })
                 },
             mapper: |it| Record::from(it),
         }
-    }
-}
-impl<'c, 'a, 's, C: GenericClient>
-    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 3>, C>
-    for RunStmt
-{
-    fn params(
-        &'s self,
-        client: &'c C,
-        params: &'a RunParams,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
-        self.bind(client, &params.p2, &params.p3, &params.p1)
     }
 }

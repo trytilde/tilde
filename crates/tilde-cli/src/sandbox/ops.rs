@@ -223,7 +223,8 @@ impl Workspace {
                 return Ok(json!({ "deleted": false }));
             }
             Err(error) => Err(error),
-            Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(&path),
+            // apply_patch deletes files; a directory named by mistake is refused, not emptied.
+            Ok(meta) if meta.is_dir() => bail!("{} is a directory, not a file", input.path),
             Ok(_) => std::fs::remove_file(&path),
         };
         removed.with_context(|| format!("Could not delete {}", input.path))?;
@@ -307,26 +308,36 @@ impl Workspace {
                     continue;
                 }
             }
-            let Ok(bytes) = std::fs::read(&path) else {
+            let Ok(file) = std::fs::File::open(&path) else {
                 continue;
             };
-            // Binary files: a NUL early on, or not UTF-8 at all.
-            if bytes[..bytes.len().min(8192)].contains(&0) {
+            // Read line by line, so a large file costs no more memory than its longest line.
+            let mut reader = BufReader::with_capacity(8192, file);
+            // Binary files: a NUL in the first 8 KiB, or a line that is not UTF-8.
+            if reader.fill_buf().map_or(true, |head| head.contains(&0)) {
                 continue;
             }
-            let Ok(text) = std::str::from_utf8(&bytes) else {
-                continue;
-            };
-            for (number, line) in text.lines().enumerate() {
-                if !pattern.is_match(line) {
+            let (mut line, mut number) = (Vec::new(), 0);
+            loop {
+                line.clear();
+                // A line is matched on at most its first MiB; the rest counts as further lines.
+                match std::io::Read::take(&mut reader, 1 << 20).read_until(b'\n', &mut line) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => number += 1,
+                }
+                let Ok(text) = std::str::from_utf8(&line) else {
+                    continue 'files;
+                };
+                let text = text.trim_end_matches(['\n', '\r']);
+                if !pattern.is_match(text) {
                     continue;
                 }
                 if matches.len() == max {
                     truncated = true;
                     break 'files;
                 }
-                let text: String = line.chars().take(MAX_LINE_TEXT).collect();
-                matches.push(json!({ "path": relative, "line": number + 1, "text": text }));
+                let text: String = text.chars().take(MAX_LINE_TEXT).collect();
+                matches.push(json!({ "path": relative, "line": number, "text": text }));
             }
         }
         Ok(json!({ "matches": matches, "truncated": truncated }))

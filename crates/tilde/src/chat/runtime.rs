@@ -749,13 +749,34 @@ impl Chat {
                 state: state.into(),
                 ..Default::default()
             };
-            // An agent with a sandbox runs only once its sandbox is up and connected.
+            // An agent with a sandbox runs only once its sandbox is up and connected. Starting
+            // one can outlast the invocation's lease, which is renewed meanwhile; an invocation
+            // canceled in the meantime is not woken.
             if let Some(tools) = &self.tools {
-                tools
-                    .sandboxes
-                    .ensure(scope.agent_id, scope.thread_id, scope.run_id, invocation)
-                    .await
-                    .map_err(|error| ChatError::Invalid(error.to_string()))?;
+                let ensure = tools.sandboxes.ensure(
+                    scope.agent_id,
+                    scope.thread_id,
+                    scope.run_id,
+                    invocation,
+                );
+                tokio::pin!(ensure);
+                let mut renew = tokio::time::interval(Duration::from_secs(10));
+                loop {
+                    tokio::select! {
+                        result = &mut ensure => {
+                            result.map_err(|error| ChatError::Invalid(error.to_string()))?;
+                            break;
+                        }
+                        _ = renew.tick() => self.renew_lease(invocation).await?,
+                    }
+                }
+                let status =
+                    crate::chat::db::invocation_status_opt(&self.pg()?.get().await?, invocation)
+                        .await?
+                        .map(|r| r.status);
+                if status.as_deref() != Some("running") {
+                    return Ok(());
+                }
             }
             self.wake(
                 scope.agent_id,
