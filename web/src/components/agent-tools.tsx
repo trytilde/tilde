@@ -353,15 +353,19 @@ export function AgentTools(props: { agentId: string } | { blueprintId: string })
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entries.map((entry) => (
-                  <SourceRows
-                    key={entry.source.id}
-                    entry={entry}
-                    owner={owner}
-                    busy={busy}
-                    act={act}
-                  />
-                ))}
+                {entries.map((entry) =>
+                  entry.source.sandbox ? (
+                    <SandboxRows key={entry.source.id} entry={entry} />
+                  ) : (
+                    <SourceRows
+                      key={entry.source.id}
+                      entry={entry}
+                      owner={owner}
+                      busy={busy}
+                      act={act}
+                    />
+                  ),
+                )}
                 {bundled.map((group) => (
                   <BundledRows key={group.id} group={group} />
                 ))}
@@ -436,34 +440,94 @@ async function bundledGroups(agentId: string, signal?: AbortSignal): Promise<Bun
  * code, so the group is read-only.
  */
 function BundledRows({ group }: { group: BundledGroup }) {
-  const count = group.tools.length;
-  const [expanded, setExpanded] = useState(true);
   const name = group.name ? `From code · ${group.name}` : "From code";
+  return (
+    <ReadOnlyRows
+      icon={<CodeIcon aria-hidden="true" className="size-5 text-muted-foreground" />}
+      name={name}
+      title={<span className="font-medium">{name}</span>}
+      badge="Bundled"
+      badgeTitle="Ships with the agent's code and runs in its process. Configure it in code, not here."
+      detail={group.detail}
+      tools={group.tools}
+    />
+  );
+}
+
+/**
+ * The agent's sandbox tools: every one, as the sandbox defines them, for as long as the agent's
+ * sandbox setting lasts. Read-only like bundled tools.
+ */
+function SandboxRows({ entry }: { entry: Entry }) {
+  const used = new Map(entry.source.tools.map((tool) => [tool.toolName, tool]));
+  return (
+    <ReadOnlyRows
+      icon={<BoxIcon aria-hidden="true" className="size-5 text-muted-foreground" />}
+      name={entry.name}
+      title={
+        entry.blueprintId ? (
+          <Link
+            to="/sandboxes/$blueprintId/settings"
+            params={{ blueprintId: entry.blueprintId }}
+            className="font-medium hover:underline"
+          >
+            {entry.name}
+          </Link>
+        ) : (
+          <span className="font-medium">{entry.name}</span>
+        )
+      }
+      badge="Sandbox"
+      badgeTitle="Comes with the agent's sandbox. Remove the sandbox in Capabilities to remove these tools."
+      tools={entry.offered.map((tool) => ({
+        name: tool.name,
+        summary: tool.summary,
+        description: tool.description,
+        display: used.get(tool.name)?.display ?? ToolDisplay.FULL,
+      }))}
+    />
+  );
+}
+
+function ReadOnlyRows({
+  icon,
+  name,
+  title,
+  badge,
+  badgeTitle,
+  detail,
+  tools,
+}: {
+  icon: React.ReactNode;
+  name: string;
+  title: React.ReactNode;
+  badge: string;
+  badgeTitle: string;
+  detail?: string;
+  tools: BundledGroup["tools"];
+}) {
+  const count = tools.length;
+  const [expanded, setExpanded] = useState(true);
   return (
     <>
       <TableRow className="bg-muted/40 hover:bg-muted/40">
-        <TableCell className="h-14 px-5 py-2">
-          <CodeIcon aria-hidden="true" className="size-5 text-muted-foreground" />
-        </TableCell>
+        <TableCell className="h-14 px-5 py-2">{icon}</TableCell>
         <TableCell colSpan={5}>
           <span className="flex flex-wrap items-center gap-3">
             <GroupToggle name={name} expanded={expanded} onToggle={setExpanded} />
-            <span className="font-medium">{name}</span>
-            <Badge
-              variant="secondary"
-              title="Ships with the agent's code and runs in its process. Configure it in code, not here."
-            >
-              Bundled
+            {title}
+            <Badge variant="secondary" title={badgeTitle}>
+              {badge}
             </Badge>
             <Badge variant="outline">
               {count} tool{count === 1 ? "" : "s"}
             </Badge>
-            <span className="text-xs text-muted-foreground">{group.detail}</span>
+            {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
           </span>
         </TableCell>
       </TableRow>
       {expanded &&
-        group.tools.map((tool) => (
+        tools.map((tool) => (
           <TableRow key={tool.name}>
             <TableCell />
             <TableCell className="whitespace-normal">
@@ -552,9 +616,7 @@ function SourceRows({
     <>
       <TableRow className="bg-muted/40 hover:bg-muted/40">
         <TableCell className="h-14 px-5 py-2">
-          {source.sandbox ? (
-            <BoxIcon aria-hidden="true" className="size-5 text-muted-foreground" />
-          ) : source.toolHostId ? (
+          {source.toolHostId ? (
             <ZapIcon aria-hidden="true" className="size-5 text-muted-foreground" />
           ) : (
             <ProviderIcon iconUrl={entry.iconUrl} />
@@ -563,28 +625,14 @@ function SourceRows({
         <TableCell colSpan={configurable ? 4 : 2}>
           <span className="flex items-center gap-3">
             <GroupToggle name={name} expanded={expanded} onToggle={setExpanded} />
-            {source.sandbox ? (
-              entry.blueprintId ? (
-                <Link
-                  to="/sandboxes/$blueprintId/settings"
-                  params={{ blueprintId: entry.blueprintId }}
-                  className="font-medium hover:underline"
-                >
-                  {name}
-                </Link>
-              ) : (
-                <span className="font-medium">{name}</span>
-              )
-            ) : (
-              <Link
-                to="/tools/$toolId"
-                params={{ toolId: source.connectionId ?? source.toolHostId ?? "" }}
-                search={{ kind: source.toolHostId ? "host" : "connection" }}
-                className="font-medium hover:underline"
-              >
-                {name}
-              </Link>
-            )}
+            <Link
+              to="/tools/$toolId"
+              params={{ toolId: source.connectionId ?? source.toolHostId ?? "" }}
+              search={{ kind: source.toolHostId ? "host" : "connection" }}
+              className="font-medium hover:underline"
+            >
+              {name}
+            </Link>
             <Badge variant="outline">
               {used.size} of {listed.length} tool{listed.length === 1 ? "" : "s"}
             </Badge>
@@ -597,36 +645,16 @@ function SourceRows({
         </TableCell>
         <TableCell className="px-5">
           <span className="flex items-center justify-end">
-            {source.sandbox ? (
-              // The sandbox source goes with the agent's sandbox setting.
-              <Tooltip>
-                <TooltipTrigger render={<span tabIndex={0} />}>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Remove ${name}`}
-                    className="text-destructive"
-                    disabled
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Remove the sandbox in Capabilities to remove these tools
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove ${name}`}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={busy}
-                onClick={() => setRemoving(true)}
-              >
-                <Trash2Icon />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove ${name}`}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={busy}
+              onClick={() => setRemoving(true)}
+            >
+              <Trash2Icon />
+            </Button>
           </span>
         </TableCell>
       </TableRow>

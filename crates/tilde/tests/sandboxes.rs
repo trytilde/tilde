@@ -366,6 +366,21 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
     for tool in ["sandbox.exec", "sandbox.apply_patch", "sandbox.grep"] {
         assert!(names.contains(&json!(tool)), "{tool} in {names:?}");
     }
+    // Its tools are fixed, like the agent's bundled ones.
+    let source = sandboxes
+        .agent_sandbox(fx.agent)
+        .await
+        .unwrap()
+        .unwrap()
+        .source_id
+        .unwrap();
+    assert!(tools.remove_tool(source, "exec").await.is_err());
+    assert!(
+        tools
+            .set_tool(source, "exec", &Default::default())
+            .await
+            .is_err()
+    );
     let echoed = fx
         .output("sandbox.exec", json!({"command":"printenv SECRET"}))
         .await;

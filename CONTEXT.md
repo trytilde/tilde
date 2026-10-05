@@ -383,8 +383,9 @@ bundled tools out) and its bundled tools.
   the customer's image; Tilde ships no credential helpers.
 - Agent sandbox: an agent's setting naming one blueprint (`agent_sandboxes`, at most one). It
   adds the agent's `sandbox` tool source of the fixed sandbox tools (exec, exec_output,
-  read_file, write_file, edit_file, apply_patch, list_dir, glob, grep), all enabled; they are
-  configured like other agent tools, but the source goes only with the setting. Every invocation
+  read_file, write_file, edit_file, apply_patch, list_dir, glob, grep), all enabled and fixed:
+  like bundled tools they cannot be switched off or edited, and the source goes only with the
+  setting. Every invocation
   of such an agent runs once its sandbox is up: the runtime calls `Sandboxes::ensure` before
   waking the agent, and a sandbox tool call ensures it again (waking it if it slept).
 - Reuse mode (on the blueprint, so agents sharing it agree): thread (one per agent and thread,

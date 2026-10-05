@@ -111,6 +111,9 @@ pub struct Filter {
 const RESERVED_SLUGS: [&str; 8] = [
     "tools", "agents", "thread", "user", "goals", "tasks", "channel", "sandbox",
 ];
+fn fixed() -> Error {
+    invalid("The sandbox's tools are fixed; remove the sandbox in Capabilities instead")
+}
 /// `value` in the catalog-name alphabet: lowercase for slugs, case kept for tool names.
 fn catalog_safe(value: &str, lowercase: bool, max: usize) -> String {
     let mut out = String::new();
@@ -477,7 +480,8 @@ impl Tools {
             _ => Ok(()),
         }
     }
-    /// Add a tool of the source to the agent, or replace all of the agent's settings for it.
+    /// Add a tool of the source to the agent, or replace all of the agent's settings for it. An
+    /// agent's sandbox tools are fixed: every one, as the sandbox defines it.
     pub async fn set_tool(
         &self,
         source: Uuid,
@@ -491,6 +495,9 @@ impl Tools {
             return Err(invalid("A tool description is at most 4096 characters"));
         }
         let current = self.source(source).await?;
+        if current.target == Target::Sandbox {
+            return Err(fixed());
+        }
         if !self
             .offered(current.target)
             .await?
@@ -518,6 +525,9 @@ impl Tools {
         self.source(source).await
     }
     pub async fn remove_tool(&self, source: Uuid, tool_name: &str) -> Result<Source, Error> {
+        if self.source(source).await?.target == Target::Sandbox {
+            return Err(fixed());
+        }
         db::agent_tool_remove_execute(&self.connections.pool.get().await?, source, tool_name)
             .await?;
         self.source(source).await

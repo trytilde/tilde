@@ -352,7 +352,7 @@ it("collapses a group's tool rows", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Expand Tavily" }));
   expect(screen.getByLabelText("Use search")).toBeTruthy();
 });
-it("keeps the agent's sandbox tools while its sandbox setting does", async () => {
+it("shows the agent's sandbox tools read-only, like bundled ones", async () => {
   rpc.tools.listToolSources.mockResolvedValue({
     sources: [
       tavily,
@@ -361,12 +361,17 @@ it("keeps the agent's sandbox tools while its sandbox setting does", async () =>
         agentId: "agent-1",
         sandbox: true,
         slug: "sandbox",
-        tools: [{ toolName: "exec" }],
+        tools: [{ toolName: "exec" }, { toolName: "read_file" }],
       }),
     ],
   });
   rpc.tools.listProviderTools.mockImplementation(async ({ sandbox }) => ({
-    tools: sandbox ? [{ name: "exec" }, { name: "read_file" }] : [],
+    tools: sandbox
+      ? [
+          { name: "exec", summary: "Ran a command", description: "Run a shell command." },
+          { name: "read_file", summary: "Read a file", description: "Read a file." },
+        ]
+      : [],
   }));
   rpc.sandboxes.getAgentSandbox.mockResolvedValue({
     sandbox: { agentId: "agent-1", blueprintId: "bp-1", toolSourceId: "src-sandbox" },
@@ -377,18 +382,18 @@ it("keeps the agent's sandbox tools while its sandbox setting does", async () =>
   renderTab();
   const link = await screen.findByRole("link", { name: "Sandbox · Dev box" });
   expect(link.getAttribute("href")).toBe("/sandboxes/bp-1/settings");
-  expect(screen.getByLabelText("Use read_file").getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(screen.getByLabelText("Use read_file"));
-  await waitFor(() =>
-    expect(rpc.tools.setAgentTool).toHaveBeenCalledWith({
-      sourceId: "src-sandbox",
-      toolName: "read_file",
-    }),
+  const group = link.closest("tr")!;
+  expect(within(group).getByText("Sandbox").getAttribute("title")).toContain(
+    "Remove the sandbox in Capabilities",
   );
-  // It goes with the sandbox setting in Capabilities; other sources can still be removed.
-  expect(
-    screen.getByRole("button", { name: "Remove Sandbox · Dev box" }).hasAttribute("disabled"),
-  ).toBe(true);
+  const row = screen.getByText("exec").closest("tr")!;
+  within(row).getByText("Ran a command");
+  within(row).getByText("Run a shell command.");
+  // Nothing to switch, edit or remove; other sources stay configurable.
+  expect(screen.queryByLabelText("Use exec")).toBeNull();
+  expect(screen.queryByRole("button", { name: /summary of exec/i })).toBeNull();
+  expect(screen.queryByRole("tablist", { name: "How exec is displayed" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Remove Sandbox · Dev box" })).toBeNull();
   expect(screen.getByRole("button", { name: "Remove Tavily" }).hasAttribute("disabled")).toBe(
     false,
   );
