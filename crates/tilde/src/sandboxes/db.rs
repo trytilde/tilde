@@ -217,8 +217,12 @@ pub async fn sandbox_renewed_execute(
         .bind(db, &lifetime_secs, &id)
         .await?)
 }
-pub async fn renew_due_all(db: &impl GenericClient) -> DbResult<Vec<RenewRow>> {
-    Ok(q::renew_due::run().bind(db).all().await?)
+/// Every unleased sandbox due for renewal, or whether `leased` (held by the caller) still is.
+pub async fn renew_due_all(
+    db: &impl GenericClient,
+    leased: Option<Uuid>,
+) -> DbResult<Vec<RenewRow>> {
+    Ok(q::renew_due::run().bind(db, &leased).all().await?)
 }
 pub async fn sandbox_enrollment_execute(
     db: &impl GenericClient,

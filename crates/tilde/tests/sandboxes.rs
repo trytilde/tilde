@@ -503,6 +503,18 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
             .count()
     };
     let before = connects(&world.lock().unwrap());
+    // Never while another process holds the sandbox, mid-transition.
+    pg.execute(
+        "UPDATE sandboxes SET lease_until=NOW()+INTERVAL '1 hour'",
+        &[],
+    )
+    .await
+    .unwrap();
+    sandboxes.sweep().await.unwrap();
+    assert_eq!(connects(&world.lock().unwrap()), before);
+    pg.execute("UPDATE sandboxes SET lease_until=NULL", &[])
+        .await
+        .unwrap();
     sandboxes.sweep().await.unwrap();
     assert_eq!(connects(&world.lock().unwrap()), before + 1);
     let renewed: bool = pg

@@ -320,13 +320,25 @@ impl Workspace {
             let (mut line, mut number) = (Vec::new(), 0);
             loop {
                 line.clear();
-                // A line is matched on at most its first MiB; the rest counts as further lines.
-                match std::io::Read::take(&mut reader, 1 << 20).read_until(b'\n', &mut line) {
+                let read =
+                    std::io::Read::take(&mut reader, LINE_LIMIT).read_until(b'\n', &mut line);
+                match read {
                     Ok(0) | Err(_) => break,
                     Ok(_) => number += 1,
                 }
-                let Ok(text) = std::str::from_utf8(&line) else {
-                    continue 'files;
+                // An oversized line is matched on its first MiB; the rest of it is skipped, so
+                // line numbers stay those of the file.
+                let whole = line.ends_with(b"\n") || (line.len() as u64) < LINE_LIMIT;
+                if !whole && skip_line(&mut reader).is_err() {
+                    break;
+                }
+                let text = match std::str::from_utf8(&line) {
+                    Ok(text) => text,
+                    // The cut may split a character; anything else is not text.
+                    Err(error) if !whole && error.error_len().is_none() => {
+                        std::str::from_utf8(&line[..error.valid_up_to()]).unwrap_or_default()
+                    }
+                    Err(_) => continue 'files,
                 };
                 let text = text.trim_end_matches(['\n', '\r']);
                 if !pattern.is_match(text) {
@@ -341,6 +353,28 @@ impl Workspace {
             }
         }
         Ok(json!({ "matches": matches, "truncated": truncated }))
+    }
+}
+
+/// grep matches a line on at most this much of it.
+const LINE_LIMIT: u64 = 1 << 20;
+/// Consume the rest of the current line.
+fn skip_line(reader: &mut impl BufRead) -> std::io::Result<()> {
+    loop {
+        let buffer = reader.fill_buf()?;
+        if buffer.is_empty() {
+            return Ok(());
+        }
+        match buffer.iter().position(|&b| b == b'\n') {
+            Some(end) => {
+                reader.consume(end + 1);
+                return Ok(());
+            }
+            None => {
+                let all = buffer.len();
+                reader.consume(all);
+            }
+        }
     }
 }
 

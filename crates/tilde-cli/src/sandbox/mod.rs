@@ -598,8 +598,13 @@ mod tests {
             read,
             json!({ "content": "2\n", "total_lines": 3, "truncated": false })
         );
-        // grep streams files, so a match deep in a large one still reports its line.
-        let big = format!("{}needle\n", "filler line\n".repeat(100_000));
+        // grep streams files and keeps physical line numbers: a 3 MiB line, cut at 1 MiB in the
+        // middle of a character, is still one line, and a match far below it keeps its number.
+        let big = format!(
+            "x{}\n{}needle\n",
+            "é".repeat(3 << 19),
+            "filler line\n".repeat(100_000)
+        );
         std::fs::write(workdir.path().join("notes/big.log"), big).unwrap();
         let found = operate(
             &first,
@@ -611,7 +616,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             found["matches"],
-            json!([{ "path": "notes/big.log", "line": 100_001, "text": "needle" }])
+            json!([{ "path": "notes/big.log", "line": 100_002, "text": "needle" }])
         );
         // apply_patch's file deletion refuses a directory rather than emptying it.
         let refused = operate(

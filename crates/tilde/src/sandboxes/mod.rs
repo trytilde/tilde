@@ -739,29 +739,47 @@ impl Sandboxes {
                 tracing::warn!(sandbox = %row.id, %error, "Sandbox sweep step failed");
             }
         }
-        for row in db::renew_due_all(&pool.get().await?).await? {
-            if let Err(error) = self.renew(&row).await {
+        for row in db::renew_due_all(&pool.get().await?, None).await? {
+            if let Err(error) = self.renew(row.id).await {
                 tracing::warn!(sandbox = %row.id, %error, "Sandbox renewal failed");
             }
         }
         Ok(())
     }
     /// Keep a running VM from the provider's own pause or end: an E2B VM's TTL is renewed; a
-    /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive.
-    async fn renew(&self, row: &db::RenewRow) -> Result<(), Error> {
-        let (provider, access) = self.access(row.connection_id).await?;
+    /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive,
+    /// once no operation is in flight. Done under the sandbox's lease, so it never resumes a VM
+    /// another process has just put to sleep.
+    async fn renew(&self, id: Uuid) -> Result<(), Error> {
         let pool = &self.connections.pool;
-        if launch::resume(provider, &access, &row.provider_sandbox_id).await? {
-            db::sandbox_renewed_execute(&pool.get().await?, row.id, launch::lifetime(provider))
-                .await?;
-        } else if provider == Provider::Modal
-            && db::sandbox_lease_opt(&pool.get().await?, row.id, LEASE_SECS)
-                .await?
-                .is_some()
+        let client = pool.get().await?;
+        if db::sandbox_lease_opt(&client, id, LEASE_SECS)
+            .await?
+            .is_none()
         {
-            self.sleep(row.id).await?;
+            return Ok(());
         }
-        Ok(())
+        let Some(row) = db::renew_due_all(&client, Some(id)).await?.pop() else {
+            db::sandbox_release_execute(&client, id).await?;
+            return Ok(());
+        };
+        drop(client);
+        let (provider, access) = self.access(row.connection_id).await?;
+        if provider == Provider::Modal && !row.busy {
+            return self.sleep(id).await;
+        }
+        let renewed = async {
+            if provider == Provider::E2b
+                && launch::resume(provider, &access, &row.provider_sandbox_id).await?
+            {
+                db::sandbox_renewed_execute(&pool.get().await?, id, launch::lifetime(provider))
+                    .await?;
+            }
+            Ok::<_, Error>(())
+        }
+        .await;
+        db::sandbox_release_execute(&pool.get().await?, id).await?;
+        renewed
     }
     /// After a settings change, terminate what it made unwanted without waiting for the timer.
     fn sweep_soon(&self) {

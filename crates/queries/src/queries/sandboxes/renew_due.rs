@@ -5,11 +5,13 @@ pub struct Record {
     pub id: uuid::Uuid,
     pub connection_id: uuid::Uuid,
     pub provider_sandbox_id: String,
+    pub busy: bool,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
     pub connection_id: uuid::Uuid,
     pub provider_sandbox_id: &'a str,
+    pub busy: bool,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -17,12 +19,14 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             id,
             connection_id,
             provider_sandbox_id,
+            busy,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
             id,
             connection_id,
             provider_sandbox_id: provider_sandbox_id.into(),
+            busy,
         }
     }
 }
@@ -95,7 +99,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id,connection_id,provider_sandbox_id FROM sandboxes WHERE status='running' AND provider_sandbox_id IS NOT NULL AND expires_at < NOW() + INTERVAL '20 minutes' AND (lease_until IS NULL OR lease_until <= NOW()) LIMIT 50",
+        "SELECT s.id,s.connection_id,s.provider_sandbox_id, EXISTS (SELECT 1 FROM sandbox_calls c WHERE c.sandbox_id=s.id) AS busy FROM sandboxes s WHERE s.status='running' AND s.provider_sandbox_id IS NOT NULL AND s.expires_at < NOW() + INTERVAL '20 minutes' AND CASE WHEN $1::UUID IS NULL THEN s.lease_until IS NULL OR s.lease_until <= NOW() ELSE s.id=$1 END LIMIT 50",
         None,
     )
 }
@@ -110,10 +114,11 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 0> {
+        p1: &'a Option<uuid::Uuid>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 1> {
         RecordQuery {
             client,
-            params: [],
+            params: [p1],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -122,6 +127,7 @@ impl RunStmt {
                         id: row.try_get(0)?,
                         connection_id: row.try_get(1)?,
                         provider_sandbox_id: row.try_get(2)?,
+                        busy: row.try_get(3)?,
                     })
                 },
             mapper: |it| Record::from(it),
