@@ -152,14 +152,9 @@ test("LangChain runs current-channel tools with the model's call ID; steering re
         ["call_time", "local_time", "completed", "Checked the time"],
       ],
     );
-    assert.deepEqual(
-      requests[0].tools[0].parameters,
-      ctx.channel.current.sendMessage.inputSchema,
-    );
+    assert.deepEqual(requests[0].tools[0].parameters, ctx.channel.current.sendMessage.inputSchema);
     assert(
-      JSON.stringify(requests[0].input[0]).includes(
-        "You have these skills.\\n- faq: Answer FAQs",
-      ),
+      JSON.stringify(requests[0].input[0]).includes("You have these skills.\\n- faq: Answer FAQs"),
       "the skill summary is appended to the system message",
     );
     assert.equal(requests[0].store, false);
