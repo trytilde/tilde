@@ -3,6 +3,7 @@
 
 /// Skills: the agent receives the skills linked to the connection. Every connection offers it.
 /// Tool: the connection serves tools; granted by adding it to an agent as a tool source.
+/// Signal: the connection's webhooks emit typed events that routines can trigger on.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum Capability {
@@ -11,6 +12,7 @@ pub enum Capability {
     CAPABILITY_INFERENCE = 2i32,
     CAPABILITY_SKILLS = 3i32,
     CAPABILITY_TOOL = 4i32,
+    CAPABILITY_SIGNAL = 5i32,
 }
 impl Capability {
     ///Idiomatic alias for [`Self::CAPABILITY_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -28,6 +30,9 @@ impl Capability {
     ///Idiomatic alias for [`Self::CAPABILITY_TOOL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Tool: Self = Self::CAPABILITY_TOOL;
+    ///Idiomatic alias for [`Self::CAPABILITY_SIGNAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Signal: Self = Self::CAPABILITY_SIGNAL;
 }
 impl ::core::default::Default for Capability {
     fn default() -> Self {
@@ -128,6 +133,7 @@ impl ::buffa::Enumeration for Capability {
             2i32 => ::core::option::Option::Some(Self::CAPABILITY_INFERENCE),
             3i32 => ::core::option::Option::Some(Self::CAPABILITY_SKILLS),
             4i32 => ::core::option::Option::Some(Self::CAPABILITY_TOOL),
+            5i32 => ::core::option::Option::Some(Self::CAPABILITY_SIGNAL),
             _ => ::core::option::Option::None,
         }
     }
@@ -141,6 +147,7 @@ impl ::buffa::Enumeration for Capability {
             Self::CAPABILITY_INFERENCE => "CAPABILITY_INFERENCE",
             Self::CAPABILITY_SKILLS => "CAPABILITY_SKILLS",
             Self::CAPABILITY_TOOL => "CAPABILITY_TOOL",
+            Self::CAPABILITY_SIGNAL => "CAPABILITY_SIGNAL",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -156,6 +163,7 @@ impl ::buffa::Enumeration for Capability {
             }
             "CAPABILITY_SKILLS" => ::core::option::Option::Some(Self::CAPABILITY_SKILLS),
             "CAPABILITY_TOOL" => ::core::option::Option::Some(Self::CAPABILITY_TOOL),
+            "CAPABILITY_SIGNAL" => ::core::option::Option::Some(Self::CAPABILITY_SIGNAL),
             _ => ::core::option::Option::None,
         }
     }
@@ -166,6 +174,7 @@ impl ::buffa::Enumeration for Capability {
             Self::CAPABILITY_INFERENCE,
             Self::CAPABILITY_SKILLS,
             Self::CAPABILITY_TOOL,
+            Self::CAPABILITY_SIGNAL,
         ]
     }
 }

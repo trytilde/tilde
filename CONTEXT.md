@@ -118,7 +118,7 @@ update atomically, and builtin definitions reconcile at startup. In-use methods 
 be deleted through registration. Remote authorization has its own opaque encryption
 identity; the migration retains existing ciphertext bindings without versioned providers.
 
-Capabilities are `channel`, `inference` and `tool`. A connection type declares which it offers;
+Capabilities are `channel`, `inference`, `tool` and `signal`. A connection type declares which it offers;
 an assignment grants one capability of one connection to one agent. Chat keeps a single
 owner per connection; an inference connection may be assigned to any number of agents.
 Every connection has a slug, `provider_id/name` (for example `linq/daniel@trytilde.ai`
@@ -329,6 +329,48 @@ native framework tools in a module-level `defineTools` / `define_tools` value, w
 declares with the deployment, and gives its model `withTildeTools` / `with_tilde_tools`: the channel's
 tools, every other Tilde tool of the agent (`ctx.agentTools` / `ctx.agent_tools`, which leave
 bundled tools out) and its bundled tools.
+
+## Routines
+
+- Signal: a typed event a connection's provider emits from an authenticated webhook delivery,
+  named `{provider}.{object}.{action}` (`github.issue.opened`), with a summary and data. The
+  `signal` capability belongs to the connection type; like `tool` it is never assigned through
+  `connection_agents`, and personal connections are not signal sources. `signals::Source`
+  (`crates/tilde/src/signals/`, ported from trytilde/api's signal providers) lists a provider's
+  signal types (each with a default thread title template) and template variables and
+  normalizes deliveries. A built-in type declares the `signal` capability exactly when it has a
+  source; registration refuses a mismatch. GitHub App (issues, pull requests, comments, reviews, CI check runs), Slack,
+  AgentMail, Linq, WhatsApp (Meta and Telnyx) connections reuse their chat webhook and its
+  verification; Sentry auth-token connections (signed with an internal integration's client
+  secret) and Firecrawl connections (signed with the account's webhook secret) have no chat
+  adapter and are verified by `signals::verify`. Their secrets are optional setup fields; without
+  one, deliveries are refused. Signal-capable setups show the connection's webhook URL. Bot
+  senders on GitHub and Slack emit nothing, so a routine cannot trigger itself.
+- Routine: one agent, a name, a prompt, a thread title, an enabled flag (on at creation, toggled
+  from the table) and exactly one trigger:
+  a five-field cron schedule evaluated in UTC, or one signal type of one signal-capable
+  connection. Prompt and title are `{{ key }}` templates: a signal's context is its data plus
+  `provider_delivery_id`, `signal_type` and `summary`; a cron routine's is `scheduled_at`. A
+  missing key renders empty; an empty title uses the routine's name. A deleted (soft-deleted)
+  agent's routines no longer fire.
+- Routine run: one firing, recorded once per fire key (the scheduled time, or the signal type and
+  provider delivery ID) in `routine_runs`, so redeliveries and replicas never start a second run.
+  Every firing creates a new thread with the rendered title and starts a run whose objective is
+  the rendered prompt, followed for a signal by its type, connection slug, summary and data
+  (each cut to fit the objective limit). The thread is the record; the run row keeps its thread
+  and any error from starting it.
+- Scheduling: a worker on every gateway process claims due cron routines with
+  `FOR UPDATE SKIP LOCKED` every 15 seconds and moves each to its next time after now in the
+  same transaction before firing (at most once; missed times are not backfilled). Signals fire
+  synchronously from the webhook ingress after the delivery is authenticated, before any chat
+  ingestion.
+- Management: `RoutineService` lists, creates, updates and deletes an agent's routines and lists
+  a connection's signal types and variables. The agent's Routines tab starts new routines from two
+  pills above a table of the agent's routines: "Tilde catalog", which searches either the ready
+  signal-capable connections or the catalog of providers that emit signals (the new connection's
+  setup then opens the routine on it), and "Scheduled routine". The routine dialog has the
+  form on the left and the template variables on the right; template fields show variables as
+  inline badges (`components/template-input.tsx`).
 
 ## Inference gateway
 

@@ -5,19 +5,20 @@ pub fn definition() -> Provider {
     Provider {
         account_name_label: Some("GitHub account".into()),
         icon_url: Some("/provider-icons/github.svg".into()),
-        instructions: Some("Connect a GitHub App installation to receive repository conversations and use GitHub tools, or a personal access token or OAuth app for tools only.".into()),
+        instructions: Some("Connect a GitHub App installation to receive repository conversations and events and use GitHub tools, or a personal access token or OAuth app for tools only.".into()),
         id: "github".into(),
         name: "GitHub".into(),
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_DEVELOPER_TOOLS.into()],
         connection_types: vec![
-            // Tool calls use the installation token the connection refreshes for chat.
+            // Tool calls use the installation token the connection refreshes for chat; issue
+            // and pull request webhooks are its signals.
             ConnectionType {
                 mcp: None,
                 id: "github_app".into(),
                 name: "GitHub App".into(),
                 credential_source: CredentialSource::Custom,
-                capabilities: vec![Capability::Channel, Capability::Tool],
+                capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
             },
             ConnectionType {
                 mcp: None,

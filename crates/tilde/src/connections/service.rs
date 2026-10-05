@@ -557,7 +557,7 @@ impl Connections {
                     .as_str()
                     .map(str::to_owned)
             }),
-            webhook_url: connection.channel_capable.then(|| {
+            webhook_url: (connection.channel_capable || connection.signal_capable).then(|| {
                 format!(
                     "{}/connections/webhooks/{}",
                     self.public_event_ingress_url, connection.id
@@ -1144,12 +1144,18 @@ impl Connections {
                 "Tools are given by adding the connection to an agent's tools, not by an assignment",
             ));
         }
+        if assignment.capability == Capability::Signal {
+            return Err(invalid(
+                "Signals are used by an agent's routines, not by an assignment",
+            ));
+        }
         if !row.capable(assignment.capability) {
             return Err(invalid(match assignment.capability {
                 Capability::Channel => "This connection type does not support chat",
                 Capability::Inference => "This connection type does not support inference",
                 Capability::Skills => "Every connection supports skills",
                 Capability::Tool => "This connection type does not serve tools",
+                Capability::Signal => "This connection type does not emit signals",
             }));
         }
         if crate::connections::db::agent_exists_opt(tx, assignment.agent_id)

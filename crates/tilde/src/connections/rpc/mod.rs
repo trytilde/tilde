@@ -315,8 +315,7 @@ pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection
         };
     let slug = c.slug();
     types::Connection {
-        webhook_url: c
-            .channel_capable
+        webhook_url: (c.channel_capable || c.signal_capable)
             .then(|| format!("{base}/connections/webhooks/{}", c.id)),
         id: c.id.to_string(),
         name: c.name,
@@ -341,6 +340,7 @@ pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection
             (c.inference_capable, types::Capability::Inference),
             (true, types::Capability::Skills),
             (c.tool_capable, types::Capability::Tool),
+            (c.signal_capable, types::Capability::Signal),
         ]
         .into_iter()
         .filter_map(|(capable, cap)| capable.then_some(cap.into()))
@@ -443,6 +443,7 @@ pub(super) fn capability_wire(cap: m::Capability) -> types::Capability {
         m::Capability::Inference => types::Capability::Inference,
         m::Capability::Skills => types::Capability::Skills,
         m::Capability::Tool => types::Capability::Tool,
+        m::Capability::Signal => types::Capability::Signal,
     }
 }
 pub(super) fn capability_model(
@@ -456,6 +457,8 @@ pub(super) fn capability_model(
         Ok(m::Capability::Skills)
     } else if cap == types::Capability::Tool {
         Ok(m::Capability::Tool)
+    } else if cap == types::Capability::Signal {
+        Ok(m::Capability::Signal)
     } else {
         Err(m::invalid("Unknown capability"))
     }

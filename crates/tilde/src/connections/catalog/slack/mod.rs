@@ -17,7 +17,7 @@ pub fn definition() -> Provider {
             id: "slack_app".into(),
             name: "Slack App".into(),
             credential_source: CredentialSource::Custom,
-            capabilities: vec![Capability::Channel, Capability::Tool],
+            capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
         }],
     }
 }

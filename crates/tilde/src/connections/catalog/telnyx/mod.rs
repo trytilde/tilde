@@ -19,7 +19,7 @@ pub fn definition() -> Provider {
             credential_source: CredentialSource::Static {
                 schema: serde_json::json!({"type": "object", "additionalProperties": false, "properties": {"api_key": {"type": "string", "title": "API key", "minLength": 1, "writeOnly": true}, "phone_number": {"type": "string", "title": "Sending phone number", "minLength": 1, "pattern": "^\\+[0-9]{7,15}$"}, "messaging_profile_id": {"type": "string", "title": "Messaging profile ID", "minLength": 1}, "public_key": {"type": "string", "title": "Ed25519 public key", "minLength": 1}}, "required": ["api_key", "phone_number", "messaging_profile_id", "public_key"]}),
             },
-            capabilities: vec![Capability::Channel, Capability::Tool],
+            capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
         }],
     }
 }

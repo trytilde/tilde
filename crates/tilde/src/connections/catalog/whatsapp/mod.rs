@@ -20,7 +20,7 @@ pub fn definition() -> Provider {
             credential_source: CredentialSource::Static {
                 schema: serde_json::json!({"type": "object", "additionalProperties": false, "properties": {"access_token": {"type": "string", "title": "Access token", "minLength": 1, "writeOnly": true}, "app_secret": {"type": "string", "title": "Meta app secret", "minLength": 1, "writeOnly": true}, "verify_token": {"type": "string", "title": "Webhook verify token", "minLength": 1, "writeOnly": true}, "phone_number_id": {"type": "string", "title": "Phone number ID", "minLength": 1}, "waba_id": {"type": "string", "title": "Business account ID", "minLength": 1}}, "required": ["access_token", "app_secret", "verify_token", "phone_number_id", "waba_id"]}),
             },
-            capabilities: vec![Capability::Channel, Capability::Tool],
+            capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
         }],
     }
 }

@@ -609,7 +609,7 @@ async fn github_and_slack_apps_use_the_broker_and_type_scoped_channel_capability
     assert_eq!(app.driver(), Driver::Custom);
     assert_eq!(
         app.capabilities,
-        vec![Capability::Channel, Capability::Tool]
+        vec![Capability::Channel, Capability::Tool, Capability::Signal]
     );
     let id = Uuid::new_v4();
     let start = service

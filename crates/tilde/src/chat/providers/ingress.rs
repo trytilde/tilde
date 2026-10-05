@@ -50,15 +50,21 @@ pub enum Webhook {
 struct Webhooks {
     chat: Chat,
     connections: Connections,
+    routines: crate::routines::Routines,
 }
 pub fn router(chat: Chat, connections: Connections) -> axum::Router {
+    let routines = crate::routines::Routines::new(connections.pool.clone(), chat.clone());
     axum::Router::new()
         .route(
             "/connections/webhooks/{connection_id}",
             post(receive).get(challenge),
         )
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
-        .with_state(Webhooks { chat, connections })
+        .with_state(Webhooks {
+            chat,
+            connections,
+            routines,
+        })
 }
 #[derive(serde::Deserialize)]
 struct Challenge {
@@ -109,15 +115,34 @@ async fn receive(
 ) -> Response {
     let result: ToolResult<Option<String>> = async {
         let row = s.connections.get(id).await?;
-        let provider = adapter(&row.provider_id, &row.type_id)
-            .ok_or_else(|| ConnectError::not_found("Unknown channel"))?;
+        let provider = adapter(&row.provider_id, &row.type_id);
+        let source = crate::signals::source(&row.provider_id, &row.type_id);
+        if provider.is_none() && source.is_none() {
+            return Err(ConnectError::not_found("Unknown channel"));
+        }
         let access = Access {
             connection_id: id,
             values: s.connections.resolve(id).await?,
             http: s.connections.http.clone(),
             endpoints: s.connections.endpoints.clone(),
         };
-        let result = provider.webhook(&access, &headers, &body).await?;
+        // A chat adapter authenticates its provider's deliveries; signal-only providers are
+        // authenticated by the signals module.
+        let result = match provider {
+            Some(provider) => provider.webhook(&access, &headers, &body).await?,
+            None => {
+                crate::signals::verify(&row.provider_id, &access, &headers, &body)?;
+                Webhook::Messages(vec![])
+            }
+        };
+        if let Some(source) = source
+            && let Ok(payload) = serde_json::from_slice::<Value>(&body)
+        {
+            let signals = source.signals(&access, &headers, &payload);
+            if !signals.is_empty() {
+                s.routines.signal(id, &row.slug(), signals).await;
+            }
+        }
         match result {
             Webhook::Challenge(value) => Ok(Some(value)),
             Webhook::Messages(messages) => {
