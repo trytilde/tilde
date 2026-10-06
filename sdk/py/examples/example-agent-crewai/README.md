@@ -8,7 +8,7 @@ Set `DEV_AGENTS=py-crewai` to start only this one.
 A local development agent mirroring the other SDK examples, built on CrewAI and the Tilde
 Python SDK. Set `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (the token comes
 from registering a Gateway deployment for the agent), then run `python main.py` from this
-directory (`OPENAI_MODEL` defaults to `gpt-4o-mini`). The host dials out to Tilde and exposes
+directory (`OPENAI_MODEL` defaults to `gpt-5.6-terra`). The host dials out to Tilde and exposes
 no endpoint.
 
 The model receives only `ctx.channel.current` tools and responds by calling them. Returned

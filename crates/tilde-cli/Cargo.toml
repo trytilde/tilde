@@ -18,8 +18,12 @@ axum = "0.8"
 base64.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
 connectrpc.workspace = true
+globset = "0.4"
 hex.workspace = true
 http = "1"
+# `tilde sandbox`'s glob and grep walk the way ripgrep does, honouring .gitignore.
+ignore = "0.4"
+regex = "1"
 # The chat page's proxy forwards opaque Connect bodies, which needs a plain HTTP client.
 reqwest.workspace = true
 serde.workspace = true
@@ -34,11 +38,20 @@ tokio = { version = "1", features = [
   "time",
   "fs",
   "io-std",
+  "io-util",
+  "net",
+  "sync",
 ] }
 toml = "0.9"
 url.workspace = true
 webpki-roots = "0.26"
 
+[target.'cfg(unix)'.dependencies]
+# Killing a sandbox command's whole process group at its timeout.
+libc = "0.2"
+
 [dev-dependencies]
 # Encoding and decoding contract messages in the stand-in gateway the deploy test drives.
 buffa.workspace = true
+tempfile = "3"
+tokio-stream = "0.1"

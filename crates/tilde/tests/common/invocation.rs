@@ -168,7 +168,7 @@ impl Fixture {
             .as_ref()
             .unwrap()
             .add_source(
-                self.agent,
+                tilde::tools::Owner::Agent(self.agent),
                 tilde::tools::Target::Connection(connection),
                 &tools.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
             )

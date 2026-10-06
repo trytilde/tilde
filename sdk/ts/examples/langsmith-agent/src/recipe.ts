@@ -21,7 +21,7 @@ export async function runRecipe(
   const run = traceable(
     async (request: string) => {
       const result = streamText({
-        model: openai(process.env.OPENAI_MODEL ?? "gpt-4o-mini"),
+        model: openai(process.env.OPENAI_MODEL ?? "gpt-5.6-terra"),
         prompt: request,
         tools: {
           getPantry: tool({

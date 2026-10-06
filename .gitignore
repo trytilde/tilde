@@ -45,6 +45,7 @@ log
 /sdk/py/packages/tilde/src/tilde/provider/
 /sdk/py/packages/tilde/src/tilde/run/
 /sdk/py/packages/tilde/src/tilde/runtime/
+/sdk/py/packages/tilde/src/tilde/sandbox/
 /sdk/py/packages/tilde/src/tilde/setup/
 /sdk/py/packages/tilde/src/tilde/tool_host/
 /sdk/py/packages/tilde/src/tilde/types/

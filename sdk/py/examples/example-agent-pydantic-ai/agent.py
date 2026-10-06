@@ -25,7 +25,7 @@ log = logging.getLogger("example-agent-pydantic-ai")
 # each request resolves the invocation running it.
 INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
 model = OpenAIResponsesModel(
-    os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+    os.environ.get("OPENAI_MODEL", "gpt-5.6-terra"),
     provider=OpenAIProvider(
         base_url=INFERENCE.base_url,
         api_key=INFERENCE.api_key,
@@ -42,7 +42,7 @@ responder = Agent(
         + TOOL_GUIDANCE
     ),
     retries=0,
-    model_settings=OpenAIResponsesModelSettings(max_tokens=600, openai_store=False),
+    model_settings=OpenAIResponsesModelSettings(openai_store=False),
 )
 
 

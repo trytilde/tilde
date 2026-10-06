@@ -10,6 +10,7 @@ pub struct Record {
     pub thread_id: Option<uuid::Uuid>,
     pub connection_id: Option<uuid::Uuid>,
     pub credentials: Option<Vec<u8>>,
+    pub sandbox_id: Option<uuid::Uuid>,
     pub connection_type: Option<String>,
 }
 pub struct RecordBorrowed<'a> {
@@ -21,6 +22,7 @@ pub struct RecordBorrowed<'a> {
     pub thread_id: Option<uuid::Uuid>,
     pub connection_id: Option<uuid::Uuid>,
     pub credentials: Option<&'a [u8]>,
+    pub sandbox_id: Option<uuid::Uuid>,
     pub connection_type: Option<&'a str>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
@@ -34,6 +36,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             thread_id,
             connection_id,
             credentials,
+            sandbox_id,
             connection_type,
         }: RecordBorrowed<'a>,
     ) -> Self {
@@ -46,6 +49,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             thread_id,
             connection_id,
             credentials: credentials.map(|v| v.into()),
+            sandbox_id,
             connection_type: connection_type.map(|v| v.into()),
         }
     }
@@ -119,7 +123,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "UPDATE tool_host_calls SET status='delivered' WHERE id IN ( SELECT id FROM tool_host_calls WHERE tool_host_id=$1 AND status='pending' ORDER BY created_at FOR UPDATE SKIP LOCKED ) RETURNING id,kind,name,input_json,agent_id,thread_id,connection_id,credentials, (SELECT type_id FROM connections c WHERE c.id=tool_host_calls.connection_id) AS connection_type",
+        "UPDATE tool_host_calls SET status='delivered' WHERE id IN ( SELECT id FROM tool_host_calls WHERE tool_host_id=$1 AND status='pending' ORDER BY created_at FOR UPDATE SKIP LOCKED ) RETURNING id,kind,name,input_json,agent_id,thread_id,connection_id,credentials,sandbox_id, (SELECT type_id FROM connections c WHERE c.id=tool_host_calls.connection_id) AS connection_type",
         None,
     )
 }
@@ -152,7 +156,8 @@ impl RunStmt {
                         thread_id: row.try_get(5)?,
                         connection_id: row.try_get(6)?,
                         credentials: row.try_get(7)?,
-                        connection_type: row.try_get(8)?,
+                        sandbox_id: row.try_get(8)?,
+                        connection_type: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),

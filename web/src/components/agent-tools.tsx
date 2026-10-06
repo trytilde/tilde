@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+  BoxIcon,
   CableIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -23,7 +24,7 @@ import {
   type ToolHost,
   type ToolSource,
 } from "@trytilde/contracts/tilde/management/v1/tools_pb.js";
-import { toolHosts, tools } from "@/client";
+import { sandboxes, toolHosts, tools } from "@/client";
 import { ProviderIcon } from "./provider-icon";
 import { servingContents } from "./agent-deployment";
 import { ChooseDialog } from "./choose-dialog";
@@ -64,8 +65,19 @@ type Origin = { name: string; detail: string; iconUrl?: string } & (
   | { connectionId: string }
   | { toolHostId: string; tools: ProviderTool[] }
 );
-/** One of the agent's sources, with every tool its origin offers. */
-type Entry = { source: ToolSource; name: string; iconUrl?: string; offered: ProviderTool[] };
+/**
+ * One of the owner's sources, with every tool its origin offers. `blueprintId` is the blueprint
+ * of an agent's sandbox source, when known.
+ */
+type Entry = {
+  source: ToolSource;
+  name: string;
+  iconUrl?: string;
+  offered: ProviderTool[];
+  blueprintId?: string;
+};
+/** Who the sources belong to: an agent, or a sandbox blueprint. */
+type Owner = "agent" | "blueprint";
 /** A tool a source offers, as far as the table needs it. */
 type Offered = Pick<ProviderTool, "name" | "description" | "summary">;
 
@@ -91,13 +103,30 @@ async function offeredTools(origin: Origin, signal?: AbortSignal) {
   return (await tools.listProviderTools({ connectionId: origin.connectionId }, { signal })).tools;
 }
 
+/** The blueprint behind an agent's sandbox source, which the source itself does not name. */
+async function sandboxBlueprint(agentId: string, signal?: AbortSignal) {
+  const { sandbox } = await sandboxes.getAgentSandbox({ agentId }, { signal });
+  if (!sandbox) return undefined;
+  const { blueprint } = await sandboxes.getSandboxBlueprint(
+    { id: sandbox.blueprintId },
+    { signal },
+  );
+  return blueprint;
+}
+
 /**
- * The tools one agent uses, grouped by source (a tool connection or a tool host without a
- * provider): which offered tools it uses and which run in the background, and one setting for
- * whether all of them are listed or found by search. The agent's bundled tools, set in
- * its code, are shown read-only beside them (`bundledGroups`).
+ * The tools one agent uses, grouped by source (a tool connection, a tool host without a
+ * provider, or its sandbox): which offered tools it uses and which run in the background, and
+ * one setting for whether all of them are listed or found by search. The agent's bundled tools,
+ * set in its code, are shown read-only beside them (`bundledGroups`).
+ *
+ * With `blueprintId` it is a sandbox blueprint's tools instead, called by processes inside its
+ * sandboxes: only which sources and tools it uses, with none of an agent's settings.
  */
-export function AgentTools({ agentId }: { agentId: string }) {
+export function AgentTools(props: { agentId: string } | { blueprintId: string }) {
+  const agentId = "agentId" in props ? props.agentId : undefined;
+  const blueprintId = "blueprintId" in props ? props.blueprintId : undefined;
+  const owner = agentId ? "agent" : "blueprint";
   const [entries, setEntries] = useState<Entry[]>([]);
   const [providers, setProviders] = useState<Map<string, Provider>>(new Map());
   const [mode, setMode] = useState(ToolMode.DIRECT);
@@ -109,12 +138,14 @@ export function AgentTools({ agentId }: { agentId: string }) {
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       const [owned, list, hosts, providers, offering, fromCode] = await Promise.all([
-        tools.listToolSources({ agentId }, { signal }),
+        tools.listToolSources(agentId ? { agentId } : { sandboxBlueprintId: blueprintId }, {
+          signal,
+        }),
         loadToolConnections({}, signal),
         toolHosts.listToolHosts({ withProvider: false }, { signal }),
         loadToolProviders({}, signal),
-        tools.getToolMode({ agentId }, { signal }),
-        bundledGroups(agentId, signal),
+        agentId ? tools.getToolMode({ agentId }, { signal }) : { mode: ToolMode.DIRECT },
+        agentId ? bundledGroups(agentId, signal) : [],
       ]);
       setBundled(fromCode);
       setMode(offering.mode === ToolMode.DYNAMIC ? ToolMode.DYNAMIC : ToolMode.DIRECT);
@@ -132,6 +163,21 @@ export function AgentTools({ agentId }: { agentId: string }) {
         );
       const next = await Promise.all(
         owned.sources.map(async (source): Promise<Entry> => {
+          if (source.sandbox) {
+            const [offered, blueprint] = await Promise.all([
+              tools.listProviderTools({ connectionId: "", sandbox: true }, { signal }).then(
+                (r) => r.tools,
+                () => [],
+              ),
+              agentId ? sandboxBlueprint(agentId, signal).catch(() => undefined) : undefined,
+            ]);
+            return {
+              source,
+              name: blueprint ? `Sandbox · ${blueprint.name}` : "Sandbox",
+              offered,
+              blueprintId: blueprint?.id,
+            };
+          }
           const origin = originOf(source);
           return {
             source,
@@ -144,7 +190,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
       );
       setEntries(next.sort((a, b) => a.name.localeCompare(b.name)));
     },
-    [agentId],
+    [agentId, blueprintId],
   );
   useEffect(() => {
     const abort = new AbortController();
@@ -177,39 +223,53 @@ export function AgentTools({ agentId }: { agentId: string }) {
             {error}
           </p>
         )}
-        <div className="w-1/2 min-w-72 space-y-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-medium">Tool discovery</h3>
-            <p
-              id="tool-mode-description"
-              className="mt-1 text-xs leading-relaxed whitespace-normal text-muted-foreground"
+        {agentId ? (
+          <div className="w-1/2 min-w-72 space-y-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium">Tool discovery</h3>
+              <p
+                id="tool-mode-description"
+                className="mt-1 text-xs leading-relaxed whitespace-normal text-muted-foreground"
+              >
+                {mode === ToolMode.DYNAMIC
+                  ? "The agent finds these tools with tools.search and runs them through tools.execute."
+                  : "Every tool switched on below is in the agent's tool list."}{" "}
+                Applies to all of the agent's tools from its next run.
+              </p>
+            </div>
+            <Tabs
+              value={mode === ToolMode.DYNAMIC ? "dynamic" : "direct"}
+              onValueChange={(value) => {
+                const next = value === "dynamic" ? ToolMode.DYNAMIC : ToolMode.DIRECT;
+                if (next !== mode) void act(() => tools.setToolMode({ agentId, mode: next }));
+              }}
             >
-              {mode === ToolMode.DYNAMIC
-                ? "The agent finds these tools with tools.search and runs them through tools.execute."
-                : "Every tool switched on below is in the agent's tool list."}{" "}
-              Applies to all of the agent's tools from its next run.
+              <TabsList
+                aria-label="How the agent's tools are offered"
+                aria-describedby="tool-mode-description"
+              >
+                <TabsTrigger value="direct" disabled={busy}>
+                  Listed directly
+                </TabsTrigger>
+                <TabsTrigger value="dynamic" disabled={busy}>
+                  Found by search
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        ) : (
+          <div className="max-w-3xl space-y-2">
+            <h3 className="text-sm font-medium">Tools for processes in the sandbox</h3>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Programs running in this blueprint's sandboxes can call the tools switched on below by
+              their catalog name, <code>{"<source>.<tool>"}</code>: run{" "}
+              <code>{"tilde sandbox call <source.tool> '<json>'"}</code> or POST the JSON input to{" "}
+              <code>{"http://127.0.0.1:4790/v1/tools/<source.tool>"}</code>. Credentials stay with
+              Tilde; for example, a git credential helper can fetch a token from your own tool
+              server without the sandbox ever holding the secret.
             </p>
           </div>
-          <Tabs
-            value={mode === ToolMode.DYNAMIC ? "dynamic" : "direct"}
-            onValueChange={(value) => {
-              const next = value === "dynamic" ? ToolMode.DYNAMIC : ToolMode.DIRECT;
-              if (next !== mode) void act(() => tools.setToolMode({ agentId, mode: next }));
-            }}
-          >
-            <TabsList
-              aria-label="How the agent's tools are offered"
-              aria-describedby="tool-mode-description"
-            >
-              <TabsTrigger value="direct" disabled={busy}>
-                Listed directly
-              </TabsTrigger>
-              <TabsTrigger value="dynamic" disabled={busy}>
-                Found by search
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        )}
       </div>
       <div className="space-y-5 px-4 py-5 lg:px-6">
         <div className="flex justify-end">
@@ -238,12 +298,13 @@ export function AgentTools({ agentId }: { agentId: string }) {
           providers={providers}
           used={entries.map(({ source }) => source.connectionId ?? source.toolHostId ?? "")}
           busy={busy}
+          owner={owner}
           onClose={() => setChoosing(false)}
-          // A new source starts with every tool off; the agent gets only what is switched on.
+          // A new source starts with every tool off; the owner gets only what is switched on.
           onChoose={(origin) =>
             act(() =>
               tools.addToolSource({
-                agentId,
+                ...(agentId ? { agentId } : { sandboxBlueprintId: blueprintId }),
                 ...("connectionId" in origin
                   ? { connectionId: origin.connectionId }
                   : { toolHostId: origin.toolHostId }),
@@ -254,7 +315,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
         />
         {entries.length || bundled.length ? (
           <div className="overflow-hidden rounded-xl border">
-            <Table aria-label="Agent tools" className="table-fixed">
+            <Table aria-label={agentId ? "Agent tools" : "Blueprint tools"} className="table-fixed">
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="h-11 w-16 px-5">
@@ -262,37 +323,49 @@ export function AgentTools({ agentId }: { agentId: string }) {
                   </TableHead>
                   <TableHead className="h-11 w-64">Tool</TableHead>
                   <TableHead className="h-11">Description</TableHead>
-                  <TableHead className="h-11 w-64">
-                    <span className="flex items-center gap-1">
-                      Displayed
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              aria-label="About displayed"
-                              className="inline-flex cursor-help text-muted-foreground [&_svg]:size-3.5"
-                            />
-                          }
-                        >
-                          <InfoIcon />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-72">
-                          How this tool's calls appear to people chatting with the agent. Full shows
-                          the input and output, Summary only the summary and whether it finished,
-                          Hidden nothing. Traces always keep full detail.
-                        </TooltipContent>
-                      </Tooltip>
-                    </span>
-                  </TableHead>
-                  <TableHead className="h-11 w-28">Background</TableHead>
+                  {agentId && (
+                    <TableHead className="h-11 w-64">
+                      <span className="flex items-center gap-1">
+                        Displayed
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                aria-label="About displayed"
+                                className="inline-flex cursor-help text-muted-foreground [&_svg]:size-3.5"
+                              />
+                            }
+                          >
+                            <InfoIcon />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-72">
+                            How this tool's calls appear to people chatting with the agent. Full
+                            shows the input and output, Summary only the summary and whether it
+                            finished, Hidden nothing. Traces always keep full detail.
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
+                    </TableHead>
+                  )}
+                  {agentId && <TableHead className="h-11 w-28">Background</TableHead>}
                   <TableHead className="h-11 w-24 px-5 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entries.map((entry) => (
-                  <SourceRows key={entry.source.id} entry={entry} busy={busy} act={act} />
-                ))}
+                {entries.map((entry) =>
+                  entry.source.sandbox ? (
+                    <SandboxRows key={entry.source.id} entry={entry} />
+                  ) : (
+                    <SourceRows
+                      key={entry.source.id}
+                      entry={entry}
+                      owner={owner}
+                      busy={busy}
+                      act={act}
+                    />
+                  ),
+                )}
                 {bundled.map((group) => (
                   <BundledRows key={group.id} group={group} />
                 ))}
@@ -301,7 +374,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
           </div>
         ) : (
           <div className="flex min-h-48 w-full items-center justify-center rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
-            {loading ? "Loading tools…" : "No tools assigned to this agent."}
+            {loading ? "Loading tools…" : `No tools assigned to this ${owner}.`}
           </div>
         )}
       </div>
@@ -367,34 +440,94 @@ async function bundledGroups(agentId: string, signal?: AbortSignal): Promise<Bun
  * code, so the group is read-only.
  */
 function BundledRows({ group }: { group: BundledGroup }) {
-  const count = group.tools.length;
-  const [expanded, setExpanded] = useState(true);
   const name = group.name ? `From code · ${group.name}` : "From code";
+  return (
+    <ReadOnlyRows
+      icon={<CodeIcon aria-hidden="true" className="size-5 text-muted-foreground" />}
+      name={name}
+      title={<span className="font-medium">{name}</span>}
+      badge="Bundled"
+      badgeTitle="Ships with the agent's code and runs in its process. Configure it in code, not here."
+      detail={group.detail}
+      tools={group.tools}
+    />
+  );
+}
+
+/**
+ * The agent's sandbox tools: every one, as the sandbox defines them, for as long as the agent's
+ * sandbox setting lasts. Read-only like bundled tools.
+ */
+function SandboxRows({ entry }: { entry: Entry }) {
+  const used = new Map(entry.source.tools.map((tool) => [tool.toolName, tool]));
+  return (
+    <ReadOnlyRows
+      icon={<BoxIcon aria-hidden="true" className="size-5 text-muted-foreground" />}
+      name={entry.name}
+      title={
+        entry.blueprintId ? (
+          <Link
+            to="/sandboxes/$blueprintId/settings"
+            params={{ blueprintId: entry.blueprintId }}
+            className="font-medium hover:underline"
+          >
+            {entry.name}
+          </Link>
+        ) : (
+          <span className="font-medium">{entry.name}</span>
+        )
+      }
+      badge="Sandbox"
+      badgeTitle="Comes with the agent's sandbox. Remove the sandbox in Capabilities to remove these tools."
+      tools={entry.offered.map((tool) => ({
+        name: tool.name,
+        summary: tool.summary,
+        description: tool.description,
+        display: used.get(tool.name)?.display ?? ToolDisplay.FULL,
+      }))}
+    />
+  );
+}
+
+function ReadOnlyRows({
+  icon,
+  name,
+  title,
+  badge,
+  badgeTitle,
+  detail,
+  tools,
+}: {
+  icon: React.ReactNode;
+  name: string;
+  title: React.ReactNode;
+  badge: string;
+  badgeTitle: string;
+  detail?: string;
+  tools: BundledGroup["tools"];
+}) {
+  const count = tools.length;
+  const [expanded, setExpanded] = useState(true);
   return (
     <>
       <TableRow className="bg-muted/40 hover:bg-muted/40">
-        <TableCell className="h-14 px-5 py-2">
-          <CodeIcon aria-hidden="true" className="size-5 text-muted-foreground" />
-        </TableCell>
+        <TableCell className="h-14 px-5 py-2">{icon}</TableCell>
         <TableCell colSpan={5}>
           <span className="flex flex-wrap items-center gap-3">
             <GroupToggle name={name} expanded={expanded} onToggle={setExpanded} />
-            <span className="font-medium">{name}</span>
-            <Badge
-              variant="secondary"
-              title="Ships with the agent's code and runs in its process. Configure it in code, not here."
-            >
-              Bundled
+            {title}
+            <Badge variant="secondary" title={badgeTitle}>
+              {badge}
             </Badge>
             <Badge variant="outline">
               {count} tool{count === 1 ? "" : "s"}
             </Badge>
-            <span className="text-xs text-muted-foreground">{group.detail}</span>
+            {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
           </span>
         </TableCell>
       </TableRow>
       {expanded &&
-        group.tools.map((tool) => (
+        tools.map((tool) => (
           <TableRow key={tool.name}>
             <TableCell />
             <TableCell className="whitespace-normal">
@@ -444,14 +577,18 @@ function GroupToggle({
 /** A source's group header row, then one row per tool its origin offers. */
 function SourceRows({
   entry,
+  owner,
   busy,
   act,
 }: {
   entry: Entry;
+  owner: Owner;
   busy: boolean;
   act: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const { source, name } = entry;
+  // A blueprint's tools are called by programs, so an agent's per-tool settings do not apply.
+  const configurable = owner === "agent";
   const [removing, setRemoving] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const used = new Map(source.tools.map((tool) => [tool.toolName, tool]));
@@ -485,7 +622,7 @@ function SourceRows({
             <ProviderIcon iconUrl={entry.iconUrl} />
           )}
         </TableCell>
-        <TableCell colSpan={4}>
+        <TableCell colSpan={configurable ? 4 : 2}>
           <span className="flex items-center gap-3">
             <GroupToggle name={name} expanded={expanded} onToggle={setExpanded} />
             <Link
@@ -499,6 +636,11 @@ function SourceRows({
             <Badge variant="outline">
               {used.size} of {listed.length} tool{listed.length === 1 ? "" : "s"}
             </Badge>
+            {!configurable && (
+              <code className="text-xs text-muted-foreground" title="Prefixes its tools' names">
+                {source.slug}
+              </code>
+            )}
           </span>
         </TableCell>
         <TableCell className="px-5">
@@ -536,63 +678,83 @@ function SourceRows({
                 }
               />
             </TableCell>
-            <TableCell className="whitespace-normal">
-              <code className="text-xs font-medium">{tool.name}</code>
-              <InlineText
-                label={`Summary of ${tool.name}`}
-                value={current?.summary ?? ""}
-                fallback={tool.summary}
-                empty="(no summary)"
-                maxLength={256}
-                editable={editing}
-                onSave={(summary) => update(current!, tool, { summary })}
-              />
-            </TableCell>
-            <TableCell className="whitespace-normal">
-              <InlineText
-                label={`Description of ${tool.name}`}
-                value={current?.description ?? ""}
-                fallback={tool.description}
-                empty="(no description)"
-                maxLength={4096}
-                multiline
-                editable={editing}
-                onSave={(description) => update(current!, tool, { description })}
-              />
-            </TableCell>
-            <TableCell>
-              {current && (
-                <Tabs
-                  value={displayKey(current.display)}
-                  onValueChange={(value) => {
-                    const display = DISPLAY[value as keyof typeof DISPLAY];
-                    if (display !== current.display) void update(current, tool, { display });
-                  }}
-                >
-                  <TabsList aria-label={`How ${tool.name} is displayed`}>
-                    <TabsTrigger value="full" disabled={busy}>
-                      Full
-                    </TabsTrigger>
-                    <TabsTrigger value="summary" disabled={busy}>
-                      Summary
-                    </TabsTrigger>
-                    <TabsTrigger value="hidden" disabled={busy}>
-                      Hidden
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-            </TableCell>
-            <TableCell>
-              {current && (
-                <Switch
-                  aria-label={`Run ${tool.name} in the background`}
-                  checked={current.isAsync}
-                  disabled={busy}
-                  onCheckedChange={(checked) => void update(current, tool, { isAsync: checked })}
-                />
-              )}
-            </TableCell>
+            {!configurable ? (
+              <>
+                <TableCell className="whitespace-normal">
+                  <code className="text-xs font-medium">{tool.name}</code>
+                  {tool.summary && (
+                    <span className="block text-xs text-muted-foreground">{tool.summary}</span>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-normal">
+                  <span className="block text-xs text-muted-foreground">
+                    {tool.description || "(no description)"}
+                  </span>
+                </TableCell>
+              </>
+            ) : (
+              <>
+                <TableCell className="whitespace-normal">
+                  <code className="text-xs font-medium">{tool.name}</code>
+                  <InlineText
+                    label={`Summary of ${tool.name}`}
+                    value={current?.summary ?? ""}
+                    fallback={tool.summary}
+                    empty="(no summary)"
+                    maxLength={256}
+                    editable={editing}
+                    onSave={(summary) => update(current!, tool, { summary })}
+                  />
+                </TableCell>
+                <TableCell className="whitespace-normal">
+                  <InlineText
+                    label={`Description of ${tool.name}`}
+                    value={current?.description ?? ""}
+                    fallback={tool.description}
+                    empty="(no description)"
+                    maxLength={4096}
+                    multiline
+                    editable={editing}
+                    onSave={(description) => update(current!, tool, { description })}
+                  />
+                </TableCell>
+                <TableCell>
+                  {current && (
+                    <Tabs
+                      value={displayKey(current.display)}
+                      onValueChange={(value) => {
+                        const display = DISPLAY[value as keyof typeof DISPLAY];
+                        if (display !== current.display) void update(current, tool, { display });
+                      }}
+                    >
+                      <TabsList aria-label={`How ${tool.name} is displayed`}>
+                        <TabsTrigger value="full" disabled={busy}>
+                          Full
+                        </TabsTrigger>
+                        <TabsTrigger value="summary" disabled={busy}>
+                          Summary
+                        </TabsTrigger>
+                        <TabsTrigger value="hidden" disabled={busy}>
+                          Hidden
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {current && (
+                    <Switch
+                      aria-label={`Run ${tool.name} in the background`}
+                      checked={current.isAsync}
+                      disabled={busy}
+                      onCheckedChange={(checked) =>
+                        void update(current, tool, { isAsync: checked })
+                      }
+                    />
+                  )}
+                </TableCell>
+              </>
+            )}
             <TableCell />
           </TableRow>
         );
@@ -600,10 +762,13 @@ function SourceRows({
       <AlertDialog open={removing} onOpenChange={setRemoving}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {name} from this agent?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Remove {name} from this {owner}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The agent stops using its tools, and your choices for them are lost. The{" "}
-              {source.toolHostId ? "tool server" : "connection"} itself stays for other agents.
+              {owner === "agent" ? "The agent stops" : "Its sandboxes stop"} using its tools, and
+              your choices for them are lost. The {source.toolHostId ? "tool server" : "connection"}{" "}
+              itself stays for others.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -756,6 +921,7 @@ function ChooseExisting({
   providers,
   used,
   busy,
+  owner,
   onClose,
   onChoose,
 }: {
@@ -763,6 +929,7 @@ function ChooseExisting({
   providers: Map<string, Provider>;
   used: string[];
   busy: boolean;
+  owner: Owner;
   onClose: () => void;
   onChoose: (origin: Origin) => Promise<void>;
 }) {
@@ -770,7 +937,7 @@ function ChooseExisting({
     <ChooseDialog
       open={open}
       title="Choose an existing tool"
-      description="Your connected tool accounts and tool servers this agent does not use yet. Its tools are added switched off."
+      description={`Your connected tool accounts and tool servers this ${owner} does not use yet. Its tools are added switched off.`}
       searchLabel="Search tools"
       listLabel="Available tools"
       empty={(search) =>

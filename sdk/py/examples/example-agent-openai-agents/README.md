@@ -26,7 +26,7 @@ Environment:
 - `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (required; the token comes
   from registering a Gateway deployment for the agent). The host dials out to Tilde and
   exposes no endpoint.
-- `OPENAI_MODEL` (default `gpt-4o-mini`)
+- `OPENAI_MODEL` (default `gpt-5.6-terra`)
 
 Run from `sdk/py` with `uv run --package example-agent-openai-agents python examples/example-agent-openai-agents/main.py`.
 

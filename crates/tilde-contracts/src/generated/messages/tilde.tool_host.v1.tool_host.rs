@@ -809,7 +809,10 @@ pub const __HOST_PING_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 };
 /// `call_id` is the agent's tool call ID: use it for upstream idempotency. `connection_id`,
 /// `connection_type` (the provider method the instance was set up with) and `credentials` are
-/// set when the call is made on an instance of the host's provider.
+/// set when the call is made on an instance of the host's provider. `sandbox_id` is set when a
+/// process inside a sandbox made the call through its blueprint's tools; `agent_id` and
+/// `thread_id` are then those the sandbox was launched for, empty when its reuse mode shares it
+/// across agents or threads.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -874,6 +877,13 @@ pub struct ToolCallRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub connection_type: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 9: `sandbox_id`
+    #[serde(
+        rename = "sandboxId",
+        alias = "sandbox_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub sandbox_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -889,6 +899,7 @@ impl ::core::fmt::Debug for ToolCallRequest {
             .field("connection_id", &self.connection_id)
             .field("credentials", &self.credentials)
             .field("connection_type", &self.connection_type)
+            .field("sandbox_id", &self.sandbox_id)
             .finish()
     }
 }
@@ -918,6 +929,16 @@ impl ToolCallRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.connection_type = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::sandbox_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_sandbox_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.sandbox_id = Some(value.into());
         self
     }
 }
@@ -970,6 +991,9 @@ impl ::buffa::Message for ToolCallRequest {
         if let Some(ref v) = self.connection_type {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.sandbox_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1008,6 +1032,9 @@ impl ::buffa::Message for ToolCallRequest {
         }
         if let Some(ref v) = self.connection_type {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if let Some(ref v) = self.sandbox_id {
+            ::buffa::types::put_string_field(9u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1093,6 +1120,18 @@ impl ::buffa::Message for ToolCallRequest {
                     buf,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .sandbox_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1109,6 +1148,7 @@ impl ::buffa::Message for ToolCallRequest {
         self.connection_id = ::core::option::Option::None;
         self.credentials.clear();
         self.connection_type = ::core::option::Option::None;
+        self.sandbox_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

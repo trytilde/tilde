@@ -103,7 +103,9 @@ class ToolContext(Generic[A]):
     """One call. ``call_id`` is the agent's tool call ID: use it for upstream idempotency.
 
     ``auth`` is the instance's credentials parsed into its method's model (``None`` for tools
-    without auth); ``cancellation`` aborts when the host closes.
+    without auth); ``cancellation`` aborts when the host closes. ``sandbox_id`` is set when a
+    process inside a sandbox made the call through its blueprint's tools; ``agent_id`` and
+    ``thread_id`` are then empty when the sandbox is shared across agents or threads.
     """
 
     call_id: str
@@ -113,6 +115,7 @@ class ToolContext(Generic[A]):
     auth_method: str | None
     auth: A | None
     cancellation: Cancellation
+    sandbox_id: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -363,6 +366,7 @@ class _Tools:
                 auth_method=method,
                 auth=auth,
                 cancellation=cancellation,
+                sandbox_id=request.sandbox_id if request.HasField("sandbox_id") else None,
             )
             result = await hosted.run(data, context)
             if hosted.output_model is None:

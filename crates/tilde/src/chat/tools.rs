@@ -453,7 +453,7 @@ impl Registry {
     }
 }
 /// Trace payloads are a view of the call; the durable record keeps the full input and output.
-fn bounded(json: &str) -> String {
+pub(crate) fn bounded(json: &str) -> String {
     let mut end = json.len().min(64 * 1024);
     while !json.is_char_boundary(end) {
         end -= 1;
@@ -499,7 +499,7 @@ fn span(
     )
 }
 /// Record a call's output, or its error as the span's status.
-fn finish(cx: &opentelemetry::Context, result: &ToolResult<Value>) {
+pub(crate) fn finish(cx: &opentelemetry::Context, result: &ToolResult<Value>) {
     match result {
         Ok(output) => cx.span().set_attribute(KeyValue::new(
             "tilde.observation.output",

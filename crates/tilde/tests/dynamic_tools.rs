@@ -35,7 +35,7 @@ async fn deferred_tools_are_found_by_search_and_executed_as_themselves() {
     tavily_connection(&fx, connection).await;
     let web = tools
         .add_source(
-            fx.agent,
+            tilde::tools::Owner::Agent(fx.agent),
             tilde::tools::Target::Connection(connection),
             &["search".into(), "extract".into(), "crawl".into()],
         )

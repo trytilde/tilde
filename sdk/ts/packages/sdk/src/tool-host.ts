@@ -38,8 +38,11 @@ export type AuthValues<Methods extends Record<string, AuthMethod>> = {
 export type ToolContext<Auth> = {
   /** The agent's tool call ID: use it for upstream idempotency. */
   callId: string;
+  /** Empty when a process in a sandbox shared across agents or threads made the call. */
   agentId: string;
   threadId: string;
+  /** Set when a process inside a sandbox made the call, through its blueprint's tools. */
+  sandboxId?: string;
   /** The instance the call is made on, and the method it was set up with. */
   connectionId?: string;
   authMethod?: string;
@@ -187,7 +190,14 @@ function messageOf(error: unknown, fallback: string) {
 }
 type Call = Pick<
   ToolCallRequest,
-  "callId" | "name" | "inputJson" | "agentId" | "threadId" | "connectionId" | "connectionType"
+  | "callId"
+  | "name"
+  | "inputJson"
+  | "agentId"
+  | "threadId"
+  | "connectionId"
+  | "connectionType"
+  | "sandboxId"
 > & { credentials?: { key: string; value: string }[] };
 async function run(tools: Tools, auth: AnyAuth | undefined, call: Call, signal: AbortSignal) {
   const tool = Object.hasOwn(tools, call.name) ? tools[call.name] : undefined;
@@ -201,6 +211,7 @@ async function run(tools: Tools, auth: AnyAuth | undefined, call: Call, signal: 
       callId: call.callId,
       agentId: call.agentId,
       threadId: call.threadId,
+      sandboxId: call.sandboxId,
       connectionId: call.connectionId,
       authMethod: call.connectionType,
       auth: needsAuth ? credentials(auth, call.connectionType, call.credentials ?? []) : undefined,

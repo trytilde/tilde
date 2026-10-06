@@ -23,12 +23,15 @@ message HostRegistered { string tool_host_id = 1; }
 message HostPing {}
 // `call_id` is the agent's tool call ID: use it for upstream idempotency. `connection_id`,
 // `connection_type` (the provider method the instance was set up with) and `credentials` are
-// set when the call is made on an instance of the host's provider.
+// set when the call is made on an instance of the host's provider. `sandbox_id` is set when a
+// process inside a sandbox made the call through its blueprint's tools; `agent_id` and
+// `thread_id` are then those the sandbox was launched for, empty when its reuse mode shares it
+// across agents or threads.
 message ToolCallRequest {
   string call_id = 1; string name = 2; string input_json = 3 [debug_redact = true];
   string agent_id = 4; string thread_id = 5;
   optional string connection_id = 6; repeated tilde.types.v1.InputField credentials = 7;
-  optional string connection_type = 8;
+  optional string connection_type = 8; optional string sandbox_id = 9;
 }
 // Sent at the end of an instance's setup, before the connection is ready: an error fails the
 // setup with the host's message, and `account_label` names the account the credentials reach.

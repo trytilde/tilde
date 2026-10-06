@@ -5,6 +5,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookOpenIcon,
   BotIcon,
+  BoxIcon,
   ChevronRightIcon,
   PlugIcon,
   ServerIcon,
@@ -101,6 +102,15 @@ export function AppSidebar() {
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </Collapsible>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/sandboxes")}
+                      render={<Link to="/sandboxes" />}
+                    >
+                      <BoxIcon />
+                      <span>Sandboxes</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

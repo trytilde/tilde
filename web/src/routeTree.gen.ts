@@ -14,6 +14,8 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSkillsRouteImport } from './routes/_app/skills'
 import { Route as AppAgentAgentIdRouteRouteImport } from './routes/_app/agent/$agentId/route'
 import { Route as AppAgentNewRouteImport } from './routes/_app/agent/new'
+import { Route as AppSandboxesIndexRouteImport } from './routes/_app/sandboxes/index'
+import { Route as AppSandboxesBlueprintIdRouteRouteImport } from './routes/_app/sandboxes/$blueprintId/route'
 import { Route as AppSkillsSkillIdRouteImport } from './routes/_app/skills_.$skillId'
 import { Route as AppSkillsCatalogRouteImport } from './routes/_app/skills_.catalog'
 import { Route as AppToolsIndexRouteImport } from './routes/_app/tools/index'
@@ -35,6 +37,11 @@ import { Route as AppAgentAgentIdSessionsRouteImport } from './routes/_app/agent
 import { Route as AppAgentAgentIdSkillsRouteImport } from './routes/_app/agent/$agentId/skills'
 import { Route as AppAgentAgentIdToolsRouteImport } from './routes/_app/agent/$agentId/tools'
 import { Route as AppAgentAgentIdTracingRouteImport } from './routes/_app/agent/$agentId/tracing'
+import { Route as AppSandboxesBlueprintIdIndexRouteImport } from './routes/_app/sandboxes/$blueprintId/index'
+import { Route as AppSandboxesBlueprintIdEnvironmentRouteImport } from './routes/_app/sandboxes/$blueprintId/environment'
+import { Route as AppSandboxesBlueprintIdSandboxesRouteImport } from './routes/_app/sandboxes/$blueprintId/sandboxes'
+import { Route as AppSandboxesBlueprintIdSettingsRouteImport } from './routes/_app/sandboxes/$blueprintId/settings'
+import { Route as AppSandboxesBlueprintIdToolsRouteImport } from './routes/_app/sandboxes/$blueprintId/tools'
 import { Route as AppSkillsCatalogGroupIdRouteImport } from './routes/_app/skills_.catalog.$groupId'
 import { Route as AppSkillsSourcesSourceIdRouteImport } from './routes/_app/skills_.sources.$sourceId'
 import { Route as AppToolsCatalogProviderIdRouteImport } from './routes/_app/tools/catalog.$providerId'
@@ -63,6 +70,17 @@ const AppAgentNewRoute = AppAgentNewRouteImport.update({
   path: '/agent/new',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppSandboxesIndexRoute = AppSandboxesIndexRouteImport.update({
+  id: '/sandboxes/',
+  path: '/sandboxes/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSandboxesBlueprintIdRouteRoute =
+  AppSandboxesBlueprintIdRouteRouteImport.update({
+    id: '/sandboxes/$blueprintId',
+    path: '/sandboxes/$blueprintId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppSkillsSkillIdRoute = AppSkillsSkillIdRouteImport.update({
   id: '/skills_/$skillId',
   path: '/skills/$skillId',
@@ -173,6 +191,36 @@ const AppAgentAgentIdTracingRoute = AppAgentAgentIdTracingRouteImport.update({
   path: '/tracing',
   getParentRoute: () => AppAgentAgentIdRouteRoute,
 } as any)
+const AppSandboxesBlueprintIdIndexRoute =
+  AppSandboxesBlueprintIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppSandboxesBlueprintIdEnvironmentRoute =
+  AppSandboxesBlueprintIdEnvironmentRouteImport.update({
+    id: '/environment',
+    path: '/environment',
+    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppSandboxesBlueprintIdSandboxesRoute =
+  AppSandboxesBlueprintIdSandboxesRouteImport.update({
+    id: '/sandboxes',
+    path: '/sandboxes',
+    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppSandboxesBlueprintIdSettingsRoute =
+  AppSandboxesBlueprintIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppSandboxesBlueprintIdToolsRoute =
+  AppSandboxesBlueprintIdToolsRouteImport.update({
+    id: '/tools',
+    path: '/tools',
+    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
+  } as any)
 const AppSkillsCatalogGroupIdRoute = AppSkillsCatalogGroupIdRouteImport.update({
   id: '/$groupId',
   path: '/$groupId',
@@ -195,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/skills': typeof AppSkillsRoute
   '/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
+  '/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdRouteRouteWithChildren
   '/agent/new': typeof AppAgentNewRoute
   '/skills/$skillId': typeof AppSkillsSkillIdRoute
   '/skills/catalog': typeof AppSkillsCatalogRouteWithChildren
@@ -203,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/tools/connections': typeof AppToolsConnectionsRoute
   '/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/sandboxes/': typeof AppSandboxesIndexRoute
   '/tools/': typeof AppToolsIndexRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
@@ -216,10 +266,15 @@ export interface FileRoutesByFullPath {
   '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
+  '/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
+  '/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
+  '/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
   '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
   '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
   '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
+  '/sandboxes/$blueprintId/': typeof AppSandboxesBlueprintIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/skills': typeof AppSkillsRoute
@@ -232,6 +287,7 @@ export interface FileRoutesByTo {
   '/tools/connections': typeof AppToolsConnectionsRoute
   '/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/sandboxes': typeof AppSandboxesIndexRoute
   '/tools': typeof AppToolsIndexRoute
   '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
@@ -245,10 +301,15 @@ export interface FileRoutesByTo {
   '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
+  '/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
+  '/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
+  '/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
   '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
   '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
   '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/agent/$agentId': typeof AppAgentAgentIdIndexRoute
+  '/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -256,6 +317,7 @@ export interface FileRoutesById {
   '/_app/skills': typeof AppSkillsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
+  '/_app/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdRouteRouteWithChildren
   '/_app/agent/new': typeof AppAgentNewRoute
   '/_app/skills_/$skillId': typeof AppSkillsSkillIdRoute
   '/_app/skills_/catalog': typeof AppSkillsCatalogRouteWithChildren
@@ -264,6 +326,7 @@ export interface FileRoutesById {
   '/_app/tools/connections': typeof AppToolsConnectionsRoute
   '/_app/tools/remote-servers': typeof AppToolsRemoteServersRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
+  '/_app/sandboxes/': typeof AppSandboxesIndexRoute
   '/_app/tools/': typeof AppToolsIndexRoute
   '/_app/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
   '/_app/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
@@ -277,10 +340,15 @@ export interface FileRoutesById {
   '/_app/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
   '/_app/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
   '/_app/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
+  '/_app/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
+  '/_app/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
+  '/_app/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
+  '/_app/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
   '/_app/skills_/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
   '/_app/skills_/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
   '/_app/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
   '/_app/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
+  '/_app/sandboxes/$blueprintId/': typeof AppSandboxesBlueprintIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -288,6 +356,7 @@ export interface FileRouteTypes {
     | '/'
     | '/skills'
     | '/agent/$agentId'
+    | '/sandboxes/$blueprintId'
     | '/agent/new'
     | '/skills/$skillId'
     | '/skills/catalog'
@@ -296,6 +365,7 @@ export interface FileRouteTypes {
     | '/tools/connections'
     | '/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/sandboxes/'
     | '/tools/'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
@@ -309,10 +379,15 @@ export interface FileRouteTypes {
     | '/agent/$agentId/skills'
     | '/agent/$agentId/tools'
     | '/agent/$agentId/tracing'
+    | '/sandboxes/$blueprintId/environment'
+    | '/sandboxes/$blueprintId/sandboxes'
+    | '/sandboxes/$blueprintId/settings'
+    | '/sandboxes/$blueprintId/tools'
     | '/skills/catalog/$groupId'
     | '/skills/sources/$sourceId'
     | '/tools/catalog/$providerId'
     | '/agent/$agentId/'
+    | '/sandboxes/$blueprintId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/skills'
@@ -325,6 +400,7 @@ export interface FileRouteTypes {
     | '/tools/connections'
     | '/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/sandboxes'
     | '/tools'
     | '/agent/$agentId/capabilities'
     | '/agent/$agentId/chat-providers'
@@ -338,16 +414,22 @@ export interface FileRouteTypes {
     | '/agent/$agentId/skills'
     | '/agent/$agentId/tools'
     | '/agent/$agentId/tracing'
+    | '/sandboxes/$blueprintId/environment'
+    | '/sandboxes/$blueprintId/sandboxes'
+    | '/sandboxes/$blueprintId/settings'
+    | '/sandboxes/$blueprintId/tools'
     | '/skills/catalog/$groupId'
     | '/skills/sources/$sourceId'
     | '/tools/catalog/$providerId'
     | '/agent/$agentId'
+    | '/sandboxes/$blueprintId'
   id:
     | '__root__'
     | '/_app'
     | '/_app/skills'
     | '/_app/'
     | '/_app/agent/$agentId'
+    | '/_app/sandboxes/$blueprintId'
     | '/_app/agent/new'
     | '/_app/skills_/$skillId'
     | '/_app/skills_/catalog'
@@ -356,6 +438,7 @@ export interface FileRouteTypes {
     | '/_app/tools/connections'
     | '/_app/tools/remote-servers'
     | '/connections/broker/$setupId'
+    | '/_app/sandboxes/'
     | '/_app/tools/'
     | '/_app/agent/$agentId/capabilities'
     | '/_app/agent/$agentId/chat-providers'
@@ -369,10 +452,15 @@ export interface FileRouteTypes {
     | '/_app/agent/$agentId/skills'
     | '/_app/agent/$agentId/tools'
     | '/_app/agent/$agentId/tracing'
+    | '/_app/sandboxes/$blueprintId/environment'
+    | '/_app/sandboxes/$blueprintId/sandboxes'
+    | '/_app/sandboxes/$blueprintId/settings'
+    | '/_app/sandboxes/$blueprintId/tools'
     | '/_app/skills_/catalog/$groupId'
     | '/_app/skills_/sources/$sourceId'
     | '/_app/tools/catalog/$providerId'
     | '/_app/agent/$agentId/'
+    | '/_app/sandboxes/$blueprintId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -415,6 +503,20 @@ declare module '@tanstack/react-router' {
       path: '/agent/new'
       fullPath: '/agent/new'
       preLoaderRoute: typeof AppAgentNewRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/sandboxes/': {
+      id: '/_app/sandboxes/'
+      path: '/sandboxes'
+      fullPath: '/sandboxes/'
+      preLoaderRoute: typeof AppSandboxesIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/sandboxes/$blueprintId': {
+      id: '/_app/sandboxes/$blueprintId'
+      path: '/sandboxes/$blueprintId'
+      fullPath: '/sandboxes/$blueprintId'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/_app/skills_/$skillId': {
@@ -564,6 +666,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAgentAgentIdTracingRouteImport
       parentRoute: typeof AppAgentAgentIdRouteRoute
     }
+    '/_app/sandboxes/$blueprintId/': {
+      id: '/_app/sandboxes/$blueprintId/'
+      path: '/'
+      fullPath: '/sandboxes/$blueprintId/'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdIndexRouteImport
+      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
+    }
+    '/_app/sandboxes/$blueprintId/environment': {
+      id: '/_app/sandboxes/$blueprintId/environment'
+      path: '/environment'
+      fullPath: '/sandboxes/$blueprintId/environment'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdEnvironmentRouteImport
+      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
+    }
+    '/_app/sandboxes/$blueprintId/sandboxes': {
+      id: '/_app/sandboxes/$blueprintId/sandboxes'
+      path: '/sandboxes'
+      fullPath: '/sandboxes/$blueprintId/sandboxes'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdSandboxesRouteImport
+      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
+    }
+    '/_app/sandboxes/$blueprintId/settings': {
+      id: '/_app/sandboxes/$blueprintId/settings'
+      path: '/settings'
+      fullPath: '/sandboxes/$blueprintId/settings'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdSettingsRouteImport
+      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
+    }
+    '/_app/sandboxes/$blueprintId/tools': {
+      id: '/_app/sandboxes/$blueprintId/tools'
+      path: '/tools'
+      fullPath: '/sandboxes/$blueprintId/tools'
+      preLoaderRoute: typeof AppSandboxesBlueprintIdToolsRouteImport
+      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
+    }
     '/_app/skills_/catalog/$groupId': {
       id: '/_app/skills_/catalog/$groupId'
       path: '/$groupId'
@@ -623,6 +760,30 @@ const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
 const AppAgentAgentIdRouteRouteWithChildren =
   AppAgentAgentIdRouteRoute._addFileChildren(AppAgentAgentIdRouteRouteChildren)
 
+interface AppSandboxesBlueprintIdRouteRouteChildren {
+  AppSandboxesBlueprintIdEnvironmentRoute: typeof AppSandboxesBlueprintIdEnvironmentRoute
+  AppSandboxesBlueprintIdSandboxesRoute: typeof AppSandboxesBlueprintIdSandboxesRoute
+  AppSandboxesBlueprintIdSettingsRoute: typeof AppSandboxesBlueprintIdSettingsRoute
+  AppSandboxesBlueprintIdToolsRoute: typeof AppSandboxesBlueprintIdToolsRoute
+  AppSandboxesBlueprintIdIndexRoute: typeof AppSandboxesBlueprintIdIndexRoute
+}
+
+const AppSandboxesBlueprintIdRouteRouteChildren: AppSandboxesBlueprintIdRouteRouteChildren =
+  {
+    AppSandboxesBlueprintIdEnvironmentRoute:
+      AppSandboxesBlueprintIdEnvironmentRoute,
+    AppSandboxesBlueprintIdSandboxesRoute:
+      AppSandboxesBlueprintIdSandboxesRoute,
+    AppSandboxesBlueprintIdSettingsRoute: AppSandboxesBlueprintIdSettingsRoute,
+    AppSandboxesBlueprintIdToolsRoute: AppSandboxesBlueprintIdToolsRoute,
+    AppSandboxesBlueprintIdIndexRoute: AppSandboxesBlueprintIdIndexRoute,
+  }
+
+const AppSandboxesBlueprintIdRouteRouteWithChildren =
+  AppSandboxesBlueprintIdRouteRoute._addFileChildren(
+    AppSandboxesBlueprintIdRouteRouteChildren,
+  )
+
 interface AppSkillsCatalogRouteChildren {
   AppSkillsCatalogGroupIdRoute: typeof AppSkillsCatalogGroupIdRoute
 }
@@ -650,6 +811,7 @@ interface AppRouteRouteChildren {
   AppSkillsRoute: typeof AppSkillsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppAgentAgentIdRouteRoute: typeof AppAgentAgentIdRouteRouteWithChildren
+  AppSandboxesBlueprintIdRouteRoute: typeof AppSandboxesBlueprintIdRouteRouteWithChildren
   AppAgentNewRoute: typeof AppAgentNewRoute
   AppSkillsSkillIdRoute: typeof AppSkillsSkillIdRoute
   AppSkillsCatalogRoute: typeof AppSkillsCatalogRouteWithChildren
@@ -657,6 +819,7 @@ interface AppRouteRouteChildren {
   AppToolsCatalogRoute: typeof AppToolsCatalogRouteWithChildren
   AppToolsConnectionsRoute: typeof AppToolsConnectionsRoute
   AppToolsRemoteServersRoute: typeof AppToolsRemoteServersRoute
+  AppSandboxesIndexRoute: typeof AppSandboxesIndexRoute
   AppToolsIndexRoute: typeof AppToolsIndexRoute
   AppSkillsSourcesSourceIdRoute: typeof AppSkillsSourcesSourceIdRoute
 }
@@ -665,6 +828,8 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSkillsRoute: AppSkillsRoute,
   AppIndexRoute: AppIndexRoute,
   AppAgentAgentIdRouteRoute: AppAgentAgentIdRouteRouteWithChildren,
+  AppSandboxesBlueprintIdRouteRoute:
+    AppSandboxesBlueprintIdRouteRouteWithChildren,
   AppAgentNewRoute: AppAgentNewRoute,
   AppSkillsSkillIdRoute: AppSkillsSkillIdRoute,
   AppSkillsCatalogRoute: AppSkillsCatalogRouteWithChildren,
@@ -672,6 +837,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppToolsCatalogRoute: AppToolsCatalogRouteWithChildren,
   AppToolsConnectionsRoute: AppToolsConnectionsRoute,
   AppToolsRemoteServersRoute: AppToolsRemoteServersRoute,
+  AppSandboxesIndexRoute: AppSandboxesIndexRoute,
   AppToolsIndexRoute: AppToolsIndexRoute,
   AppSkillsSourcesSourceIdRoute: AppSkillsSourcesSourceIdRoute,
 }

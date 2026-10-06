@@ -12,7 +12,7 @@ registers its instructions as `responder/instructions`.
 
 Required environment: `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (the
 token comes from registering a Gateway deployment for the agent). Optional: `OPENAI_MODEL`
-(default `gpt-4o-mini`).
+(default `gpt-5.6-terra`).
 
 ```
 cd sdk/py

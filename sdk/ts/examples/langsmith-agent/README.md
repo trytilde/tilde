@@ -4,7 +4,7 @@ A small recipe agent for inspecting LangSmith's trace UI. It uses AI SDK 6,
 `@ai-sdk/openai`, Zod, and LangSmith's `wrapAISDK` integration. A run contains a
 parent `dummy.recipe-agent` trace, an OpenAI tool-selection step, a deterministic
 `getPantry` tool, and a streamed recipe response. The default model is
-`gpt-4o-mini`; the LangSmith project defaults to `test`.
+`gpt-5.6-terra`; the LangSmith project defaults to `test`.
 
 ## Generate a trace without starting Tilde
 
@@ -30,7 +30,7 @@ LANGSMITH_TRACING=true
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGSMITH_PROJECT=test
 # LANGSMITH_WORKSPACE_ID=...  # If required by a multi-workspace API key.
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-5.6-terra
 # AGENT_PROMPT=Write a vegetarian lasagna recipe for 4 people.
 ```
 

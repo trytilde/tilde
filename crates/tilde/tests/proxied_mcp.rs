@@ -167,7 +167,11 @@ async fn discovered_mcp_tools_are_called_through_tilde_with_the_connection_crede
         "an unchanged server is a no-op"
     );
     let source = agent_tools
-        .add_source(fx.agent, tilde::tools::Target::Connection(connection), &[])
+        .add_source(
+            tilde::tools::Owner::Agent(fx.agent),
+            tilde::tools::Target::Connection(connection),
+            &[],
+        )
         .await
         .unwrap();
     assert_eq!(source.slug, "tracker_team_tracker");
@@ -458,7 +462,7 @@ async fn an_output_too_large_to_record_fails_the_call_and_is_still_delivered() {
     );
     let source = agent_tools
         .add_source(
-            fx.agent,
+            tilde::tools::Owner::Agent(fx.agent),
             tilde::tools::Target::Connection(connection),
             &["export".into()],
         )

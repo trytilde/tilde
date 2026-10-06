@@ -134,7 +134,7 @@ const TOOL_SERVERS: &[ToolServer] = &[
 struct Config {
     #[envconfig(from = "OPENAI_API_KEY")]
     openai_api_key: SecretEnv,
-    #[envconfig(from = "OPENAI_MODEL", default = "gpt-4o-mini")]
+    #[envconfig(from = "OPENAI_MODEL", default = "gpt-5.6-terra")]
     model: String,
     #[envconfig(from = "ENGINE_RUNTIME_PUBLIC_URL", default = "http://127.0.0.1:8080")]
     gateway_url: String,
@@ -520,7 +520,7 @@ async fn give_example_tools(
     connections: tilde::connections::service::Connections,
     examples: &[&Example],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let tools = tilde::tools::Tools::new(connections.clone());
+    let tools = tilde::tools::Tools::new(connections.clone(), String::new());
     let hosts = tilde::tools::hosts::ToolHosts::new(connections.clone());
     let mut published = None;
     for _ in 0..90 {
@@ -600,7 +600,9 @@ async fn give_example_tools(
             (tilde::tools::Target::ToolHost(py_host.id), &py_tools),
         ] {
             if !existing.iter().any(|source| source.target == target) {
-                tools.add_source(agent, target, names).await?;
+                tools
+                    .add_source(tilde::tools::Owner::Agent(agent), target, names)
+                    .await?;
             }
         }
         if existing.is_empty() && example.key == DYNAMIC_EXAMPLE {

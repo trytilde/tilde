@@ -22,12 +22,13 @@ INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
 
 agent = create_agent(
     ChatOpenAI(
-        model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.environ.get("OPENAI_MODEL", "gpt-5.6-terra"),
+        # GPT-5.6 takes function tools with reasoning only on the Responses API.
+        use_responses_api=True,
         base_url=INFERENCE.base_url,
         api_key=INFERENCE.api_key,
         http_async_client=INFERENCE.async_client(),
         http_client=INFERENCE.client(),
-        max_tokens=600,
         max_retries=0,
         timeout=60,
     ),

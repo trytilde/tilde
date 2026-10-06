@@ -9,16 +9,28 @@ pub use q::agent_tool_list::Record as AgentToolRow;
 pub use q::source_list::Record as SourceRow;
 pub use q::tool_connection::Record as ToolConnectionRow;
 
+/// For an agent or a sandbox blueprint; `sandbox` (the agent) makes it the agent's sandbox.
 pub async fn source_insert_execute(
     db: &impl GenericClient,
     id: Uuid,
-    agent: Uuid,
+    agent: Option<Uuid>,
     connection: Option<Uuid>,
     tool_host: Option<Uuid>,
     slug: &str,
+    blueprint: Option<Uuid>,
+    sandbox: Option<Uuid>,
 ) -> DbResult<u64> {
     Ok(q::source_insert::run()
-        .bind(db, &id, &agent, &connection, &tool_host, &slug)
+        .bind(
+            db,
+            &id,
+            &agent,
+            &connection,
+            &tool_host,
+            &slug,
+            &blueprint,
+            &sandbox,
+        )
         .await?)
 }
 pub async fn source_list_all(
@@ -27,20 +39,22 @@ pub async fn source_list_all(
     agent: Option<Uuid>,
     connection: Option<Uuid>,
     tool_host: Option<Uuid>,
+    blueprint: Option<Uuid>,
 ) -> DbResult<Vec<SourceRow>> {
     Ok(q::source_list::run()
-        .bind(db, &id, &agent, &connection, &tool_host)
+        .bind(db, &id, &agent, &connection, &tool_host, &blueprint)
         .all()
         .await?)
 }
 pub async fn source_of_agent_opt(
     db: &impl GenericClient,
-    agent: Uuid,
+    agent: Option<Uuid>,
     connection: Option<Uuid>,
     tool_host: Option<Uuid>,
+    blueprint: Option<Uuid>,
 ) -> DbResult<Option<Uuid>> {
     Ok(q::source_of_agent::run()
-        .bind(db, &agent, &connection, &tool_host)
+        .bind(db, &agent, &blueprint, &connection, &tool_host)
         .opt()
         .await?
         .map(|r| r.id))
@@ -106,11 +120,26 @@ pub async fn tool_connection_opt(
         .opt()
         .await?)
 }
+/// An agent's or a sandbox blueprint's.
 pub async fn agent_functions_all(
     db: &impl GenericClient,
-    agent: Uuid,
+    agent: Option<Uuid>,
+    blueprint: Option<Uuid>,
 ) -> DbResult<Vec<AgentFunctionRow>> {
-    Ok(q::agent_functions::run().bind(db, &agent).all().await?)
+    Ok(q::agent_functions::run()
+        .bind(db, &agent, &blueprint)
+        .all()
+        .await?)
+}
+pub use q::agent_sandbox_functions::Record as AgentSandboxFunctionRow;
+pub async fn agent_sandbox_functions_all(
+    db: &impl GenericClient,
+    agent: Uuid,
+) -> DbResult<Vec<AgentSandboxFunctionRow>> {
+    Ok(q::agent_sandbox_functions::run()
+        .bind(db, &agent)
+        .all()
+        .await?)
 }
 
 pub use q::agent_host_functions::Record as AgentHostFunctionRow;
@@ -119,13 +148,15 @@ pub use q::host_call_take::Record as HostCallResultRow;
 pub use q::host_list::Record as HostRow;
 pub use q::host_tools::Record as HostToolRow;
 
+/// An agent's or a sandbox blueprint's.
 pub async fn agent_host_functions_all(
     db: &impl GenericClient,
-    agent: Uuid,
+    agent: Option<Uuid>,
     liveness_secs: f64,
+    blueprint: Option<Uuid>,
 ) -> DbResult<Vec<AgentHostFunctionRow>> {
     Ok(q::agent_host_functions::run()
-        .bind(db, &agent, &liveness_secs)
+        .bind(db, &agent, &blueprint, &liveness_secs)
         .all()
         .await?)
 }
@@ -294,6 +325,8 @@ pub struct HostCallInsert<'a> {
     pub connection: Option<Uuid>,
     /// Sealed with the row's ID; deleted with the row.
     pub credentials: Option<&'a [u8]>,
+    /// The sandbox whose process made the call.
+    pub sandbox: Option<Uuid>,
 }
 pub async fn host_call_insert_execute(
     db: &impl GenericClient,
@@ -311,6 +344,7 @@ pub async fn host_call_insert_execute(
             &call.thread,
             &call.connection,
             &call.credentials,
+            &call.sandbox,
         )
         .await?)
 }
@@ -599,9 +633,14 @@ pub async fn discovery_set_execute(
 ) -> DbResult<u64> {
     Ok(q::discovery_set::run().bind(db, &connection, &hash).await?)
 }
+/// An agent's or a sandbox blueprint's.
 pub async fn agent_mcp_functions_all(
     db: &impl GenericClient,
-    agent: Uuid,
+    agent: Option<Uuid>,
+    blueprint: Option<Uuid>,
 ) -> DbResult<Vec<AgentMcpFunctionRow>> {
-    Ok(q::agent_mcp_functions::run().bind(db, &agent).all().await?)
+    Ok(q::agent_mcp_functions::run()
+        .bind(db, &agent, &blueprint)
+        .all()
+        .await?)
 }

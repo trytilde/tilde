@@ -6,21 +6,26 @@ pub struct RunParams {
     pub p2: Option<uuid::Uuid>,
     pub p3: Option<uuid::Uuid>,
     pub p4: Option<uuid::Uuid>,
+    pub p5: Option<uuid::Uuid>,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub id: uuid::Uuid,
-    pub agent_id: uuid::Uuid,
+    pub agent_id: Option<uuid::Uuid>,
     pub connection_id: Option<uuid::Uuid>,
     pub tool_host_id: Option<uuid::Uuid>,
     pub slug: String,
+    pub sandbox_blueprint_id: Option<uuid::Uuid>,
+    pub sandbox: bool,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
-    pub agent_id: uuid::Uuid,
+    pub agent_id: Option<uuid::Uuid>,
     pub connection_id: Option<uuid::Uuid>,
     pub tool_host_id: Option<uuid::Uuid>,
     pub slug: &'a str,
+    pub sandbox_blueprint_id: Option<uuid::Uuid>,
+    pub sandbox: bool,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -30,6 +35,8 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             connection_id,
             tool_host_id,
             slug,
+            sandbox_blueprint_id,
+            sandbox,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -38,6 +45,8 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             connection_id,
             tool_host_id,
             slug: slug.into(),
+            sandbox_blueprint_id,
+            sandbox,
         }
     }
 }
@@ -110,7 +119,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id,agent_id,connection_id,tool_host_id,slug FROM agent_tool_sources WHERE ($1::UUID IS NULL OR id=$1) AND ($2::UUID IS NULL OR agent_id=$2) AND ($3::UUID IS NULL OR connection_id=$3) AND ($4::UUID IS NULL OR tool_host_id=$4) ORDER BY agent_id,slug",
+        "SELECT id,agent_id,connection_id,tool_host_id,slug,sandbox_blueprint_id,sandbox_agent_id IS NOT NULL AS sandbox FROM agent_tool_sources WHERE ($1::UUID IS NULL OR id=$1) AND ($2::UUID IS NULL OR agent_id=$2) AND ($3::UUID IS NULL OR connection_id=$3) AND ($4::UUID IS NULL OR tool_host_id=$4) AND ($5::UUID IS NULL OR sandbox_blueprint_id=$5) ORDER BY agent_id,sandbox_blueprint_id,slug",
         None,
     )
 }
@@ -129,10 +138,11 @@ impl RunStmt {
         p2: &'a Option<uuid::Uuid>,
         p3: &'a Option<uuid::Uuid>,
         p4: &'a Option<uuid::Uuid>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
+        p5: &'a Option<uuid::Uuid>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 5> {
         RecordQuery {
             client,
-            params: [p1, p2, p3, p4],
+            params: [p1, p2, p3, p4, p5],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -143,6 +153,8 @@ impl RunStmt {
                         connection_id: row.try_get(2)?,
                         tool_host_id: row.try_get(3)?,
                         slug: row.try_get(4)?,
+                        sandbox_blueprint_id: row.try_get(5)?,
+                        sandbox: row.try_get(6)?,
                     })
                 },
             mapper: |it| Record::from(it),
@@ -150,14 +162,16 @@ impl RunStmt {
     }
 }
 impl<'c, 'a, 's, C: GenericClient>
-    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 4>, C>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 5>, C>
     for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
         params: &'a RunParams,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 4> {
-        self.bind(client, &params.p1, &params.p2, &params.p3, &params.p4)
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 5> {
+        self.bind(
+            client, &params.p1, &params.p2, &params.p3, &params.p4, &params.p5,
+        )
     }
 }

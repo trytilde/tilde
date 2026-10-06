@@ -1,6 +1,7 @@
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }));
 // The inference tab stays mounted; its connections and budgets have their own tests.
 vi.mock("@/components/agent-connections", () => ({ AgentConnections: () => null }));
+vi.mock("@/components/agent-sandbox", () => ({ AgentSandbox: () => null }));
 import { useState } from "react";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { AgentEditor } from "./agent-editor";

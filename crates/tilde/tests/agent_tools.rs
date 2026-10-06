@@ -70,7 +70,7 @@ async fn an_agents_tools_reach_the_provider_with_connection_credentials() {
     connections.seed().await.unwrap();
     let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1:1".into())
         .with_connections(connections.clone());
-    let tools = Tools::new(connections.clone());
+    let tools = Tools::new(connections.clone(), String::new());
 
     // A ready Tavily connection, seeded as the setup broker would leave it. Tools take no
     // connection assignment: the agent's own tool source is what grants them.
@@ -201,7 +201,11 @@ async fn an_agents_tools_reach_the_provider_with_connection_credentials() {
         let tool_names: Vec<String> = tool_names.iter().map(|t| t.to_string()).collect();
         async move {
             tools
-                .add_source(agent, Target::Connection(connection), &tool_names)
+                .add_source(
+                    tilde::tools::Owner::Agent(agent),
+                    Target::Connection(connection),
+                    &tool_names,
+                )
                 .await
         }
     };
@@ -241,7 +245,7 @@ async fn an_agents_tools_reach_the_provider_with_connection_credentials() {
     let chosen = |agent| {
         using
             .iter()
-            .find(|s| s.agent_id == agent)
+            .find(|s| s.owner == tilde::tools::Owner::Agent(agent))
             .unwrap()
             .tools
             .iter()

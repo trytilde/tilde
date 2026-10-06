@@ -3,7 +3,7 @@ Run with `REGISTER_DEV_AGENTS=1 task dev`. The debug-only `tilde dev-agent` comm
 beside the other SDK examples. Set `DEV_AGENTS=mastra` to start only this one.
 
 A Mastra counterpart of `sdk/ts/examples/vercel-ai-example-agent`. Start it as a plain SDK host;
-it uses `OPENAI_MODEL` (default `gpt-4o-mini`).
+it uses `OPENAI_MODEL` (default `gpt-5.6-terra`).
 It dials out to Tilde with `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (a Gateway deployment token for the agent) and listens on no port. Keys and tokens are never logged.
 
 The model receives only `ctx.channel.current` tools and responds by calling them.

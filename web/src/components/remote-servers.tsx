@@ -94,7 +94,8 @@ export function RemoteServersPage() {
         Promise.all(
           hosts.toolHosts.map((host) =>
             tools.listToolSources({ toolHostId: host.id }, { signal }).then(
-              ({ sources }) => [...new Set(sources.map((s) => s.agentId))],
+              // Blueprint-owned sources have no agent; this column lists agents.
+              ({ sources }) => [...new Set(sources.filter((s) => s.agentId).map((s) => s.agentId))],
               () => [],
             ),
           ),

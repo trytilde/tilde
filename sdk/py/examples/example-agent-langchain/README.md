@@ -15,7 +15,7 @@ Run it from `sdk/py` with the workspace environment:
 TILDE_GATEWAY_URL=... TILDE_DEPLOYMENT_TOKEN=... uv run --directory examples/example-agent-langchain python main.py
 ```
 
-`OPENAI_MODEL` (default `gpt-4o-mini`) is optional. The deployment token comes
+`OPENAI_MODEL` (default `gpt-5.6-terra`) is optional. The deployment token comes
 from registering a Gateway deployment for the agent; the host dials out to Tilde
 and exposes no endpoint. Assign channels normally.
 

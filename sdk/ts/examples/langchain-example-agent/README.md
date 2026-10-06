@@ -3,7 +3,7 @@ Run with `REGISTER_DEV_AGENTS=1 task dev`. The debug-only `tilde dev-agent` comm
 beside the other SDK examples. Set `DEV_AGENTS=langchain` to start only this one.
 
 A LangChain/LangGraph counterpart to `sdk/ts/examples/vercel-ai-example-agent`. It uses
-`OPENAI_MODEL` (default `gpt-4o-mini`).
+`OPENAI_MODEL` (default `gpt-5.6-terra`).
 It dials out to Tilde with `TILDE_GATEWAY_URL` and `TILDE_DEPLOYMENT_TOKEN` (a Gateway deployment token for the agent) and listens on no port. Keys and tokens are never logged.
 
 The model receives only `ctx.channel.current` tools and responds by calling them.

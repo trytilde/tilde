@@ -37,9 +37,9 @@ agent = Agent(
         + TOOL_GUIDANCE
     ),
     model=OpenAIResponsesModel(
-        model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"), openai_client=client
+        model=os.environ.get("OPENAI_MODEL", "gpt-5.6-terra"), openai_client=client
     ),
-    model_settings=ModelSettings(max_tokens=600, store=False),
+    model_settings=ModelSettings(store=False),
 )
 
 

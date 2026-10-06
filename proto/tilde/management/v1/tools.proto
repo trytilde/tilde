@@ -9,6 +9,9 @@ import "tilde/types/v1/chat.proto";
 // the agent picks the tools it uses; they are offered as `{source slug}.{tool name}`, and the
 // agent's tools_invoke capability still filters those names. Connections and tool hosts hold
 // credentials and describe their tools; which tools an agent gets is the agent's configuration.
+// A sandbox blueprint owns sources the same way: their tools are offered to processes inside its
+// sandboxes. An agent with a sandbox also has the sandbox as a source of the fixed sandbox tools;
+// it goes with the agent's sandbox setting and cannot be removed on its own.
 service ToolService {
   rpc ListProviderTools(ListProviderToolsRequest) returns (ListProviderToolsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   // MCP-served connections only: asks the server for its tools and replaces the stored snapshot.
@@ -63,11 +66,14 @@ message RefreshToolHostRequest { string id = 1; }
 message RefreshToolHostResponse { ToolHost tool_host = 1; }
 message DeleteToolHostRequest { string id = 1; }
 message DeleteToolHostResponse {}
-// One agent's use of one source. Exactly one of connection_id and tool_host_id is set. The slug,
-// derived from the source's name when it is added, prefixes the catalog names of its tools.
+// One owner's use of one source. The owner is an agent (`agent_id`) or a sandbox blueprint
+// (`sandbox_blueprint_id`). Exactly one of connection_id, tool_host_id and sandbox is set;
+// `sandbox` marks the agent's sandbox, whose tools are the fixed sandbox tools. The slug, derived
+// from the source's name when it is added, prefixes the catalog names of its tools.
 message ToolSource {
   string id = 1; string agent_id = 2; optional string connection_id = 3; optional string tool_host_id = 4;
   string slug = 5; repeated AgentTool tools = 7;
+  optional string sandbox_blueprint_id = 8; bool sandbox = 9;
 }
 // How an agent is offered all of its tools. DIRECT lists them in its catalog. DYNAMIC keeps them
 // out of it: the agent finds them with tools.search and calls them through tools.execute.
@@ -86,20 +92,29 @@ message ProviderTool { string name = 1; string description = 2; string input_sch
 // A connection's tools, with `tool_host_id` instead a tool host's, or with `provider_id` the
 // tools a catalog provider offers before any connection: its built-in tools, its tool host's, or
 // an MCP server's advertised list (the connected server's own list replaces it once a connection
-// is ready). `search` matches a tool's name or description case-insensitively.
-message ListProviderToolsRequest { string connection_id = 1; optional string provider_id = 2; optional string tool_host_id = 3; optional string search = 4; }
+// is ready). `sandbox` lists the fixed sandbox tools. `search` matches a tool's name or
+// description case-insensitively.
+message ListProviderToolsRequest {
+  string connection_id = 1; optional string provider_id = 2; optional string tool_host_id = 3; optional string search = 4;
+  bool sandbox = 5;
+}
 message ListProviderToolsResponse { repeated ProviderTool tools = 1; }
 message RefreshConnectionToolsRequest { string connection_id = 1; }
 // `changed` is false when the server described the same tools as before.
 message RefreshConnectionToolsResponse { repeated ProviderTool tools = 1; bool changed = 2; }
-// Exactly one filter: an agent's sources, or the agents using a connection or tool host.
-message ListToolSourcesRequest { optional string agent_id = 1; optional string connection_id = 2; optional string tool_host_id = 3; }
+// Exactly one filter: an agent's or a sandbox blueprint's sources, or the sources using a
+// connection or tool host.
+message ListToolSourcesRequest {
+  optional string agent_id = 1; optional string connection_id = 2; optional string tool_host_id = 3;
+  optional string sandbox_blueprint_id = 4;
+}
 message ListToolSourcesResponse { repeated ToolSource sources = 1; }
-// Exactly one of connection_id and tool_host_id; an agent uses each at most once. `tool_names`
-// are the tools the agent starts with.
+// For an agent (`agent_id`) or a sandbox blueprint (`sandbox_blueprint_id`); exactly one of
+// connection_id and tool_host_id, and an owner uses each at most once. `tool_names` are the tools
+// it starts with.
 message AddToolSourceRequest {
   string agent_id = 1; optional string connection_id = 2; optional string tool_host_id = 3;
-  repeated string tool_names = 5;
+  repeated string tool_names = 5; optional string sandbox_blueprint_id = 6;
 }
 message AddToolSourceResponse { ToolSource source = 1; }
 message GetToolModeRequest { string agent_id = 1; }

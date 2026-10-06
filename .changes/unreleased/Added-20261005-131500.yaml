@@ -1,0 +1,3 @@
+kind: Added
+body: "Sandboxes: blueprints launch E2B or Modal VMs for agents, with sandbox tools, reuse modes, encrypted environment variables and blueprint tools callable from inside the VM through `tilde sandbox`."
+time: 2026-10-05T13:15:00.000000+00:00

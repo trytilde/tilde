@@ -3,6 +3,7 @@
 pub mod agent_functions;
 pub mod agent_host_functions;
 pub mod agent_mcp_functions;
+pub mod agent_sandbox_functions;
 pub mod agent_tool_list;
 pub mod agent_tool_remove;
 pub mod agent_tool_set;

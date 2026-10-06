@@ -18,7 +18,7 @@ export const agent = new ToolLoopAgent({
   id: "vercel-ai-example-agent",
   instructions:
     "You are Example Agent 1, a helpful local development assistant. Use the current channel tools to respond to the latest message, concisely and helpfully. Model text is private and is not delivered to the user. Choose the appropriate provider tool using its instructions and conversation references. Use the supplied attachments when answering. Your other tools (the time, dice, a CRM, unit and date helpers, and tools.search when some tools are only found by searching) are for working out the answer; still reply through the channel tools.",
-  model: openai.responses(process.env.OPENAI_MODEL ?? "gpt-4o-mini"),
+  model: openai.responses(process.env.OPENAI_MODEL ?? "gpt-5.6-terra"),
   stopWhen: stepCountIs(8),
   maxOutputTokens: 600,
   maxRetries: 0,

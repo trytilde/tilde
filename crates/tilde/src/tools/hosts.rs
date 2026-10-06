@@ -513,6 +513,7 @@ impl ToolHosts {
                         thread: None,
                         connection: Some(connection),
                         credentials: Some(&sealed),
+                        sandbox: None,
                     },
                     VERIFY_TIMEOUT,
                 )
@@ -582,6 +583,8 @@ impl ToolHosts {
                 }
                 let id = crate::chat::id(&request.call_id)?;
                 let sealed = values.as_ref().map(|v| self.seal(id, v)).transpose()?;
+                // A call from a shared sandbox has no agent or thread of its own.
+                let optional = |id: &str| (!id.is_empty()).then(|| crate::chat::id(id)).transpose();
                 self.enqueue(
                     db::HostCallInsert {
                         id,
@@ -589,10 +592,15 @@ impl ToolHosts {
                         kind: "call",
                         name: &request.name,
                         input_json: &request.input_json,
-                        agent: Some(crate::chat::id(&request.agent_id)?),
-                        thread: Some(crate::chat::id(&request.thread_id)?),
+                        agent: optional(&request.agent_id)?,
+                        thread: optional(&request.thread_id)?,
                         connection: target.connection.as_ref().map(|(id, _)| *id),
                         credentials: sealed.as_deref(),
+                        sandbox: request
+                            .sandbox_id
+                            .as_deref()
+                            .map(crate::chat::id)
+                            .transpose()?,
                     },
                     CALL_TIMEOUT,
                 )
@@ -731,7 +739,8 @@ impl ToolHostService for Rpc {
                             call_id: call.id.to_string(), name: call.name, input_json: call.input_json,
                             agent_id: call.agent_id.map(|a| a.to_string()).unwrap_or_default(),
                             thread_id: call.thread_id.map(|t| t.to_string()).unwrap_or_default(),
-                            connection_id, connection_type: call.connection_type, credentials, ..Default::default()
+                            connection_id, connection_type: call.connection_type, credentials,
+                            sandbox_id: call.sandbox_id.map(|s| s.to_string()), ..Default::default()
                         }))
                     };
                     yield Frame(wire::WatchResponse { frame: Some(frame), ..Default::default() });

@@ -1,4 +1,5 @@
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <input aria-label="IAM draft" /> }));
+vi.mock("@/components/agent-sandbox", () => ({ AgentSandbox: () => null }));
 import type { ReactNode } from "react";
 import { create } from "@bufbuild/protobuf";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";

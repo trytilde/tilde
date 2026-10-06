@@ -871,6 +871,9 @@ pub const TOOL_SERVICE_LIST_MCP_SERVER_HEALTH_SPEC: ::connectrpc::Spec = ::conne
 /// the agent picks the tools it uses; they are offered as `{source slug}.{tool name}`, and the
 /// agent's tools_invoke capability still filters those names. Connections and tool hosts hold
 /// credentials and describe their tools; which tools an agent gets is the agent's configuration.
+/// A sandbox blueprint owns sources the same way: their tools are offered to processes inside its
+/// sandboxes. An agent with a sandbox also has the sandbox as a source of the fixed sandbox tools;
+/// it goes with the agent's sandbox setting and cannot be removed on its own.
 ///
 /// # Implementing handlers
 ///

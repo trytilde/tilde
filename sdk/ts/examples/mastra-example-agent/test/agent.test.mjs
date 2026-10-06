@@ -74,7 +74,7 @@ function context({ baseURL = "http://127.0.0.1:1", fetch: send = fetch, steering
   };
 }
 function response(output) {
-  return { id: "resp_fixture", created_at: 1700000000, model: "gpt-4o-mini", output };
+  return { id: "resp_fixture", created_at: 1700000000, model: "gpt-5.6-terra", output };
 }
 const privateText = {
   id: "msg_private",
@@ -161,7 +161,8 @@ test("Mastra runs current-channel tools with the model's call ID; returned text 
       "steering input reaches the model as a user message at the next step",
     );
     // The deployed skill and the registry skill both reach the model through Mastra's skills.
-    const system = JSON.stringify(requests[0].input.filter((item) => item.role === "system"));
+    // Reasoning models take the instructions as developer messages.
+    const system = JSON.stringify(requests[0].input.filter((item) => item.role === "developer"));
     assert.match(system, /channel-replies/);
     assert.match(system, /refunds/);
     // Static instructions are matched by the gateway itself; nothing is stamped.

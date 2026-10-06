@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
+from agno.models.openai import OpenAIResponses
 from agno.skills import LocalSkills
 from bundled_tools import TOOL_GUIDANCE, TOOLS
 
@@ -23,14 +23,13 @@ TIMEOUT_SECONDS = 60
 # each request resolves the invocation running it.
 INFERENCE = tilde.inference(os.environ.get("TILDE_INFERENCE", "default"))
 responder = Agent(
-    model=OpenAIChat(
-        id=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+    model=OpenAIResponses(
+        id=os.environ.get("OPENAI_MODEL", "gpt-5.6-terra"),
         base_url=INFERENCE.base_url,
         api_key=INFERENCE.api_key,
         http_client=INFERENCE.async_client(),
         store=False,
         max_retries=0,
-        max_tokens=600,
     ),
     instructions=(
         "You are Example Agent 1, a helpful local development assistant. Use the current channel "
