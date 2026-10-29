@@ -48,6 +48,19 @@ pub struct Row {
     pub character_per_m_micros: Option<i64>,
     /// Micro-dollars per second of audio (transcription).
     pub second_micros: Option<i64>,
+    /// Set on embedding models: their native dimension, 0 when the sheet does not list it.
+    #[serde(default)]
+    pub embedding_vector_size: Option<u32>,
+}
+/// The vendored sheet's embedding models for a provider, with their native dimension.
+pub fn embedding_models(provider: &str) -> Result<Vec<(String, u32)>, Error> {
+    let rows: Vec<Row> = serde_json::from_str(include_str!("prices.json"))
+        .map_err(|_| Error::Invalid("Vendored price sheet is invalid".into()))?;
+    Ok(rows
+        .into_iter()
+        .filter(|r| r.provider_id == provider)
+        .filter_map(|r| Some((r.model, r.embedding_vector_size?)))
+        .collect())
 }
 #[derive(Deserialize)]
 struct Entry {
@@ -109,6 +122,8 @@ pub fn from_litellm(json: &str) -> Result<Vec<Row>, Error> {
                 second_micros: entry
                     .input_cost_per_second
                     .map(|p| (p * 1_000_000.0).round() as i64),
+                // Prices only; embedding suggestions come from the vendored sheet.
+                embedding_vector_size: None,
             });
         }
     }

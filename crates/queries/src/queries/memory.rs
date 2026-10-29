@@ -1,0 +1,32 @@
+// This file was generated with `cornucopia`. Do not modify.
+
+pub mod agent_banks;
+pub mod agent_live;
+pub mod agent_memory_delete;
+pub mod at_path;
+pub mod bank_delete;
+pub mod bank_insert;
+pub mod bank_list;
+pub mod bank_update;
+pub mod browse;
+pub mod job_done;
+pub mod job_enqueue;
+pub mod job_failed;
+pub mod jobs_claim;
+pub mod link_delete;
+pub mod link_set;
+pub mod memories_get;
+pub mod memory_forget;
+pub mod memory_insert;
+pub mod memory_list;
+pub mod memory_status;
+pub mod memory_update;
+pub mod recall_text;
+pub mod recall_vector_1024;
+pub mod recall_vector_1536;
+pub mod revision_insert;
+pub mod revisions_list;
+pub mod settings_clear;
+pub mod settings_get;
+pub mod settings_set;
+pub mod vector_session;

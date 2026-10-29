@@ -110,7 +110,8 @@ services:
       - state:/state
 
   postgres:
-    image: postgres:16-alpine
+    # pgvector backs memory recall.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: tilde
       POSTGRES_PASSWORD: tilde

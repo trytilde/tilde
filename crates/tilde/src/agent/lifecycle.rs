@@ -45,6 +45,8 @@ impl Agents {
             crate::connections::db::tilde_delete_execute(&tx, tilde.id).await?;
         }
         crate::agent::db::delete_execute(&tx, id).await?;
+        // The agent row stays (soft delete), so its own banks and memories go here.
+        crate::memory::db::agent_memory_delete_execute(&tx, id).await?;
         tx.commit().await?;
         drop(tx_client);
         Ok(())

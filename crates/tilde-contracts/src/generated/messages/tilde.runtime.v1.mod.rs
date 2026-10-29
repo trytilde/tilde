@@ -4,6 +4,7 @@ include!("tilde.runtime.v1.agents.rs");
 include!("tilde.runtime.v1.cache.rs");
 include!("tilde.runtime.v1.chat.rs");
 include!("tilde.runtime.v1.controls.rs");
+include!("tilde.runtime.v1.memory.rs");
 include!("tilde.runtime.v1.prompts.rs");
 include!("tilde.runtime.v1.skills.rs");
 #[allow(
@@ -27,6 +28,7 @@ pub mod __buffa {
         include!("tilde.runtime.v1.cache.__view.rs");
         include!("tilde.runtime.v1.chat.__view.rs");
         include!("tilde.runtime.v1.controls.__view.rs");
+        include!("tilde.runtime.v1.memory.__view.rs");
         include!("tilde.runtime.v1.prompts.__view.rs");
         include!("tilde.runtime.v1.skills.__view.rs");
     }
@@ -87,6 +89,10 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_MEMORY_TOOL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_MEMORY_TOOL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SKILL_FILE_INFO_JSON_ANY);
@@ -328,6 +334,22 @@ pub use self::__buffa::view::AcknowledgeCommandRequestOwnedView;
 pub use self::__buffa::view::AcknowledgeCommandResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryToolsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeMemoryToolRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeMemoryToolRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeMemoryToolResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeMemoryToolResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListPromptsRequestView;
 #[doc(inline)]

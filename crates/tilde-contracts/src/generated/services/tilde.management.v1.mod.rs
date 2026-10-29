@@ -6,6 +6,7 @@ include!("tilde.management.v1.deployments.__connect.rs");
 include!("tilde.management.v1.identities.__connect.rs");
 include!("tilde.management.v1.inference.__connect.rs");
 include!("tilde.management.v1.logs.__connect.rs");
+include!("tilde.management.v1.memory.__connect.rs");
 include!("tilde.management.v1.prompts.__connect.rs");
 include!("tilde.management.v1.routines.__connect.rs");
 include!("tilde.management.v1.sandboxes.__connect.rs");

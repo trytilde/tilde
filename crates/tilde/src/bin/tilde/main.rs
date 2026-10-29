@@ -270,6 +270,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .tools
         .clone()
         .map(|tools| tokio::spawn(tools.sandboxes.run(chat_shutdown_rx.clone())));
+    let _memory_worker = chat
+        .tools
+        .clone()
+        .map(|tools| tokio::spawn(tools.memory.run(chat_shutdown_rx.clone())));
     let chat_worker = tokio::spawn(chat.clone().worker(chat_shutdown_rx));
     let readiness_pool = pool.clone();
     let mut router = Router::new()

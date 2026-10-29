@@ -1,0 +1,3 @@
+kind: Added
+body: "Add memory banks: agents recall, write, supersede and forget facts through built-in memory tools (sidecar-hosted agents included, answered by the gateway) in banks of their own or shared ones (read or read-write, optionally kept per person), with hybrid full-text and pgvector recall over embeddings from an inference connection, and MemoryService for people to curate banks, memories and embedding settings. Deleting an agent deletes its own bank. Postgres now needs the pgvector extension, 0.8 or later."
+time: 2026-10-29T19:36:36.394274184+01:00

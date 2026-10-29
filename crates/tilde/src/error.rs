@@ -23,6 +23,9 @@ pub enum Error {
     CredentialsRejected(String),
     #[error("agent not found")]
     NotFound,
+    /// Any other missing resource, named so callers see which.
+    #[error("{0} not found")]
+    Missing(&'static str),
     #[error("agent ID already exists with different creation parameters")]
     Conflict,
     /// A concurrent write changed what this one was based on; the caller reloads and retries.
@@ -61,6 +64,7 @@ impl From<Error> for connectrpc::ConnectError {
                 Self::invalid_argument(message)
             }
             Error::NotFound => Self::not_found("Agent not found"),
+            Error::Missing(what) => Self::not_found(format!("{what} not found")),
             Error::Conflict => {
                 Self::already_exists("Agent ID already exists with different parameters")
             }

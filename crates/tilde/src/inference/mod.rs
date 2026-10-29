@@ -120,6 +120,13 @@ impl Auth {
     }
 }
 
+/// Why a call Tilde made itself failed. `rejected` when the provider refused this request's content
+/// (400, 413, 422), so a smaller request may succeed; otherwise (network, timeouts, auth, rate
+/// limits, server errors) the same request may succeed later.
+pub(crate) struct PostError {
+    pub rejected: bool,
+    pub error: Error,
+}
 /// One ready inference connection with a warm connection pool to its provider.
 pub struct Upstream {
     pub connection: Uuid,
@@ -162,6 +169,60 @@ impl Upstream {
             base,
             auth,
             client,
+        })
+    }
+    /// A JSON POST Tilde makes itself (memory embeddings), to `path` below the base. Such calls
+    /// belong to no invocation, so they are not recorded in `inference_requests`.
+    pub(crate) async fn post_json(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+        timeout: Duration,
+    ) -> Result<serde_json::Value, PostError> {
+        let failed = |error| PostError {
+            rejected: false,
+            error,
+        };
+        let url = format!("{}/{path}", self.base.as_str().trim_end_matches('/'));
+        let body = serde_json::to_vec(body)
+            .map_err(|_| failed(Error::Invalid("Unable to encode the request".into())))?;
+        let mut request = self
+            .client
+            .post(&url)
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .timeout(timeout)
+            .body(body.clone())
+            .build()
+            .map_err(|_| failed(Error::Invalid("Invalid provider URL".into())))?;
+        self.authorize(&mut request, &body).map_err(failed)?;
+        let unreachable = || {
+            failed(Error::Invalid(format!(
+                "{} is unreachable",
+                self.provider.name()
+            )))
+        };
+        let response = self
+            .client
+            .execute(request)
+            .await
+            .map_err(|_| unreachable())?;
+        let status = response.status();
+        let text = response.text().await.map_err(|_| unreachable())?;
+        if !status.is_success() {
+            let detail: String = text.chars().take(300).collect();
+            return Err(PostError {
+                rejected: matches!(status.as_u16(), 400 | 413 | 422),
+                error: Error::Invalid(format!(
+                    "{} answered {status}: {detail}",
+                    self.provider.name()
+                )),
+            });
+        }
+        serde_json::from_str(&text).map_err(|_| {
+            failed(Error::Invalid(format!(
+                "{} answered with invalid JSON",
+                self.provider.name()
+            )))
         })
     }
     fn authorize(&self, request: &mut reqwest::Request, body: &[u8]) -> Result<(), Error> {

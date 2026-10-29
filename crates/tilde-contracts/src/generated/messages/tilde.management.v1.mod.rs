@@ -7,6 +7,7 @@ include!("tilde.management.v1.deployments.rs");
 include!("tilde.management.v1.identities.rs");
 include!("tilde.management.v1.inference.rs");
 include!("tilde.management.v1.logs.rs");
+include!("tilde.management.v1.memory.rs");
 include!("tilde.management.v1.prompts.rs");
 include!("tilde.management.v1.routines.rs");
 include!("tilde.management.v1.sandboxes.rs");
@@ -38,6 +39,7 @@ pub mod __buffa {
         include!("tilde.management.v1.identities.__view.rs");
         include!("tilde.management.v1.inference.__view.rs");
         include!("tilde.management.v1.logs.__view.rs");
+        include!("tilde.management.v1.memory.__view.rs");
         include!("tilde.management.v1.prompts.__view.rs");
         include!("tilde.management.v1.routines.__view.rs");
         include!("tilde.management.v1.sandboxes.__view.rs");
@@ -173,6 +175,46 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_LOG_METRICS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LOG_METRIC_BUCKET_JSON_ANY);
         reg.register_json_any(super::__GET_LOG_METRICS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_BANK_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_BANKS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_BANKS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__AGENT_MEMORY_BANK_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_MEMORY_BANKS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_MEMORY_BANKS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_MEMORY_BANK_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_MEMORY_BANK_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_REVISION_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORIES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORIES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_MEMORY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_MEMORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_MEMORY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_MEMORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MEMORY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MEMORY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__EMBEDDING_SETTINGS_JSON_ANY);
+        reg.register_json_any(super::__GET_EMBEDDING_SETTINGS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_EMBEDDING_SETTINGS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_EMBEDDING_SETTINGS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_EMBEDDING_SETTINGS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CLEAR_EMBEDDING_SETTINGS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CLEAR_EMBEDDING_SETTINGS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__EMBEDDING_MODEL_JSON_ANY);
+        reg.register_json_any(super::__LIST_EMBEDDING_MODELS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_EMBEDDING_MODELS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_REQUEST_JSON_ANY);
@@ -779,6 +821,166 @@ pub use self::__buffa::view::LogMetricBucketOwnedView;
 pub use self::__buffa::view::GetLogMetricsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetLogMetricsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryBankView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryBankOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryBanksRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryBanksRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryBanksResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryBanksResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentMemoryBankView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentMemoryBankOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentMemoryBanksRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentMemoryBanksRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentMemoryBanksResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentMemoryBanksResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentMemoryBankRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentMemoryBankRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentMemoryBankResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentMemoryBankResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryRevisionView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryRevisionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoriesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoriesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoriesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoriesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateMemoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateMemoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteMemoryResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EmbeddingSettingsView;
+#[doc(inline)]
+pub use self::__buffa::view::EmbeddingSettingsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEmbeddingSettingsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEmbeddingSettingsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEmbeddingSettingsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetEmbeddingSettingsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetEmbeddingSettingsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetEmbeddingSettingsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetEmbeddingSettingsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetEmbeddingSettingsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearEmbeddingSettingsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearEmbeddingSettingsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearEmbeddingSettingsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearEmbeddingSettingsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EmbeddingModelView;
+#[doc(inline)]
+pub use self::__buffa::view::EmbeddingModelOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListEmbeddingModelsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListEmbeddingModelsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListEmbeddingModelsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListEmbeddingModelsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListPromptsRequestView;
 #[doc(inline)]
