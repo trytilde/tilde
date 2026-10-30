@@ -6,6 +6,8 @@ import {
   BookOpenIcon,
   BotIcon,
   BoxIcon,
+  BrainIcon,
+  NotebookTextIcon,
   ChevronRightIcon,
   PlugIcon,
   ServerIcon,
@@ -109,6 +111,24 @@ export function AppSidebar() {
                     >
                       <BoxIcon />
                       <span>Sandboxes</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/memory")}
+                      render={<Link to="/memory" />}
+                    >
+                      <BrainIcon />
+                      <span>Memory</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith("/wikis")}
+                      render={<Link to="/wikis" />}
+                    >
+                      <NotebookTextIcon />
+                      <span>Wikis</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

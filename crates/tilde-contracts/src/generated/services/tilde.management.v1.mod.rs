@@ -14,3 +14,4 @@ include!("tilde.management.v1.skills.__connect.rs");
 include!("tilde.management.v1.tilde_chat.__connect.rs");
 include!("tilde.management.v1.tools.__connect.rs");
 include!("tilde.management.v1.tracing.__connect.rs");
+include!("tilde.management.v1.wikis.__connect.rs");

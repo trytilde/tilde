@@ -5,14 +5,18 @@ pub struct RunParams<
     T1: crate::ArraySql<Item = uuid::Uuid>,
     T2: crate::StringSql,
     T3: crate::StringSql,
+    T4: crate::StringSql,
 > {
     pub pb: T1,
     pub pk: Option<T2>,
     pub pp: Option<T3>,
     pub pf: Option<chrono::DateTime<chrono::Utc>>,
     pub pt: Option<chrono::DateTime<chrono::Utc>>,
+    pub po: Option<T4>,
+    pub pd: Option<uuid::Uuid>,
     pub pe: bool,
     pub pi: Option<uuid::Uuid>,
+    pub pc: Option<uuid::Uuid>,
     pub pl: i64,
 }
 use crate::client::async_::GenericClient;
@@ -84,7 +88,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT m.id FROM memories m JOIN memory_banks b ON b.id=m.bank_id WHERE m.bank_id=ANY($1::UUID[]) AND m.deleted_at IS NULL AND ($2::TEXT IS NULL OR m.kind=$2) AND ($3::TEXT IS NULL OR $3='' OR m.path=$3 OR starts_with(m.path,$3||'/')) AND (($4::TIMESTAMPTZ IS NULL AND $5::TIMESTAMPTZ IS NULL) OR m.valid_during && tstzrange($4,$5,'[]')) AND ($6 OR b.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$7::UUID) AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id) ORDER BY m.created_at DESC, m.id DESC LIMIT $8",
+        "SELECT m.id FROM current_memories m WHERE m.bank_id=ANY($1::UUID[]) AND ($2::TEXT IS NULL OR m.kind=$2) AND ($3::TEXT IS NULL OR $3='' OR m.path=$3 OR starts_with(m.path,$3||'/')) AND (($4::TIMESTAMPTZ IS NULL AND $5::TIMESTAMPTZ IS NULL) OR m.valid_during && tstzrange($4,$5,'[]')) AND ($6::TEXT IS NULL OR m.origin=$6) AND ($7::UUID IS NULL OR m.identity_id=$7) AND ($8 OR m.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$9::UUID) AND ($10::UUID IS NULL OR (m.created_at, m.id) < (SELECT c.created_at, c.id FROM memories c WHERE c.id=$10)) ORDER BY m.created_at DESC, m.id DESC LIMIT $11",
         None,
     )
 }
@@ -104,6 +108,7 @@ impl RunStmt {
         T1: crate::ArraySql<Item = uuid::Uuid>,
         T2: crate::StringSql,
         T3: crate::StringSql,
+        T4: crate::StringSql,
     >(
         &'s self,
         client: &'c C,
@@ -112,13 +117,16 @@ impl RunStmt {
         pp: &'a Option<T3>,
         pf: &'a Option<chrono::DateTime<chrono::Utc>>,
         pt: &'a Option<chrono::DateTime<chrono::Utc>>,
+        po: &'a Option<T4>,
+        pd: &'a Option<uuid::Uuid>,
         pe: &'a bool,
         pi: &'a Option<uuid::Uuid>,
+        pc: &'a Option<uuid::Uuid>,
         pl: &'a i64,
-    ) -> UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 8> {
+    ) -> UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 11> {
         UuidUuidQuery {
             client,
-            params: [pb, pk, pp, pf, pt, pe, pi, pl],
+            params: [pb, pk, pp, pf, pt, po, pd, pe, pi, pc, pl],
             query: self.0,
             cached: self.1.as_ref(),
             extractor: |row| Ok(row.try_get(0)?),
@@ -134,24 +142,25 @@ impl<
     T1: crate::ArraySql<Item = uuid::Uuid>,
     T2: crate::StringSql,
     T3: crate::StringSql,
+    T4: crate::StringSql,
 >
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2, T3>,
-        UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 8>,
+        RunParams<T1, T2, T3, T4>,
+        UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 11>,
         C,
     > for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2, T3>,
-    ) -> UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 8> {
+        params: &'a RunParams<T1, T2, T3, T4>,
+    ) -> UuidUuidQuery<'c, 'a, 's, C, uuid::Uuid, 11> {
         self.bind(
-            client, &params.pb, &params.pk, &params.pp, &params.pf, &params.pt, &params.pe,
-            &params.pi, &params.pl,
+            client, &params.pb, &params.pk, &params.pp, &params.pf, &params.pt, &params.po,
+            &params.pd, &params.pe, &params.pi, &params.pc, &params.pl,
         )
     }
 }

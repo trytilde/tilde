@@ -100,6 +100,30 @@ pub type OwnedListMemoriesRequestView = ::buffa::view::OwnedView<
 pub type OwnedListMemoriesResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::ListMemoriesResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListMemoryPathsRequestView<'static>>`.
+pub type OwnedListMemoryPathsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMemoryPathsResponseView<'static>>`.
+pub type OwnedListMemoryPathsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMemoryPeopleRequestView<'static>>`.
+pub type OwnedListMemoryPeopleRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMemoryPeopleResponseView<'static>>`.
+pub type OwnedListMemoryPeopleResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<GetMemoryRequestView<'static>>`.
 pub type OwnedGetMemoryRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::GetMemoryRequestView<'static>,
@@ -542,6 +566,88 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemoryPathsResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemoryPathsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemoryPeopleResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemoryPeopleResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetMemoryResponse>
 for crate::proto::tilde::management::v1::__buffa::view::GetMemoryResponseView<'_> {
     fn encode(
@@ -902,6 +1008,18 @@ pub const MEMORY_SERVICE_LIST_MEMORIES_SPEC: ::connectrpc::Spec = ::connectrpc::
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListMemoryPaths` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_LIST_MEMORY_PATHS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/ListMemoryPaths",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListMemoryPeople` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_LIST_MEMORY_PEOPLE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/ListMemoryPeople",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Static [`Spec`](::connectrpc::Spec) for the `GetMemory` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const MEMORY_SERVICE_GET_MEMORY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.MemoryService/GetMemory",
@@ -1210,6 +1328,52 @@ pub trait MemoryService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::ListMemoriesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Every path in the bank holding memories, for its tree.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_memory_paths<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ListMemoryPathsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// The people a per-person bank keeps memories for.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_memory_people<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ListMemoryPeopleResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1694,6 +1858,64 @@ impl<S: MemoryService> MemoryServiceExt for S {
             .with_spec(MEMORY_SERVICE_LIST_MEMORIES_SPEC)
             .route_view_idempotent(
                 MEMORY_SERVICE_SERVICE_NAME,
+                "ListMemoryPaths",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_memory_paths(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ListMemoryPathsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_LIST_MEMORY_PATHS_SPEC)
+            .route_view_idempotent(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "ListMemoryPeople",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_memory_people(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ListMemoryPeopleResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_LIST_MEMORY_PEOPLE_SPEC)
+            .route_view_idempotent(
+                MEMORY_SERVICE_SERVICE_NAME,
                 "GetMemory",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -2032,6 +2254,18 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
                         .with_spec(MEMORY_SERVICE_LIST_MEMORIES_SPEC),
                 )
             }
+            "ListMemoryPaths" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MEMORY_SERVICE_LIST_MEMORY_PATHS_SPEC),
+                )
+            }
+            "ListMemoryPeople" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MEMORY_SERVICE_LIST_MEMORY_PEOPLE_SPEC),
+                )
+            }
             "GetMemory" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -2290,6 +2524,50 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::ListMemoriesResponse,
+                        >(format)
+                })
+            }
+            "ListMemoryPaths" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_memory_paths(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ListMemoryPathsResponse,
+                        >(format)
+                })
+            }
+            "ListMemoryPeople" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_memory_people(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ListMemoryPeopleResponse,
                         >(format)
                 })
             }
@@ -2996,6 +3274,96 @@ where
                 &self.transport,
                 &self.config,
                 MEMORY_SERVICE_LIST_MEMORIES_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListMemoryPaths RPC. Sends a request to /tilde.management.v1.MemoryService/ListMemoryPaths.
+    pub async fn list_memory_paths(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_memory_paths_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMemoryPaths RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_memory_paths_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemoryPathsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemoryPathsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_LIST_MEMORY_PATHS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListMemoryPeople RPC. Sends a request to /tilde.management.v1.MemoryService/ListMemoryPeople.
+    pub async fn list_memory_people(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_memory_people_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMemoryPeople RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_memory_people_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemoryPeopleRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemoryPeopleResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_LIST_MEMORY_PEOPLE_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

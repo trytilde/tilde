@@ -22,7 +22,7 @@ const WRITE: Hints = Hints {
     read_only: false,
     destructive: false,
 };
-const GUIDE: &str = "Write one durable fact per memory, the key fact first and then the context that makes it useful later. Never store secrets, credentials, tokens or transient chatter. Recall first to avoid duplicates, and prefer memory.supersede when a fact changes. Browse to reuse an existing path so related memories sit together.";
+const GUIDE: &str = "Write one durable fact per memory, the key fact first and then the context that makes it useful later. Never store secrets, credentials, tokens or transient chatter. Recall first to avoid duplicates, and prefer memory.supersede when a fact changes. Browse to reuse an existing path so related memories sit together. Longer reference material (runbooks, how things work) belongs in a wiki page, if you have one.";
 const SUPERSEDE_GUIDE: &str = "Keep one durable fact, the key fact first. Never store secrets, credentials, tokens or transient chatter.";
 
 pub struct MemoryTools(pub Memory);
@@ -259,6 +259,7 @@ impl MemoryTools {
             path: input["path"].as_str().map(super::path).transpose()?,
             from: time(&input["during"], "from")?,
             to: time(&input["during"], "to")?,
+            ..Default::default()
         })
     }
 

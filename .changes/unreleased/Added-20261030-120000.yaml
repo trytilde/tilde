@@ -1,0 +1,3 @@
+kind: Added
+body: "Add the Memory pages: a sidebar entry listing memory banks, each bank's path tree, searchable and filterable memories with their history, sources and replacements, people's facts, settings and linked agents, and administrators' embedding settings. An agent's Capabilities gain a Memory section that gives a new agent a bank of its own and shared banks, and changes them afterwards."
+time: 2026-10-30T12:00:00.000000000+01:00

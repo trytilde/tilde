@@ -94,7 +94,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT CASE WHEN $1='' THEN split_part(m.path,'/',1) ELSE $1||'/'||split_part(substr(m.path,length($1)+2),'/',1) END AS path, COUNT(*) AS count FROM memories m JOIN memory_banks b ON b.id=m.bank_id WHERE m.bank_id=ANY($2::UUID[]) AND m.deleted_at IS NULL AND (($1='' AND m.path<>'') OR starts_with(m.path,$1||'/')) AND ($3 OR b.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$4::UUID) AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id) GROUP BY 1 ORDER BY 1 LIMIT $5",
+        "SELECT CASE WHEN $1='' THEN split_part(m.path,'/',1) ELSE $1||'/'||split_part(substr(m.path,length($1)+2),'/',1) END AS path, COUNT(*) AS count FROM current_memories m WHERE m.bank_id=ANY($2::UUID[]) AND (($1='' AND m.path<>'') OR starts_with(m.path,$1||'/')) AND ($3 OR m.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$4::UUID) GROUP BY 1 ORDER BY 1 LIMIT $5",
         None,
     )
 }

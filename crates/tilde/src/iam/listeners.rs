@@ -90,6 +90,7 @@ pub fn management_router(
                 .unwrap_or_else(|| crate::tools::Tools::new(connections.clone(), String::new()));
             crate::sandboxes::rpc::management_router(tools.sandboxes.clone())
                 .merge(crate::memory::rpc::router(tools.memory.clone()))
+                .merge(crate::wikis::rpc::router(tools.wikis.clone()))
                 .merge(crate::tools::rpc::router(tools))
         })
         .merge(crate::inference::rpc::router(

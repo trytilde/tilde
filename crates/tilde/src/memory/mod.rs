@@ -50,6 +50,8 @@ const CONTENT_MAX: usize = 16384;
 /// What browse returns at most: child paths, and memories at the path.
 const BROWSE_PATHS: i64 = 200;
 const BROWSE_MEMORIES: i64 = 50;
+/// Paths the bank page's tree shows at most.
+const BANK_PATHS: i64 = 2000;
 /// Embedding jobs claimed together, and how long a claim is held.
 const BATCH: i64 = 32;
 const LEASE_SECS: f64 = 300.0;
@@ -94,6 +96,9 @@ pub struct Filter {
     /// are left out when either is set.
     pub from: Option<DateTime<Utc>>,
     pub to: Option<DateTime<Utc>>,
+    /// The bank page narrows by origin and by person.
+    pub origin: Option<String>,
+    pub identity: Option<Uuid>,
 }
 /// Whose memories in per-person banks count: everyone's (a person managing the bank), or one
 /// person's and bank-wide ones (an agent acting for that person, or for nobody).
@@ -264,7 +269,7 @@ impl Memory {
         let id = Uuid::new_v4();
         let mut client = self.client().await?;
         let tx = client.transaction().await?;
-        let inserted = db::bank_insert_execute(
+        let inserted = match db::bank_insert_execute(
             &tx,
             id,
             &name,
@@ -272,7 +277,14 @@ impl Memory {
             agent,
             scope(scope_name)?,
         )
-        .await?;
+        .await
+        {
+            Ok(inserted) => inserted,
+            Err(e) if e.is_unique_violation() => {
+                return Err(Error::Exists("This agent already has its own bank".into()));
+            }
+            Err(e) => return Err(e.into()),
+        };
         if inserted == 0 {
             return Err(invalid("Another memory bank has this name"));
         }
@@ -511,10 +523,8 @@ impl Memory {
             return Err(invalid("A period ends after it starts"));
         }
         let Some(query) = query.map(str::trim).filter(|q| !q.is_empty()) else {
-            let ids =
-                db::memory_list_all(&self.client().await?, banks, filter, person, limit).await?;
             return Ok(self
-                .load(&ids)
+                .list(banks, filter, person, None, limit)
                 .await?
                 .into_iter()
                 .map(|m| (m, vec![]))
@@ -577,6 +587,28 @@ impl Memory {
                 (m, how)
             })
             .collect())
+    }
+    /// Memories in `banks` newest first, after memory `after` (the previous page's last).
+    pub async fn list(
+        &self,
+        banks: &[Uuid],
+        filter: &Filter,
+        person: Person,
+        after: Option<Uuid>,
+        limit: i64,
+    ) -> Result<Vec<db::MemoryRow>, Error> {
+        let ids =
+            db::memory_list_all(&self.client().await?, banks, filter, person, after, limit).await?;
+        self.load(&ids).await
+    }
+    /// Every path in the bank holding memories, with how many it holds exactly, at most
+    /// `BANK_PATHS`.
+    pub async fn paths(&self, bank: Uuid) -> Result<Vec<db::PathCountRow>, Error> {
+        Ok(db::memory_paths_all(&self.client().await?, bank, BANK_PATHS).await?)
+    }
+    /// The people a per-person bank keeps memories for.
+    pub async fn people(&self, bank: Uuid) -> Result<Vec<db::PersonRow>, Error> {
+        Ok(db::memory_people_all(&self.client().await?, bank).await?)
     }
     /// The paths directly below `at` with how many memories each holds (itself and below), and
     /// the newest memories at `at`, each capped (`BROWSE_PATHS`, `BROWSE_MEMORIES`).

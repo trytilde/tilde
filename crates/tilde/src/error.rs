@@ -31,6 +31,9 @@ pub enum Error {
     /// A concurrent write changed what this one was based on; the caller reloads and retries.
     #[error("{0}")]
     Stale(String),
+    /// Something already holds the name or place this write wanted.
+    #[error("{0}")]
+    Exists(String),
     #[error("database operation failed")]
     Database(#[from] crate::database::DbError),
     #[error("database migration failed")]
@@ -69,6 +72,7 @@ impl From<Error> for connectrpc::ConnectError {
                 Self::already_exists("Agent ID already exists with different parameters")
             }
             Error::Stale(message) => Self::aborted(message),
+            Error::Exists(message) => Self::already_exists(message),
             other => {
                 tracing::error!(error = ?other, "engine operation failed");
                 Self::internal("Engine operation failed")

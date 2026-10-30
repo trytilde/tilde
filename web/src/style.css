@@ -159,4 +159,83 @@
   margin-bottom: 0;
 }
 
+/* Wiki pages: Markdown at reading size, with GitHub-style tables and task lists. */
+.wiki-prose {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.wiki-prose :is(p, ul, ol, pre, blockquote, table) {
+  margin: 0 0 0.85rem;
+}
+.wiki-prose h1 {
+  margin: 1.2rem 0 0.6rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.wiki-prose h2 {
+  margin: 1.1rem 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.wiki-prose :is(h3, h4, h5, h6) {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.wiki-prose > :first-child {
+  margin-top: 0;
+}
+.wiki-prose :is(ul, ol) {
+  padding-left: 1.4rem;
+}
+.wiki-prose ul {
+  list-style: disc;
+}
+.wiki-prose ol {
+  list-style: decimal;
+}
+.wiki-prose li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.2rem;
+}
+.wiki-prose a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.wiki-prose code {
+  border-radius: 4px;
+  background: var(--muted);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.8em;
+}
+.wiki-prose pre {
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--muted);
+  padding: 0.6rem 0.75rem;
+}
+.wiki-prose pre code {
+  background: none;
+  padding: 0;
+}
+.wiki-prose blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 0.75rem;
+  color: var(--muted-foreground);
+}
+.wiki-prose table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.wiki-prose :is(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+}
+.wiki-prose th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
 @source "../../sdk/ts/packages/chat-ui/src";

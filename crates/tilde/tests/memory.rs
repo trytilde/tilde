@@ -156,6 +156,15 @@ async fn an_agent_remembers_supersedes_and_forgets_but_never_touches_a_persons_f
         .map(|r| r.operation)
         .collect();
     assert_eq!(operations, ["create", "supersede"]);
+    assert_eq!(
+        memory
+            .memory(first)
+            .await
+            .unwrap()
+            .superseded_by
+            .map(|s| s.to_string()),
+        Some(second.clone())
+    );
     for (tool, input) in [
         (
             "memory.supersede",
@@ -423,6 +432,52 @@ async fn a_per_person_bank_keeps_each_persons_memories_apart() {
         .await
         .unwrap();
     assert_eq!(all.len(), 3);
+
+    // The bank page: who it keeps memories for, narrowed to one of them or to people's facts,
+    // a page at a time, and the paths it holds.
+    let listed = memory.people(people).await.unwrap();
+    let blake_row = listed.iter().find(|p| p.name == "Blake").unwrap();
+    assert_eq!((listed.len(), blake_row.count), (2, 1));
+    let bank_memory = &memory;
+    let only = |filter: Filter| async move {
+        bank_memory
+            .list(&[people], &filter, Person::Everyone, None, 10)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.title)
+            .collect::<Vec<_>>()
+    };
+    let blakes = Filter {
+        identity: Some(blake_row.identity_id),
+        ..Default::default()
+    };
+    assert_eq!(only(blakes).await, ["Blake is allergic to nuts"]);
+    let owners = Filter {
+        origin: Some("owner".into()),
+        ..Default::default()
+    };
+    assert_eq!(only(owners).await, ["Office closes at six"]);
+    let mut paged = Vec::new();
+    let mut after = None;
+    loop {
+        let page = memory
+            .list(&[people], &Filter::default(), Person::Everyone, after, 1)
+            .await
+            .unwrap();
+        let Some(last) = page.last() else { break };
+        after = Some(last.id);
+        paged.push(last.title.clone());
+    }
+    assert_eq!(paged.len(), 3, "{paged:?}");
+    let paths: Vec<_> = memory
+        .paths(people)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|p| (p.path, p.count))
+        .collect();
+    assert_eq!(paths, [(String::new(), 2), ("team".to_owned(), 1)]);
     fx.close().await;
 }
 
@@ -522,6 +577,8 @@ async fn recall_finds_memories_by_meaning_once_the_worker_has_embedded_them() {
         .is_empty()
     );
 
+    // Nothing waits for an embedding until a model is set.
+    assert_eq!(memory.bank(own).await.unwrap().pending_embeddings, 0);
     let url = embeddings().await;
     let connection = openai(&fx.connections, &url).await;
     // A model answering with another dimension is refused before anything changes.

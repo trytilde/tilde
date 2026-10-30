@@ -1,0 +1,17 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/chat.proto";
+
+// The memory and wiki tools of an agent whose conversations a sidecar runs. Memory banks and
+// wikis live in the gateway's Postgres, so the sidecar relays its agent's listing and calls of
+// these tools here (through the registry relay, which re-verifies the invocation token) rather
+// than answering them itself. Agents call the tools through ChatService as everywhere else.
+service KnowledgeService {
+  rpc ListKnowledgeTools(ListKnowledgeToolsRequest) returns (ListKnowledgeToolsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc InvokeKnowledgeTool(InvokeKnowledgeToolRequest) returns (InvokeKnowledgeToolResponse);
+}
+message ListKnowledgeToolsRequest {}
+message ListKnowledgeToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; }
+// `call_id` is the tool call's, so a retried call writes once.
+message InvokeKnowledgeToolRequest { string name = 1; string input_json = 2; string call_id = 3; }
+message InvokeKnowledgeToolResponse { string output_json = 1; }

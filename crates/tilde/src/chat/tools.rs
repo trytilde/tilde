@@ -101,6 +101,9 @@ impl Registry {
                 providers.push(Arc::new(crate::memory::tools::MemoryTools(
                     tools.memory.clone(),
                 )));
+                providers.push(Arc::new(crate::wikis::tools::WikiTools(
+                    tools.wikis.clone(),
+                )));
             }
             return Self::new(providers);
         }
@@ -111,7 +114,7 @@ impl Registry {
                 crate::deployment::runtime::providers::LocalChannels(local.clone()),
             ));
             providers.push(Arc::new(
-                crate::deployment::runtime::providers::GatewayMemory(local.clone()),
+                crate::deployment::runtime::providers::GatewayKnowledge(local.clone()),
             ));
         }
         Self::new(providers)

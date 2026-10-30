@@ -1,23 +1,31 @@
-///Shorthand for `OwnedView<ListMemoryToolsRequestView<'static>>`.
-pub type OwnedListMemoryToolsRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsRequestView<'static>,
->;
-///Shorthand for `OwnedView<ListMemoryToolsResponseView<'static>>`.
-pub type OwnedListMemoryToolsResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView<'static>,
->;
-///Shorthand for `OwnedView<InvokeMemoryToolRequestView<'static>>`.
-pub type OwnedInvokeMemoryToolRequestView = ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolRequestView<'static>,
->;
-///Shorthand for `OwnedView<InvokeMemoryToolResponseView<'static>>`.
-pub type OwnedInvokeMemoryToolResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseView<
+///Shorthand for `OwnedView<ListKnowledgeToolsRequestView<'static>>`.
+pub type OwnedListKnowledgeToolsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsRequestView<
         'static,
     >,
 >;
-impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::ListMemoryToolsResponse>
-for crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView<'_> {
+///Shorthand for `OwnedView<ListKnowledgeToolsResponseView<'static>>`.
+pub type OwnedListKnowledgeToolsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<InvokeKnowledgeToolRequestView<'static>>`.
+pub type OwnedInvokeKnowledgeToolRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<InvokeKnowledgeToolResponseView<'static>>`.
+pub type OwnedInvokeKnowledgeToolResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolResponseView<
+        'static,
+    >,
+>;
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse,
+>
+for crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -25,9 +33,13 @@ for crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::ListMemoryToolsResponse>
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse,
+>
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView<'static>,
+    crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -50,8 +62,12 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse>
-for crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseView<'_> {
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse,
+>
+for crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolResponseView<
+    '_,
+> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -59,9 +75,11 @@ for crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseVie
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse>
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse,
+>
 for ::buffa::view::OwnedView<
-    crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseView<
+    crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolResponseView<
         'static,
     >,
 > {
@@ -87,23 +105,23 @@ for ::buffa::view::OwnedView<
     }
 }
 /// Full service name for this service.
-pub const MEMORY_SERVICE_SERVICE_NAME: &str = "tilde.runtime.v1.MemoryService";
-/// Static [`Spec`](::connectrpc::Spec) for the `ListMemoryTools` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const MEMORY_SERVICE_LIST_MEMORY_TOOLS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.runtime.v1.MemoryService/ListMemoryTools",
+pub const KNOWLEDGE_SERVICE_SERVICE_NAME: &str = "tilde.runtime.v1.KnowledgeService";
+/// Static [`Spec`](::connectrpc::Spec) for the `ListKnowledgeTools` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const KNOWLEDGE_SERVICE_LIST_KNOWLEDGE_TOOLS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.KnowledgeService/ListKnowledgeTools",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
-/// Static [`Spec`](::connectrpc::Spec) for the `InvokeMemoryTool` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const MEMORY_SERVICE_INVOKE_MEMORY_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.runtime.v1.MemoryService/InvokeMemoryTool",
+/// Static [`Spec`](::connectrpc::Spec) for the `InvokeKnowledgeTool` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const KNOWLEDGE_SERVICE_INVOKE_KNOWLEDGE_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.KnowledgeService/InvokeKnowledgeTool",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// The memory tools of an agent whose conversations a sidecar runs. Memory lives in the gateway's
-/// Postgres, so the sidecar relays its agent's memory tool listing and calls here (through the
-/// registry relay, which re-verifies the invocation token) rather than answering them itself.
-/// Agents call the tools through ChatService as everywhere else.
+/// The memory and wiki tools of an agent whose conversations a sidecar runs. Memory banks and
+/// wikis live in the gateway's Postgres, so the sidecar relays its agent's listing and calls of
+/// these tools here (through the registry relay, which re-verifies the invocation token) rather
+/// than answering them itself. Agents call the tools through ChatService as everywhere else.
 ///
 /// # Implementing handlers
 ///
@@ -153,8 +171,8 @@ pub const MEMORY_SERVICE_INVOKE_MEMORY_TOOL_SPEC: ::connectrpc::Spec = ::connect
 /// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
 /// example` doc.
 #[allow(clippy::type_complexity)]
-pub trait MemoryService: Send + Sync + 'static {
-    /// Handle the ListMemoryTools RPC.
+pub trait KnowledgeService: Send + Sync + 'static {
+    /// Handle the ListKnowledgeTools RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -163,21 +181,21 @@ pub trait MemoryService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn list_memory_tools<'a>(
+    fn list_knowledge_tools<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+            crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::runtime::v1::ListMemoryToolsResponse,
+                crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the InvokeMemoryTool RPC.
+    /// Handle the InvokeKnowledgeTool RPC.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -186,17 +204,17 @@ pub trait MemoryService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn invoke_memory_tool<'a>(
+    fn invoke_knowledge_tool<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+            crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse,
+                crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -216,7 +234,7 @@ pub trait MemoryService: Send + Sync + 'static {
 /// let service = Arc::new(MyServiceImpl);
 /// let router = service.register(Router::new());
 /// ```
-pub trait MemoryServiceExt: MemoryService {
+pub trait KnowledgeServiceExt: KnowledgeService {
     /// Register this service implementation with a Router.
     ///
     /// Takes ownership of the `Arc<Self>` and returns a new Router with
@@ -226,21 +244,21 @@ pub trait MemoryServiceExt: MemoryService {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router;
 }
-impl<S: MemoryService> MemoryServiceExt for S {
+impl<S: KnowledgeService> KnowledgeServiceExt for S {
     fn register(
         self: ::std::sync::Arc<Self>,
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
             .route_view_idempotent(
-                MEMORY_SERVICE_SERVICE_NAME,
-                "ListMemoryTools",
+                KNOWLEDGE_SERVICE_SERVICE_NAME,
+                "ListKnowledgeTools",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsRequestView<
+                            crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsRequestView<
                                 'static,
                             >,
                         >,
@@ -249,27 +267,27 @@ impl<S: MemoryService> MemoryServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+                                crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.list_memory_tools(ctx, sreq)
+                            svc.list_knowledge_tools(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::runtime::v1::ListMemoryToolsResponse,
+                                    crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(MEMORY_SERVICE_LIST_MEMORY_TOOLS_SPEC)
+            .with_spec(KNOWLEDGE_SERVICE_LIST_KNOWLEDGE_TOOLS_SPEC)
             .route_view(
-                MEMORY_SERVICE_SERVICE_NAME,
-                "InvokeMemoryTool",
+                KNOWLEDGE_SERVICE_SERVICE_NAME,
+                "InvokeKnowledgeTool",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolRequestView<
+                            crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolRequestView<
                                 'static,
                             >,
                         >,
@@ -278,30 +296,30 @@ impl<S: MemoryService> MemoryServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+                                crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.invoke_memory_tool(ctx, sreq)
+                            svc.invoke_knowledge_tool(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse,
+                                    crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(MEMORY_SERVICE_INVOKE_MEMORY_TOOL_SPEC)
+            .with_spec(KNOWLEDGE_SERVICE_INVOKE_KNOWLEDGE_TOOL_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
 #[doc(hidden)]
-pub struct MemoryServiceRegisterMarker;
-impl<S: MemoryService> ::connectrpc::ServiceRegister<MemoryServiceRegisterMarker>
+pub struct KnowledgeServiceRegisterMarker;
+impl<S: KnowledgeService> ::connectrpc::ServiceRegister<KnowledgeServiceRegisterMarker>
 for ::std::sync::Arc<S> {
     fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
-        <S as MemoryServiceExt>::register(self, router)
+        <S as KnowledgeServiceExt>::register(self, router)
     }
 }
-/// Monomorphic dispatcher for `MemoryService`.
+/// Monomorphic dispatcher for `KnowledgeService`.
 ///
 /// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
 ///
@@ -310,14 +328,14 @@ for ::std::sync::Arc<S> {
 /// ```rust,ignore
 /// use connectrpc::ConnectRpcService;
 ///
-/// let server = MemoryServiceServer::new(MyImpl);
+/// let server = KnowledgeServiceServer::new(MyImpl);
 /// let service = ConnectRpcService::new(server);
 /// // hand `service` to axum/hyper as a fallback_service
 /// ```
-pub struct MemoryServiceServer<T> {
+pub struct KnowledgeServiceServer<T> {
     inner: ::std::sync::Arc<T>,
 }
-impl<T: MemoryService> MemoryServiceServer<T> {
+impl<T: KnowledgeService> KnowledgeServiceServer<T> {
     /// Wrap a service implementation in a monomorphic dispatcher.
     pub fn new(service: T) -> Self {
         Self {
@@ -329,31 +347,31 @@ impl<T: MemoryService> MemoryServiceServer<T> {
         Self { inner }
     }
 }
-impl<T> Clone for MemoryServiceServer<T> {
+impl<T> Clone for KnowledgeServiceServer<T> {
     fn clone(&self) -> Self {
         Self {
             inner: ::std::sync::Arc::clone(&self.inner),
         }
     }
 }
-impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
+impl<T: KnowledgeService> ::connectrpc::Dispatcher for KnowledgeServiceServer<T> {
     #[inline]
     fn lookup(
         &self,
         path: &str,
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
-        let method = path.strip_prefix("tilde.runtime.v1.MemoryService/")?;
+        let method = path.strip_prefix("tilde.runtime.v1.KnowledgeService/")?;
         match method {
-            "ListMemoryTools" => {
+            "ListKnowledgeTools" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
-                        .with_spec(MEMORY_SERVICE_LIST_MEMORY_TOOLS_SPEC),
+                        .with_spec(KNOWLEDGE_SERVICE_LIST_KNOWLEDGE_TOOLS_SPEC),
                 )
             }
-            "InvokeMemoryTool" => {
+            "InvokeKnowledgeTool" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MEMORY_SERVICE_INVOKE_MEMORY_TOOL_SPEC),
+                        .with_spec(KNOWLEDGE_SERVICE_INVOKE_KNOWLEDGE_TOOL_SPEC),
                 )
             }
             _ => None,
@@ -366,52 +384,52 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
         request: ::connectrpc::Payload,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("tilde.runtime.v1.MemoryService/") else {
+        let Some(method) = path.strip_prefix("tilde.runtime.v1.KnowledgeService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "ListMemoryTools" => {
+            "ListKnowledgeTools" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+                        crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsRequestView<
+                    let req: crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+                        crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
                     >::from_parts(&req, &body);
-                    svc.list_memory_tools(ctx, req)
+                    svc.list_knowledge_tools(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::runtime::v1::ListMemoryToolsResponse,
+                            crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse,
                         >(format)
                 })
             }
-            "InvokeMemoryTool" => {
+            "InvokeKnowledgeTool" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+                        crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolRequestView<
+                    let req: crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                         ctx.decode_options(),
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+                        crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
                     >::from_parts(&req, &body);
-                    svc.invoke_memory_tool(ctx, req)
+                    svc.invoke_knowledge_tool(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse,
+                            crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse,
                         >(format)
                 })
             }
@@ -425,7 +443,7 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
         request: ::buffa::bytes::Bytes,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("tilde.runtime.v1.MemoryService/") else {
+        let Some(method) = path.strip_prefix("tilde.runtime.v1.KnowledgeService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &request, &format);
@@ -440,7 +458,7 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
         requests: ::connectrpc::dispatcher::codegen::RequestStream,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
-        let Some(method) = path.strip_prefix("tilde.runtime.v1.MemoryService/") else {
+        let Some(method) = path.strip_prefix("tilde.runtime.v1.KnowledgeService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -455,7 +473,7 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
         requests: ::connectrpc::dispatcher::codegen::RequestStream,
         format: ::connectrpc::CodecFormat,
     ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
-        let Some(method) = path.strip_prefix("tilde.runtime.v1.MemoryService/") else {
+        let Some(method) = path.strip_prefix("tilde.runtime.v1.KnowledgeService/") else {
             return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
         };
         let _ = (&ctx, &requests, &format);
@@ -481,8 +499,8 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
 /// let conn = Http2Connection::connect_plaintext(uri.clone()).await?.shared(1024);
 /// let config = ClientConfig::new(uri).with_protocol(Protocol::Grpc);
 ///
-/// let client = MemoryServiceClient::new(conn, config);
-/// let response = client.list_memory_tools(request).await?;
+/// let client = KnowledgeServiceClient::new(conn, config);
+/// let response = client.list_knowledge_tools(request).await?;
 /// ```
 ///
 /// # Example (Connect / HTTP/1.1 or ALPN)
@@ -493,8 +511,8 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
 /// let http = HttpClient::plaintext();  // cleartext http:// only
 /// let config = ClientConfig::new("http://localhost:8080".parse()?);
 ///
-/// let client = MemoryServiceClient::new(http, config);
-/// let response = client.list_memory_tools(request).await?;
+/// let client = KnowledgeServiceClient::new(http, config);
+/// let response = client.list_knowledge_tools(request).await?;
 /// ```
 ///
 /// # Working with the response
@@ -504,7 +522,7 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.list_memory_tools(request).await?;
+/// let resp = client.list_knowledge_tools(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -512,7 +530,7 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.list_memory_tools(request).await?.into_owned();
+/// let owned = client.list_knowledge_tools(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -522,11 +540,11 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
 /// `.message().await` — read fields zero-copy through the generated accessor
 /// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
 #[derive(Clone)]
-pub struct MemoryServiceClient<T> {
+pub struct KnowledgeServiceClient<T> {
     transport: T,
     config: ::connectrpc::client::ClientConfig,
 }
-impl<T> MemoryServiceClient<T>
+impl<T> KnowledgeServiceClient<T>
 where
     T: ::connectrpc::client::ClientTransport,
     <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
@@ -543,35 +561,35 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the ListMemoryTools RPC. Sends a request to /tilde.runtime.v1.MemoryService/ListMemoryTools.
-    pub async fn list_memory_tools(
+    /// Call the ListKnowledgeTools RPC. Sends a request to /tilde.runtime.v1.KnowledgeService/ListKnowledgeTools.
+    pub async fn list_knowledge_tools(
         &self,
-        request: crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+        request: crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView<
+                crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.list_memory_tools_with_options(
+        self.list_knowledge_tools_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ListMemoryTools RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn list_memory_tools_with_options(
+    /// Call the ListKnowledgeTools RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_knowledge_tools_with_options(
         &self,
-        request: crate::proto::tilde::runtime::v1::ListMemoryToolsRequest,
+        request: crate::proto::tilde::runtime::v1::ListKnowledgeToolsRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::runtime::v1::__buffa::view::ListMemoryToolsResponseView<
+                crate::proto::tilde::runtime::v1::__buffa::view::ListKnowledgeToolsResponseView<
                     'static,
                 >,
             >,
@@ -581,42 +599,42 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                MEMORY_SERVICE_LIST_MEMORY_TOOLS_SPEC
+                KNOWLEDGE_SERVICE_LIST_KNOWLEDGE_TOOLS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,
             )
             .await
     }
-    /// Call the InvokeMemoryTool RPC. Sends a request to /tilde.runtime.v1.MemoryService/InvokeMemoryTool.
-    pub async fn invoke_memory_tool(
+    /// Call the InvokeKnowledgeTool RPC. Sends a request to /tilde.runtime.v1.KnowledgeService/InvokeKnowledgeTool.
+    pub async fn invoke_knowledge_tool(
         &self,
-        request: crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+        request: crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseView<
+                crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.invoke_memory_tool_with_options(
+        self.invoke_knowledge_tool_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the InvokeMemoryTool RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn invoke_memory_tool_with_options(
+    /// Call the InvokeKnowledgeTool RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn invoke_knowledge_tool_with_options(
         &self,
-        request: crate::proto::tilde::runtime::v1::InvokeMemoryToolRequest,
+        request: crate::proto::tilde::runtime::v1::InvokeKnowledgeToolRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::tilde::runtime::v1::__buffa::view::InvokeMemoryToolResponseView<
+                crate::proto::tilde::runtime::v1::__buffa::view::InvokeKnowledgeToolResponseView<
                     'static,
                 >,
             >,
@@ -626,7 +644,7 @@ where
         ::connectrpc::client::call_unary(
                 &self.transport,
                 &self.config,
-                MEMORY_SERVICE_INVOKE_MEMORY_TOOL_SPEC
+                KNOWLEDGE_SERVICE_INVOKE_KNOWLEDGE_TOOL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

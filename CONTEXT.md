@@ -501,15 +501,33 @@ listing a bank with a query ranks it as recall does, with every person's memorie
 memories enter a conversation only through these tools: prompts live in agent code, so Tilde
 injects nothing.
 
+The memory pages: **Memory** in the sidebar lists banks (owner agent or shared, scope, current
+memory count, memories waiting for an embedding, linked agents) with New bank and, for
+administrators, Embedding settings (an inference connection, a model from `ListEmbeddingModels` or
+typed, and dimensions; saving runs the probe). A bank page has two tabs. Memories: the bank's path
+tree (`ListMemoryPaths`, counts summed up the tree), the memories under the chosen path newest
+first a page at a time (`ListMemories` without a query pages by the last memory's id), or ranked by
+a search with how each was found; filters by kind, origin and, in a per-person bank, person
+(`ListMemoryPeople`: each identity with memories there, named after one of its users). A memory's
+panel shows its validity, origin, writer, the conversation it came from, what it replaced or what
+replaced it (`superseded_by`) and its revisions; people add facts and edit or delete any memory
+(editing an agent's memory is "Take over and edit": it becomes the person's). Settings: name,
+description, linked agents and their access (carried on the bank's `links`), and delete. Every listing reads the
+`current_memories` view (live and not replaced) and adds its own person filter. An agent's
+Capabilities have a Memory section: on creation a bank of its own (none, one pool or separate per
+person, named after the agent unless renamed; created for the agent and deleted with it, with a
+name another bank has refused up front) and other banks with read or read-write access, saved
+right after the agent is created; afterwards the same choices change at once.
+
 Memory always lives in the gateway's Postgres, never in a sidecar. A sidecar offers its agent the
-memory tools by relaying their listing and every call to the runtime `MemoryService` through the
-registry relay (`tilde.runtime.v1.MemoryService` is one of the relayed services and is served only
-there). Calls go under the agent's own invocation token. The listing happens inside the sidecar's
+memory and wiki tools by relaying their listing and every call to the runtime `KnowledgeService`
+through the registry relay (`tilde.runtime.v1.KnowledgeService` is one of the relayed services
+and is served only there; `knowledge.rs`). Calls go under the agent's own invocation token. The listing happens inside the sidecar's
 tool registry, which holds only the verified scope, so the sidecar mints a minute-long token for
 that scope with the agent's signing key (lease epoch unset, so it cannot be renewed). The gateway
 checks either like the agent's own: signature, generation, thread lease, projected invocation and
 capability ceiling, and checks `tools_invoke` again. A gateway the sidecar cannot reach hides the
-memory tools from that listing only.
+memory and wiki tools from that listing only.
 
 ## Inference gateway
 
@@ -605,6 +623,74 @@ versions newest first with format, origin and first deployment, files with a lin
 usage; a deployment's drawer on the Deployments tab lists the prompt and skill versions it
 shipped (`GetDeploymentContents`, which also returns its declared bundled tools). Per-deployment and per-invocation overrides for experiments
 are the planned next step; nothing in the version model changes for them.
+
+## Wikis
+
+Wikis hold durable reference pages people and agents both read: runbooks, decisions, how things
+work. Memory banks hold the short facts an agent recalls; a wiki is where longer, structured
+knowledge is kept up to date (ADR-0014).
+
+- Wiki: a named tree of Markdown pages (`wikis`). Shared, or an agent's own (at most one per
+  agent, as with memory banks; a second is refused): created with the agent's id, linked to it read-write, never linked to another agent, and deleted with it in
+  `Lifecycle::delete` (with its pages and their history).
+- Agent wiki: a link giving an agent a wiki, read or read_write (`agent_wikis`). An agent with no
+  link has no wiki tools.
+- Wiki page: a path unique in its wiki (slash-separated segments), a title, Markdown content and
+  its current revision (`wiki_pages`). A generated English `tsvector` weights title words above
+  content words.
+- Page revision: the page after each create, update, move or delete (`wiki_page_revisions`), with
+  the writing agent and the conversation it wrote in (`thread_id`, unset for a person or a sidecar
+  conversation not yet projected), and the write's `call_id` (unique): an agent's tool call id, or
+  a fresh id for a person's change. Deleting a page removes its row; its revisions stay in
+  the database, with the last content in the delete revision, though nothing shows a deleted
+  page's history.
+- Stale write: an update, move or delete names the revision it read (`expected_revision`, 0 to
+  create); when the page has moved on it is refused (ABORTED) naming the page's current revision,
+  read again at that point, and the writer reads the page again.
+- Retried write: a write whose `call_id` already has a revision returns that write's result (the
+  page, or success for a delete) without writing again, found with one lookup, when it is the same
+  write: the recorded page, wiki, operation (and path, for a create or a delete by path) match,
+  and for an update, move or delete the recorded revision is the one after the revision it read.
+  Otherwise the call id was reused for a different write and is refused (INVALID_ARGUMENT). A call
+  racing its own retry loses on the unique `call_id` and returns the winner's result. Creates,
+  updates, moves and deletes are all retry-safe.
+- Edits: an update replaces the whole content or applies edits in order, each replacing an `old`
+  text that must occur in the page exactly once (INVALID_ARGUMENT names the edit that does not).
+- Search and grep: search joins the query's words with OR (as memory recall does) and ranks by
+  `ts_rank_cd` with an excerpt whose matches are bracketed by U+E000 and U+E001 (private-use
+  characters, so Markdown in pages cannot be mistaken for them; agents get `**`, the page shows a
+  highlight). Grep matches a literal (special characters escaped) or a regular expression line by
+  line under a three-second statement timeout, cuts each line to 500 characters and stops at 200
+  lines or 128 KiB, so responses stay far below the relay's and management's message limits. An
+  invalid or too slow pattern is the caller's to fix (INVALID_ARGUMENT).
+- Wiki tools: `wiki.search`, `wiki.grep`, `wiki.read` (a page and its revision, optionally a line
+  range, reporting `from`, `to` and `total` lines; a start past the end is INVALID_ARGUMENT),
+  `wiki.list` (optionally under a path `prefix`; at most 500 pages, with `more` asking to narrow),
+  and with a read-write link `wiki.write`
+  (create, or at the revision read change the content by `edits` or replace it) and
+  `wiki.delete`. As for memory, a wiki is chosen by name only when there is
+  a choice, the tool text describes the linked wikis, listing and calling share one gate, and
+  sidecar-hosted agents reach them through the relayed `KnowledgeService`.
+
+People manage wikis through `WikiService` (`wikis::rpc`). The **Wikis** sidebar page lists them;
+a wiki's page has its page tree (the open page is in the URL, `?page=<path>`), the page rendered
+from Markdown (`react-markdown` with GitHub's extensions, raw HTML not rendered; `wiki-markdown.tsx`:
+a link without a scheme names a page by its path from the wiki root (`/runbooks/deploys`; a
+leading `./` and a trailing `.md` are ignored) and opens it here, absolute links open outside the
+app, and
+images from other origins show as links and are never fetched), a raw Markdown editor (Monaco)
+that saves at the revision it opened, asks before discarding unsaved changes (any navigation
+through the router's blocker, Cancel, leaving the browser page) and, when someone saved first,
+shows their changes and overwrites them with the draft at the latest revision or discards it; a
+`?page=` naming no page offers editors to create it, move and delete, a history linking each agent
+change to its conversation, where a revision shows what restoring it (title and content) would
+change in the current page with a line diff folding long unchanged runs (`line-diff.tsx`), search
+and grep, and a settings tab with linked agents (`linked-agents.tsx`, shared with memory banks; wikis and banks
+carry each link's access). An agent's Capabilities have a Wikis section beside Memory: on creation
+a wiki of its own ("Created for this agent and deleted with it", named in both modes) and other
+wikis (`LinkedResources`, shared with the Memory section), saved right after the agent is created,
+the own wiki and the links each once even when a save is retried; Create agent waits while the own
+bank's or wiki's name is another's. Afterwards each change saves at once.
 
 ## Skills
 
@@ -754,7 +840,9 @@ shared editor preserves local state across tab navigation and browser Back/Forwa
 shows Agent Registry / agent-name breadcrumbs, updated from loaded and saved route data.
 Pages can contribute a DashboardNavigation slot beside the breadcrumbs; agent tabs use a
 React portal so their panel context and keyboard behavior remain intact.
-`/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
+`/memory` lists memory banks and `/memory/{id}/memories` and `/memory/{id}/settings` are a bank's
+tabs, like a sandbox blueprint's; `/wikis` and `/wikis/{id}/pages` and `/wikis/{id}/settings` do
+the same for wikis. `/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
 separate public route outside the authenticated app layout. Connection setup and
 identity verification host modules live under `web/src/routes/connections/` with
 `-` prefixes to exclude them from route generation. Shared connection UI loading

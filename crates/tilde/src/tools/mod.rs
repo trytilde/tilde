@@ -108,8 +108,8 @@ pub struct Filter {
 
 /// Prefixes of built-in catalog names; a source with one could shadow them. `sandbox` is the
 /// agent's sandbox source.
-const RESERVED_SLUGS: [&str; 9] = [
-    "tools", "agents", "thread", "user", "goals", "tasks", "channel", "sandbox", "memory",
+const RESERVED_SLUGS: [&str; 10] = [
+    "tools", "agents", "thread", "user", "goals", "tasks", "channel", "sandbox", "memory", "wiki",
 ];
 fn fixed() -> Error {
     invalid("The sandbox's tools are fixed; remove the sandbox in Capabilities instead")
@@ -203,6 +203,7 @@ pub struct Tools {
     pub hosts: hosts::ToolHosts,
     pub sandboxes: crate::sandboxes::Sandboxes,
     pub memory: crate::memory::Memory,
+    pub wikis: crate::wikis::Wikis,
     probes: std::sync::Arc<std::sync::Mutex<Probes>>,
     catalogs: std::sync::Arc<std::sync::Mutex<Catalogs>>,
 }
@@ -309,6 +310,7 @@ impl Tools {
             hosts: hosts::ToolHosts::new(connections.clone()),
             sandboxes: crate::sandboxes::Sandboxes::new(connections.clone(), runtime_url),
             memory: crate::memory::Memory::new(connections.clone()),
+            wikis: crate::wikis::Wikis::new(connections.clone()),
             connections,
             probes: Default::default(),
             catalogs: Default::default(),

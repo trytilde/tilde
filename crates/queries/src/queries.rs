@@ -20,3 +20,4 @@ pub mod system;
 pub mod testing;
 pub mod tools;
 pub mod tracing;
+pub mod wikis;

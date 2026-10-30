@@ -17,6 +17,7 @@ pub mod chat;
 
 pub mod iam;
 pub mod inference;
+pub mod knowledge;
 pub mod memory;
 pub mod prompts;
 pub mod routines;
@@ -24,6 +25,7 @@ pub mod sandboxes;
 pub mod signals;
 pub mod skills;
 pub mod tools;
+pub mod wikis;
 
 pub mod telemetry;
 

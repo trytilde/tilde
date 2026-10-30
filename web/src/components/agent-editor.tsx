@@ -12,6 +12,14 @@ import { AgentPrompts } from "./agent-prompts";
 import { AgentRoutines } from "./agent-routines";
 import { AgentSkills } from "./agent-skills";
 import { AgentSandbox } from "./agent-sandbox";
+import {
+  AgentMemory,
+  applyMemoryDraft,
+  NO_MEMORY,
+  type Applied,
+  type MemoryDraft,
+} from "./agent-memory";
+import { AgentWikis, applyWikiDraft, NO_WIKIS, type WikiDraft } from "./agent-wikis";
 import { SkillSourcePicker } from "./skill-source-picker";
 import { Capability } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { randomUUID } from "@/lib/browser-crypto";
@@ -273,6 +281,15 @@ export function AgentEditor({
   const [error, setError] = useState("");
   const id = useRef(agent?.id ?? randomUUID());
   const [createdAgent, setCreatedAgent] = useState<Agent | null>(null);
+  const [memoryDraft, setMemoryDraft] = useState<MemoryDraft>(NO_MEMORY);
+  // What of the drafts exists, so a retried save creates neither the own bank or wiki nor the
+  // links twice.
+  const memoryApplied = useRef<Applied>({ own: false, links: false });
+  const [wikiDraft, setWikiDraft] = useState<WikiDraft>(NO_WIKIS);
+  const wikisApplied = useRef<Applied>({ own: false, links: false });
+  // A drafted own bank or wiki whose name another already has; saving waits for a new name.
+  const [bankTaken, setBankTaken] = useState(false);
+  const [wikiTaken, setWikiTaken] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState(agent?.avatarUrl);
   const [preview, setPreview] = useState<string>();
@@ -351,6 +368,8 @@ export function AgentEditor({
           if (!created) throw new Error("Agent creation returned no agent.");
           setCreatedAgent(created);
         }
+        await applyMemoryDraft(created.id, created.name, memoryDraft, memoryApplied.current);
+        await applyWikiDraft(created.id, created.name, wikiDraft, wikisApplied.current);
         if (avatarFile) await uploadAvatar(created.id, avatarFile);
       }
       onSaved(!agent);
@@ -493,10 +512,32 @@ export function AgentEditor({
           </div>
         </div>
         {agent && <AgentSandbox agentId={agent.id} />}
+        {/* With an agent each change saves at once; while creating one they are drafted. */}
+        <AgentMemory
+          agentId={agent?.id}
+          agentName={name}
+          draft={memoryDraft}
+          onDraft={setMemoryDraft}
+          onTaken={setBankTaken}
+          disabled={!agent && locked}
+        />
+        <AgentWikis
+          agentId={agent?.id}
+          agentName={name}
+          draft={wikiDraft}
+          onDraft={setWikiDraft}
+          onTaken={setWikiTaken}
+          disabled={!agent && locked}
+        />
       </fieldset>
       {!agent && (
         <div className="flex justify-end">
-          <Button type="submit" disabled={saving || metadataSaving || avatarSaving || !name.trim()}>
+          <Button
+            type="submit"
+            disabled={
+              saving || metadataSaving || avatarSaving || !name.trim() || bankTaken || wikiTaken
+            }
+          >
             {saving
               ? "Saving…"
               : createdAgent

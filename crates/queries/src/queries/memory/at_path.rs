@@ -77,7 +77,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT m.id FROM memories m JOIN memory_banks b ON b.id=m.bank_id WHERE m.bank_id=ANY($1::UUID[]) AND m.deleted_at IS NULL AND m.path=$2 AND ($3 OR b.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$4::UUID) AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id) ORDER BY m.created_at DESC, m.id DESC LIMIT $5",
+        "SELECT m.id FROM current_memories m WHERE m.bank_id=ANY($1::UUID[]) AND m.path=$2 AND ($3 OR m.scope='shared' OR m.identity_id IS NULL OR m.identity_id=$4::UUID) ORDER BY m.created_at DESC, m.id DESC LIMIT $5",
         None,
     )
 }

@@ -1,5 +1,13 @@
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => <p>Agent access</p> }));
 vi.mock("@/components/agent-sandbox", () => ({ AgentSandbox: () => null }));
+vi.mock("@/components/agent-memory", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/agent-memory")>()),
+  AgentMemory: () => null,
+}));
+vi.mock("@/components/agent-wikis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/components/agent-wikis")>()),
+  AgentWikis: () => null,
+}));
 import { create } from "@bufbuild/protobuf";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";

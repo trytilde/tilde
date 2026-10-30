@@ -15,6 +15,7 @@ include!("tilde.management.v1.skills.rs");
 include!("tilde.management.v1.tilde_chat.rs");
 include!("tilde.management.v1.tools.rs");
 include!("tilde.management.v1.tracing.rs");
+include!("tilde.management.v1.wikis.rs");
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -47,6 +48,7 @@ pub mod __buffa {
         include!("tilde.management.v1.tilde_chat.__view.rs");
         include!("tilde.management.v1.tools.__view.rs");
         include!("tilde.management.v1.tracing.__view.rs");
+        include!("tilde.management.v1.wikis.__view.rs");
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -176,6 +178,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LOG_METRIC_BUCKET_JSON_ANY);
         reg.register_json_any(super::__GET_LOG_METRICS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MEMORY_BANK_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_BANK_LINK_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORY_BANKS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORY_BANKS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_MEMORY_BANK_REQUEST_JSON_ANY);
@@ -197,6 +200,12 @@ pub mod __buffa {
         reg.register_json_any(super::__MEMORY_REVISION_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_PATH_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_PATHS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_PATHS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_PERSON_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_PEOPLE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_PEOPLE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_MEMORY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_MEMORY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_MEMORY_REQUEST_JSON_ANY);
@@ -367,6 +376,48 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_OBSERVATION_METRICS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__OBSERVATION_METRIC_BUCKET_JSON_ANY);
         reg.register_json_any(super::__GET_OBSERVATION_METRICS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__WIKI_JSON_ANY);
+        reg.register_json_any(super::__WIKI_LINK_JSON_ANY);
+        reg.register_json_any(super::__LIST_WIKIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_WIKIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__AGENT_WIKI_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_WIKIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_AGENT_WIKIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_AGENT_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_AGENT_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__WIKI_PAGE_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__WIKI_PAGE_JSON_ANY);
+        reg.register_json_any(super::__WIKI_PAGE_REVISION_JSON_ANY);
+        reg.register_json_any(super::__LIST_WIKI_PAGES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_WIKI_PAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_PAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_PAGE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_PAGE_REVISION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_WIKI_PAGE_REVISION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SEARCH_WIKI_PAGES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WIKI_SEARCH_RESULT_JSON_ANY);
+        reg.register_json_any(super::__SEARCH_WIKI_PAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GREP_WIKI_PAGES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WIKI_GREP_LINE_JSON_ANY);
+        reg.register_json_any(super::__GREP_WIKI_PAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WIKI_PAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_WIKI_PAGE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WIKI_PAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UPDATE_WIKI_PAGE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MOVE_WIKI_PAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__MOVE_WIKI_PAGE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WIKI_PAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_WIKI_PAGE_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -826,6 +877,10 @@ pub use self::__buffa::view::MemoryBankView;
 #[doc(inline)]
 pub use self::__buffa::view::MemoryBankOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::MemoryBankLinkView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryBankLinkOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ListMemoryBanksRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMemoryBanksRequestOwnedView;
@@ -909,6 +964,30 @@ pub use self::__buffa::view::ListMemoriesRequestOwnedView;
 pub use self::__buffa::view::ListMemoriesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMemoriesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryPathView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryPathOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPathsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPathsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPathsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPathsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryPersonView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryPersonOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPeopleRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPeopleRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPeopleResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemoryPeopleResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetMemoryRequestView;
 #[doc(inline)]
@@ -1589,5 +1668,173 @@ pub use self::__buffa::view::ObservationMetricBucketOwnedView;
 pub use self::__buffa::view::GetObservationMetricsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetObservationMetricsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiLinkView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiLinkOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentWikiView;
+#[doc(inline)]
+pub use self::__buffa::view::AgentWikiOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentWikisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentWikisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentWikisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAgentWikisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAgentWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveAgentWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageRevisionView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiPageRevisionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikiPagesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikiPagesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikiPagesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListWikiPagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRevisionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRevisionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRevisionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWikiPageRevisionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SearchWikiPagesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SearchWikiPagesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiSearchResultView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiSearchResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SearchWikiPagesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SearchWikiPagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GrepWikiPagesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GrepWikiPagesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiGrepLineView;
+#[doc(inline)]
+pub use self::__buffa::view::WikiGrepLineOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GrepWikiPagesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GrepWikiPagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiPageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiPageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiPageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWikiPageResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiPageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiPageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiPageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UpdateWikiPageResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MoveWikiPageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::MoveWikiPageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MoveWikiPageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::MoveWikiPageResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiPageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiPageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiPageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteWikiPageResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

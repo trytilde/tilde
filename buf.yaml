@@ -17,6 +17,9 @@ breaking:
   ignore:
     - proto/tilde/management/v1/chat.proto
     - proto/tilde/ingress/v1/chat.proto
+    # The sidecar's memory relay was renamed KnowledgeService (memory and wiki tools) before any
+    # release shipped it.
+    - proto/tilde/runtime/v1/memory.proto
   # AgentService (Invoke/Healthz) was deliberately retired: hosts only dial in through
   # RunService.Watch. InvokeRequest stays in that file and stays checked.
   # GetLogsStatus and GetTracingStatus were deliberately retired: ClickHouse is required, so
