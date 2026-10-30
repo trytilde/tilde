@@ -44,10 +44,10 @@ jobs:
             cross: true
           - target: x86_64-apple-darwin
             asset: darwin-x86_64
-            runner: macos-14
+            runner: macos-15
           - target: aarch64-apple-darwin
             asset: darwin-arm64
-            runner: macos-14
+            runner: macos-15
           - target: x86_64-pc-windows-msvc
             asset: windows-x86_64
             runner: windows-2022
