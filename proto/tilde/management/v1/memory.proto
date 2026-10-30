@@ -23,6 +23,10 @@ service MemoryService {
   rpc RemoveAgentMemoryBank(RemoveAgentMemoryBankRequest) returns (RemoveAgentMemoryBankResponse);
   // With a query, the bank's memories ranked as agents recall them; without, newest first.
   rpc ListMemories(ListMemoriesRequest) returns (ListMemoriesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Every path in the bank holding memories, for its tree.
+  rpc ListMemoryPaths(ListMemoryPathsRequest) returns (ListMemoryPathsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // The people a per-person bank keeps memories for.
+  rpc ListMemoryPeople(ListMemoryPeopleRequest) returns (ListMemoryPeopleResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   rpc GetMemory(GetMemoryRequest) returns (GetMemoryResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   // A person's memory (origin OWNER): agents may read it but never change or forget it.
   rpc CreateMemory(CreateMemoryRequest) returns (CreateMemoryResponse);
@@ -62,19 +66,24 @@ enum MemoryKind {
   // A learned procedure for a recurring task.
   MEMORY_KIND_SKILLS = 8;
 }
+// How a search found a memory: by its words, or by similarity of meaning.
+enum MemoryMatch { MEMORY_MATCH_UNSPECIFIED = 0; MEMORY_MATCH_KEYWORDS = 1; MEMORY_MATCH_MEANING = 2; }
 // EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents cannot change it.
 enum MemoryOrigin { MEMORY_ORIGIN_UNSPECIFIED = 0; MEMORY_ORIGIN_EXPLICIT = 1; MEMORY_ORIGIN_OWNER = 2; }
 message MemoryBank {
   string id = 1; string name = 2; string description = 3; MemoryBankScope scope = 4;
   // Set when the bank is this agent's own.
   optional string agent_id = 5;
-  // Agents linked to it.
-  repeated string agent_ids = 6;
   uint32 memory_count = 7;
-  // Memories waiting for an embedding under the current settings.
+  // Memories waiting for an embedding under the current settings; 0 without settings.
   uint32 pending_embeddings = 8;
   google.protobuf.Timestamp created_at = 9;
+  // Agents linked to it, and how.
+  repeated MemoryBankLink links = 10;
+  reserved 6;
+  reserved "agent_ids";
 }
+message MemoryBankLink { string agent_id = 1; MemoryAccess access = 2; }
 message ListMemoryBanksRequest { optional string search = 1; }
 message ListMemoryBanksResponse { repeated MemoryBank banks = 1; }
 message GetMemoryBankRequest { string id = 1; }
@@ -110,6 +119,10 @@ message Memory {
   // Where an agent wrote it: the conversation, and the latest message a person sent there.
   optional string thread_id = 15; optional string message_id = 16;
   google.protobuf.Timestamp created_at = 17; google.protobuf.Timestamp updated_at = 18;
+  // The memory that replaced this one; a replaced memory is no longer recalled.
+  optional string superseded_by = 19;
+  // In ListMemories with a query: how it was found.
+  repeated MemoryMatch matched = 20;
 }
 enum MemoryOperation {
   MEMORY_OPERATION_UNSPECIFIED = 0; MEMORY_OPERATION_CREATE = 1; MEMORY_OPERATION_UPDATE = 2;
@@ -127,11 +140,22 @@ message MemoryRevision {
   // The agent that made it; absent when a person did.
   optional string agent_id = 12;
 }
-// `path` limits to that path and below; `limit` defaults to 50, at most 200.
+// `path` limits to that path and below; `limit` defaults to 50, at most 200. Without a query the
+// list pages newest first by `page_token`; with one, the best `limit` matches are the only page.
+// `identity_id` narrows a per-person bank to one person's memories.
 message ListMemoriesRequest {
   string bank_id = 1; optional string query = 2; optional string path = 3; MemoryKind kind = 4; uint32 limit = 5;
+  string page_token = 6; MemoryOrigin origin = 7; optional string identity_id = 8;
 }
-message ListMemoriesResponse { repeated Memory memories = 1; }
+message ListMemoriesResponse { repeated Memory memories = 1; string next_page_token = 2; }
+// `count` is of memories exactly at the path.
+message MemoryPath { string path = 1; uint32 count = 2; }
+message ListMemoryPathsRequest { string bank_id = 1; }
+message ListMemoryPathsResponse { repeated MemoryPath paths = 1; }
+// A root identity, or a person with none, named after one of its users.
+message MemoryPerson { string identity_id = 1; string name = 2; uint32 count = 3; }
+message ListMemoryPeopleRequest { string bank_id = 1; }
+message ListMemoryPeopleResponse { repeated MemoryPerson people = 1; }
 message GetMemoryRequest { string id = 1; }
 message GetMemoryResponse { Memory memory = 1; repeated MemoryRevision revisions = 2; }
 message CreateMemoryRequest {

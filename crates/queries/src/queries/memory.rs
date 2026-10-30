@@ -19,6 +19,8 @@ pub mod memories_get;
 pub mod memory_forget;
 pub mod memory_insert;
 pub mod memory_list;
+pub mod memory_paths;
+pub mod memory_people;
 pub mod memory_status;
 pub mod memory_update;
 pub mod recall_text;

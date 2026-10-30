@@ -14,6 +14,7 @@ pub struct Record {
     pub agent_id: Option<uuid::Uuid>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub agent_ids: Vec<uuid::Uuid>,
+    pub link_access: Vec<String>,
     pub memory_count: i64,
     pub pending_embeddings: i64,
 }
@@ -25,6 +26,7 @@ pub struct RecordBorrowed<'a> {
     pub agent_id: Option<uuid::Uuid>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub agent_ids: crate::ArrayIterator<'a, uuid::Uuid>,
+    pub link_access: crate::ArrayIterator<'a, &'a str>,
     pub memory_count: i64,
     pub pending_embeddings: i64,
 }
@@ -38,6 +40,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             created_at,
             agent_ids,
+            link_access,
             memory_count,
             pending_embeddings,
         }: RecordBorrowed<'a>,
@@ -50,6 +53,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             agent_id,
             created_at,
             agent_ids: agent_ids.map(|v| v).collect(),
+            link_access: link_access.map(|v| v.into()).collect(),
             memory_count,
             pending_embeddings,
         }
@@ -124,7 +128,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT b.id,b.name,b.description,b.scope,b.agent_id,b.created_at, COALESCE((SELECT array_agg(l.agent_id ORDER BY l.agent_id) FROM agent_memory_banks l WHERE l.bank_id=b.id), '{}')::UUID[] AS agent_ids, (SELECT COUNT(*) FROM memories m WHERE m.bank_id=b.id AND m.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id)) AS memory_count, (SELECT COUNT(*) FROM memory_embedding_jobs j JOIN memories m ON m.id=j.memory_id WHERE m.bank_id=b.id AND m.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id)) AS pending_embeddings FROM memory_banks b WHERE ($1::UUID IS NULL OR b.id=$1) AND ($2::TEXT IS NULL OR b.name ILIKE '%'||$2||'%') ORDER BY b.name",
+        "SELECT b.id,b.name,b.description,b.scope,b.agent_id,b.created_at, COALESCE((SELECT array_agg(l.agent_id ORDER BY l.agent_id) FROM agent_memory_banks l WHERE l.bank_id=b.id), '{}')::UUID[] AS agent_ids, COALESCE((SELECT array_agg(l.access ORDER BY l.agent_id) FROM agent_memory_banks l WHERE l.bank_id=b.id), '{}')::TEXT[] AS link_access, (SELECT COUNT(*) FROM current_memories m WHERE m.bank_id=b.id) AS memory_count, (SELECT COUNT(*) FROM memory_embedding_jobs j JOIN current_memories m ON m.id=j.memory_id WHERE m.bank_id=b.id AND EXISTS (SELECT 1 FROM memory_settings)) AS pending_embeddings FROM memory_banks b WHERE ($1::UUID IS NULL OR b.id=$1) AND ($2::TEXT IS NULL OR b.name ILIKE '%'||$2||'%') ORDER BY b.name",
         None,
     )
 }
@@ -157,8 +161,9 @@ impl RunStmt {
                         agent_id: row.try_get(4)?,
                         created_at: row.try_get(5)?,
                         agent_ids: row.try_get(6)?,
-                        memory_count: row.try_get(7)?,
-                        pending_embeddings: row.try_get(8)?,
+                        link_access: row.try_get(7)?,
+                        memory_count: row.try_get(8)?,
+                        pending_embeddings: row.try_get(9)?,
                     })
                 },
             mapper: |it| Record::from(it),

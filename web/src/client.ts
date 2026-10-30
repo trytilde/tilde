@@ -6,6 +6,8 @@ import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/conn
 import { DeploymentService } from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
 import { InferenceService } from "@trytilde/contracts/tilde/management/v1/inference_pb.js";
 import { LogsService } from "@trytilde/contracts/tilde/management/v1/logs_pb.js";
+import { MemoryService } from "@trytilde/contracts/tilde/management/v1/memory_pb.js";
+import { WikiService } from "@trytilde/contracts/tilde/management/v1/wikis_pb.js";
 import { PromptService } from "@trytilde/contracts/tilde/management/v1/prompts_pb.js";
 import { RoutineService } from "@trytilde/contracts/tilde/management/v1/routines_pb.js";
 import { SandboxBlueprintService } from "@trytilde/contracts/tilde/management/v1/sandboxes_pb.js";
@@ -36,5 +38,7 @@ export const skills = createClient(SkillService, transport);
 export const tools = createClient(ToolService, transport);
 export const toolHosts = createClient(ToolHostRegistryService, transport);
 export const sandboxes = createClient(SandboxBlueprintService, transport);
+export const memory = createClient(MemoryService, transport);
+export const wikis = createClient(WikiService, transport);
 // Setup calls authenticate with each setup's own token.
 export const connectionSetup = createClient(ConnectionSetupService, transport);

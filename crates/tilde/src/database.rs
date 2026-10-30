@@ -47,6 +47,13 @@ impl DbError {
     pub fn is_check_violation(&self) -> bool {
         self.code() == Some(&tokio_postgres::error::SqlState::CHECK_VIOLATION)
     }
+    pub fn is_invalid_regex(&self) -> bool {
+        self.code() == Some(&tokio_postgres::error::SqlState::INVALID_REGULAR_EXPRESSION)
+    }
+    /// A statement timeout fired.
+    pub fn is_query_canceled(&self) -> bool {
+        self.code() == Some(&tokio_postgres::error::SqlState::QUERY_CANCELED)
+    }
 }
 
 /// Pool identity, connection configuration and shutdown travel together. In particular,

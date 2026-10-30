@@ -137,12 +137,13 @@ impl Provider for LocalChannels {
     }
 }
 
-/// Memory tools, answered by the gateway: memory lives in its Postgres, so listing and every
-/// call are relayed (`tilde.runtime.v1.MemoryService`) and nothing is held here. Relay checks the
-/// token, the thread lease and the capability ceiling as for the agent's registry calls.
-pub struct GatewayMemory(pub Arc<Runtime>);
-const MEMORY_SERVICE: &str = "tilde.runtime.v1.MemoryService";
-impl GatewayMemory {
+/// Memory and wiki tools, answered by the gateway: both live in its Postgres, so listing and
+/// every call are relayed (`tilde.runtime.v1.KnowledgeService`) and nothing is held here. Relay
+/// checks the token, the thread lease and the capability ceiling as for the agent's registry
+/// calls.
+pub struct GatewayKnowledge(pub Arc<Runtime>);
+const KNOWLEDGE_SERVICE: &str = "tilde.runtime.v1.KnowledgeService";
+impl GatewayKnowledge {
     async fn relay<T: serde::de::DeserializeOwned>(
         &self,
         token: &SecretString,
@@ -154,7 +155,7 @@ impl GatewayMemory {
             .gateway
             .relay(
                 self.0.instance_id,
-                &format!("{MEMORY_SERVICE}/{method}"),
+                &format!("{KNOWLEDGE_SERVICE}/{method}"),
                 "application/json",
                 body.to_string().into_bytes(),
                 token.expose_secret(),
@@ -168,14 +169,16 @@ impl GatewayMemory {
                 .unwrap_or(connectrpc::ErrorCode::Unavailable);
             return Err(ConnectError::new(
                 code,
-                value["message"].as_str().unwrap_or("Memory is unavailable"),
+                value["message"]
+                    .as_str()
+                    .unwrap_or("Memory and wikis are unavailable"),
             ));
         }
         serde_json::from_value(value)
-            .map_err(|_| ConnectError::internal("Invalid memory response from the gateway"))
+            .map_err(|_| ConnectError::internal("Invalid response from the gateway"))
     }
 }
-impl Provider for GatewayMemory {
+impl Provider for GatewayKnowledge {
     fn tools<'a>(
         &'a self,
         scope: &'a Scope,
@@ -187,18 +190,19 @@ impl Provider for GatewayMemory {
             // The registry lists tools from the verified scope alone, so the listing goes under a
             // token minted for it; calls go under the agent's own.
             let token = self.0.relay_token(scope)?;
-            // An unreachable gateway hides memory for this listing rather than every tool.
+            // An unreachable gateway hides memory and wikis for this listing rather than every
+            // tool.
             match self
-                .relay::<crate::proto::tilde::runtime::v1::ListMemoryToolsResponse>(
+                .relay::<crate::proto::tilde::runtime::v1::ListKnowledgeToolsResponse>(
                     &token,
-                    "ListMemoryTools",
+                    "ListKnowledgeTools",
                     json!({}),
                 )
                 .await
             {
                 Ok(listed) => Ok(listed.tools),
                 Err(error) => {
-                    tracing::warn!(%error, "Memory tools unavailable from the gateway");
+                    tracing::warn!(%error, "Memory and wiki tools unavailable from the gateway");
                     Ok(vec![])
                 }
             }
@@ -217,14 +221,14 @@ impl Provider for GatewayMemory {
             }
             context.authorize().await?;
             let output = self
-                .relay::<crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse>(
+                .relay::<crate::proto::tilde::runtime::v1::InvokeKnowledgeToolResponse>(
                     context.capability(),
-                    "InvokeMemoryTool",
+                    "InvokeKnowledgeTool",
                     json!({"name": name, "inputJson": input.to_string(), "callId": context.call_id}),
                 )
                 .await?;
             serde_json::from_str(&output.output_json)
-                .map_err(|_| ConnectError::internal("Invalid memory tool result"))
+                .map_err(|_| ConnectError::internal("Invalid tool result from the gateway"))
         })
     }
 }

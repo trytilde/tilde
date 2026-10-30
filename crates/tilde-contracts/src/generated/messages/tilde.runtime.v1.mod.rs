@@ -4,7 +4,7 @@ include!("tilde.runtime.v1.agents.rs");
 include!("tilde.runtime.v1.cache.rs");
 include!("tilde.runtime.v1.chat.rs");
 include!("tilde.runtime.v1.controls.rs");
-include!("tilde.runtime.v1.memory.rs");
+include!("tilde.runtime.v1.knowledge.rs");
 include!("tilde.runtime.v1.prompts.rs");
 include!("tilde.runtime.v1.skills.rs");
 #[allow(
@@ -28,7 +28,7 @@ pub mod __buffa {
         include!("tilde.runtime.v1.cache.__view.rs");
         include!("tilde.runtime.v1.chat.__view.rs");
         include!("tilde.runtime.v1.controls.__view.rs");
-        include!("tilde.runtime.v1.memory.__view.rs");
+        include!("tilde.runtime.v1.knowledge.__view.rs");
         include!("tilde.runtime.v1.prompts.__view.rs");
         include!("tilde.runtime.v1.skills.__view.rs");
     }
@@ -89,10 +89,10 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__LIST_MEMORY_TOOLS_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__LIST_MEMORY_TOOLS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__INVOKE_MEMORY_TOOL_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__INVOKE_MEMORY_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_KNOWLEDGE_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_KNOWLEDGE_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_KNOWLEDGE_TOOL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_KNOWLEDGE_TOOL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SKILL_FILE_INFO_JSON_ANY);
@@ -335,21 +335,21 @@ pub use self::__buffa::view::AcknowledgeCommandResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListMemoryToolsRequestView;
+pub use self::__buffa::view::ListKnowledgeToolsRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::ListMemoryToolsRequestOwnedView;
+pub use self::__buffa::view::ListKnowledgeToolsRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ListMemoryToolsResponseView;
+pub use self::__buffa::view::ListKnowledgeToolsResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::ListMemoryToolsResponseOwnedView;
+pub use self::__buffa::view::ListKnowledgeToolsResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::InvokeMemoryToolRequestView;
+pub use self::__buffa::view::InvokeKnowledgeToolRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::InvokeMemoryToolRequestOwnedView;
+pub use self::__buffa::view::InvokeKnowledgeToolRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::InvokeMemoryToolResponseView;
+pub use self::__buffa::view::InvokeKnowledgeToolResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::InvokeMemoryToolResponseOwnedView;
+pub use self::__buffa::view::InvokeKnowledgeToolResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListPromptsRequestView;
 #[doc(inline)]

@@ -10,6 +10,8 @@ const sections = [
   { prefix: "/skills", label: "Skills", to: "/skills" },
   { prefix: "/tools", label: "Tools", to: "/tools/connections" },
   { prefix: "/sandboxes", label: "Sandboxes", to: "/sandboxes" },
+  { prefix: "/memory", label: "Memory", to: "/memory" },
+  { prefix: "/wikis", label: "Wikis", to: "/wikis" },
 ] as const;
 export function SiteHeader() {
   const { agentId } = useParams({ strict: false });
@@ -30,7 +32,9 @@ export function SiteHeader() {
           ? "Catalog"
           : pathname.startsWith("/skills/") ||
               pathname.startsWith("/tools/") ||
-              pathname.startsWith("/sandboxes/")
+              pathname.startsWith("/sandboxes/") ||
+              pathname.startsWith("/memory/") ||
+              pathname.startsWith("/wikis/")
             ? (named?.label ?? null)
             : agentId
               ? agent?.id === agentId

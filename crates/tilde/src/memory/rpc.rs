@@ -1,74 +1,14 @@
-//! The memory management service, and the memory tools a sidecar relays for its agent.
-use super::tools::MemoryTools;
+//! The memory management service.
 use super::{Change, Draft, Filter, Memory, Person, Source, db};
 use crate::chat::audit::timestamp;
 use crate::error::Error;
 use crate::proto::tilde::management::v1 as management;
-use crate::proto::tilde::runtime::v1 as runtime;
 use crate::services::tilde::management::v1::MemoryService;
-use crate::services::tilde::runtime::v1::MemoryService as RuntimeMemoryService;
 use buffa_types::google::protobuf::Timestamp;
 use chrono::{DateTime, Utc};
-use connectrpc::{
-    ConnectError, Encodable, RequestContext, Response, ServiceRequest, ServiceResult,
-};
+use connectrpc::{Encodable, RequestContext, Response, ServiceRequest, ServiceResult};
 use std::sync::Arc;
 use uuid::Uuid;
-
-/// Memory tools for an agent beside a sidecar, served only behind the registry relay.
-pub fn runtime_router(memory: Memory, chat: crate::chat::Chat) -> axum::Router {
-    crate::rpc::mount(
-        connectrpc::Router::new().add_service(Arc::new(Runtime {
-            tools: MemoryTools(memory),
-            chat,
-        })),
-        1024 * 1024,
-    )
-}
-struct Runtime {
-    tools: MemoryTools,
-    chat: crate::chat::Chat,
-}
-impl RuntimeMemoryService for Runtime {
-    async fn list_memory_tools<'a>(
-        &'a self,
-        ctx: RequestContext,
-        _request: ServiceRequest<'_, runtime::ListMemoryToolsRequest>,
-    ) -> ServiceResult<impl Encodable<runtime::ListMemoryToolsResponse> + Send + use<'a>> {
-        let scope = crate::chat::rpc::invocation_scope(&self.chat, &ctx).await?;
-        Response::ok(runtime::ListMemoryToolsResponse {
-            tools: self.tools.list(scope.agent_id).await?,
-            ..Default::default()
-        })
-    }
-    async fn invoke_memory_tool<'a>(
-        &'a self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, runtime::InvokeMemoryToolRequest>,
-    ) -> ServiceResult<impl Encodable<runtime::InvokeMemoryToolResponse> + Send + use<'a>> {
-        let scope = crate::chat::rpc::invocation_scope(&self.chat, &ctx).await?;
-        let r = request.to_owned_message();
-        // The sidecar's registry filtered the catalog by tools_invoke; check it again here.
-        if !scope
-            .capabilities
-            .permits(crate::iam::capabilities::Capability::ToolsInvoke, &r.name)
-        {
-            return Err(ConnectError::permission_denied(
-                "Tool is not available to this agent",
-            ));
-        }
-        let input = serde_json::from_str(&r.input_json)
-            .map_err(|_| ConnectError::invalid_argument("Invalid tool input"))?;
-        let output = self
-            .tools
-            .call(&scope, id(&r.call_id)?, &r.name, input)
-            .await?;
-        Response::ok(runtime::InvokeMemoryToolResponse {
-            output_json: output.to_string(),
-            ..Default::default()
-        })
-    }
-}
 
 pub fn router(memory: Memory) -> axum::Router {
     crate::rpc::mount(
@@ -153,7 +93,16 @@ fn bank_wire(b: db::BankRow) -> management::MemoryBank {
         description: b.description,
         scope: scope_wire(&b.scope).into(),
         agent_id: b.agent_id.map(|a| a.to_string()),
-        agent_ids: b.agent_ids.iter().map(Uuid::to_string).collect(),
+        links: b
+            .agent_ids
+            .iter()
+            .zip(&b.link_access)
+            .map(|(agent, access)| management::MemoryBankLink {
+                agent_id: agent.to_string(),
+                access: access_wire(access).into(),
+                ..Default::default()
+            })
+            .collect(),
         memory_count: b.memory_count as u32,
         pending_embeddings: b.pending_embeddings as u32,
         created_at: timestamp(b.created_at).into(),
@@ -175,6 +124,23 @@ fn origin_wire(origin: &str) -> management::MemoryOrigin {
     match origin {
         "owner" => management::MemoryOrigin::Owner,
         _ => management::MemoryOrigin::Explicit,
+    }
+}
+/// Unspecified means any.
+fn origin_text(
+    origin: buffa::EnumValue<management::MemoryOrigin>,
+) -> Result<Option<String>, Error> {
+    match origin.as_known() {
+        Some(management::MemoryOrigin::Unspecified) => Ok(None),
+        Some(management::MemoryOrigin::Explicit) => Ok(Some("explicit".into())),
+        Some(management::MemoryOrigin::Owner) => Ok(Some("owner".into())),
+        None => Err(Error::Invalid("Unknown memory origin".into())),
+    }
+}
+fn match_wire(how: &str) -> management::MemoryMatch {
+    match how {
+        "meaning" => management::MemoryMatch::Meaning,
+        _ => management::MemoryMatch::Keywords,
     }
 }
 fn operation_wire(operation: &str) -> management::MemoryOperation {
@@ -202,6 +168,7 @@ fn memory_wire(m: db::MemoryRow) -> management::Memory {
         identity_id: m.identity_id.map(|i| i.to_string()),
         written_by_agent_id: m.written_by_agent_id.map(|a| a.to_string()),
         supersedes_id: m.supersedes_id.map(|s| s.to_string()),
+        superseded_by: m.superseded_by.map(|s| s.to_string()),
         embedded: m.embedded,
         thread_id: m.thread_id.map(|t| t.to_string()),
         message_id: m.message_id.map(|m| m.to_string()),
@@ -338,24 +305,94 @@ impl MemoryService for Management {
         let filter = Filter {
             kind: kind_text(r.kind)?,
             path: r.path.as_deref().map(super::path).transpose()?,
+            origin: origin_text(r.origin)?,
+            identity: r.identity_id.as_deref().map(id).transpose()?,
             ..Default::default()
         };
         let limit = match r.limit {
             0 => 50,
             n => i64::from(n.min(200)),
         };
-        let memories = self
+        if let Some(query) = r.query.as_deref().filter(|q| !q.trim().is_empty()) {
+            let memories = self
+                .0
+                .recall(&[bank], Some(query), &filter, Person::Everyone, limit)
+                .await?;
+            return Response::ok(management::ListMemoriesResponse {
+                memories: memories
+                    .into_iter()
+                    .map(|(m, how)| management::Memory {
+                        matched: how.into_iter().map(|h| match_wire(h).into()).collect(),
+                        ..memory_wire(m)
+                    })
+                    .collect(),
+                ..Default::default()
+            });
+        }
+        let after = match r.page_token.as_str() {
+            "" => None,
+            token => Some(id(token)?),
+        };
+        // One more than a page tells whether another follows.
+        let mut memories = self
             .0
-            .recall(
-                &[bank],
-                r.query.as_deref(),
-                &filter,
-                Person::Everyone,
-                limit,
-            )
+            .list(&[bank], &filter, Person::Everyone, after, limit + 1)
             .await?;
+        let next_page_token = if memories.len() as i64 > limit {
+            memories.truncate(limit as usize);
+            memories
+                .last()
+                .map(|m| m.id.to_string())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
         Response::ok(management::ListMemoriesResponse {
-            memories: memories.into_iter().map(|(m, _)| memory_wire(m)).collect(),
+            memories: memories.into_iter().map(memory_wire).collect(),
+            next_page_token,
+            ..Default::default()
+        })
+    }
+    async fn list_memory_paths<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, management::ListMemoryPathsRequest>,
+    ) -> ServiceResult<impl Encodable<management::ListMemoryPathsResponse> + Send + use<'a>> {
+        let bank = id(&request.to_owned_message().bank_id)?;
+        Response::ok(management::ListMemoryPathsResponse {
+            paths: self
+                .0
+                .paths(bank)
+                .await?
+                .into_iter()
+                .map(|p| management::MemoryPath {
+                    path: p.path,
+                    count: p.count as u32,
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        })
+    }
+    async fn list_memory_people<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, management::ListMemoryPeopleRequest>,
+    ) -> ServiceResult<impl Encodable<management::ListMemoryPeopleResponse> + Send + use<'a>> {
+        let bank = id(&request.to_owned_message().bank_id)?;
+        Response::ok(management::ListMemoryPeopleResponse {
+            people: self
+                .0
+                .people(bank)
+                .await?
+                .into_iter()
+                .map(|p| management::MemoryPerson {
+                    identity_id: p.identity_id.to_string(),
+                    name: p.name,
+                    count: p.count as u32,
+                    ..Default::default()
+                })
+                .collect(),
             ..Default::default()
         })
     }

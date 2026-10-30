@@ -11,6 +11,8 @@ pub use q::bank_list::Record as BankRow;
 pub use q::browse::Run as PathRow;
 pub use q::jobs_claim::Run as JobRow;
 pub use q::memories_get::Record as MemoryRow;
+pub use q::memory_paths::Run as PathCountRow;
+pub use q::memory_people::Run as PersonRow;
 pub use q::memory_status::Record as StatusRow;
 pub use q::revisions_list::Record as RevisionRow;
 pub use q::settings_get::Run as SettingsRow;
@@ -162,11 +164,13 @@ pub async fn memories_get_all(
         .all()
         .await?)
 }
+/// Newest first, after memory `after` when given.
 pub async fn memory_list_all(
     db: &impl GenericClient,
     banks: &[Uuid],
     filter: &super::Filter,
     person: super::Person,
+    after: Option<Uuid>,
     limit: i64,
 ) -> DbResult<Vec<Uuid>> {
     let (identity, everyone) = person.params();
@@ -178,8 +182,11 @@ pub async fn memory_list_all(
             &filter.path,
             &filter.from,
             &filter.to,
+            &filter.origin,
+            &filter.identity,
             &everyone,
             &identity,
+            &after,
             &limit,
         )
         .all()
@@ -203,6 +210,8 @@ pub async fn recall_text_all(
             &filter.path,
             &filter.from,
             &filter.to,
+            &filter.origin,
+            &filter.identity,
             &everyone,
             &identity,
             &limit,
@@ -233,6 +242,8 @@ pub async fn recall_vector_all(
                     &filter.path,
                     &filter.from,
                     &filter.to,
+                    &filter.origin,
+                    &filter.identity,
                     &everyone,
                     &identity,
                     &vector,
@@ -251,6 +262,8 @@ pub async fn recall_vector_all(
                     &filter.path,
                     &filter.from,
                     &filter.to,
+                    &filter.origin,
+                    &filter.identity,
                     &everyone,
                     &identity,
                     &vector,
@@ -290,6 +303,16 @@ pub async fn at_path_all(
         .bind(db, &banks, &path, &everyone, &identity, &limit)
         .all()
         .await?)
+}
+pub async fn memory_paths_all(
+    db: &impl GenericClient,
+    bank: Uuid,
+    limit: i64,
+) -> DbResult<Vec<PathCountRow>> {
+    Ok(q::memory_paths::run().bind(db, &bank, &limit).all().await?)
+}
+pub async fn memory_people_all(db: &impl GenericClient, bank: Uuid) -> DbResult<Vec<PersonRow>> {
+    Ok(q::memory_people::run().bind(db, &bank).all().await?)
 }
 pub async fn settings_get_opt(db: &impl GenericClient) -> DbResult<Option<SettingsRow>> {
     Ok(q::settings_get::run().bind(db).opt().await?)

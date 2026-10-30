@@ -22,6 +22,7 @@ pub struct Record {
     pub identity_id: Option<uuid::Uuid>,
     pub written_by_agent_id: Option<uuid::Uuid>,
     pub supersedes_id: Option<uuid::Uuid>,
+    pub superseded_by: Option<uuid::Uuid>,
     pub thread_id: Option<uuid::Uuid>,
     pub message_id: Option<uuid::Uuid>,
     pub embedded: bool,
@@ -44,6 +45,7 @@ pub struct RecordBorrowed<'a> {
     pub identity_id: Option<uuid::Uuid>,
     pub written_by_agent_id: Option<uuid::Uuid>,
     pub supersedes_id: Option<uuid::Uuid>,
+    pub superseded_by: Option<uuid::Uuid>,
     pub thread_id: Option<uuid::Uuid>,
     pub message_id: Option<uuid::Uuid>,
     pub embedded: bool,
@@ -68,6 +70,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             identity_id,
             written_by_agent_id,
             supersedes_id,
+            superseded_by,
             thread_id,
             message_id,
             embedded,
@@ -91,6 +94,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             identity_id,
             written_by_agent_id,
             supersedes_id,
+            superseded_by,
             thread_id,
             message_id,
             embedded,
@@ -168,7 +172,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT m.id,m.bank_id,b.name AS bank_name,b.scope,m.kind,m.path,m.title,m.content, lower(m.valid_during) AS valid_from,upper(m.valid_during) AS valid_to,m.importance,m.origin, m.identity_id,m.written_by_agent_id,m.supersedes_id,m.thread_id,m.message_id, COALESCE(m.embedding_version=$1::INTEGER,FALSE) AS embedded,m.created_at,m.updated_at FROM memories m JOIN memory_banks b ON b.id=m.bank_id WHERE m.id=ANY($2::UUID[]) AND m.deleted_at IS NULL",
+        "SELECT m.id,m.bank_id,b.name AS bank_name,b.scope,m.kind,m.path,m.title,m.content, lower(m.valid_during) AS valid_from,upper(m.valid_during) AS valid_to,m.importance,m.origin, m.identity_id,m.written_by_agent_id,m.supersedes_id, (SELECT s.id FROM memories s WHERE s.supersedes_id=m.id) AS superseded_by,m.thread_id,m.message_id, COALESCE(m.embedding_version=$1::INTEGER,FALSE) AS embedded,m.created_at,m.updated_at FROM memories m JOIN memory_banks b ON b.id=m.bank_id WHERE m.id=ANY($2::UUID[]) AND m.deleted_at IS NULL",
         None,
     )
 }
@@ -209,11 +213,12 @@ impl RunStmt {
                         identity_id: row.try_get(12)?,
                         written_by_agent_id: row.try_get(13)?,
                         supersedes_id: row.try_get(14)?,
-                        thread_id: row.try_get(15)?,
-                        message_id: row.try_get(16)?,
-                        embedded: row.try_get(17)?,
-                        created_at: row.try_get(18)?,
-                        updated_at: row.try_get(19)?,
+                        superseded_by: row.try_get(15)?,
+                        thread_id: row.try_get(16)?,
+                        message_id: row.try_get(17)?,
+                        embedded: row.try_get(18)?,
+                        created_at: row.try_get(19)?,
+                        updated_at: row.try_get(20)?,
                     })
                 },
             mapper: |it| Record::from(it),

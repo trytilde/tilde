@@ -5,7 +5,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO memory_embedding_jobs(memory_id) SELECT m.id FROM memories m WHERE ($1::UUID IS NULL OR m.id=$1) AND m.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM memories s WHERE s.supersedes_id=m.id) ON CONFLICT(memory_id) DO UPDATE SET requested_at=clock_timestamp(),run_after=NOW(),attempts=0",
+        "INSERT INTO memory_embedding_jobs(memory_id) SELECT m.id FROM current_memories m WHERE $1::UUID IS NULL OR m.id=$1 ON CONFLICT(memory_id) DO UPDATE SET requested_at=clock_timestamp(),run_after=NOW(),attempts=0",
         None,
     )
 }

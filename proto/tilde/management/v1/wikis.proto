@@ -1,0 +1,118 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+
+// Wikis are trees of Markdown pages people write here and agents read and edit through the
+// built-in wiki tools: durable reference pages, where memory banks hold short facts. A wiki is
+// shared, or an agent's own (created with the agent's id and deleted with it). An agent reaches a
+// wiki only through a link, read or read-write. Every change to a page is a revision; a write
+// names the revision it read and is refused (ABORTED) when the page has changed since.
+service WikiService {
+  rpc ListWikis(ListWikisRequest) returns (ListWikisResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetWiki(GetWikiRequest) returns (GetWikiResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // With an agent id, the wiki is that agent's own: it is linked read-write and deleted with it.
+  rpc CreateWiki(CreateWikiRequest) returns (CreateWikiResponse);
+  rpc UpdateWiki(UpdateWikiRequest) returns (UpdateWikiResponse);
+  // Deletes the wiki, its pages and their history.
+  rpc DeleteWiki(DeleteWikiRequest) returns (DeleteWikiResponse);
+  rpc ListAgentWikis(ListAgentWikisRequest) returns (ListAgentWikisResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Links a shared wiki to the agent, or changes the access of a link. An agent's own wiki cannot
+  // be linked to another agent.
+  rpc SetAgentWiki(SetAgentWikiRequest) returns (SetAgentWikiResponse);
+  // Refused for the agent's own wiki; delete the wiki instead.
+  rpc RemoveAgentWiki(RemoveAgentWikiRequest) returns (RemoveAgentWikiResponse);
+  // Every page of the wiki without its content, in path order, for its tree.
+  rpc ListWikiPages(ListWikiPagesRequest) returns (ListWikiPagesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // A page with its history, newest first.
+  rpc GetWikiPage(GetWikiPageRequest) returns (GetWikiPageResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // One revision's content, for a diff.
+  rpc GetWikiPageRevision(GetWikiPageRevisionRequest) returns (GetWikiPageRevisionResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Ranked full-text search over page titles and content.
+  rpc SearchWikiPages(SearchWikiPagesRequest) returns (SearchWikiPagesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Lines of the wiki's pages matching a literal or a regular expression.
+  rpc GrepWikiPages(GrepWikiPagesRequest) returns (GrepWikiPagesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Refused (ALREADY_EXISTS) when the wiki has a page at the path.
+  rpc CreateWikiPage(CreateWikiPageRequest) returns (CreateWikiPageResponse);
+  // Changes the title or content of the page at `expected_revision`.
+  rpc UpdateWikiPage(UpdateWikiPageRequest) returns (UpdateWikiPageResponse);
+  // Gives the page at `expected_revision` a new path.
+  rpc MoveWikiPage(MoveWikiPageRequest) returns (MoveWikiPageResponse);
+  // Deletes the page at `expected_revision`; its history is kept.
+  rpc DeleteWikiPage(DeleteWikiPageRequest) returns (DeleteWikiPageResponse);
+}
+enum WikiAccess { WIKI_ACCESS_UNSPECIFIED = 0; WIKI_ACCESS_READ = 1; WIKI_ACCESS_READ_WRITE = 2; }
+enum WikiOperation { WIKI_OPERATION_UNSPECIFIED = 0; WIKI_OPERATION_CREATE = 1; WIKI_OPERATION_UPDATE = 2; WIKI_OPERATION_MOVE = 3; WIKI_OPERATION_DELETE = 4; }
+message Wiki {
+  string id = 1; string name = 2; string description = 3;
+  // Set for an agent's own wiki.
+  optional string agent_id = 4;
+  // Agents linked to it, and how.
+  repeated WikiLink links = 5;
+  uint32 page_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+message WikiLink { string agent_id = 1; WikiAccess access = 2; }
+message ListWikisRequest { optional string search = 1; }
+message ListWikisResponse { repeated Wiki wikis = 1; }
+message GetWikiRequest { string id = 1; }
+message GetWikiResponse { Wiki wiki = 1; }
+message CreateWikiRequest { string name = 1; string description = 2; optional string agent_id = 3; }
+message CreateWikiResponse { Wiki wiki = 1; }
+message UpdateWikiRequest { string id = 1; optional string name = 2; optional string description = 3; }
+message UpdateWikiResponse { Wiki wiki = 1; }
+message DeleteWikiRequest { string id = 1; }
+message DeleteWikiResponse {}
+message AgentWiki { string agent_id = 1; string wiki_id = 2; string wiki_name = 3; WikiAccess access = 4; bool own = 5; }
+message ListAgentWikisRequest { string agent_id = 1; }
+message ListAgentWikisResponse { repeated AgentWiki wikis = 1; }
+message SetAgentWikiRequest { string agent_id = 1; string wiki_id = 2; WikiAccess access = 3; }
+message SetAgentWikiResponse { AgentWiki wiki = 1; }
+message RemoveAgentWikiRequest { string agent_id = 1; string wiki_id = 2; }
+message RemoveAgentWikiResponse {}
+// A page without its content.
+message WikiPageSummary { string id = 1; string path = 2; string title = 3; uint32 revision = 4; google.protobuf.Timestamp updated_at = 5; }
+message WikiPage {
+  string id = 1; string wiki_id = 2;
+  // Slash-separated segments, unique in the wiki.
+  string path = 3;
+  string title = 4;
+  // Markdown.
+  string content = 5;
+  uint32 revision = 6;
+  google.protobuf.Timestamp created_at = 7; google.protobuf.Timestamp updated_at = 8;
+}
+// One change; `agent_id` is absent when a person made it, and `thread_id` names the conversation
+// an agent made it in, when the gateway has it.
+message WikiPageRevision {
+  uint32 revision = 1; WikiOperation operation = 2; string path = 3; string title = 4;
+  optional string agent_id = 5;
+  google.protobuf.Timestamp at = 6;
+  optional string thread_id = 7;
+}
+message ListWikiPagesRequest { string wiki_id = 1; }
+// `more` when the wiki has more pages than the 5000 returned.
+message ListWikiPagesResponse { repeated WikiPageSummary pages = 1; bool more = 2; }
+message GetWikiPageRequest { string id = 1; }
+message GetWikiPageResponse { WikiPage page = 1; repeated WikiPageRevision revisions = 2; }
+message GetWikiPageRevisionRequest { string page_id = 1; uint32 revision = 2; }
+// The page as it was after the revision; a delete keeps the last content.
+message GetWikiPageRevisionResponse { WikiPageRevision revision = 1; string content = 2; }
+message SearchWikiPagesRequest { string wiki_id = 1; string query = 2; }
+// `excerpt` marks each matched word with U+E000 before it and U+E001 after it.
+message WikiSearchResult { WikiPageSummary page = 1; string excerpt = 2; }
+message SearchWikiPagesResponse { repeated WikiSearchResult results = 1; }
+// `pattern` is a literal unless `regex`; at most 256 characters.
+message GrepWikiPagesRequest { string wiki_id = 1; string pattern = 2; bool regex = 3; bool ignore_case = 4; }
+// `truncated` when the line is longer than the 500 characters returned.
+message WikiGrepLine { string page_path = 1; uint32 line_number = 2; string line = 3; bool truncated = 4; }
+// `more` when more lines matched than are returned.
+message GrepWikiPagesResponse { repeated WikiGrepLine lines = 1; bool more = 2; }
+message CreateWikiPageRequest { string wiki_id = 1; string path = 2; string title = 3; string content = 4; }
+message CreateWikiPageResponse { WikiPage page = 1; }
+// Absent fields keep their value.
+message UpdateWikiPageRequest { string id = 1; uint32 expected_revision = 2; optional string title = 3; optional string content = 4; }
+message UpdateWikiPageResponse { WikiPage page = 1; }
+message MoveWikiPageRequest { string id = 1; uint32 expected_revision = 2; string path = 3; }
+message MoveWikiPageResponse { WikiPage page = 1; }
+message DeleteWikiPageRequest { string id = 1; uint32 expected_revision = 2; }
+message DeleteWikiPageResponse {}

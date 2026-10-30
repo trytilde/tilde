@@ -563,9 +563,15 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         registry("not-an-invocation-token").await.unwrap().status(),
         401
     );
-    // Memory tools are listed and run by the gateway: a write through the replica lands in
-    // Postgres, and recall through it reads it back.
+    // Memory and wiki tools are listed and run by the gateway: a write through the replica lands
+    // in Postgres, and recall through it reads it back.
     let memory = tilde::memory::Memory::new(fx.connections.clone());
+    let wikis = tilde::wikis::Wikis::new(fx.connections.clone());
+    let wiki = wikis
+        .create_wiki("sidecar", "", Some(fx.agent))
+        .await
+        .unwrap()
+        .id;
     memory
         .create_bank("sidecar", "", "shared", Some(fx.agent))
         .await
@@ -593,7 +599,12 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["name"] == "memory.write"),
+            .any(|t| t["name"] == "memory.write")
+            && tools["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|t| t["name"] == "wiki.write"),
         "{tools}"
     );
     let invoke = async |name: &str, input: serde_json::Value| -> serde_json::Value {
@@ -628,6 +639,16 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     assert_eq!(stored.written_by_agent_id, Some(fx.agent));
     let recalled = invoke("memory.recall", serde_json::json!({"query":"launch"})).await;
     assert_eq!(recalled["memories"][0]["title"], "Launch moved");
+    invoke(
+        "wiki.write",
+        serde_json::json!({"path":"launch","title":"Launch","content":"Thursday.","expected_revision":0}),
+    )
+    .await;
+    let page = wikis.page_at(wiki, "launch").await.unwrap().unwrap();
+    assert_eq!(
+        wikis.revisions(page.id).await.unwrap()[0].agent_id,
+        Some(fx.agent)
+    );
     fx.finish.notify_one();
     // The holder's events reach Postgres without the gateway ever calling the replica.
     let projected = eventually(async || {
