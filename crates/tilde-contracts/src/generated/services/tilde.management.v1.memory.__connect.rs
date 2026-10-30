@@ -204,6 +204,114 @@ pub type OwnedListEmbeddingModelsResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetMemorySynthesisRequestView<'static>>`.
+pub type OwnedGetMemorySynthesisRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetMemorySynthesisResponseView<'static>>`.
+pub type OwnedGetMemorySynthesisResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemorySynthesisRequestView<'static>>`.
+pub type OwnedSetMemorySynthesisRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemorySynthesisResponseView<'static>>`.
+pub type OwnedSetMemorySynthesisResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ClearMemorySynthesisRequestView<'static>>`.
+pub type OwnedClearMemorySynthesisRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ClearMemorySynthesisResponseView<'static>>`.
+pub type OwnedClearMemorySynthesisResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemoryBankRetainRequestView<'static>>`.
+pub type OwnedSetMemoryBankRetainRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemoryBankRetainResponseView<'static>>`.
+pub type OwnedSetMemoryBankRetainResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemoryBankWikiRequestView<'static>>`.
+pub type OwnedSetMemoryBankWikiRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetMemoryBankWikiResponseView<'static>>`.
+pub type OwnedSetMemoryBankWikiResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RemoveMemoryBankWikiRequestView<'static>>`.
+pub type OwnedRemoveMemoryBankWikiRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RemoveMemoryBankWikiResponseView<'static>>`.
+pub type OwnedRemoveMemoryBankWikiResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMemorySynthesisBatchesRequestView<'static>>`.
+pub type OwnedListMemorySynthesisBatchesRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListMemorySynthesisBatchesResponseView<'static>>`.
+pub type OwnedListMemorySynthesisBatchesResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RunMemorySynthesisRequestView<'static>>`.
+pub type OwnedRunMemorySynthesisRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RunMemorySynthesisResponseView<'static>>`.
+pub type OwnedRunMemorySynthesisResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListChatModelsRequestView<'static>>`.
+pub type OwnedListChatModelsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListChatModelsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListChatModelsResponseView<'static>>`.
+pub type OwnedListChatModelsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListChatModelsResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::tilde::management::v1::ListMemoryBanksResponse,
 >
@@ -952,6 +1060,378 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetMemorySynthesisResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::GetMemorySynthesisResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemorySynthesisResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemorySynthesisResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ClearMemorySynthesisResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ClearMemorySynthesisResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemoryBankRetainResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemoryBankRetainResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemoryBankWikiResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetMemoryBankWikiResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RemoveMemoryBankWikiResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RemoveMemoryBankWikiResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemorySynthesisBatchesResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::ListMemorySynthesisBatchesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RunMemorySynthesisResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::RunMemorySynthesisResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ListChatModelsResponse>
+for crate::proto::tilde::management::v1::__buffa::view::ListChatModelsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ListChatModelsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::ListChatModelsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const MEMORY_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.MemoryService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListMemoryBanks` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -1065,6 +1545,60 @@ pub const MEMORY_SERVICE_CLEAR_EMBEDDING_SETTINGS_SPEC: ::connectrpc::Spec = ::c
 /// Static [`Spec`](::connectrpc::Spec) for the `ListEmbeddingModels` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const MEMORY_SERVICE_LIST_EMBEDDING_MODELS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.MemoryService/ListEmbeddingModels",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetMemorySynthesis` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_GET_MEMORY_SYNTHESIS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/GetMemorySynthesis",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetMemorySynthesis` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_SET_MEMORY_SYNTHESIS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/SetMemorySynthesis",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ClearMemorySynthesis` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_CLEAR_MEMORY_SYNTHESIS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/ClearMemorySynthesis",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetMemoryBankRetain` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_SET_MEMORY_BANK_RETAIN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/SetMemoryBankRetain",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetMemoryBankWiki` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_SET_MEMORY_BANK_WIKI_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/SetMemoryBankWiki",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RemoveMemoryBankWiki` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_REMOVE_MEMORY_BANK_WIKI_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/RemoveMemoryBankWiki",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListMemorySynthesisBatches` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_LIST_MEMORY_SYNTHESIS_BATCHES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/ListMemorySynthesisBatches",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `RunMemorySynthesis` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_RUN_MEMORY_SYNTHESIS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/RunMemorySynthesis",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListChatModels` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const MEMORY_SERVICE_LIST_CHAT_MODELS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.MemoryService/ListChatModels",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
@@ -1560,6 +2094,214 @@ pub trait MemoryService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::ListEmbeddingModelsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// The bank's synthesis: its chat model, what feeds it and how its worker is doing.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_memory_synthesis<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::GetMemorySynthesisResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Sends the model a probe first, so a model that fails or does not answer in JSON is refused.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_memory_synthesis<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::SetMemorySynthesisResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Stops synthesis; what it wrote stays, and setting it again continues where it stopped.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn clear_memory_synthesis<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ClearMemorySynthesisResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Whether a read-write linked agent's conversations feed the bank, from their newest message on
+    /// when turned on (earlier history is not synthesized).
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_memory_bank_retain<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::SetMemoryBankRetainResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// A wiki whose pages feed the bank.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_memory_bank_wiki<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::SetMemoryBankWikiResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the RemoveMemoryBankWiki RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn remove_memory_bank_wiki<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::RemoveMemoryBankWikiResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// The bank's latest synthesis batches, newest first.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_memory_synthesis_batches<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ListMemorySynthesisBatchesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Makes the bank due now, after a failure's back-off for example.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn run_memory_synthesis<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::RunMemorySynthesisResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Chat models of the connection's provider from the price sheet; suggestions only.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_chat_models<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::ListChatModelsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::ListChatModelsResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2146,6 +2888,267 @@ impl<S: MemoryService> MemoryServiceExt for S {
                 },
             )
             .with_spec(MEMORY_SERVICE_LIST_EMBEDDING_MODELS_SPEC)
+            .route_view_idempotent(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "GetMemorySynthesis",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_memory_synthesis(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::GetMemorySynthesisResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_GET_MEMORY_SYNTHESIS_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "SetMemorySynthesis",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_memory_synthesis(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::SetMemorySynthesisResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_SET_MEMORY_SYNTHESIS_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "ClearMemorySynthesis",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.clear_memory_synthesis(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ClearMemorySynthesisResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_CLEAR_MEMORY_SYNTHESIS_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "SetMemoryBankRetain",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_memory_bank_retain(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::SetMemoryBankRetainResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_SET_MEMORY_BANK_RETAIN_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "SetMemoryBankWiki",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_memory_bank_wiki(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::SetMemoryBankWikiResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_SET_MEMORY_BANK_WIKI_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "RemoveMemoryBankWiki",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.remove_memory_bank_wiki(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::RemoveMemoryBankWikiResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_REMOVE_MEMORY_BANK_WIKI_SPEC)
+            .route_view_idempotent(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "ListMemorySynthesisBatches",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_memory_synthesis_batches(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ListMemorySynthesisBatchesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_LIST_MEMORY_SYNTHESIS_BATCHES_SPEC)
+            .route_view(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "RunMemorySynthesis",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.run_memory_synthesis(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::RunMemorySynthesisResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_RUN_MEMORY_SYNTHESIS_SPEC)
+            .route_view_idempotent(
+                MEMORY_SERVICE_SERVICE_NAME,
+                "ListChatModels",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::ListChatModelsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::ListChatModelsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_chat_models(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::ListChatModelsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MEMORY_SERVICE_LIST_CHAT_MODELS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -2312,6 +3315,60 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(MEMORY_SERVICE_LIST_EMBEDDING_MODELS_SPEC),
+                )
+            }
+            "GetMemorySynthesis" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MEMORY_SERVICE_GET_MEMORY_SYNTHESIS_SPEC),
+                )
+            }
+            "SetMemorySynthesis" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_SET_MEMORY_SYNTHESIS_SPEC),
+                )
+            }
+            "ClearMemorySynthesis" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_CLEAR_MEMORY_SYNTHESIS_SPEC),
+                )
+            }
+            "SetMemoryBankRetain" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_SET_MEMORY_BANK_RETAIN_SPEC),
+                )
+            }
+            "SetMemoryBankWiki" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_SET_MEMORY_BANK_WIKI_SPEC),
+                )
+            }
+            "RemoveMemoryBankWiki" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_REMOVE_MEMORY_BANK_WIKI_SPEC),
+                )
+            }
+            "ListMemorySynthesisBatches" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MEMORY_SERVICE_LIST_MEMORY_SYNTHESIS_BATCHES_SPEC),
+                )
+            }
+            "RunMemorySynthesis" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MEMORY_SERVICE_RUN_MEMORY_SYNTHESIS_SPEC),
+                )
+            }
+            "ListChatModels" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MEMORY_SERVICE_LIST_CHAT_MODELS_SPEC),
                 )
             }
             _ => None,
@@ -2744,6 +3801,204 @@ impl<T: MemoryService> ::connectrpc::Dispatcher for MemoryServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::ListEmbeddingModelsResponse,
+                        >(format)
+                })
+            }
+            "GetMemorySynthesis" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_memory_synthesis(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::GetMemorySynthesisResponse,
+                        >(format)
+                })
+            }
+            "SetMemorySynthesis" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_memory_synthesis(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::SetMemorySynthesisResponse,
+                        >(format)
+                })
+            }
+            "ClearMemorySynthesis" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+                    >::from_parts(&req, &body);
+                    svc.clear_memory_synthesis(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ClearMemorySynthesisResponse,
+                        >(format)
+                })
+            }
+            "SetMemoryBankRetain" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_memory_bank_retain(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::SetMemoryBankRetainResponse,
+                        >(format)
+                })
+            }
+            "SetMemoryBankWiki" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_memory_bank_wiki(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::SetMemoryBankWikiResponse,
+                        >(format)
+                })
+            }
+            "RemoveMemoryBankWiki" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+                    >::from_parts(&req, &body);
+                    svc.remove_memory_bank_wiki(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::RemoveMemoryBankWikiResponse,
+                        >(format)
+                })
+            }
+            "ListMemorySynthesisBatches" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_memory_synthesis_batches(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ListMemorySynthesisBatchesResponse,
+                        >(format)
+                })
+            }
+            "RunMemorySynthesis" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+                    >::from_parts(&req, &body);
+                    svc.run_memory_synthesis(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::RunMemorySynthesisResponse,
+                        >(format)
+                })
+            }
+            "ListChatModels" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::ListChatModelsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::ListChatModelsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::ListChatModelsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_chat_models(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::ListChatModelsResponse,
                         >(format)
                 })
             }
@@ -3724,6 +4979,411 @@ where
                 &self.transport,
                 &self.config,
                 MEMORY_SERVICE_LIST_EMBEDDING_MODELS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetMemorySynthesis RPC. Sends a request to /tilde.management.v1.MemoryService/GetMemorySynthesis.
+    pub async fn get_memory_synthesis(
+        &self,
+        request: crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_memory_synthesis_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetMemorySynthesis RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_memory_synthesis_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::GetMemorySynthesisRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::GetMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_GET_MEMORY_SYNTHESIS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetMemorySynthesis RPC. Sends a request to /tilde.management.v1.MemoryService/SetMemorySynthesis.
+    pub async fn set_memory_synthesis(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_memory_synthesis_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetMemorySynthesis RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_memory_synthesis_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemorySynthesisRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_SET_MEMORY_SYNTHESIS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ClearMemorySynthesis RPC. Sends a request to /tilde.management.v1.MemoryService/ClearMemorySynthesis.
+    pub async fn clear_memory_synthesis(
+        &self,
+        request: crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.clear_memory_synthesis_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ClearMemorySynthesis RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn clear_memory_synthesis_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ClearMemorySynthesisRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ClearMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_CLEAR_MEMORY_SYNTHESIS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetMemoryBankRetain RPC. Sends a request to /tilde.management.v1.MemoryService/SetMemoryBankRetain.
+    pub async fn set_memory_bank_retain(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_memory_bank_retain_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetMemoryBankRetain RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_memory_bank_retain_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemoryBankRetainRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankRetainResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_SET_MEMORY_BANK_RETAIN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetMemoryBankWiki RPC. Sends a request to /tilde.management.v1.MemoryService/SetMemoryBankWiki.
+    pub async fn set_memory_bank_wiki(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_memory_bank_wiki_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetMemoryBankWiki RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_memory_bank_wiki_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::SetMemoryBankWikiRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetMemoryBankWikiResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_SET_MEMORY_BANK_WIKI_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RemoveMemoryBankWiki RPC. Sends a request to /tilde.management.v1.MemoryService/RemoveMemoryBankWiki.
+    pub async fn remove_memory_bank_wiki(
+        &self,
+        request: crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.remove_memory_bank_wiki_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RemoveMemoryBankWiki RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn remove_memory_bank_wiki_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::RemoveMemoryBankWikiRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RemoveMemoryBankWikiResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_REMOVE_MEMORY_BANK_WIKI_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListMemorySynthesisBatches RPC. Sends a request to /tilde.management.v1.MemoryService/ListMemorySynthesisBatches.
+    pub async fn list_memory_synthesis_batches(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_memory_synthesis_batches_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListMemorySynthesisBatches RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_memory_synthesis_batches_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ListMemorySynthesisBatchesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListMemorySynthesisBatchesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_LIST_MEMORY_SYNTHESIS_BATCHES_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RunMemorySynthesis RPC. Sends a request to /tilde.management.v1.MemoryService/RunMemorySynthesis.
+    pub async fn run_memory_synthesis(
+        &self,
+        request: crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.run_memory_synthesis_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RunMemorySynthesis RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn run_memory_synthesis_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::RunMemorySynthesisRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RunMemorySynthesisResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_RUN_MEMORY_SYNTHESIS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListChatModels RPC. Sends a request to /tilde.management.v1.MemoryService/ListChatModels.
+    pub async fn list_chat_models(
+        &self,
+        request: crate::proto::tilde::management::v1::ListChatModelsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListChatModelsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_chat_models_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListChatModels RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_chat_models_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::ListChatModelsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::ListChatModelsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MEMORY_SERVICE_LIST_CHAT_MODELS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

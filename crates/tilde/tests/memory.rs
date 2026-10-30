@@ -6,7 +6,7 @@ use common::invocation::{Fixture, all_tools};
 use secrecy::SecretString;
 use serde_json::{Value, json};
 use tilde::connections::service::Connections;
-use tilde::memory::{Draft, Filter, Memory, Person, Source};
+use tilde::memory::{Actor, Draft, Filter, Memory, Person, Source};
 use uuid::Uuid;
 
 fn memory(fx: &Fixture) -> Memory {
@@ -48,7 +48,7 @@ async fn person_fact(memory: &Memory, bank: Uuid, title: &str, identity: Option<
             },
             Source {
                 identity,
-                agent: None,
+                actor: Actor::Person,
                 thread: None,
             },
             None,
@@ -122,7 +122,7 @@ async fn an_agent_remembers_supersedes_and_forgets_but_never_touches_a_persons_f
             },
             Source {
                 identity: None,
-                agent: None,
+                actor: Actor::Person,
                 thread: None,
             },
             None,

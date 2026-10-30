@@ -62,6 +62,21 @@ pub fn embedding_models(provider: &str) -> Result<Vec<(String, u32)>, Error> {
         .filter_map(|r| Some((r.model, r.embedding_vector_size?)))
         .collect())
 }
+/// The price sheet's chat models for a provider: models billed for output tokens that are not
+/// embedding models.
+pub fn chat_models(provider: &str) -> Result<Vec<String>, Error> {
+    let rows: Vec<Row> = serde_json::from_str(include_str!("prices.json"))
+        .map_err(|_| Error::Invalid("Vendored price sheet is invalid".into()))?;
+    Ok(rows
+        .into_iter()
+        .filter(|r| {
+            r.provider_id == provider
+                && r.embedding_vector_size.is_none()
+                && r.output_per_m_micros.is_some()
+        })
+        .map(|r| r.model)
+        .collect())
+}
 #[derive(Deserialize)]
 struct Entry {
     litellm_provider: Option<String>,

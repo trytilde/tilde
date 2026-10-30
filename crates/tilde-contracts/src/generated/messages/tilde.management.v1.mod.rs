@@ -197,6 +197,7 @@ pub mod __buffa {
         reg.register_json_any(super::__REMOVE_AGENT_MEMORY_BANK_REQUEST_JSON_ANY);
         reg.register_json_any(super::__REMOVE_AGENT_MEMORY_BANK_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MEMORY_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_EVIDENCE_JSON_ANY);
         reg.register_json_any(super::__MEMORY_REVISION_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_RESPONSE_JSON_ANY);
@@ -224,6 +225,28 @@ pub mod __buffa {
         reg.register_json_any(super::__EMBEDDING_MODEL_JSON_ANY);
         reg.register_json_any(super::__LIST_EMBEDDING_MODELS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_EMBEDDING_MODELS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_SYNTHESIS_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_BANK_WIKI_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_SYNTHESIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_SYNTHESIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CLEAR_MEMORY_SYNTHESIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CLEAR_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_BANK_RETAIN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_BANK_RETAIN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_BANK_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_MEMORY_BANK_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_MEMORY_BANK_WIKI_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REMOVE_MEMORY_BANK_WIKI_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_SYNTHESIS_BATCH_JSON_ANY);
+        reg.register_json_any(super::__MEMORY_SYNTHESIS_BATCH_MEMORY_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_SYNTHESIS_BATCHES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_MEMORY_SYNTHESIS_BATCHES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RUN_MEMORY_SYNTHESIS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RUN_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_CHAT_MODELS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CHAT_MODELS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_REQUEST_JSON_ANY);
@@ -953,6 +976,10 @@ pub use self::__buffa::view::MemoryView;
 #[doc(inline)]
 pub use self::__buffa::view::MemoryOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::MemoryEvidenceView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryEvidenceOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::MemoryRevisionView;
 #[doc(inline)]
 pub use self::__buffa::view::MemoryRevisionOwnedView;
@@ -1060,6 +1087,94 @@ pub use self::__buffa::view::ListEmbeddingModelsRequestOwnedView;
 pub use self::__buffa::view::ListEmbeddingModelsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListEmbeddingModelsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryBankWikiView;
+#[doc(inline)]
+pub use self::__buffa::view::MemoryBankWikiOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemorySynthesisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemorySynthesisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemorySynthesisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMemorySynthesisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemorySynthesisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemorySynthesisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemorySynthesisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemorySynthesisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearMemorySynthesisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearMemorySynthesisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearMemorySynthesisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ClearMemorySynthesisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankRetainRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankRetainRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankRetainResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankRetainResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetMemoryBankWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveMemoryBankWikiRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveMemoryBankWikiRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveMemoryBankWikiResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RemoveMemoryBankWikiResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisBatchView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisBatchOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisBatchMemoryView;
+#[doc(inline)]
+pub use self::__buffa::view::MemorySynthesisBatchMemoryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemorySynthesisBatchesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemorySynthesisBatchesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemorySynthesisBatchesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListMemorySynthesisBatchesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RunMemorySynthesisRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RunMemorySynthesisRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RunMemorySynthesisResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RunMemorySynthesisResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChatModelsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChatModelsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChatModelsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListChatModelsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListPromptsRequestView;
 #[doc(inline)]

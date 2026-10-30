@@ -68,13 +68,10 @@ pub(crate) async fn embed(
         })
         .collect();
     if vectors.len() != texts.len() || vectors.iter().any(|v| v.len() != dims) {
-        return Err(PostError {
-            rejected: false,
-            error: Error::Invalid(format!(
-                "The embedding model did not return {} vectors of {dims} dimensions",
-                texts.len()
-            )),
-        });
+        return Err(PostError::from(Error::Invalid(format!(
+            "The embedding model did not return {} vectors of {dims} dimensions",
+            texts.len()
+        ))));
     }
     Ok(vectors)
 }

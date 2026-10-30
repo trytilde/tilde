@@ -42,6 +42,24 @@ service MemoryService {
   // Embedding models of the connection's provider from the price sheet. Any model the provider
   // serves may be set; these are suggestions.
   rpc ListEmbeddingModels(ListEmbeddingModelsRequest) returns (ListEmbeddingModelsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // The bank's synthesis: its chat model, what feeds it and how its worker is doing.
+  rpc GetMemorySynthesis(GetMemorySynthesisRequest) returns (GetMemorySynthesisResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Sends the model a probe first, so a model that fails or does not answer in JSON is refused.
+  rpc SetMemorySynthesis(SetMemorySynthesisRequest) returns (SetMemorySynthesisResponse);
+  // Stops synthesis; what it wrote stays, and setting it again continues where it stopped.
+  rpc ClearMemorySynthesis(ClearMemorySynthesisRequest) returns (ClearMemorySynthesisResponse);
+  // Whether a read-write linked agent's conversations feed the bank, from their newest message on
+  // when turned on (earlier history is not synthesized).
+  rpc SetMemoryBankRetain(SetMemoryBankRetainRequest) returns (SetMemoryBankRetainResponse);
+  // A wiki whose pages feed the bank.
+  rpc SetMemoryBankWiki(SetMemoryBankWikiRequest) returns (SetMemoryBankWikiResponse);
+  rpc RemoveMemoryBankWiki(RemoveMemoryBankWikiRequest) returns (RemoveMemoryBankWikiResponse);
+  // The bank's latest synthesis batches, newest first.
+  rpc ListMemorySynthesisBatches(ListMemorySynthesisBatchesRequest) returns (ListMemorySynthesisBatchesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Makes the bank due now, after a failure's back-off for example.
+  rpc RunMemorySynthesis(RunMemorySynthesisRequest) returns (RunMemorySynthesisResponse);
+  // Chat models of the connection's provider from the price sheet; suggestions only.
+  rpc ListChatModels(ListChatModelsRequest) returns (ListChatModelsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
 }
 // SHARED: agents read and write every memory. PER_PERSON: an agent reads and writes only the
 // memories of the verified person it acts for, plus memories people wrote for the whole bank.
@@ -68,8 +86,11 @@ enum MemoryKind {
 }
 // How a search found a memory: by its words, or by similarity of meaning.
 enum MemoryMatch { MEMORY_MATCH_UNSPECIFIED = 0; MEMORY_MATCH_KEYWORDS = 1; MEMORY_MATCH_MEANING = 2; }
-// EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents cannot change it.
-enum MemoryOrigin { MEMORY_ORIGIN_UNSPECIFIED = 0; MEMORY_ORIGIN_EXPLICIT = 1; MEMORY_ORIGIN_OWNER = 2; }
+// EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents and synthesis cannot
+// change it. SYNTHESIZED: Tilde derived it from the bank's sources; see `evidence`.
+enum MemoryOrigin { MEMORY_ORIGIN_UNSPECIFIED = 0; MEMORY_ORIGIN_EXPLICIT = 1; MEMORY_ORIGIN_OWNER = 2; MEMORY_ORIGIN_SYNTHESIZED = 3; }
+// Who made a change.
+enum MemoryActor { MEMORY_ACTOR_UNSPECIFIED = 0; MEMORY_ACTOR_PERSON = 1; MEMORY_ACTOR_AGENT = 2; MEMORY_ACTOR_SYNTHESIZER = 3; }
 message MemoryBank {
   string id = 1; string name = 2; string description = 3; MemoryBankScope scope = 4;
   // Set when the bank is this agent's own.
@@ -123,6 +144,18 @@ message Memory {
   optional string superseded_by = 19;
   // In ListMemories with a query: how it was found.
   repeated MemoryMatch matched = 20;
+  // What a synthesized memory was derived from.
+  repeated MemoryEvidence evidence = 21;
+}
+// A message of a conversation (with the conversation's agent), or a wiki page revision (with the
+// wiki and path where the page is now, or was when deleted; absent for a wiki the caller cannot
+// view).
+message MemoryEvidence {
+  // A message of a conversation with an agent.
+  optional string agent_id = 1; optional string thread_id = 2; optional string message_id = 3;
+  // A revision of a wiki page.
+  optional string wiki_id = 4; optional string wiki_name = 5; optional string page_id = 6; optional string path = 7;
+  optional uint32 revision = 8;
 }
 enum MemoryOperation {
   MEMORY_OPERATION_UNSPECIFIED = 0; MEMORY_OPERATION_CREATE = 1; MEMORY_OPERATION_UPDATE = 2;
@@ -137,8 +170,9 @@ message MemoryRevision {
   MemoryKind kind = 3; string path = 4; string title = 5; string content = 6;
   optional google.protobuf.Timestamp valid_from = 7; optional google.protobuf.Timestamp valid_to = 8;
   float importance = 9; MemoryOrigin origin = 10; optional string identity_id = 11;
-  // The agent that made it; absent when a person did.
+  // The agent that made it, when an agent did.
   optional string agent_id = 12;
+  MemoryActor actor = 13;
 }
 // `path` limits to that path and below; `limit` defaults to 50, at most 200. Without a query the
 // list pages newest first by `page_token`; with one, the best `limit` matches are the only page.
@@ -201,3 +235,61 @@ message EmbeddingModel {
 }
 message ListEmbeddingModelsRequest { string connection_id = 1; }
 message ListEmbeddingModelsResponse { repeated EmbeddingModel models = 1; }
+// A bank's synthesis, on while set. `connection_id` is an OpenAI, Azure OpenAI, Vercel AI
+// Gateway, Baseten, Cerebras or Anthropic connection; `instructions` (at most 2000 characters)
+// guide the model. Each batch is one call to the model, billed to the connection.
+message MemorySynthesis {
+  string connection_id = 1; string model = 2; string instructions = 3;
+}
+message MemoryBankWiki { string wiki_id = 1; string name = 2; }
+message GetMemorySynthesisRequest { string bank_id = 1; }
+message GetMemorySynthesisResponse {
+  // Absent until set.
+  optional MemorySynthesis synthesis = 1;
+  // Linked agents whose conversations feed the bank, and wikis whose pages do.
+  repeated string retaining_agent_ids = 2;
+  repeated MemoryBankWiki wikis = 3;
+  // Failures since the last batch that succeeded, and the last one's error.
+  uint32 failures = 4; string last_error = 5;
+  optional google.protobuf.Timestamp last_run_at = 6;
+  // Conversations and pages waiting to be synthesized, also while synthesis is off.
+  uint32 pending_conversations = 7; uint32 pending_pages = 8;
+}
+message SetMemorySynthesisRequest { string bank_id = 1; MemorySynthesis synthesis = 2; }
+message SetMemorySynthesisResponse { MemorySynthesis synthesis = 1; }
+message ClearMemorySynthesisRequest { string bank_id = 1; }
+message ClearMemorySynthesisResponse {}
+message SetMemoryBankRetainRequest { string bank_id = 1; string agent_id = 2; bool auto_retain = 3; }
+message SetMemoryBankRetainResponse {}
+message SetMemoryBankWikiRequest { string bank_id = 1; string wiki_id = 2; }
+message SetMemoryBankWikiResponse {}
+message RemoveMemoryBankWikiRequest { string bank_id = 1; string wiki_id = 2; }
+message RemoveMemoryBankWikiResponse {}
+// SKIPPED: passed over, with why in its notes: nothing was asked of the model (for example a
+// conversation with no verified person in a per-person bank), or its content failed three times
+// (an unreadable or cut-off answer, or the provider refusing the content). Other failures (outages,
+// credentials, rate limits) leave a batch FAILED and retried; they never pass it over.
+enum MemorySynthesisBatchStatus { MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED = 0; MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED = 1; MEMORY_SYNTHESIS_BATCH_STATUS_FAILED = 2; MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED = 3; }
+// One synthesis of one source's new part: a conversation's messages (with its agent), or a page's
+// revision (with the wiki and path where the page is now, or was when deleted; absent for a wiki
+// the caller cannot view).
+message MemorySynthesisBatch {
+  string id = 1;
+  google.protobuf.Timestamp at = 2;
+  MemorySynthesisBatchStatus status = 3;
+  // Where it came from: a conversation with an agent, or a page revision.
+  optional string agent_id = 4; optional string thread_id = 5;
+  optional string wiki_id = 6; optional string page_id = 7; optional string path = 8; optional uint32 revision = 9;
+  uint32 written = 10; uint32 superseded = 11; uint32 forgotten = 12;
+  // Operations refused, with why in `notes`; for a failed batch, `notes` is the error.
+  uint32 dropped = 13; string notes = 14;
+  // The memories it wrote and those it forgot.
+  repeated MemorySynthesisBatchMemory memories = 15;
+}
+message MemorySynthesisBatchMemory { string id = 1; string title = 2; bool forgotten = 3; }
+message ListMemorySynthesisBatchesRequest { string bank_id = 1; }
+message ListMemorySynthesisBatchesResponse { repeated MemorySynthesisBatch batches = 1; }
+message RunMemorySynthesisRequest { string bank_id = 1; }
+message RunMemorySynthesisResponse {}
+message ListChatModelsRequest { string connection_id = 1; }
+message ListChatModelsResponse { repeated string models = 1; }

@@ -320,8 +320,8 @@ function CreateBankDialog({
   );
 }
 
-/** Ready inference connections, which embedding settings may use. */
-async function inferenceConnections(signal?: AbortSignal) {
+/** Ready inference connections, which embedding and synthesis settings may use. */
+export async function inferenceConnections(signal?: AbortSignal) {
   const all: Connection[] = [];
   let pageToken = "";
   do {

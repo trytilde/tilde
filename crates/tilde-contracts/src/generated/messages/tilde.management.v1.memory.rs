@@ -670,13 +670,15 @@ impl ::buffa::Enumeration for MemoryMatch {
         ]
     }
 }
-/// EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents cannot change it.
+/// EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents and synthesis cannot
+/// change it. SYNTHESIZED: Tilde derived it from the bank's sources; see `evidence`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum MemoryOrigin {
     MEMORY_ORIGIN_UNSPECIFIED = 0i32,
     MEMORY_ORIGIN_EXPLICIT = 1i32,
     MEMORY_ORIGIN_OWNER = 2i32,
+    MEMORY_ORIGIN_SYNTHESIZED = 3i32,
 }
 impl MemoryOrigin {
     ///Idiomatic alias for [`Self::MEMORY_ORIGIN_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -688,6 +690,9 @@ impl MemoryOrigin {
     ///Idiomatic alias for [`Self::MEMORY_ORIGIN_OWNER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Owner: Self = Self::MEMORY_ORIGIN_OWNER;
+    ///Idiomatic alias for [`Self::MEMORY_ORIGIN_SYNTHESIZED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Synthesized: Self = Self::MEMORY_ORIGIN_SYNTHESIZED;
 }
 impl ::core::default::Default for MemoryOrigin {
     fn default() -> Self {
@@ -786,6 +791,7 @@ impl ::buffa::Enumeration for MemoryOrigin {
             0i32 => ::core::option::Option::Some(Self::MEMORY_ORIGIN_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::MEMORY_ORIGIN_EXPLICIT),
             2i32 => ::core::option::Option::Some(Self::MEMORY_ORIGIN_OWNER),
+            3i32 => ::core::option::Option::Some(Self::MEMORY_ORIGIN_SYNTHESIZED),
             _ => ::core::option::Option::None,
         }
     }
@@ -797,6 +803,7 @@ impl ::buffa::Enumeration for MemoryOrigin {
             Self::MEMORY_ORIGIN_UNSPECIFIED => "MEMORY_ORIGIN_UNSPECIFIED",
             Self::MEMORY_ORIGIN_EXPLICIT => "MEMORY_ORIGIN_EXPLICIT",
             Self::MEMORY_ORIGIN_OWNER => "MEMORY_ORIGIN_OWNER",
+            Self::MEMORY_ORIGIN_SYNTHESIZED => "MEMORY_ORIGIN_SYNTHESIZED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -810,6 +817,9 @@ impl ::buffa::Enumeration for MemoryOrigin {
             "MEMORY_ORIGIN_OWNER" => {
                 ::core::option::Option::Some(Self::MEMORY_ORIGIN_OWNER)
             }
+            "MEMORY_ORIGIN_SYNTHESIZED" => {
+                ::core::option::Option::Some(Self::MEMORY_ORIGIN_SYNTHESIZED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -818,6 +828,168 @@ impl ::buffa::Enumeration for MemoryOrigin {
             Self::MEMORY_ORIGIN_UNSPECIFIED,
             Self::MEMORY_ORIGIN_EXPLICIT,
             Self::MEMORY_ORIGIN_OWNER,
+            Self::MEMORY_ORIGIN_SYNTHESIZED,
+        ]
+    }
+}
+/// Who made a change.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum MemoryActor {
+    MEMORY_ACTOR_UNSPECIFIED = 0i32,
+    MEMORY_ACTOR_PERSON = 1i32,
+    MEMORY_ACTOR_AGENT = 2i32,
+    MEMORY_ACTOR_SYNTHESIZER = 3i32,
+}
+impl MemoryActor {
+    ///Idiomatic alias for [`Self::MEMORY_ACTOR_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::MEMORY_ACTOR_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MEMORY_ACTOR_PERSON`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Person: Self = Self::MEMORY_ACTOR_PERSON;
+    ///Idiomatic alias for [`Self::MEMORY_ACTOR_AGENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Agent: Self = Self::MEMORY_ACTOR_AGENT;
+    ///Idiomatic alias for [`Self::MEMORY_ACTOR_SYNTHESIZER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Synthesizer: Self = Self::MEMORY_ACTOR_SYNTHESIZER;
+}
+impl ::core::default::Default for MemoryActor {
+    fn default() -> Self {
+        Self::MEMORY_ACTOR_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MemoryActor {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MemoryActor {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MemoryActor;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(MemoryActor)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MemoryActor, E> {
+                <MemoryActor as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MemoryActor, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemoryActor as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MemoryActor, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemoryActor as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MemoryActor, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryActor {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MemoryActor {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::MEMORY_ACTOR_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::MEMORY_ACTOR_PERSON),
+            2i32 => ::core::option::Option::Some(Self::MEMORY_ACTOR_AGENT),
+            3i32 => ::core::option::Option::Some(Self::MEMORY_ACTOR_SYNTHESIZER),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MEMORY_ACTOR_UNSPECIFIED => "MEMORY_ACTOR_UNSPECIFIED",
+            Self::MEMORY_ACTOR_PERSON => "MEMORY_ACTOR_PERSON",
+            Self::MEMORY_ACTOR_AGENT => "MEMORY_ACTOR_AGENT",
+            Self::MEMORY_ACTOR_SYNTHESIZER => "MEMORY_ACTOR_SYNTHESIZER",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MEMORY_ACTOR_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::MEMORY_ACTOR_UNSPECIFIED)
+            }
+            "MEMORY_ACTOR_PERSON" => {
+                ::core::option::Option::Some(Self::MEMORY_ACTOR_PERSON)
+            }
+            "MEMORY_ACTOR_AGENT" => {
+                ::core::option::Option::Some(Self::MEMORY_ACTOR_AGENT)
+            }
+            "MEMORY_ACTOR_SYNTHESIZER" => {
+                ::core::option::Option::Some(Self::MEMORY_ACTOR_SYNTHESIZER)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::MEMORY_ACTOR_UNSPECIFIED,
+            Self::MEMORY_ACTOR_PERSON,
+            Self::MEMORY_ACTOR_AGENT,
+            Self::MEMORY_ACTOR_SYNTHESIZER,
         ]
     }
 }
@@ -991,6 +1163,193 @@ impl ::buffa::Enumeration for MemoryOperation {
             Self::MEMORY_OPERATION_UPDATE,
             Self::MEMORY_OPERATION_SUPERSEDE,
             Self::MEMORY_OPERATION_FORGET,
+        ]
+    }
+}
+/// SKIPPED: passed over, with why in its notes: nothing was asked of the model (for example a
+/// conversation with no verified person in a per-person bank), or its content failed three times
+/// (an unreadable or cut-off answer, or the provider refusing the content). Other failures (outages,
+/// credentials, rate limits) leave a batch FAILED and retried; they never pass it over.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum MemorySynthesisBatchStatus {
+    MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED = 0i32,
+    MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED = 1i32,
+    MEMORY_SYNTHESIS_BATCH_STATUS_FAILED = 2i32,
+    MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED = 3i32,
+}
+impl MemorySynthesisBatchStatus {
+    ///Idiomatic alias for [`Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Applied: Self = Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED;
+    ///Idiomatic alias for [`Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Failed: Self = Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED;
+    ///Idiomatic alias for [`Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Skipped: Self = Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED;
+}
+impl ::core::default::Default for MemorySynthesisBatchStatus {
+    fn default() -> Self {
+        Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MemorySynthesisBatchStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MemorySynthesisBatchStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MemorySynthesisBatchStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(MemorySynthesisBatchStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MemorySynthesisBatchStatus, E> {
+                <MemorySynthesisBatchStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MemorySynthesisBatchStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemorySynthesisBatchStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MemorySynthesisBatchStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemorySynthesisBatchStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MemorySynthesisBatchStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemorySynthesisBatchStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MemorySynthesisBatchStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(
+                    Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED,
+                )
+            }
+            1i32 => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED)
+            }
+            2i32 => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED)
+            }
+            3i32 => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED => {
+                "MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED"
+            }
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED => {
+                "MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED"
+            }
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED => {
+                "MEMORY_SYNTHESIS_BATCH_STATUS_FAILED"
+            }
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED => {
+                "MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(
+                    Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED,
+                )
+            }
+            "MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED" => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED)
+            }
+            "MEMORY_SYNTHESIS_BATCH_STATUS_FAILED" => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED)
+            }
+            "MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED" => {
+                ::core::option::Option::Some(Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_UNSPECIFIED,
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_APPLIED,
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_FAILED,
+            Self::MEMORY_SYNTHESIS_BATCH_STATUS_SKIPPED,
         ]
     }
 }
@@ -4232,6 +4591,15 @@ pub struct Memory {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub matched: ::buffa::alloc::vec::Vec<::buffa::EnumValue<MemoryMatch>>,
+    /// What a synthesized memory was derived from.
+    ///
+    /// Field 21: `evidence`
+    #[serde(
+        rename = "evidence",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub evidence: ::buffa::alloc::vec::Vec<MemoryEvidence>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4259,6 +4627,7 @@ impl ::core::fmt::Debug for Memory {
             .field("updated_at", &self.updated_at)
             .field("superseded_by", &self.superseded_by)
             .field("matched", &self.matched)
+            .field("evidence", &self.evidence)
             .finish()
     }
 }
@@ -4442,6 +4811,14 @@ impl ::buffa::Message for Memory {
                 .sum::<u64>();
             size += 2u64 + ::buffa::encoding::varint_len(payload) as u64 + payload;
         }
+        for v in &self.evidence {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -4545,6 +4922,14 @@ impl ::buffa::Message for Memory {
             for v in &self.matched {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
+        }
+        for v in &self.evidence {
+            ::buffa::types::put_len_delimited_header(
+                21u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4778,6 +5163,18 @@ impl ::buffa::Message for Memory {
                     );
                 }
             }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.evidence.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4806,6 +5203,7 @@ impl ::buffa::Message for Memory {
         self.updated_at = ::buffa::MessageField::none();
         self.superseded_by = ::core::option::Option::None;
         self.matched.clear();
+        self.evidence.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4836,6 +5234,399 @@ pub const __MEMORY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::typ
     type_url: "type.googleapis.com/tilde.management.v1.Memory",
     to_json: ::buffa::type_registry::any_to_json::<Memory>,
     from_json: ::buffa::type_registry::any_from_json::<Memory>,
+    is_wkt: false,
+};
+/// A message of a conversation (with the conversation's agent), or a wiki page revision (with the
+/// wiki and path where the page is now, or was when deleted; absent for a wiki the caller cannot
+/// view).
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryEvidence {
+    /// A message of a conversation with an agent.
+    ///
+    /// Field 1: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 2: `thread_id`
+    #[serde(
+        rename = "threadId",
+        alias = "thread_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub thread_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 3: `message_id`
+    #[serde(
+        rename = "messageId",
+        alias = "message_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub message_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// A revision of a wiki page.
+    ///
+    /// Field 4: `wiki_id`
+    #[serde(
+        rename = "wikiId",
+        alias = "wiki_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub wiki_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `wiki_name`
+    #[serde(
+        rename = "wikiName",
+        alias = "wiki_name",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub wiki_name: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `page_id`
+    #[serde(
+        rename = "pageId",
+        alias = "page_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub page_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `path`
+    #[serde(rename = "path", skip_serializing_if = "::core::option::Option::is_none")]
+    pub path: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 8: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub revision: ::core::option::Option<u32>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryEvidence {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryEvidence")
+            .field("agent_id", &self.agent_id)
+            .field("thread_id", &self.thread_id)
+            .field("message_id", &self.message_id)
+            .field("wiki_id", &self.wiki_id)
+            .field("wiki_name", &self.wiki_name)
+            .field("page_id", &self.page_id)
+            .field("path", &self.path)
+            .field("revision", &self.revision)
+            .finish()
+    }
+}
+impl MemoryEvidence {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemoryEvidence";
+}
+impl MemoryEvidence {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::thread_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_thread_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.thread_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::message_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_message_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.message_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::wiki_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_wiki_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.wiki_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::wiki_name`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_wiki_name(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.wiki_name = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::page_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_page_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.page_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::path`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_path(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.path = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::revision`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_revision(mut self, value: u32) -> Self {
+        self.revision = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemoryEvidence);
+impl ::buffa::MessageName for MemoryEvidence {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemoryEvidence";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemoryEvidence";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemoryEvidence";
+}
+impl ::buffa::Message for MemoryEvidence {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.thread_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.message_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.wiki_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.wiki_name {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.page_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.path {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.revision {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if let Some(ref v) = self.thread_id {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if let Some(ref v) = self.message_id {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.wiki_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.wiki_name {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.page_id {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.path {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        if let Some(v) = self.revision {
+            ::buffa::types::put_uint32_field(8u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .thread_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .message_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.wiki_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .wiki_name
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.page_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.path.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.agent_id = ::core::option::Option::None;
+        self.thread_id = ::core::option::Option::None;
+        self.message_id = ::core::option::Option::None;
+        self.wiki_id = ::core::option::Option::None;
+        self.wiki_name = ::core::option::Option::None;
+        self.page_id = ::core::option::Option::None;
+        self.path = ::core::option::Option::None;
+        self.revision = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryEvidence {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemoryEvidence";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryEvidence {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_EVIDENCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemoryEvidence",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryEvidence>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryEvidence>,
     is_wkt: false,
 };
 /// The memory as it was after the change.
@@ -4928,7 +5719,7 @@ pub struct MemoryRevision {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub identity_id: ::core::option::Option<::buffa::alloc::string::String>,
-    /// The agent that made it; absent when a person did.
+    /// The agent that made it, when an agent did.
     ///
     /// Field 12: `agent_id`
     #[serde(
@@ -4937,6 +5728,13 @@ pub struct MemoryRevision {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 13: `actor`
+    #[serde(
+        rename = "actor",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub actor: ::buffa::EnumValue<MemoryActor>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4956,6 +5754,7 @@ impl ::core::fmt::Debug for MemoryRevision {
             .field("origin", &self.origin)
             .field("identity_id", &self.identity_id)
             .field("agent_id", &self.agent_id)
+            .field("actor", &self.actor)
             .finish()
     }
 }
@@ -5068,6 +5867,12 @@ impl ::buffa::Message for MemoryRevision {
         if let Some(ref v) = self.agent_id {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        {
+            let val = self.actor.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -5137,6 +5942,12 @@ impl ::buffa::Message for MemoryRevision {
         }
         if let Some(ref v) = self.agent_id {
             ::buffa::types::put_string_field(12u32, v, buf);
+        }
+        {
+            let val = self.actor.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5261,6 +6072,15 @@ impl ::buffa::Message for MemoryRevision {
                     buf,
                 )?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.actor = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5281,6 +6101,7 @@ impl ::buffa::Message for MemoryRevision {
         self.origin = ::buffa::EnumValue::from(0);
         self.identity_id = ::core::option::Option::None;
         self.agent_id = ::core::option::Option::None;
+        self.actor = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9597,5 +10418,3608 @@ pub const __LIST_EMBEDDING_MODELS_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     type_url: "type.googleapis.com/tilde.management.v1.ListEmbeddingModelsResponse",
     to_json: ::buffa::type_registry::any_to_json::<ListEmbeddingModelsResponse>,
     from_json: ::buffa::type_registry::any_from_json::<ListEmbeddingModelsResponse>,
+    is_wkt: false,
+};
+/// A bank's synthesis, on while set. `connection_id` is an OpenAI, Azure OpenAI, Vercel AI
+/// Gateway, Baseten, Cerebras or Anthropic connection; `instructions` (at most 2000 characters)
+/// guide the model. Each batch is one call to the model, billed to the connection.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemorySynthesis {
+    /// Field 1: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    /// Field 2: `model`
+    #[serde(
+        rename = "model",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub model: ::buffa::alloc::string::String,
+    /// Field 3: `instructions`
+    #[serde(
+        rename = "instructions",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub instructions: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemorySynthesis {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemorySynthesis")
+            .field("connection_id", &self.connection_id)
+            .field("model", &self.model)
+            .field("instructions", &self.instructions)
+            .finish()
+    }
+}
+impl MemorySynthesis {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesis";
+}
+::buffa::impl_default_instance!(MemorySynthesis);
+impl ::buffa::MessageName for MemorySynthesis {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemorySynthesis";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemorySynthesis";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesis";
+}
+impl ::buffa::Message for MemorySynthesis {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.model.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.model) as u64;
+        }
+        if !self.instructions.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.instructions) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.connection_id, buf);
+        }
+        if !self.model.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.model, buf);
+        }
+        if !self.instructions.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.instructions, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.model, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.instructions, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connection_id.clear();
+        self.model.clear();
+        self.instructions.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemorySynthesis {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemorySynthesis";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemorySynthesis {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_SYNTHESIS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemorySynthesis",
+    to_json: ::buffa::type_registry::any_to_json::<MemorySynthesis>,
+    from_json: ::buffa::type_registry::any_from_json::<MemorySynthesis>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemoryBankWiki {
+    /// Field 1: `wiki_id`
+    #[serde(
+        rename = "wikiId",
+        alias = "wiki_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub wiki_id: ::buffa::alloc::string::String,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemoryBankWiki {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemoryBankWiki")
+            .field("wiki_id", &self.wiki_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl MemoryBankWiki {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemoryBankWiki";
+}
+::buffa::impl_default_instance!(MemoryBankWiki);
+impl ::buffa::MessageName for MemoryBankWiki {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemoryBankWiki";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemoryBankWiki";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemoryBankWiki";
+}
+impl ::buffa::Message for MemoryBankWiki {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.wiki_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.wiki_id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.wiki_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.wiki_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.wiki_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.wiki_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemoryBankWiki {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemoryBankWiki";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoryBankWiki {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_BANK_WIKI_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemoryBankWiki",
+    to_json: ::buffa::type_registry::any_to_json::<MemoryBankWiki>,
+    from_json: ::buffa::type_registry::any_from_json::<MemoryBankWiki>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetMemorySynthesisRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMemorySynthesisRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMemorySynthesisRequest")
+            .field("bank_id", &self.bank_id)
+            .finish()
+    }
+}
+impl GetMemorySynthesisRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GetMemorySynthesisRequest";
+}
+::buffa::impl_default_instance!(GetMemorySynthesisRequest);
+impl ::buffa::MessageName for GetMemorySynthesisRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GetMemorySynthesisRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.GetMemorySynthesisRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GetMemorySynthesisRequest";
+}
+impl ::buffa::Message for GetMemorySynthesisRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMemorySynthesisRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.GetMemorySynthesisRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMemorySynthesisRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MEMORY_SYNTHESIS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.GetMemorySynthesisRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetMemorySynthesisRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMemorySynthesisRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetMemorySynthesisResponse {
+    /// Absent until set.
+    ///
+    /// Field 1: `synthesis`
+    #[serde(
+        rename = "synthesis",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub synthesis: ::buffa::MessageField<
+        MemorySynthesis,
+        ::buffa::Inline<MemorySynthesis>,
+    >,
+    /// Linked agents whose conversations feed the bank, and wikis whose pages do.
+    ///
+    /// Field 2: `retaining_agent_ids`
+    #[serde(
+        rename = "retainingAgentIds",
+        alias = "retaining_agent_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub retaining_agent_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Field 3: `wikis`
+    #[serde(
+        rename = "wikis",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub wikis: ::buffa::alloc::vec::Vec<MemoryBankWiki>,
+    /// Failures since the last batch that succeeded, and the last one's error.
+    ///
+    /// Field 4: `failures`
+    #[serde(
+        rename = "failures",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub failures: u32,
+    /// Field 5: `last_error`
+    #[serde(
+        rename = "lastError",
+        alias = "last_error",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub last_error: ::buffa::alloc::string::String,
+    /// Field 6: `last_run_at`
+    #[serde(
+        rename = "lastRunAt",
+        alias = "last_run_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub last_run_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Conversations and pages waiting to be synthesized, also while synthesis is off.
+    ///
+    /// Field 7: `pending_conversations`
+    #[serde(
+        rename = "pendingConversations",
+        alias = "pending_conversations",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub pending_conversations: u32,
+    /// Field 8: `pending_pages`
+    #[serde(
+        rename = "pendingPages",
+        alias = "pending_pages",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub pending_pages: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMemorySynthesisResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMemorySynthesisResponse")
+            .field("synthesis", &self.synthesis)
+            .field("retaining_agent_ids", &self.retaining_agent_ids)
+            .field("wikis", &self.wikis)
+            .field("failures", &self.failures)
+            .field("last_error", &self.last_error)
+            .field("last_run_at", &self.last_run_at)
+            .field("pending_conversations", &self.pending_conversations)
+            .field("pending_pages", &self.pending_pages)
+            .finish()
+    }
+}
+impl GetMemorySynthesisResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GetMemorySynthesisResponse";
+}
+::buffa::impl_default_instance!(GetMemorySynthesisResponse);
+impl ::buffa::MessageName for GetMemorySynthesisResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GetMemorySynthesisResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.GetMemorySynthesisResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GetMemorySynthesisResponse";
+}
+impl ::buffa::Message for GetMemorySynthesisResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.synthesis.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.synthesis.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.retaining_agent_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.wikis {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.failures != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.failures) as u64;
+        }
+        if !self.last_error.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.last_error) as u64;
+        }
+        if self.last_run_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.last_run_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.pending_conversations != 0u32 {
+            size
+                += 1u64
+                    + ::buffa::types::uint32_encoded_len(self.pending_conversations)
+                        as u64;
+        }
+        if self.pending_pages != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.pending_pages) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.synthesis.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.synthesis.write_to(__cache, buf);
+        }
+        for v in &self.retaining_agent_ids {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        for v in &self.wikis {
+            ::buffa::types::put_len_delimited_header(
+                3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.failures != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.failures, buf);
+        }
+        if !self.last_error.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.last_error, buf);
+        }
+        if self.last_run_at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.last_run_at.write_to(__cache, buf);
+        }
+        if self.pending_conversations != 0u32 {
+            ::buffa::types::put_uint32_field(7u32, self.pending_conversations, buf);
+        }
+        if self.pending_pages != 0u32 {
+            ::buffa::types::put_uint32_field(8u32, self.pending_pages, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.synthesis.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.retaining_agent_ids.push(__elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.wikis.push(elem);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.failures = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.last_error, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.last_run_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pending_conversations = ::buffa::types::decode_uint32(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pending_pages = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.synthesis = ::buffa::MessageField::none();
+        self.retaining_agent_ids.clear();
+        self.wikis.clear();
+        self.failures = 0u32;
+        self.last_error.clear();
+        self.last_run_at = ::buffa::MessageField::none();
+        self.pending_conversations = 0u32;
+        self.pending_pages = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMemorySynthesisResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.GetMemorySynthesisResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMemorySynthesisResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.GetMemorySynthesisResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetMemorySynthesisResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMemorySynthesisResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemorySynthesisRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    /// Field 2: `synthesis`
+    #[serde(
+        rename = "synthesis",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub synthesis: ::buffa::MessageField<
+        MemorySynthesis,
+        ::buffa::Inline<MemorySynthesis>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemorySynthesisRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemorySynthesisRequest")
+            .field("bank_id", &self.bank_id)
+            .field("synthesis", &self.synthesis)
+            .finish()
+    }
+}
+impl SetMemorySynthesisRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemorySynthesisRequest";
+}
+::buffa::impl_default_instance!(SetMemorySynthesisRequest);
+impl ::buffa::MessageName for SetMemorySynthesisRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemorySynthesisRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemorySynthesisRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemorySynthesisRequest";
+}
+impl ::buffa::Message for SetMemorySynthesisRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        if self.synthesis.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.synthesis.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        if self.synthesis.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.synthesis.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.synthesis.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.synthesis = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemorySynthesisRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemorySynthesisRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemorySynthesisRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_SYNTHESIS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemorySynthesisRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemorySynthesisRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemorySynthesisRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemorySynthesisResponse {
+    /// Field 1: `synthesis`
+    #[serde(
+        rename = "synthesis",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub synthesis: ::buffa::MessageField<
+        MemorySynthesis,
+        ::buffa::Inline<MemorySynthesis>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemorySynthesisResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemorySynthesisResponse")
+            .field("synthesis", &self.synthesis)
+            .finish()
+    }
+}
+impl SetMemorySynthesisResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemorySynthesisResponse";
+}
+::buffa::impl_default_instance!(SetMemorySynthesisResponse);
+impl ::buffa::MessageName for SetMemorySynthesisResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemorySynthesisResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemorySynthesisResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemorySynthesisResponse";
+}
+impl ::buffa::Message for SetMemorySynthesisResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.synthesis.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.synthesis.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.synthesis.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.synthesis.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.synthesis.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.synthesis = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemorySynthesisResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemorySynthesisResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemorySynthesisResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemorySynthesisResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemorySynthesisResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemorySynthesisResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ClearMemorySynthesisRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ClearMemorySynthesisRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ClearMemorySynthesisRequest")
+            .field("bank_id", &self.bank_id)
+            .finish()
+    }
+}
+impl ClearMemorySynthesisRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisRequest";
+}
+::buffa::impl_default_instance!(ClearMemorySynthesisRequest);
+impl ::buffa::MessageName for ClearMemorySynthesisRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ClearMemorySynthesisRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.ClearMemorySynthesisRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisRequest";
+}
+impl ::buffa::Message for ClearMemorySynthesisRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ClearMemorySynthesisRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ClearMemorySynthesisRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ClearMemorySynthesisRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CLEAR_MEMORY_SYNTHESIS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ClearMemorySynthesisRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ClearMemorySynthesisRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ClearMemorySynthesisResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ClearMemorySynthesisResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ClearMemorySynthesisResponse").finish()
+    }
+}
+impl ClearMemorySynthesisResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisResponse";
+}
+::buffa::impl_default_instance!(ClearMemorySynthesisResponse);
+impl ::buffa::MessageName for ClearMemorySynthesisResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ClearMemorySynthesisResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.ClearMemorySynthesisResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisResponse";
+}
+impl ::buffa::Message for ClearMemorySynthesisResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ClearMemorySynthesisResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ClearMemorySynthesisResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ClearMemorySynthesisResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CLEAR_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ClearMemorySynthesisResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ClearMemorySynthesisResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ClearMemorySynthesisResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemoryBankRetainRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    /// Field 2: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub agent_id: ::buffa::alloc::string::String,
+    /// Field 3: `auto_retain`
+    #[serde(
+        rename = "autoRetain",
+        alias = "auto_retain",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub auto_retain: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemoryBankRetainRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemoryBankRetainRequest")
+            .field("bank_id", &self.bank_id)
+            .field("agent_id", &self.agent_id)
+            .field("auto_retain", &self.auto_retain)
+            .finish()
+    }
+}
+impl SetMemoryBankRetainRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainRequest";
+}
+::buffa::impl_default_instance!(SetMemoryBankRetainRequest);
+impl ::buffa::MessageName for SetMemoryBankRetainRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemoryBankRetainRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemoryBankRetainRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainRequest";
+}
+impl ::buffa::Message for SetMemoryBankRetainRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if self.auto_retain {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.agent_id, buf);
+        }
+        if self.auto_retain {
+            ::buffa::types::put_bool_field(3u32, self.auto_retain, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.agent_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.auto_retain = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.agent_id.clear();
+        self.auto_retain = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemoryBankRetainRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemoryBankRetainRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemoryBankRetainRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_BANK_RETAIN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemoryBankRetainRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemoryBankRetainRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemoryBankRetainResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemoryBankRetainResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemoryBankRetainResponse").finish()
+    }
+}
+impl SetMemoryBankRetainResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainResponse";
+}
+::buffa::impl_default_instance!(SetMemoryBankRetainResponse);
+impl ::buffa::MessageName for SetMemoryBankRetainResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemoryBankRetainResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemoryBankRetainResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainResponse";
+}
+impl ::buffa::Message for SetMemoryBankRetainResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemoryBankRetainResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemoryBankRetainResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemoryBankRetainResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_BANK_RETAIN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemoryBankRetainResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemoryBankRetainResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemoryBankRetainResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemoryBankWikiRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    /// Field 2: `wiki_id`
+    #[serde(
+        rename = "wikiId",
+        alias = "wiki_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub wiki_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemoryBankWikiRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemoryBankWikiRequest")
+            .field("bank_id", &self.bank_id)
+            .field("wiki_id", &self.wiki_id)
+            .finish()
+    }
+}
+impl SetMemoryBankWikiRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiRequest";
+}
+::buffa::impl_default_instance!(SetMemoryBankWikiRequest);
+impl ::buffa::MessageName for SetMemoryBankWikiRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemoryBankWikiRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemoryBankWikiRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiRequest";
+}
+impl ::buffa::Message for SetMemoryBankWikiRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        if !self.wiki_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.wiki_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        if !self.wiki_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.wiki_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.wiki_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.wiki_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemoryBankWikiRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemoryBankWikiRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemoryBankWikiRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_BANK_WIKI_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemoryBankWikiRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemoryBankWikiRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetMemoryBankWikiResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetMemoryBankWikiResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetMemoryBankWikiResponse").finish()
+    }
+}
+impl SetMemoryBankWikiResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiResponse";
+}
+::buffa::impl_default_instance!(SetMemoryBankWikiResponse);
+impl ::buffa::MessageName for SetMemoryBankWikiResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetMemoryBankWikiResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetMemoryBankWikiResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiResponse";
+}
+impl ::buffa::Message for SetMemoryBankWikiResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetMemoryBankWikiResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetMemoryBankWikiResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetMemoryBankWikiResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MEMORY_BANK_WIKI_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetMemoryBankWikiResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetMemoryBankWikiResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetMemoryBankWikiResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RemoveMemoryBankWikiRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    /// Field 2: `wiki_id`
+    #[serde(
+        rename = "wikiId",
+        alias = "wiki_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub wiki_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RemoveMemoryBankWikiRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RemoveMemoryBankWikiRequest")
+            .field("bank_id", &self.bank_id)
+            .field("wiki_id", &self.wiki_id)
+            .finish()
+    }
+}
+impl RemoveMemoryBankWikiRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiRequest";
+}
+::buffa::impl_default_instance!(RemoveMemoryBankWikiRequest);
+impl ::buffa::MessageName for RemoveMemoryBankWikiRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RemoveMemoryBankWikiRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.RemoveMemoryBankWikiRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiRequest";
+}
+impl ::buffa::Message for RemoveMemoryBankWikiRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        if !self.wiki_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.wiki_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        if !self.wiki_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.wiki_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.wiki_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.wiki_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RemoveMemoryBankWikiRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RemoveMemoryBankWikiRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RemoveMemoryBankWikiRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REMOVE_MEMORY_BANK_WIKI_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RemoveMemoryBankWikiRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RemoveMemoryBankWikiRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RemoveMemoryBankWikiResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RemoveMemoryBankWikiResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RemoveMemoryBankWikiResponse").finish()
+    }
+}
+impl RemoveMemoryBankWikiResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiResponse";
+}
+::buffa::impl_default_instance!(RemoveMemoryBankWikiResponse);
+impl ::buffa::MessageName for RemoveMemoryBankWikiResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RemoveMemoryBankWikiResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.RemoveMemoryBankWikiResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiResponse";
+}
+impl ::buffa::Message for RemoveMemoryBankWikiResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RemoveMemoryBankWikiResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RemoveMemoryBankWikiResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RemoveMemoryBankWikiResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REMOVE_MEMORY_BANK_WIKI_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RemoveMemoryBankWikiResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RemoveMemoryBankWikiResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RemoveMemoryBankWikiResponse>,
+    is_wkt: false,
+};
+/// One synthesis of one source's new part: a conversation's messages (with its agent), or a page's
+/// revision (with the wiki and path where the page is now, or was when deleted; absent for a wiki
+/// the caller cannot view).
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemorySynthesisBatch {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `at`
+    #[serde(
+        rename = "at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+        ::buffa::Inline<::buffa_types::google::protobuf::Timestamp>,
+    >,
+    /// Field 3: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<MemorySynthesisBatchStatus>,
+    /// Where it came from: a conversation with an agent, or a page revision.
+    ///
+    /// Field 4: `agent_id`
+    #[serde(
+        rename = "agentId",
+        alias = "agent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub agent_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `thread_id`
+    #[serde(
+        rename = "threadId",
+        alias = "thread_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub thread_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 6: `wiki_id`
+    #[serde(
+        rename = "wikiId",
+        alias = "wiki_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub wiki_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 7: `page_id`
+    #[serde(
+        rename = "pageId",
+        alias = "page_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub page_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 8: `path`
+    #[serde(rename = "path", skip_serializing_if = "::core::option::Option::is_none")]
+    pub path: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 9: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub revision: ::core::option::Option<u32>,
+    /// Field 10: `written`
+    #[serde(
+        rename = "written",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub written: u32,
+    /// Field 11: `superseded`
+    #[serde(
+        rename = "superseded",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub superseded: u32,
+    /// Field 12: `forgotten`
+    #[serde(
+        rename = "forgotten",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub forgotten: u32,
+    /// Operations refused, with why in `notes`; for a failed batch, `notes` is the error.
+    ///
+    /// Field 13: `dropped`
+    #[serde(
+        rename = "dropped",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub dropped: u32,
+    /// Field 14: `notes`
+    #[serde(
+        rename = "notes",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub notes: ::buffa::alloc::string::String,
+    /// The memories it wrote and those it forgot.
+    ///
+    /// Field 15: `memories`
+    #[serde(
+        rename = "memories",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub memories: ::buffa::alloc::vec::Vec<MemorySynthesisBatchMemory>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemorySynthesisBatch {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemorySynthesisBatch")
+            .field("id", &self.id)
+            .field("at", &self.at)
+            .field("status", &self.status)
+            .field("agent_id", &self.agent_id)
+            .field("thread_id", &self.thread_id)
+            .field("wiki_id", &self.wiki_id)
+            .field("page_id", &self.page_id)
+            .field("path", &self.path)
+            .field("revision", &self.revision)
+            .field("written", &self.written)
+            .field("superseded", &self.superseded)
+            .field("forgotten", &self.forgotten)
+            .field("dropped", &self.dropped)
+            .field("notes", &self.notes)
+            .field("memories", &self.memories)
+            .finish()
+    }
+}
+impl MemorySynthesisBatch {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesisBatch";
+}
+impl MemorySynthesisBatch {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::agent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_agent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.agent_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::thread_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_thread_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.thread_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::wiki_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_wiki_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.wiki_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::page_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_page_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.page_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::path`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_path(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.path = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::revision`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_revision(mut self, value: u32) -> Self {
+        self.revision = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(MemorySynthesisBatch);
+impl ::buffa::MessageName for MemorySynthesisBatch {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemorySynthesisBatch";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemorySynthesisBatch";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesisBatch";
+}
+impl ::buffa::Message for MemorySynthesisBatch {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if self.at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if let Some(ref v) = self.agent_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.thread_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.wiki_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.page_id {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.path {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(v) = self.revision {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(v) as u64;
+        }
+        if self.written != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.written) as u64;
+        }
+        if self.superseded != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.superseded) as u64;
+        }
+        if self.forgotten != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.forgotten) as u64;
+        }
+        if self.dropped != 0u32 {
+            size += 1u64 + ::buffa::types::uint32_encoded_len(self.dropped) as u64;
+        }
+        if !self.notes.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.notes) as u64;
+        }
+        for v in &self.memories {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if self.at.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.at.write_to(__cache, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.agent_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.thread_id {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.wiki_id {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.page_id {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        if let Some(ref v) = self.path {
+            ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        if let Some(v) = self.revision {
+            ::buffa::types::put_uint32_field(9u32, v, buf);
+        }
+        if self.written != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.written, buf);
+        }
+        if self.superseded != 0u32 {
+            ::buffa::types::put_uint32_field(11u32, self.superseded, buf);
+        }
+        if self.forgotten != 0u32 {
+            ::buffa::types::put_uint32_field(12u32, self.forgotten, buf);
+        }
+        if self.dropped != 0u32 {
+            ::buffa::types::put_uint32_field(13u32, self.dropped, buf);
+        }
+        if !self.notes.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.notes, buf);
+        }
+        for v in &self.memories {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .agent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .thread_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.wiki_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.page_id.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.path.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.written = ::buffa::types::decode_uint32(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.superseded = ::buffa::types::decode_uint32(buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.forgotten = ::buffa::types::decode_uint32(buf)?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.dropped = ::buffa::types::decode_uint32(buf)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.notes, buf)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.memories.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.at = ::buffa::MessageField::none();
+        self.status = ::buffa::EnumValue::from(0);
+        self.agent_id = ::core::option::Option::None;
+        self.thread_id = ::core::option::Option::None;
+        self.wiki_id = ::core::option::Option::None;
+        self.page_id = ::core::option::Option::None;
+        self.path = ::core::option::Option::None;
+        self.revision = ::core::option::Option::None;
+        self.written = 0u32;
+        self.superseded = 0u32;
+        self.forgotten = 0u32;
+        self.dropped = 0u32;
+        self.notes.clear();
+        self.memories.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemorySynthesisBatch {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemorySynthesisBatch";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemorySynthesisBatch {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_SYNTHESIS_BATCH_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemorySynthesisBatch",
+    to_json: ::buffa::type_registry::any_to_json::<MemorySynthesisBatch>,
+    from_json: ::buffa::type_registry::any_from_json::<MemorySynthesisBatch>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemorySynthesisBatchMemory {
+    /// Field 1: `id`
+    #[serde(
+        rename = "id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub id: ::buffa::alloc::string::String,
+    /// Field 2: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    /// Field 3: `forgotten`
+    #[serde(
+        rename = "forgotten",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub forgotten: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemorySynthesisBatchMemory {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemorySynthesisBatchMemory")
+            .field("id", &self.id)
+            .field("title", &self.title)
+            .field("forgotten", &self.forgotten)
+            .finish()
+    }
+}
+impl MemorySynthesisBatchMemory {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesisBatchMemory";
+}
+::buffa::impl_default_instance!(MemorySynthesisBatchMemory);
+impl ::buffa::MessageName for MemorySynthesisBatchMemory {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemorySynthesisBatchMemory";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemorySynthesisBatchMemory";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemorySynthesisBatchMemory";
+}
+impl ::buffa::Message for MemorySynthesisBatchMemory {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.title.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.title) as u64;
+        }
+        if self.forgotten {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.id, buf);
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.title, buf);
+        }
+        if self.forgotten {
+            ::buffa::types::put_bool_field(3u32, self.forgotten, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.forgotten = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.id.clear();
+        self.title.clear();
+        self.forgotten = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemorySynthesisBatchMemory {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemorySynthesisBatchMemory";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemorySynthesisBatchMemory {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMORY_SYNTHESIS_BATCH_MEMORY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemorySynthesisBatchMemory",
+    to_json: ::buffa::type_registry::any_to_json::<MemorySynthesisBatchMemory>,
+    from_json: ::buffa::type_registry::any_from_json::<MemorySynthesisBatchMemory>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListMemorySynthesisBatchesRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListMemorySynthesisBatchesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListMemorySynthesisBatchesRequest")
+            .field("bank_id", &self.bank_id)
+            .finish()
+    }
+}
+impl ListMemorySynthesisBatchesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesRequest";
+}
+::buffa::impl_default_instance!(ListMemorySynthesisBatchesRequest);
+impl ::buffa::MessageName for ListMemorySynthesisBatchesRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ListMemorySynthesisBatchesRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.ListMemorySynthesisBatchesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesRequest";
+}
+impl ::buffa::Message for ListMemorySynthesisBatchesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListMemorySynthesisBatchesRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ListMemorySynthesisBatchesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListMemorySynthesisBatchesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_MEMORY_SYNTHESIS_BATCHES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListMemorySynthesisBatchesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListMemorySynthesisBatchesRequest,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListMemorySynthesisBatchesResponse {
+    /// Field 1: `batches`
+    #[serde(
+        rename = "batches",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub batches: ::buffa::alloc::vec::Vec<MemorySynthesisBatch>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListMemorySynthesisBatchesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListMemorySynthesisBatchesResponse")
+            .field("batches", &self.batches)
+            .finish()
+    }
+}
+impl ListMemorySynthesisBatchesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesResponse";
+}
+::buffa::impl_default_instance!(ListMemorySynthesisBatchesResponse);
+impl ::buffa::MessageName for ListMemorySynthesisBatchesResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ListMemorySynthesisBatchesResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.ListMemorySynthesisBatchesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesResponse";
+}
+impl ::buffa::Message for ListMemorySynthesisBatchesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.batches {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.batches {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.batches.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batches.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListMemorySynthesisBatchesResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ListMemorySynthesisBatchesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListMemorySynthesisBatchesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_MEMORY_SYNTHESIS_BATCHES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ListMemorySynthesisBatchesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListMemorySynthesisBatchesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ListMemorySynthesisBatchesResponse,
+    >,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RunMemorySynthesisRequest {
+    /// Field 1: `bank_id`
+    #[serde(
+        rename = "bankId",
+        alias = "bank_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub bank_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RunMemorySynthesisRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RunMemorySynthesisRequest")
+            .field("bank_id", &self.bank_id)
+            .finish()
+    }
+}
+impl RunMemorySynthesisRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RunMemorySynthesisRequest";
+}
+::buffa::impl_default_instance!(RunMemorySynthesisRequest);
+impl ::buffa::MessageName for RunMemorySynthesisRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RunMemorySynthesisRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.RunMemorySynthesisRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RunMemorySynthesisRequest";
+}
+impl ::buffa::Message for RunMemorySynthesisRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.bank_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.bank_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.bank_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.bank_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.bank_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.bank_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RunMemorySynthesisRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RunMemorySynthesisRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RunMemorySynthesisRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RUN_MEMORY_SYNTHESIS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RunMemorySynthesisRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RunMemorySynthesisRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RunMemorySynthesisRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RunMemorySynthesisResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RunMemorySynthesisResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RunMemorySynthesisResponse").finish()
+    }
+}
+impl RunMemorySynthesisResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RunMemorySynthesisResponse";
+}
+::buffa::impl_default_instance!(RunMemorySynthesisResponse);
+impl ::buffa::MessageName for RunMemorySynthesisResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "RunMemorySynthesisResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.RunMemorySynthesisResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.RunMemorySynthesisResponse";
+}
+impl ::buffa::Message for RunMemorySynthesisResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RunMemorySynthesisResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.RunMemorySynthesisResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RunMemorySynthesisResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __RUN_MEMORY_SYNTHESIS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.RunMemorySynthesisResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RunMemorySynthesisResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RunMemorySynthesisResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListChatModelsRequest {
+    /// Field 1: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListChatModelsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListChatModelsRequest")
+            .field("connection_id", &self.connection_id)
+            .finish()
+    }
+}
+impl ListChatModelsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListChatModelsRequest";
+}
+::buffa::impl_default_instance!(ListChatModelsRequest);
+impl ::buffa::MessageName for ListChatModelsRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ListChatModelsRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.ListChatModelsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListChatModelsRequest";
+}
+impl ::buffa::Message for ListChatModelsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.connection_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connection_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListChatModelsRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ListChatModelsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListChatModelsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CHAT_MODELS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ListChatModelsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListChatModelsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListChatModelsRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListChatModelsResponse {
+    /// Field 1: `models`
+    #[serde(
+        rename = "models",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub models: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListChatModelsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListChatModelsResponse").field("models", &self.models).finish()
+    }
+}
+impl ListChatModelsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListChatModelsResponse";
+}
+::buffa::impl_default_instance!(ListChatModelsResponse);
+impl ::buffa::MessageName for ListChatModelsResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ListChatModelsResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.ListChatModelsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ListChatModelsResponse";
+}
+impl ::buffa::Message for ListChatModelsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.models {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.models {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.models.push(__elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.models.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListChatModelsResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ListChatModelsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListChatModelsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CHAT_MODELS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ListChatModelsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListChatModelsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListChatModelsResponse>,
     is_wkt: false,
 };

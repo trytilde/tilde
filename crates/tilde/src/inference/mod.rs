@@ -121,12 +121,49 @@ impl Auth {
 }
 
 /// Why a call Tilde made itself failed. `rejected` when the provider refused this request's content
-/// (400, 413, 422), so a smaller request may succeed; otherwise (network, timeouts, auth, rate
-/// limits, server errors) the same request may succeed later.
+/// (400, 413, 422), so a smaller request may succeed. `content` when the content itself is the
+/// problem whatever is retried (413, 422, a 400 naming the context length or a content filter,
+/// an answer cut off or unreadable); otherwise (network, timeouts, auth, rate limits, server
+/// errors, other 400s such as billing) the same request may succeed later.
 pub(crate) struct PostError {
     pub rejected: bool,
+    pub content: bool,
     pub error: Error,
 }
+impl PostError {
+    /// A failure caused by what was sent or answered, not by the provider being unavailable.
+    pub(crate) fn content(error: Error) -> Self {
+        Self {
+            rejected: false,
+            content: true,
+            error,
+        }
+    }
+}
+impl From<Error> for PostError {
+    fn from(error: Error) -> Self {
+        Self {
+            rejected: false,
+            content: false,
+            error,
+        }
+    }
+}
+impl From<crate::database::DbError> for PostError {
+    fn from(error: crate::database::DbError) -> Self {
+        Error::from(error).into()
+    }
+}
+/// Provider error codes that name the request's content, in a 400's body.
+const CONTENT_ERRORS: [&str; 7] = [
+    "context_length_exceeded",
+    "maximum context length",
+    "prompt is too long",
+    "content_filter",
+    "content_policy",
+    "string_above_max_length",
+    "too many tokens",
+];
 /// One ready inference connection with a warm connection pool to its provider.
 pub struct Upstream {
     pub connection: Uuid,
@@ -171,7 +208,7 @@ impl Upstream {
             client,
         })
     }
-    /// A JSON POST Tilde makes itself (memory embeddings), to `path` below the base. Such calls
+    /// A JSON POST Tilde makes itself (memory embeddings and synthesis), to `path` below the base. Such calls
     /// belong to no invocation, so they are not recorded in `inference_requests`.
     pub(crate) async fn post_json(
         &self,
@@ -179,17 +216,19 @@ impl Upstream {
         body: &serde_json::Value,
         timeout: Duration,
     ) -> Result<serde_json::Value, PostError> {
-        let failed = |error| PostError {
-            rejected: false,
-            error,
-        };
+        let failed = |error: Error| PostError::from(error);
         let url = format!("{}/{path}", self.base.as_str().trim_end_matches('/'));
         let body = serde_json::to_vec(body)
             .map_err(|_| failed(Error::Invalid("Unable to encode the request".into())))?;
         let mut request = self
             .client
             .post(&url)
-            .header(http::header::CONTENT_TYPE, "application/json")
+            .header(http::header::CONTENT_TYPE, "application/json");
+        // Agents' SDKs send Anthropic's API version themselves; Tilde's own calls must too.
+        if self.provider == Provider::Anthropic {
+            request = request.header("anthropic-version", "2023-06-01");
+        }
+        let mut request = request
             .timeout(timeout)
             .body(body.clone())
             .build()
@@ -210,8 +249,11 @@ impl Upstream {
         let text = response.text().await.map_err(|_| unreachable())?;
         if !status.is_success() {
             let detail: String = text.chars().take(300).collect();
+            let lower = text.to_lowercase();
             return Err(PostError {
                 rejected: matches!(status.as_u16(), 400 | 413 | 422),
+                content: matches!(status.as_u16(), 413 | 422)
+                    || (status.as_u16() == 400 && CONTENT_ERRORS.iter().any(|c| lower.contains(c))),
                 error: Error::Invalid(format!(
                     "{} answered {status}: {detail}",
                     self.provider.name()

@@ -16,7 +16,10 @@
 pub mod db;
 pub mod embed;
 pub mod rpc;
+pub mod synthesis;
 pub mod tools;
+
+pub use synthesis::Evidence;
 
 use crate::connections::{model::invalid, service::Connections};
 use crate::error::Error;
@@ -37,6 +40,26 @@ pub const KINDS: [&str; 8] = [
     "tools",
     "skills",
 ];
+/// What each kind holds, in `KINDS` order: told to agents and to the synthesis model.
+const KIND_HINTS: [&str; 8] = [
+    "who someone is",
+    "how someone likes things",
+    "facts about a thing",
+    "something that happened",
+    "a problem and its resolution",
+    "an approach that works",
+    "how to use a tool",
+    "a procedure for a recurring task",
+];
+/// "profile: who someone is. preferences: …" for every kind.
+pub fn kind_guide() -> String {
+    KINDS
+        .iter()
+        .zip(KIND_HINTS)
+        .map(|(kind, hint)| format!("{kind}: {hint}."))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
 /// Candidates each recall list contributes before fusion (the vector session searches at least
 /// as many neighbours), and the fusion constant.
 const CANDIDATES: i64 = 50;
@@ -59,8 +82,8 @@ const LEASE_SECS: f64 = 300.0;
 #[derive(Clone)]
 pub struct Memory {
     connections: Connections,
-    /// The client for the settings' connection, rebuilt when its credentials change.
-    upstream: Arc<Mutex<Option<Arc<Upstream>>>>,
+    /// Clients for the connections embeddings and synthesis use, rebuilt when credentials change.
+    upstreams: Arc<Mutex<HashMap<Uuid, Arc<Upstream>>>>,
 }
 /// A new memory.
 pub struct Draft {
@@ -122,12 +145,48 @@ pub struct Browse {
     pub more_paths: bool,
     pub more_memories: bool,
 }
-/// Where a memory being written comes from. `agent` is set for every agent tool call; without
-/// one a person wrote it (origin `owner`). The rules on people's memories and supersession key
-/// on it.
+/// Who writes a memory: a person through management (origin `owner`), an agent through its
+/// tools (`explicit`) or Tilde's synthesis (`synthesized`). Only people change people's memories.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Actor {
+    Person,
+    Agent(Uuid),
+    /// Synthesis, in a batch.
+    Synthesizer(Uuid),
+}
+impl Actor {
+    pub fn agent(self) -> Option<Uuid> {
+        match self {
+            Self::Agent(agent) => Some(agent),
+            _ => None,
+        }
+    }
+    fn batch(self) -> Option<Uuid> {
+        match self {
+            Self::Synthesizer(batch) => Some(batch),
+            _ => None,
+        }
+    }
+    fn name(self) -> &'static str {
+        match self {
+            Self::Person => "person",
+            Self::Agent(_) => "agent",
+            Self::Synthesizer(_) => "synthesizer",
+        }
+    }
+    fn origin(self) -> &'static str {
+        match self {
+            Self::Person => "owner",
+            Self::Agent(_) => "explicit",
+            Self::Synthesizer(_) => "synthesized",
+        }
+    }
+}
+/// Where a memory being written comes from: who writes it, the person it is for in a per-person
+/// bank and, for an agent, the conversation it writes in.
 pub struct Source {
     pub identity: Option<Uuid>,
-    pub agent: Option<Uuid>,
+    pub actor: Actor,
     pub thread: Option<Uuid>,
 }
 
@@ -214,8 +273,44 @@ fn access(value: &str) -> Result<&'static str, Error> {
         _ => Err(invalid("Access is read or read_write")),
     }
 }
+/// Seconds before retrying after `attempts` failures: doubling, up to an hour.
+fn backoff(attempts: i32) -> f64 {
+    2f64.powi(attempts.clamp(0, 12)).min(3600.0)
+}
+/// Writes memory `id` in `tx`: the row, its revision (and the replaced memory's), and an
+/// embedding request. Callers check the rules first.
+async fn insert(
+    tx: &crate::database::Transaction<'_>,
+    id: Uuid,
+    bank: Uuid,
+    draft: &Draft,
+    source: &Source,
+    supersedes: Option<Uuid>,
+) -> crate::database::DbResult<()> {
+    db::memory_insert_execute(tx, id, bank, draft, source, supersedes).await?;
+    db::revision_insert_execute(tx, id, "create", source.actor).await?;
+    if let Some(old) = supersedes {
+        db::revision_insert_execute(tx, old, "supersede", source.actor).await?;
+    }
+    db::job_enqueue_execute(tx, Some(id)).await?;
+    Ok(())
+}
 fn owners() -> Error {
     invalid("A person wrote this memory; agents cannot change or forget it")
+}
+/// Whether `actor` may replace memory `old` in `bank`: never a person's memory unless a person
+/// replaces it, and never a memory already replaced.
+fn replaceable(old: &db::StatusRow, bank: Uuid, actor: Actor) -> Result<(), Error> {
+    if old.deleted || old.bank_id != bank {
+        return Err(Error::Missing("Memory"));
+    }
+    if actor != Actor::Person && old.origin == "owner" {
+        return Err(owners());
+    }
+    if old.superseded {
+        return Err(superseded());
+    }
+    Ok(())
 }
 fn superseded() -> Error {
     invalid("This memory was already replaced; recall the current one and change that instead")
@@ -225,7 +320,7 @@ impl Memory {
     pub fn new(connections: Connections) -> Self {
         Self {
             connections,
-            upstream: Arc::default(),
+            upstreams: Arc::default(),
         }
     }
     async fn client(&self) -> Result<crate::database::Client, Error> {
@@ -405,7 +500,7 @@ impl Memory {
                     None => None,
                     Some(m)
                         if m.bank_id == bank
-                            && m.written_by_agent_id == source.agent
+                            && m.written_by_agent_id == source.actor.agent()
                             && m.supersedes_id == supersedes =>
                     {
                         Some(id)
@@ -421,20 +516,11 @@ impl Memory {
             return Err(invalid("Only per-person banks keep memories for a person"));
         }
         if let Some(old) = supersedes {
-            let old = self.status(old).await?;
-            if old.deleted || old.bank_id != bank {
-                return Err(Error::Missing("Memory"));
-            }
-            if source.agent.is_some() && old.origin == "owner" {
-                return Err(owners());
-            }
-            if old.superseded {
-                return Err(superseded());
-            }
+            replaceable(&self.status(old).await?, bank, source.actor)?;
         }
         let mut client = self.client().await?;
         let tx = client.transaction().await?;
-        match db::memory_insert_execute(&tx, id, bank, &draft, &source, supersedes).await {
+        match insert(&tx, id, bank, &draft, &source, supersedes).await {
             // A concurrent retry, or a concurrent superseding of the same memory.
             Err(error) if error.is_unique_violation() => {
                 drop(tx);
@@ -443,11 +529,6 @@ impl Memory {
             }
             result => result?,
         };
-        db::revision_insert_execute(&tx, id, "create", source.agent).await?;
-        if let Some(old) = supersedes {
-            db::revision_insert_execute(&tx, old, "supersede", source.agent).await?;
-        }
-        db::job_enqueue_execute(&tx, Some(id)).await?;
         tx.commit().await?;
         Ok(id)
     }
@@ -475,7 +556,7 @@ impl Memory {
         if db::memory_update_execute(&tx, id, &change).await? == 0 {
             return Err(Error::Missing("Memory"));
         }
-        db::revision_insert_execute(&tx, id, "update", None).await?;
+        db::revision_insert_execute(&tx, id, "update", Actor::Person).await?;
         db::job_enqueue_execute(&tx, Some(id)).await?;
         tx.commit().await?;
         drop(client);
@@ -499,7 +580,8 @@ impl Memory {
         }
         let mut client = self.client().await?;
         let tx = client.transaction().await?;
-        db::revision_insert_execute(&tx, id, "forget", agent).await?;
+        db::revision_insert_execute(&tx, id, "forget", agent.map_or(Actor::Person, Actor::Agent))
+            .await?;
         if db::memory_forget_execute(&tx, id).await? == 0 {
             return Err(Error::Missing("Memory"));
         }
@@ -692,35 +774,57 @@ impl Memory {
             })
             .collect())
     }
-    /// The connection's provider and credential version, if it can serve embeddings.
-    async fn embedding_connection(&self, connection: Uuid) -> Result<(Provider, i64), Error> {
+    /// The connection's provider and credential version, if it is a ready inference connection
+    /// of a provider `supported` accepts; `refused` explains which do.
+    async fn inference_connection(
+        &self,
+        connection: Uuid,
+        supported: fn(Provider) -> bool,
+        refused: &str,
+    ) -> Result<(Provider, i64), Error> {
         let row = self.connections.get(connection).await?;
         let provider = Provider::parse(&row.provider_id)
-            .filter(|p| row.inference_capable && embed::supported(*p))
-            .ok_or_else(|| {
-                invalid("Embeddings come from an OpenAI, Azure OpenAI, Vercel AI Gateway, Baseten, Voyage or Cohere connection")
-            })?;
+            .filter(|p| row.inference_capable && supported(*p))
+            .ok_or_else(|| invalid(refused))?;
         if row.status != "ready" {
             return Err(invalid("The connection is not ready"));
         }
         Ok((provider, row.credential_version))
     }
+    async fn embedding_connection(&self, connection: Uuid) -> Result<(Provider, i64), Error> {
+        self.inference_connection(
+            connection,
+            embed::supported,
+            "Embeddings come from an OpenAI, Azure OpenAI, Vercel AI Gateway, Baseten, Voyage or Cohere connection",
+        )
+        .await
+    }
     /// A client for the connection, reused until its credentials change.
-    async fn upstream(&self, connection: Uuid) -> Result<Arc<Upstream>, Error> {
-        let (provider, version) = self.embedding_connection(connection).await?;
+    async fn client_for(
+        &self,
+        connection: Uuid,
+        (provider, version): (Provider, i64),
+    ) -> Result<Arc<Upstream>, Error> {
         if let Some(cached) = self
-            .upstream
+            .upstreams
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-            .filter(|u| u.connection == connection && u.version == version)
+            .get(&connection)
+            .filter(|u| u.version == version)
         {
             return Ok(cached.clone());
         }
         let values = self.connections.resolve(connection).await?;
         let upstream = Arc::new(Upstream::new(connection, version, provider, &values)?);
-        *self.upstream.lock().unwrap_or_else(|e| e.into_inner()) = Some(upstream.clone());
+        self.upstreams
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(connection, upstream.clone());
         Ok(upstream)
+    }
+    async fn upstream(&self, connection: Uuid) -> Result<Arc<Upstream>, Error> {
+        let checked = self.embedding_connection(connection).await?;
+        self.client_for(connection, checked).await
     }
     async fn query_vector(&self, settings: &db::SettingsRow, query: &str) -> Result<String, Error> {
         let upstream = self.upstream(settings.connection_id).await?;
@@ -814,18 +918,46 @@ impl Memory {
     ) -> Result<(), Error> {
         let client = self.client().await?;
         for job in jobs {
-            let retry = 2f64.powi(job.attempts.min(12)).min(3600.0);
-            db::job_failed_execute(&client, job.memory_id, job.requested_at, retry).await?;
+            db::job_failed_execute(
+                &client,
+                job.memory_id,
+                job.requested_at,
+                backoff(job.attempts),
+            )
+            .await?;
         }
         Ok(())
     }
-    pub async fn run(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    /// The embedding and synthesis workers, until shutdown.
+    pub async fn run(self, shutdown: tokio::sync::watch::Receiver<bool>) {
+        tokio::join!(
+            self.clone().embed_worker(shutdown.clone()),
+            self.synthesis_worker(shutdown)
+        );
+    }
+    async fn embed_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
         loop {
             let wait = match self.embed_pending().await {
                 Ok(0) => Duration::from_secs(2),
                 Ok(_) => Duration::ZERO,
                 Err(error) => {
                     tracing::warn!(%error, "Memory embedding worker failed");
+                    Duration::from_secs(10)
+                }
+            };
+            tokio::select! {
+                _ = shutdown.changed() => return,
+                _ = tokio::time::sleep(wait) => {}
+            }
+        }
+    }
+    async fn synthesis_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+        loop {
+            let wait = match self.synthesize_pending().await {
+                Ok(false) => Duration::from_secs(5),
+                Ok(true) => Duration::ZERO,
+                Err(error) => {
+                    tracing::warn!(%error, "Memory synthesis worker failed");
                     Duration::from_secs(10)
                 }
             };
