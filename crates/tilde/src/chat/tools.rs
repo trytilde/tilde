@@ -50,6 +50,10 @@ impl Context {
     pub fn scope(&self) -> &Scope {
         &self.scope
     }
+    /// The invocation token the call was made with, for relaying it.
+    pub(crate) fn capability(&self) -> &SecretString {
+        &self.capability
+    }
     pub async fn authorize(&self) -> ToolResult<()> {
         self.chat.scope(self.capability.expose_secret()).await?;
         Ok(())
@@ -94,6 +98,9 @@ impl Registry {
                 providers.push(Arc::new(tools.clone()));
                 providers.push(Arc::new(crate::tools::builtin::Builtin(tools.clone())));
                 providers.push(Arc::new(crate::tools::personal::Personal(tools.clone())));
+                providers.push(Arc::new(crate::memory::tools::MemoryTools(
+                    tools.memory.clone(),
+                )));
             }
             return Self::new(providers);
         }
@@ -102,6 +109,9 @@ impl Registry {
         if let Some(local) = chat.local() {
             providers.push(Arc::new(
                 crate::deployment::runtime::providers::LocalChannels(local.clone()),
+            ));
+            providers.push(Arc::new(
+                crate::deployment::runtime::providers::GatewayMemory(local.clone()),
             ));
         }
         Self::new(providers)

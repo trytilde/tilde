@@ -7,6 +7,7 @@ use crate::chat::{
 };
 use connectrpc::ConnectError;
 use futures::{StreamExt, future::BoxFuture};
+use secrecy::ExposeSecret;
 use serde_json::{Value, json};
 pub struct LocalChannels(pub Arc<Runtime>);
 impl Runtime {
@@ -132,6 +133,98 @@ impl Provider for LocalChannels {
                 ));
             }
             provider.invoke(&access, &context, name, input).await
+        })
+    }
+}
+
+/// Memory tools, answered by the gateway: memory lives in its Postgres, so listing and every
+/// call are relayed (`tilde.runtime.v1.MemoryService`) and nothing is held here. Relay checks the
+/// token, the thread lease and the capability ceiling as for the agent's registry calls.
+pub struct GatewayMemory(pub Arc<Runtime>);
+const MEMORY_SERVICE: &str = "tilde.runtime.v1.MemoryService";
+impl GatewayMemory {
+    async fn relay<T: serde::de::DeserializeOwned>(
+        &self,
+        token: &SecretString,
+        method: &str,
+        body: Value,
+    ) -> ToolResult<T> {
+        let result = self
+            .0
+            .gateway
+            .relay(
+                self.0.instance_id,
+                &format!("{MEMORY_SERVICE}/{method}"),
+                "application/json",
+                body.to_string().into_bytes(),
+                token.expose_secret(),
+            )
+            .await?;
+        let value: Value = serde_json::from_slice(&result.body).unwrap_or(Value::Null);
+        if result.status != 200 {
+            let code = value["code"]
+                .as_str()
+                .and_then(|c| c.parse().ok())
+                .unwrap_or(connectrpc::ErrorCode::Unavailable);
+            return Err(ConnectError::new(
+                code,
+                value["message"].as_str().unwrap_or("Memory is unavailable"),
+            ));
+        }
+        serde_json::from_value(value)
+            .map_err(|_| ConnectError::internal("Invalid memory response from the gateway"))
+    }
+}
+impl Provider for GatewayMemory {
+    fn tools<'a>(
+        &'a self,
+        scope: &'a Scope,
+    ) -> BoxFuture<'a, ToolResult<Vec<types::ToolDefinition>>> {
+        Box::pin(async move {
+            if scope.agent_id != self.0.agent_id {
+                return Err(ConnectError::permission_denied("Wrong agent"));
+            }
+            // The registry lists tools from the verified scope alone, so the listing goes under a
+            // token minted for it; calls go under the agent's own.
+            let token = self.0.relay_token(scope)?;
+            // An unreachable gateway hides memory for this listing rather than every tool.
+            match self
+                .relay::<crate::proto::tilde::runtime::v1::ListMemoryToolsResponse>(
+                    &token,
+                    "ListMemoryTools",
+                    json!({}),
+                )
+                .await
+            {
+                Ok(listed) => Ok(listed.tools),
+                Err(error) => {
+                    tracing::warn!(%error, "Memory tools unavailable from the gateway");
+                    Ok(vec![])
+                }
+            }
+        })
+    }
+    fn invoke<'a>(
+        &'a self,
+        context: Context,
+        name: &'a str,
+        input: Value,
+        mut chunks: InputStream,
+    ) -> BoxFuture<'a, ToolResult<Value>> {
+        Box::pin(async move {
+            while let Some(chunk) = chunks.next().await {
+                chunk?;
+            }
+            context.authorize().await?;
+            let output = self
+                .relay::<crate::proto::tilde::runtime::v1::InvokeMemoryToolResponse>(
+                    context.capability(),
+                    "InvokeMemoryTool",
+                    json!({"name": name, "inputJson": input.to_string(), "callId": context.call_id}),
+                )
+                .await?;
+            serde_json::from_str(&output.output_json)
+                .map_err(|_| ConnectError::internal("Invalid memory tool result"))
         })
     }
 }

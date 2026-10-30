@@ -57,15 +57,19 @@ impl Database {
         let url = url.0.expose_secret();
         let admin = database::pool(url, 2).unwrap();
         let schema = format!("test_{}", Uuid::new_v4().simple());
+        // Extensions are database-wide: install pgvector once in public, which every test
+        // schema then sees, instead of inside whichever schema migrates first.
         admin
             .get()
             .await
             .unwrap()
-            .batch_execute(&format!("CREATE SCHEMA {schema}"))
+            .batch_execute(&format!(
+                "BEGIN; SELECT pg_advisory_xact_lock(7370617); CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public; COMMIT; CREATE SCHEMA {schema}"
+            ))
             .await
             .unwrap();
         let mut config = tokio_postgres::Config::from_str(url).unwrap();
-        config.options(format!("-c search_path={schema}"));
+        config.options(format!("-c search_path={schema},public"));
         let pool = database::pool_from_config(config, 4).unwrap();
         Self {
             pool,

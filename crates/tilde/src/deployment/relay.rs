@@ -25,6 +25,7 @@ pub const RELAYED_SERVICES: &[&str] = &[
     "tilde.runtime.v1.AgentService/",
     "tilde.runtime.v1.PromptService/",
     "tilde.runtime.v1.SkillService/",
+    "tilde.runtime.v1.MemoryService/",
 ];
 impl Deployments {
     pub async fn relay(
@@ -137,7 +138,18 @@ impl Deployments {
                 crate::prompts::Prompts::new(self.pool.clone()),
                 chat.clone(),
             ))
-            .merge(crate::skills::rpc::runtime_router(chat.skills()?, chat));
+            .merge(crate::skills::rpc::runtime_router(
+                chat.skills()?,
+                chat.clone(),
+            ));
+        // Memory is only reached this way: gateway-hosted agents call the tools directly.
+        let router = match chat.tools.as_ref() {
+            Some(tools) => router.merge(crate::memory::rpc::runtime_router(
+                tools.memory.clone(),
+                chat,
+            )),
+            None => router,
+        };
         let response = match router.oneshot(request).await {
             Ok(response) => response,
             Err(never) => match never {},

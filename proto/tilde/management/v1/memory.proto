@@ -1,0 +1,179 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "google/protobuf/timestamp.proto";
+
+// Memory banks hold short facts agents recall and write through the built-in memory tools, and
+// people curate here. A bank is shared, or an agent's own (created with the agent's id and
+// deleted with it). An agent reaches a bank only through a link, read or read-write. Recall fuses
+// full-text search with similarity over embeddings computed through an inference connection
+// (the embedding settings); memories not yet embedded are found by full text only.
+service MemoryService {
+  rpc ListMemoryBanks(ListMemoryBanksRequest) returns (ListMemoryBanksResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetMemoryBank(GetMemoryBankRequest) returns (GetMemoryBankResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // With an agent id, the bank is that agent's own: it is linked read-write and deleted with it.
+  rpc CreateMemoryBank(CreateMemoryBankRequest) returns (CreateMemoryBankResponse);
+  rpc UpdateMemoryBank(UpdateMemoryBankRequest) returns (UpdateMemoryBankResponse);
+  // Deletes the bank and its memories.
+  rpc DeleteMemoryBank(DeleteMemoryBankRequest) returns (DeleteMemoryBankResponse);
+  rpc ListAgentMemoryBanks(ListAgentMemoryBanksRequest) returns (ListAgentMemoryBanksResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Links a shared bank to the agent, or changes the access of a link. An agent's own bank cannot
+  // be linked to another agent.
+  rpc SetAgentMemoryBank(SetAgentMemoryBankRequest) returns (SetAgentMemoryBankResponse);
+  // Refused for the agent's own bank; delete the bank instead.
+  rpc RemoveAgentMemoryBank(RemoveAgentMemoryBankRequest) returns (RemoveAgentMemoryBankResponse);
+  // With a query, the bank's memories ranked as agents recall them; without, newest first.
+  rpc ListMemories(ListMemoriesRequest) returns (ListMemoriesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc GetMemory(GetMemoryRequest) returns (GetMemoryResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // A person's memory (origin OWNER): agents may read it but never change or forget it.
+  rpc CreateMemory(CreateMemoryRequest) returns (CreateMemoryResponse);
+  // Editing any memory makes it the person's (origin OWNER).
+  rpc UpdateMemory(UpdateMemoryRequest) returns (UpdateMemoryResponse);
+  rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteMemoryResponse);
+  rpc GetEmbeddingSettings(GetEmbeddingSettingsRequest) returns (GetEmbeddingSettingsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Embeds a probe text first, so a model that fails or returns another dimension is refused.
+  // Every memory is then embedded again under the new settings.
+  rpc SetEmbeddingSettings(SetEmbeddingSettingsRequest) returns (SetEmbeddingSettingsResponse);
+  // Recall falls back to full text; stored embeddings are kept until settings are set again.
+  rpc ClearEmbeddingSettings(ClearEmbeddingSettingsRequest) returns (ClearEmbeddingSettingsResponse);
+  // Embedding models of the connection's provider from the price sheet. Any model the provider
+  // serves may be set; these are suggestions.
+  rpc ListEmbeddingModels(ListEmbeddingModelsRequest) returns (ListEmbeddingModelsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+// SHARED: agents read and write every memory. PER_PERSON: an agent reads and writes only the
+// memories of the verified person it acts for, plus memories people wrote for the whole bank.
+enum MemoryBankScope { MEMORY_BANK_SCOPE_UNSPECIFIED = 0; MEMORY_BANK_SCOPE_SHARED = 1; MEMORY_BANK_SCOPE_PER_PERSON = 2; }
+enum MemoryAccess { MEMORY_ACCESS_UNSPECIFIED = 0; MEMORY_ACCESS_READ = 1; MEMORY_ACCESS_READ_WRITE = 2; }
+enum MemoryKind {
+  MEMORY_KIND_UNSPECIFIED = 0;
+  // Who someone is: role, background, circumstances.
+  MEMORY_KIND_PROFILE = 1;
+  // How someone likes things done.
+  MEMORY_KIND_PREFERENCES = 2;
+  // Facts about a thing: a project, company, system or place.
+  MEMORY_KIND_ENTITIES = 3;
+  // Something that happened, usually with a time.
+  MEMORY_KIND_EVENTS = 4;
+  // A problem met and how it was resolved.
+  MEMORY_KIND_CASES = 5;
+  // A convention or approach that works and should be repeated.
+  MEMORY_KIND_PATTERNS = 6;
+  // How to use a tool or system well.
+  MEMORY_KIND_TOOLS = 7;
+  // A learned procedure for a recurring task.
+  MEMORY_KIND_SKILLS = 8;
+}
+// EXPLICIT: an agent wrote it. OWNER: a person wrote or edited it; agents cannot change it.
+enum MemoryOrigin { MEMORY_ORIGIN_UNSPECIFIED = 0; MEMORY_ORIGIN_EXPLICIT = 1; MEMORY_ORIGIN_OWNER = 2; }
+message MemoryBank {
+  string id = 1; string name = 2; string description = 3; MemoryBankScope scope = 4;
+  // Set when the bank is this agent's own.
+  optional string agent_id = 5;
+  // Agents linked to it.
+  repeated string agent_ids = 6;
+  uint32 memory_count = 7;
+  // Memories waiting for an embedding under the current settings.
+  uint32 pending_embeddings = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+message ListMemoryBanksRequest { optional string search = 1; }
+message ListMemoryBanksResponse { repeated MemoryBank banks = 1; }
+message GetMemoryBankRequest { string id = 1; }
+message GetMemoryBankResponse { MemoryBank bank = 1; }
+// Unspecified scope means SHARED.
+message CreateMemoryBankRequest { string name = 1; string description = 2; MemoryBankScope scope = 3; optional string agent_id = 4; }
+message CreateMemoryBankResponse { MemoryBank bank = 1; }
+message UpdateMemoryBankRequest { string id = 1; optional string name = 2; optional string description = 3; }
+message UpdateMemoryBankResponse { MemoryBank bank = 1; }
+message DeleteMemoryBankRequest { string id = 1; }
+message DeleteMemoryBankResponse {}
+message AgentMemoryBank { string agent_id = 1; string bank_id = 2; string bank_name = 3; MemoryAccess access = 4; bool own = 5; MemoryBankScope scope = 6; }
+message ListAgentMemoryBanksRequest { string agent_id = 1; }
+message ListAgentMemoryBanksResponse { repeated AgentMemoryBank banks = 1; }
+message SetAgentMemoryBankRequest { string agent_id = 1; string bank_id = 2; MemoryAccess access = 3; }
+message SetAgentMemoryBankResponse { AgentMemoryBank bank = 1; }
+message RemoveAgentMemoryBankRequest { string agent_id = 1; string bank_id = 2; }
+message RemoveAgentMemoryBankResponse {}
+message Memory {
+  string id = 1; string bank_id = 2; MemoryKind kind = 3;
+  // Slash-separated segments, empty for the bank's root.
+  string path = 4;
+  string title = 5; string content = 6;
+  // When it holds: equal for a point in time, the period [from, to), or from `valid_from` on with
+  // no `valid_to` (ongoing).
+  optional google.protobuf.Timestamp valid_from = 7; optional google.protobuf.Timestamp valid_to = 8;
+  float importance = 9; MemoryOrigin origin = 10;
+  // The person it belongs to in a per-person bank.
+  optional string identity_id = 11;
+  optional string written_by_agent_id = 12;
+  optional string supersedes_id = 13;
+  bool embedded = 14;
+  // Where an agent wrote it: the conversation, and the latest message a person sent there.
+  optional string thread_id = 15; optional string message_id = 16;
+  google.protobuf.Timestamp created_at = 17; google.protobuf.Timestamp updated_at = 18;
+}
+enum MemoryOperation {
+  MEMORY_OPERATION_UNSPECIFIED = 0; MEMORY_OPERATION_CREATE = 1; MEMORY_OPERATION_UPDATE = 2;
+  // Recorded on the memory that was replaced.
+  MEMORY_OPERATION_SUPERSEDE = 3;
+  MEMORY_OPERATION_FORGET = 4;
+}
+// The memory as it was after the change.
+message MemoryRevision {
+  google.protobuf.Timestamp at = 1;
+  MemoryOperation operation = 2;
+  MemoryKind kind = 3; string path = 4; string title = 5; string content = 6;
+  optional google.protobuf.Timestamp valid_from = 7; optional google.protobuf.Timestamp valid_to = 8;
+  float importance = 9; MemoryOrigin origin = 10; optional string identity_id = 11;
+  // The agent that made it; absent when a person did.
+  optional string agent_id = 12;
+}
+// `path` limits to that path and below; `limit` defaults to 50, at most 200.
+message ListMemoriesRequest {
+  string bank_id = 1; optional string query = 2; optional string path = 3; MemoryKind kind = 4; uint32 limit = 5;
+}
+message ListMemoriesResponse { repeated Memory memories = 1; }
+message GetMemoryRequest { string id = 1; }
+message GetMemoryResponse { Memory memory = 1; repeated MemoryRevision revisions = 2; }
+message CreateMemoryRequest {
+  string bank_id = 1; MemoryKind kind = 2; string path = 3; string title = 4; string content = 5;
+  optional google.protobuf.Timestamp valid_from = 6; optional google.protobuf.Timestamp valid_to = 7;
+  optional float importance = 8;
+  // In a per-person bank, the person it belongs to; absent, it holds for everyone.
+  optional string identity_id = 9;
+  // From `valid_from` with no end yet; not with `valid_to`. Without either, `valid_from` alone is
+  // a moment.
+  bool ongoing = 10;
+}
+message CreateMemoryResponse { Memory memory = 1; }
+// Absent fields keep their value. `clear_validity` removes the time it holds.
+message UpdateMemoryRequest {
+  string id = 1; MemoryKind kind = 2; optional string path = 3; optional string title = 4; optional string content = 5;
+  optional google.protobuf.Timestamp valid_from = 6; optional google.protobuf.Timestamp valid_to = 7; bool clear_validity = 8;
+  optional float importance = 9;
+  // With a new `valid_from`: it holds from then with no end yet.
+  bool ongoing = 10;
+}
+message UpdateMemoryResponse { Memory memory = 1; }
+message DeleteMemoryRequest { string id = 1; }
+message DeleteMemoryResponse {}
+message EmbeddingSettings {
+  // An inference connection: OpenAI, Azure OpenAI, Vercel AI Gateway, Baseten, Voyage or Cohere.
+  string connection_id = 1; string model = 2;
+  // 1024 or 1536.
+  uint32 dimensions = 3;
+}
+message GetEmbeddingSettingsRequest {}
+// Without settings, memories are recalled by full text only.
+message GetEmbeddingSettingsResponse { optional EmbeddingSettings settings = 1; }
+message SetEmbeddingSettingsRequest { EmbeddingSettings settings = 1; }
+message SetEmbeddingSettingsResponse { EmbeddingSettings settings = 1; }
+message ClearEmbeddingSettingsRequest {}
+message ClearEmbeddingSettingsResponse {}
+message EmbeddingModel {
+  string model = 1;
+  // Its native dimension when it is 1024 or 1536; 0 when another or unknown (several models take
+  // a requested dimension).
+  uint32 dimensions = 2;
+}
+message ListEmbeddingModelsRequest { string connection_id = 1; }
+message ListEmbeddingModelsResponse { repeated EmbeddingModel models = 1; }

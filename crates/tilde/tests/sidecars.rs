@@ -177,6 +177,12 @@ impl Fixture {
                             ..Default::default()
                         }
                         .into(),
+                        // Its memory tools, which the gateway serves through the replica.
+                        tools_invoke: types::TargetPermission {
+                            mode: types::TargetSelection::All.into(),
+                            ..Default::default()
+                        }
+                        .into(),
                         ..Default::default()
                     },
                 )
@@ -557,6 +563,71 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
         registry("not-an-invocation-token").await.unwrap().status(),
         401
     );
+    // Memory tools are listed and run by the gateway: a write through the replica lands in
+    // Postgres, and recall through it reads it back.
+    let memory = tilde::memory::Memory::new(fx.connections.clone());
+    memory
+        .create_bank("sidecar", "", "shared", Some(fx.agent))
+        .await
+        .unwrap();
+    let chat_call = |method: &str, body: Vec<u8>, content_type: &str| {
+        fx.http
+            .post(format!(
+                "{}/tilde.runtime.v1.ChatService/{method}",
+                invocation.callback_url
+            ))
+            .bearer_auth(&invocation.capability)
+            .header("content-type", content_type)
+            .header("connect-protocol-version", "1")
+            .body(body)
+            .send()
+    };
+    let tools: serde_json::Value = chat_call("ListTools", b"{}".to_vec(), "application/json")
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        tools["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "memory.write"),
+        "{tools}"
+    );
+    let invoke = async |name: &str, input: serde_json::Value| -> serde_json::Value {
+        let response = chat_call(
+            "InvokeTool",
+            common::invocation::framed(serde_json::json!({"name":name,"callId":Uuid::new_v4().to_string(),"sequence":0,"inputJson":input.to_string(),"finish":true})),
+            "application/connect+json",
+        )
+        .await
+        .unwrap();
+        let mut bytes = response.bytes().await.unwrap().to_vec();
+        let result = common::invocation::drain(&mut bytes)
+            .into_iter()
+            .next()
+            .unwrap();
+        serde_json::from_str(
+            result["outputJson"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{result}")),
+        )
+        .unwrap()
+    };
+    let written = invoke(
+        "memory.write",
+        serde_json::json!({"kind":"events","title":"Launch moved","content":"The launch moved to Thursday."}),
+    )
+    .await;
+    let stored = memory
+        .memory(Uuid::parse_str(written["memory_id"].as_str().unwrap()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(stored.written_by_agent_id, Some(fx.agent));
+    let recalled = invoke("memory.recall", serde_json::json!({"query":"launch"})).await;
+    assert_eq!(recalled["memories"][0]["title"], "Launch moved");
     fx.finish.notify_one();
     // The holder's events reach Postgres without the gateway ever calling the replica.
     let projected = eventually(async || {

@@ -5,6 +5,8 @@ Source: https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_wi
 (MIT). Only the providers Tilde routes and the per-token fields Tilde bills are kept, in
 micro-dollars per million tokens, so the checked-in file stays small and diffable. The engine
 reconciles it into `inference_prices` at startup; rows edited by hand keep source 'manual'.
+Embedding models also keep `embedding_vector_size` (LiteLLM's `output_vector_size`, 0 when
+unlisted), which memory offers as embedding model suggestions.
 """
 import json
 import sys
@@ -62,7 +64,7 @@ def main():
             if (provider, model) in seen:
                 continue
             seen.add((provider, model))
-            rows.append({
+            row = {
                 "provider_id": provider,
                 "model": model,
                 "input_per_m_micros": per_million_micros(entry.get("input_cost_per_token")),
@@ -72,7 +74,10 @@ def main():
                 "image_micros": None if entry.get("output_cost_per_image") is None else round(float(entry["output_cost_per_image"]) * 1_000_000),
                 "character_per_m_micros": per_million_micros(entry.get("input_cost_per_character")),
                 "second_micros": None if entry.get("input_cost_per_second") is None else round(float(entry["input_cost_per_second"]) * 1_000_000),
-            })
+            }
+            if entry.get("mode") == "embedding":
+                row["embedding_vector_size"] = int(entry.get("output_vector_size") or 0)
+            rows.append(row)
     rows.sort(key=lambda r: (r["provider_id"], r["model"]))
     OUT.write_text(json.dumps(rows, indent=0, separators=(",", ":")) + "\n")
     by_provider = {}

@@ -421,6 +421,96 @@ bundled tools out) and its bundled tools.
   E2B VM's TTL before E2B would pause it, and puts a Modal VM to sleep before its 24-hour
   lifetime ends; it never sleeps a sandbox with operations in flight, which keep it in use.
 
+## Memory
+
+- Memory bank: a named container of memories (`memory_banks`). Shared, or an agent's own: created
+  with the agent's id, linked to it read-write and never linked to another agent. Agent deletion
+  is a soft delete, so `Lifecycle::delete` deletes the agent's own banks (their memories go
+  with them) and its links in the same transaction; a deleted agent gets no new banks or
+  links. A bank's scope is shared (agents see every memory) or per_person.
+- Agent memory bank: a link giving an agent a bank, read or read_write (`agent_memory_banks`).
+  Links are the only way an agent reaches memory; an agent with none has no memory tools.
+- Memory: one fact (`memories`): a kind (profile, preferences, entities, events, cases,
+  patterns, tools, skills), a path (slash-separated segments organising the bank, '' for its
+  root), title, content, an optional time it holds (`valid_during`: [t,t] for a moment, [start,
+  end) for a period that ended, [start,) for an ongoing one) and importance. Its origin is explicit (an agent wrote it) or owner (a person
+  wrote or edited it through management). The `Memory` domain refuses an agent superseding or
+  forgetting an owner memory, whoever calls it. In a per-person bank a memory agents write
+  belongs to the verified person the invocation acts for (the root identity, as personal tools
+  and sandboxes resolve it); agents see that person's memories and bank-wide ones people wrote
+  without a person, and without a verified person cannot write there; only per-person banks
+  keep memories for a person. A memory an agent writes records its thread and the latest message
+  a person sent there (`thread_id`, `message_id`), left unset for a sidecar conversation the
+  gateway has not projected yet. The origin follows the writer: an agent's memory is explicit, a
+  person's owner.
+- Supersession: a new memory naming the one it replaces (`supersedes_id`, unique, so a memory is
+  replaced at most once; bank counts are of current memories). A superseded memory stays, with its history, but is no longer recalled,
+  listed or browsed, even if its successor is forgotten; agents are told to recall the current
+  one instead of changing it. Forgetting is a soft delete (`deleted_at`); an agent forgetting
+  what it already forgot succeeds, so retries are safe.
+- Revision: every create, supersede, update and forget appends the memory as it then is (kind,
+  path, title, content, validity, importance, origin, person) to `memory_revisions`, with the
+  agent, or none for a person.
+- Recall: reciprocal rank fusion (k=60) of up to two ranked lists of 50 candidates: full text
+  (any of the query's words: `plainto_tsquery`'s terms joined with OR as they are, without
+  stemming them again, over a generated English `tsvector` weighting title words above content
+  words, ranked by `ts_rank_cd`) and, once embedding settings exist,
+  cosine similarity over pgvector `halfvec` embeddings computed under the current settings. The
+  vector query runs in its own transaction with `hnsw.iterative_scan = relaxed_order` and
+  `hnsw.ef_search = 100`, so filters still leave enough neighbours (pgvector 0.8 or later).
+  Importance only orders memories with equal scores. Each result says which list found it
+  (`keywords`, `meaning`). Filters: kind, path and below, and a period the memory's validity
+  overlaps (timeless memories are left out when one is given; a period ending before it starts is
+  refused). Without a
+  query, recall lists the filtered memories newest first. The query is embedded with a 10-second
+  timeout and no pooled connection held; recall answers from full text alone when the provider
+  fails.
+- Embedding settings: one installation setting (`memory_settings`): an inference connection
+  (OpenAI, Azure OpenAI's v1 API, Vercel AI Gateway, Baseten, Voyage or Cohere), a model and 1024
+  or 1536 dimensions. Setting them embeds a probe first, takes a new version from a sequence and
+  asks for every live, current memory's embedding again; until a memory is re-embedded only full
+  text finds it. The migration refuses pgvector older than 0.8.
+  The column is untyped `halfvec`, with a partial HNSW index per supported dimension, so changing
+  models needs no migration. `inference::prices::embedding_models` lists the vendored sheet's
+  embedding models (`embedding_vector_size`) as suggestions.
+- Embedding queue: `memory_embedding_jobs`, one row per memory waiting. A write, an edit or a
+  settings change (re)requests it, stamping `requested_at`. The worker (`Memory::run`, in every
+  process with chat tools) claims due jobs with `FOR UPDATE SKIP LOCKED`, leasing them by pushing
+  `run_after` out, embeds them in one call through an `inference::Upstream` it builds from the
+  decrypted connection (cached per credential version) and stores the vector only if the job was
+  not requested again meanwhile. When the provider refuses a batch's content (400, 413, 422) each
+  memory is tried alone and only those it refuses back off; otherwise (network, timeouts, 401,
+  403, 404, 429, 5xx) the whole batch backs off, exponentially up to an hour. These calls belong to no invocation and
+  are not in `inference_requests`.
+
+Agents use the built-in tools `memory.recall`, `memory.browse` (the paths directly below a path
+with counts, grouped in SQL, and the id, kind, title, date and a 200-character preview of the
+memories at it, each list capped and saying so when cut), `memory.write` and `memory.supersede`
+(omitted fields, content included, keep the old memory's values; `valid_from` alone is a moment,
+with `valid_to` a period, with `ongoing` an open one) and `memory.forget` (provider `tilde`, catalog prefix
+`memory` reserved). Agents see each memory's kind, path, title, content, importance, origin and,
+when set, validity (`ongoing` for an open period), not who wrote it or where, and are told owner memories are authoritative and to tell the
+person when one looks wrong. Read links offer recall and browse only. Banks are chosen by name,
+never id, and only when the agent has several. The recall, browse and write descriptions list the
+agent's banks (name, shared or private to the person, the agent's own or not, read-only or
+read-write, description), so an agent with one bank knows it too. One function builds the tools
+from the agent's links, for listing and calling alike. A write's id is the tool call id, so a
+retried call writes once; an existing id with another bank, writer or superseded memory is
+refused. People manage banks, links, memories and settings through `MemoryService`;
+listing a bank with a query ranks it as recall does, with every person's memories. Recalled
+memories enter a conversation only through these tools: prompts live in agent code, so Tilde
+injects nothing.
+
+Memory always lives in the gateway's Postgres, never in a sidecar. A sidecar offers its agent the
+memory tools by relaying their listing and every call to the runtime `MemoryService` through the
+registry relay (`tilde.runtime.v1.MemoryService` is one of the relayed services and is served only
+there). Calls go under the agent's own invocation token. The listing happens inside the sidecar's
+tool registry, which holds only the verified scope, so the sidecar mints a minute-long token for
+that scope with the agent's signing key (lease epoch unset, so it cannot be renewed). The gateway
+checks either like the agent's own: signature, generation, thread lease, projected invocation and
+capability ceiling, and checks `tools_invoke` again. A gateway the sidecar cannot reach hides the
+memory tools from that listing only.
+
 ## Inference gateway
 
 Agents call model providers through `/inference/{provider}/{account}/{*rest}` on the
@@ -1447,7 +1537,8 @@ since only the projection sees every replica's conversations; a replica forwards
 listings and cursor pages, and serves the current window of a thread it holds.
 Gateway provider WatchThread subscriptions read projected activity with opaque replay
 cursors, so clients do not need a management API or direct sidecar URL for streaming.
-Registry RPCs from an agent beside a sidecar are verified by the replica, relayed over
+Registry RPCs (agents, prompts, skills, and the memory tools the replica's tool registry
+offers) from an agent beside a sidecar are verified by the replica, relayed over
 `Relay`, and re-verified at the gateway: token signature, agent generation, the
 thread lease, and the capability ceiling, before the existing registry handlers run.
 The projection may lag a young invocation or roster, so only an invocation the gateway

@@ -327,7 +327,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"azure_ai",
@@ -338,7 +339,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"azure_ai",
@@ -1152,7 +1154,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"azure_ai",
@@ -1636,7 +1639,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"azure_openai",
@@ -3000,7 +3004,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"azure_openai",
@@ -3011,7 +3016,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"azure_openai",
@@ -3022,7 +3028,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"azure_openai",
@@ -3231,7 +3238,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"bedrock",
@@ -3330,7 +3338,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -3341,7 +3350,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"bedrock",
@@ -3352,7 +3362,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -3363,7 +3374,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"bedrock",
@@ -4683,7 +4695,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"bedrock",
@@ -4694,7 +4707,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"bedrock",
@@ -4705,7 +4719,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -5574,7 +5589,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -6916,7 +6932,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -6927,7 +6944,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"bedrock",
@@ -7158,7 +7176,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"bedrock",
@@ -7202,7 +7221,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -7213,7 +7233,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"bedrock",
@@ -8137,7 +8158,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"bedrock",
@@ -8632,7 +8654,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"cohere",
@@ -8654,7 +8677,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"cohere",
@@ -8665,7 +8689,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"cohere",
@@ -8687,7 +8712,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"cohere",
@@ -8698,7 +8724,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"cohere",
@@ -9259,7 +9286,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"google_ai",
@@ -9270,7 +9298,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"google_ai",
@@ -9281,7 +9310,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"google_ai",
@@ -11404,7 +11434,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":3072
 },
 {
 "provider_id":"openai",
@@ -11415,7 +11446,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"openai",
@@ -11426,7 +11458,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1536
 },
 {
 "provider_id":"openai",
@@ -11437,7 +11470,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"openai",
@@ -11602,7 +11636,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11613,7 +11648,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11624,7 +11660,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11635,7 +11672,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11646,7 +11684,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11657,7 +11696,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11668,7 +11708,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11679,7 +11720,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11690,7 +11732,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11701,7 +11744,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11712,7 +11756,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11723,7 +11768,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11734,7 +11780,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11745,7 +11792,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11756,7 +11804,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11767,7 +11816,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11778,7 +11828,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11789,7 +11840,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11800,7 +11852,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11811,7 +11864,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 },
 {
 "provider_id":"voyage",
@@ -11822,7 +11876,8 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":0
 },
 {
 "provider_id":"voyage",
@@ -11833,6 +11888,7 @@
 "cache_write_per_m_micros":null,
 "image_micros":null,
 "character_per_m_micros":null,
-"second_micros":null
+"second_micros":null,
+"embedding_vector_size":1024
 }
 ]

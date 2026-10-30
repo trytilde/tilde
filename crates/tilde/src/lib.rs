@@ -17,6 +17,7 @@ pub mod chat;
 
 pub mod iam;
 pub mod inference;
+pub mod memory;
 pub mod prompts;
 pub mod routines;
 pub mod sandboxes;

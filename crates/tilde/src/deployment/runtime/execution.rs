@@ -497,13 +497,39 @@ impl Runtime {
             lease_epoch: v.generation,
             agent_generation: configuration.agent_generation,
         };
+        self.sign(&claims)
+    }
+    fn sign(&self, claims: &Claims) -> Result<SecretString> {
         jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
-            &claims,
+            claims,
             &jsonwebtoken::EncodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
         )
         .map(SecretString::from)
         .map_err(|_| ChatError::Transport)
+    }
+    /// A minute-long token for an already verified `scope`, so a call the tool registry answers
+    /// from the scope alone (listing tools) can still be relayed to the gateway, which checks it
+    /// like the agent's own. It never leaves the sidecar's gateway connection, and its lease
+    /// epoch is unset, so it cannot be renewed.
+    pub(crate) fn relay_token(&self, scope: &Scope) -> Result<SecretString> {
+        let now = chrono::Utc::now().timestamp();
+        let claims = Claims {
+            iss: "tilde:invocation".into(),
+            aud: "tilde:agent-api".into(),
+            sub: scope.agent_id,
+            invocation_id: scope.id,
+            run_id: scope.run_id,
+            thread_id: scope.thread_id,
+            participant_id: scope.participant_id,
+            capabilities: scope.capabilities.clone(),
+            inference: scope.inference.clone(),
+            iat: now,
+            exp: now + 60,
+            lease_epoch: 0,
+            agent_generation: self.configuration()?.agent_generation,
+        };
+        self.sign(&claims)
     }
     /// Ready inference connections, unless the agent or the run's source identity is over budget.
     async fn inference_grants(
@@ -663,13 +689,7 @@ impl Runtime {
             .await;
         claims.iat = chrono::Utc::now().timestamp();
         claims.exp = claims.iat + crate::iam::tokens::TOKEN_TTL_SECONDS;
-        jsonwebtoken::encode(
-            &jsonwebtoken::Header::default(),
-            &claims,
-            &jsonwebtoken::EncodingKey::from_secret(self.signing_key.expose_secret().as_bytes()),
-        )
-        .map(SecretString::from)
-        .map_err(|_| ChatError::Transport)
+        self.sign(&claims)
     }
     pub async fn verified_claims(
         &self,

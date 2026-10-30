@@ -10,6 +10,7 @@ pub mod encryption;
 pub mod iam;
 pub mod identities;
 pub mod inference;
+pub mod memory;
 pub mod prompts;
 pub mod routines;
 pub mod sandboxes;
