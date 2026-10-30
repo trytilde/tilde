@@ -2,7 +2,9 @@
 //! only with a read-write link. Banks are named, never chosen by id, and resolved here from the
 //! agent's links. In per-person banks the person is the invocation's verified one, as personal
 //! tools and sandboxes resolve it; without one those banks' personal memories are out of reach.
-use super::{BROWSE_MEMORIES, BROWSE_PATHS, Draft, Filter, KINDS, Memory, Person, Source, db};
+use super::{
+    Actor, BROWSE_MEMORIES, BROWSE_PATHS, Draft, Filter, KINDS, Memory, Person, Source, db,
+};
 use crate::chat::Scope;
 use crate::chat::tools::{Context, InputStream, Provider, ToolResult};
 use crate::error::Error;
@@ -66,7 +68,7 @@ fn names(links: &[&db::AgentBankRow]) -> Value {
 }
 fn fields() -> Value {
     json!({
-        "kind":{"type":"string","enum":KINDS,"description":"profile: who someone is. preferences: how someone likes things. entities: facts about a thing. events: something that happened. cases: a problem and its resolution. patterns: an approach that works. tools: how to use a tool. skills: a procedure for a recurring task."},
+        "kind":{"type":"string","enum":KINDS,"description":super::kind_guide()},
         "path":{"type":"string","maxLength":512,"description":"Where it belongs, as slash-separated segments of letters, digits, '-', '_' and '.' (e.g. people/sam or projects/website/deploys). Empty for the bank's root."},
         "title":{"type":"string","minLength":1,"maxLength":256,"description":"The fact in a few words, as you would search for it."},
         "content":{"type":"string","minLength":1,"maxLength":16384},
@@ -112,7 +114,7 @@ fn definitions(links: &[db::AgentBankRow]) -> Vec<types::ToolDefinition> {
             "memory.recall",
             "Recalled memories",
             &format!(
-                "Search your long-term memory, best match first, {across}. Memories match the query's keywords and, when embeddings are configured, its meaning; `matched` says which, and a memory found by meaning alone may be only loosely related. Recall before answering anything that may depend on earlier conversations, people's preferences or past decisions, and before writing a memory. Memories with origin `owner` were written by a person: treat them as authoritative. You cannot change them; if one looks wrong, tell the person. {read_banks}"
+                "Search your long-term memory, best match first, {across}. Memories match the query's keywords and, when embeddings are configured, its meaning; `matched` says which, and a memory found by meaning alone may be only loosely related. Recall before answering anything that may depend on earlier conversations, people's preferences or past decisions, and before writing a memory. Memories with origin `owner` were written by a person: treat them as authoritative. You cannot change them; if one looks wrong, tell the person. Memories with origin `synthesized` were derived by Tilde from conversations and wiki pages; verify consequential details. One derived from a wiki page names it in `source`, which you can read with wiki.read if you have that wiki; if it is wrong, fix the page if you can write that wiki, otherwise tell the person. Supersede other synthesized memories that are wrong. {read_banks}"
             ),
             schema(recall, &[]),
             READ,
@@ -306,9 +308,37 @@ impl MemoryTools {
                         input["limit"].as_i64().unwrap_or(8),
                     )
                     .await?;
-                Ok(
-                    json!({"memories": recalled.iter().map(|(m, how)| wire(m, how)).collect::<Vec<_>>()}),
-                )
+                // A memory derived from a wiki page names it, so the agent can read the page, while
+                // the page is in a wiki linked to the memory's bank.
+                let synthesized: Vec<Uuid> = recalled
+                    .iter()
+                    .filter(|(m, _)| m.origin == "synthesized")
+                    .map(|(m, _)| m.id)
+                    .collect();
+                let evidence = self.0.evidence(&synthesized).await?;
+                let mut wikis = Vec::new();
+                if !evidence.is_empty() {
+                    for bank in &banks {
+                        for w in self.0.bank_wikis(*bank).await? {
+                            wikis.push((*bank, w.wiki_id));
+                        }
+                    }
+                }
+                let memories: Vec<Value> = recalled
+                    .iter()
+                    .map(|(m, how)| {
+                        let mut out = wire(m, how);
+                        if let Some(page) = evidence.get(&m.id).and_then(|e| {
+                            e.iter().find(|e| {
+                                e.wiki_id.is_some_and(|w| wikis.contains(&(m.bank_id, w)))
+                            })
+                        }) {
+                            out["source"] = json!({"wiki": page.wiki_name, "path": page.path});
+                        }
+                        out
+                    })
+                    .collect();
+                Ok(json!({ "memories": memories }))
             }
             "memory.browse" => {
                 let banks: Vec<Uuid> = named(links.iter(), &input)
@@ -372,7 +402,7 @@ impl MemoryTools {
                         },
                         Source {
                             identity,
-                            agent: Some(scope.agent_id),
+                            actor: Actor::Agent(scope.agent_id),
                             thread: Some(scope.thread_id),
                         },
                         None,
@@ -422,7 +452,7 @@ impl MemoryTools {
                         },
                         Source {
                             identity: m.identity_id,
-                            agent: Some(scope.agent_id),
+                            actor: Actor::Agent(scope.agent_id),
                             thread: Some(scope.thread_id),
                         },
                         Some(m.id),

@@ -429,13 +429,17 @@ bundled tools out) and its bundled tools.
   with them) and its links in the same transaction; a deleted agent gets no new banks or
   links. A bank's scope is shared (agents see every memory) or per_person.
 - Agent memory bank: a link giving an agent a bank, read or read_write (`agent_memory_banks`).
-  Links are the only way an agent reaches memory; an agent with none has no memory tools.
+  Links are the only way an agent reaches memory; an agent with none has no memory tools. A
+  read-write link may `auto_retain`: the agent's conversations then feed the bank's synthesis (a
+  link no longer read-write stops retaining).
 - Memory: one fact (`memories`): a kind (profile, preferences, entities, events, cases,
   patterns, tools, skills), a path (slash-separated segments organising the bank, '' for its
   root), title, content, an optional time it holds (`valid_during`: [t,t] for a moment, [start,
-  end) for a period that ended, [start,) for an ongoing one) and importance. Its origin is explicit (an agent wrote it) or owner (a person
-  wrote or edited it through management). The `Memory` domain refuses an agent superseding or
-  forgetting an owner memory, whoever calls it. In a per-person bank a memory agents write
+  end) for a period that ended, [start,) for an ongoing one) and importance. Its origin is explicit (an agent wrote it), owner (a person
+  wrote or edited it through management) or synthesized (Tilde derived it from the bank's
+  sources). The writer is a `memory::Actor` (person, agent or synthesizer); the `Memory` domain
+  refuses anyone but a person superseding an owner memory, and an agent forgetting one, whoever
+  calls it. In a per-person bank a memory agents write
   belongs to the verified person the invocation acts for (the root identity, as personal tools
   and sandboxes resolve it); agents see that person's memories and bank-wide ones people wrote
   without a person, and without a verified person cannot write there; only per-person banks
@@ -449,8 +453,9 @@ bundled tools out) and its bundled tools.
   one instead of changing it. Forgetting is a soft delete (`deleted_at`); an agent forgetting
   what it already forgot succeeds, so retries are safe.
 - Revision: every create, supersede, update and forget appends the memory as it then is (kind,
-  path, title, content, validity, importance, origin, person) to `memory_revisions`, with the
-  agent, or none for a person.
+  path, title, content, validity, importance, origin, person) to `memory_revisions`, with its
+  actor (person, agent or synthesizer), the agent when an agent made it and the batch when the
+  synthesizer did (`batch_id`), so a batch's forgets can be found as well as its writes.
 - Recall: reciprocal rank fusion (k=60) of up to two ranked lists of 50 candidates: full text
   (any of the query's words: `plainto_tsquery`'s terms joined with OR as they are, without
   stemming them again, over a generated English `tsvector` weighting title words above content
@@ -483,6 +488,69 @@ bundled tools out) and its bundled tools.
   403, 404, 429, 5xx) the whole batch backs off, exponentially up to an hour. These calls belong to no invocation and
   are not in `inference_requests`.
 
+- Synthesis: a bank's own chat model turning its sources into memories (`memory_synthesis`, on
+  while the row exists: an OpenAI-compatible or Anthropic inference connection, a model,
+  instructions of at most 2000 characters; saving probes the model; clearing it keeps the
+  watermarks). Sources are the conversations of agents linked read-write with `auto_retain`,
+  counted from their newest message when retaining starts (no history backfill; a conversation
+  another agent already retains into the bank keeps its watermark), and the pages of wikis linked
+  to the bank (`memory_bank_wikis`; unlinking one drops its pages' watermarks, and a batch finishing
+  after the unlink sets none, so memories already synthesized from them stay). The synthesis worker, beside the embedding
+  worker, claims the bank that waited longest (`FOR UPDATE SKIP LOCKED`, leased ten minutes) and
+  takes one source part:
+  - a conversation's complete messages after the bank's `(created_at, id)` watermark for it
+    (`memory_synthesis_threads`) and before any message still streaming, at most about 16k tokens
+    (each message cut to 8000 characters), once the conversation is idle (no invocation of the
+    agent pending or running there and its newest message twenty minutes old) or, in a conversation
+    the gateway runs, once about 4k tokens wait; conversations a sidecar runs (`thread_leases`)
+    wait until idle. The last few messages before the watermark are shown as context, without
+    evidence keys (in a per-person bank only agents' and the person's);
+  - or a page's current content (cut to 64k characters) once it has been unchanged for five
+    minutes and its revision is past the bank's watermark for it (`memory_synthesis_pages`). A
+    page synthesized before comes with a line diff from that revision as the batch read it (cut
+    the same way), at most 16k characters (a larger change sends the model to the page whole),
+    and the model is told to record only what changed; one whose title and content did not change
+    only moves the watermark, with no model call. A page deleted since is handled first: its synthesized memories whose whole
+    supersession chain has evidence and all of it from that page are forgotten, without a model
+    call, as a batch of their own, and its watermark goes.
+  Evidence, batches and recall's `source` name a page by its current wiki and path, so a moved
+  page still links; recall gives `source` only while that wiki is linked to the memory's bank.
+  The batch's id is derived from the bank, the source and where the part ends. The model gets the
+  time, the bank's name and description, its instructions, the kinds (`memory::kind_guide`, shared with the tools), the
+  memories derived from the page (for a page) and related memories (the person's in a per-person
+  bank) recalled from a conversation's first, middle and last items, or a page diff's added lines,
+  or the page's title and windows at its start, middle and end, and the source keyed E1, E2…
+  with each message's time. It is told the source is data, not instructions; that a person's
+  statements are their claims and an agent's low-trust unless confirmed or an outcome; and that
+  memories are self-contained, and to keep from a page only what the bank's agents need to recall
+  rather than restating it. It answers in JSON with `write`, `supersede`, `forget` and `noop`
+  operations (decoded as `synthesis::Op`; told to keep at most 20, the most durable; at most 20
+  taken, output capped at 16000 tokens, an answer cut at the cap failing the batch). Tilde drops an operation it cannot read, citing no or
+  foreign evidence, an invalid memory, a supersede of a memory it was not shown, a person's, a
+  replaced one or another person's, or a forget of anything but a synthesized memory derived from
+  the page being read whose whole supersession chain is from that page alone, noting why; it applies the rest (origin `synthesized`, actor
+  `synthesizer`, evidence rows naming the batch, embedding requests) through the same
+  `memory::insert` agents' writes use, with the batch row (`memory_synthesis_batches`: applied
+  with counts and notes, including truncation, failed with the error, or skipped) and the
+  watermark in one transaction. A batch found done only moves the watermark. In a per-person bank
+  a conversation feeds only its verified person (its only active human, verified or attested):
+  other people's messages are left out (noted), and a batch with none of the person's messages, or
+  a conversation with no such person, is recorded as skipped without a model call. Wiki-derived
+  memories are bank-wide. A failure shows its error on the bank. Only a failure the batch's
+  content caused counts against it: an answer that is not JSON or not operations, an answer cut at
+  the output cap, a 413 or 422, or a 400 whose error names the content (context length, content
+  filter; `PostError::content`). Content failures are counted per source start (the bank, the
+  source and its watermark), and the third passes the part over: its batch is recorded skipped, the
+  watermark moves past it and the bank carries on, its failure count kept. Anything else (a connection not ready, network
+  errors and timeouts, 401, 403, 404, 408, 429, 5xx, other 400s, recall or embedding failures)
+  backs the bank off exponentially (`memory::backoff`, shared with embeddings) and passes over
+  nothing, so an outage loses no conversation. Synthesis calls are not in `inference_requests`.
+- Memory evidence: what a synthesized memory was derived from and in which batch
+  (`memory_evidence`): exactly one of a message of a conversation or a page revision (kept by page
+  id, since revisions outlive their page). Memories agents write keep their conversation on
+  `memories` instead. Recall gives agents a wiki-derived memory's `source` (wiki and path), so
+  they can read the page.
+
 Agents use the built-in tools `memory.recall`, `memory.browse` (the paths directly below a path
 with counts, grouped in SQL, and the id, kind, title, date and a 200-character preview of the
 memories at it, each list capped and saying so when cut), `memory.write` and `memory.supersede`
@@ -496,7 +564,8 @@ agent's banks (name, shared or private to the person, the agent's own or not, re
 read-write, description), so an agent with one bank knows it too. One function builds the tools
 from the agent's links, for listing and calling alike. A write's id is the tool call id, so a
 retried call writes once; an existing id with another bank, writer or superseded memory is
-refused. People manage banks, links, memories and settings through `MemoryService`;
+refused. People manage banks, links, memories, settings and synthesis (settings, sources,
+recent batches, run now) through `MemoryService`;
 listing a bank with a query ranks it as recall does, with every person's memories. Recalled
 memories enter a conversation only through these tools: prompts live in agent code, so Tilde
 injects nothing.
@@ -511,8 +580,19 @@ a search with how each was found; filters by kind, origin and, in a per-person b
 (`ListMemoryPeople`: each identity with memories there, named after one of its users). A memory's
 panel shows its validity, origin, writer, the conversation it came from, what it replaced or what
 replaced it (`superseded_by`) and its revisions; people add facts and edit or delete any memory
-(editing an agent's memory is "Take over and edit": it becomes the person's). Settings: name,
-description, linked agents and their access (carried on the bank's `links`), and delete. Every listing reads the
+(editing an agent's memory is "Take over and edit": it becomes the person's); a synthesized
+memory's panel lists its evidence, linking to the conversation (`/agent/$agentId/sessions`) or
+the wiki page, and `?memory=` opens a memory's panel. Settings: name,
+description, linked agents and their access (carried on the bank's `links`), Synthesis
+(`memory-synthesis.tsx`: its state, last error and the conversations and pages waiting (also
+while off), the chat
+model and instructions with Run now and Turn off, a note that each batch is a model call billed to
+the connection, a switch per read-write linked agent for learning from its conversations, the
+wikis it learns from (linking one first confirms its page count: every page is a model call), and
+the latest ten batches linking to their conversation or page (`SourceLink`, shared with the
+evidence panel) and the memories they wrote, listing those they forgot, with what they wrote,
+replaced, forgot and refused and why), and
+delete. Every listing reads the
 `current_memories` view (live and not replaced) and adds its own person filter. An agent's
 Capabilities have a Memory section: on creation a bank of its own (none, one pool or separate per
 person, named after the agent unless renamed; created for the agent and deleted with it, with a

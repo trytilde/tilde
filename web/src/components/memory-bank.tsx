@@ -8,6 +8,7 @@ import { NativeSelect } from "@trytilde/connection-ui";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import {
   MemoryBankScope,
+  MemoryActor,
   MemoryKind,
   MemoryMatch,
   MemoryOperation,
@@ -25,6 +26,7 @@ import { DashboardNavigation, usePageCrumb } from "./dashboard-breadcrumbs";
 import { TildeLoader } from "./loading-screen";
 import { KINDS, SCOPES, scopeOf } from "./memory";
 import { LinkedAgentsTable, OwnerLink } from "./linked-agents";
+import { BankSynthesis, SourceLink } from "./memory-synthesis";
 import { RemoveButton } from "./remove-button";
 import { CatalogSearchField } from "./tool-catalog";
 import { message } from "./tool-connections";
@@ -170,6 +172,13 @@ function BankMemories({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string>();
+  // A link to one memory (from a synthesis batch, say) opens its panel.
+  const wanted = useRouterState({
+    select: (state) => (state.location.search as { memory?: string }).memory,
+  });
+  useEffect(() => {
+    if (wanted) setSelected(wanted);
+  }, [wanted]);
   // The memory being edited; null adds a fact.
   const [editing, setEditing] = useState<Memory | null>();
   const [version, setVersion] = useState(0);
@@ -260,9 +269,10 @@ function BankMemories({
             value={String(origin)}
             onChange={(event) => setOrigin(Number(event.target.value) as MemoryOrigin)}
           >
-            <option value={MemoryOrigin.UNSPECIFIED}>Agents and people</option>
+            <option value={MemoryOrigin.UNSPECIFIED}>Agents, people and synthesis</option>
             <option value={MemoryOrigin.EXPLICIT}>Written by agents</option>
             <option value={MemoryOrigin.OWNER}>Written by people</option>
+            <option value={MemoryOrigin.SYNTHESIZED}>Synthesized</option>
           </NativeSelect>
           {perPerson && (
             <NativeSelect
@@ -315,7 +325,9 @@ function BankMemories({
                   <span>
                     {m.origin === MemoryOrigin.OWNER
                       ? "Written by a person"
-                      : (registry.get(m.writtenByAgentId ?? "")?.name ?? "An agent")}
+                      : m.origin === MemoryOrigin.SYNTHESIZED
+                        ? "Synthesized"
+                        : (registry.get(m.writtenByAgentId ?? "")?.name ?? "An agent")}
                   </span>
                   {m.identityId && <span>For {personName(m.identityId)}</span>}
                 </span>
@@ -468,8 +480,10 @@ function MemoryDetail({
     [
       "Written by",
       m.origin === MemoryOrigin.OWNER
-        ? "A person (agents cannot change it)"
-        : agentName(m.writtenByAgentId),
+        ? "A person (agents and synthesis cannot change it)"
+        : m.origin === MemoryOrigin.SYNTHESIZED
+          ? "Synthesis, from the bank's sources"
+          : agentName(m.writtenByAgentId),
     ],
     ...(m.identityId ? [["For", personName(m.identityId)] as [string, string]] : []),
     ["Embedded", m.embedded ? "Yes" : "Not yet"],
@@ -540,6 +554,23 @@ function MemoryDetail({
             </dd>
           </div>
         )}
+        {m.evidence.length > 0 && (
+          <div className="contents">
+            <dt className="text-muted-foreground">Derived from</dt>
+            <dd>
+              <ul className="space-y-0.5">
+                {m.evidence.map((e, index) => (
+                  <li key={index}>
+                    <SourceLink
+                      source={e}
+                      agentName={(id) => registry.get(id)?.name ?? "an agent"}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
         {m.supersedesId && (
           <div className="contents">
             <dt className="text-muted-foreground">Replaces</dt>
@@ -563,7 +594,12 @@ function MemoryDetail({
             <li key={index} className="text-xs">
               <span className="font-medium">{OPERATIONS[r.operation]}</span>{" "}
               <span className="text-muted-foreground">
-                by {r.agentId ? agentName(r.agentId) : "a person"}
+                by{" "}
+                {r.actor === MemoryActor.SYNTHESIZER
+                  ? "synthesis"
+                  : r.agentId
+                    ? agentName(r.agentId)
+                    : "a person"}
                 {r.at && `, ${formatDistanceToNow(timestampDate(r.at), { addSuffix: true })}`}
               </span>
               {r.operation !== MemoryOperation.FORGET && (
@@ -883,6 +919,7 @@ function BankSettings({
         </div>
       </form>
       <BankAgents bank={bank} registry={registry} onChanged={onSaved} />
+      <BankSynthesis bank={bank} registry={registry} />
       <section className="grid max-w-2xl gap-3 border-t pt-6" aria-label="Delete memory bank">
         <h3 className="text-sm font-medium">Delete memory bank</h3>
         <p className="text-xs text-muted-foreground">

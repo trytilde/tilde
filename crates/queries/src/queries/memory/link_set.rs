@@ -11,7 +11,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO agent_memory_banks(agent_id,bank_id,access) VALUES($1,$2,$3) ON CONFLICT(agent_id,bank_id) DO UPDATE SET access=EXCLUDED.access",
+        "INSERT INTO agent_memory_banks(agent_id,bank_id,access) VALUES($1,$2,$3) ON CONFLICT(agent_id,bank_id) DO UPDATE SET access=EXCLUDED.access, auto_retain=agent_memory_banks.auto_retain AND EXCLUDED.access='read_write'",
         None,
     )
 }

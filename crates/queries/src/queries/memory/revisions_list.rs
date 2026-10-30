@@ -13,6 +13,7 @@ pub struct Record {
     pub importance: f32,
     pub origin: String,
     pub identity_id: Option<uuid::Uuid>,
+    pub actor: String,
     pub agent_id: Option<uuid::Uuid>,
 }
 pub struct RecordBorrowed<'a> {
@@ -27,6 +28,7 @@ pub struct RecordBorrowed<'a> {
     pub importance: f32,
     pub origin: &'a str,
     pub identity_id: Option<uuid::Uuid>,
+    pub actor: &'a str,
     pub agent_id: Option<uuid::Uuid>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
@@ -43,6 +45,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             importance,
             origin,
             identity_id,
+            actor,
             agent_id,
         }: RecordBorrowed<'a>,
     ) -> Self {
@@ -58,6 +61,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             importance,
             origin: origin.into(),
             identity_id,
+            actor: actor.into(),
             agent_id,
         }
     }
@@ -131,7 +135,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT at,operation,kind,path,title,content,lower(valid_during) AS valid_from,upper(valid_during) AS valid_to, importance,origin,identity_id,agent_id FROM memory_revisions WHERE memory_id=$1 ORDER BY id",
+        "SELECT at,operation,kind,path,title,content,lower(valid_during) AS valid_from,upper(valid_during) AS valid_to, importance,origin,identity_id,actor,agent_id FROM memory_revisions WHERE memory_id=$1 ORDER BY id",
         None,
     )
 }
@@ -167,7 +171,8 @@ impl RunStmt {
                         importance: row.try_get(8)?,
                         origin: row.try_get(9)?,
                         identity_id: row.try_get(10)?,
-                        agent_id: row.try_get(11)?,
+                        actor: row.try_get(11)?,
+                        agent_id: row.try_get(12)?,
                     })
                 },
             mapper: |it| Record::from(it),
