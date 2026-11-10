@@ -351,14 +351,7 @@ async fn discovery_never_follows_a_server_to_a_private_address() {
 #[test]
 fn every_catalogue_server_is_a_valid_tool_provider() {
     let providers = tilde::connections::catalog::builtins();
-    for id in [
-        "notion",
-        "linear",
-        "hubspot",
-        "vercel",
-        "twilio-docs",
-        "browserbase",
-    ] {
+    for id in ["notion", "hubspot", "vercel", "twilio-docs", "browserbase"] {
         let provider = providers
             .iter()
             .find(|p| p.id == id)
@@ -374,6 +367,14 @@ fn every_catalogue_server_is_a_valid_tool_provider() {
             .connection_types
             .iter()
             .any(|t| t.id == "mcp_oauth_app" && t.mcp.is_some())
+    );
+    let linear = providers.iter().find(|p| p.id == "linear").unwrap();
+    linear.validate().unwrap();
+    assert!(
+        linear
+            .connection_types
+            .iter()
+            .any(|t| t.id == "mcp_oauth" && t.mcp.is_some())
     );
 }
 
@@ -430,10 +431,9 @@ async fn the_catalog_lists_what_a_provider_offers_before_any_connection() {
         tools.into_iter().map(|t| t.name).collect::<Vec<_>>()
     };
     // Before any connection: what the server lists without credentials, else its snapshot.
-    assert_eq!(
-        names(tools.catalog_tools("linear",).await.unwrap()),
-        ["list_issues"]
-    );
+    // Linear's managed tools are listed beside what its MCP server lists.
+    let linear = names(tools.catalog_tools("linear").await.unwrap());
+    assert!(linear.contains(&"list_issues".into()) && linear.contains(&"get_issue".into()));
     assert!(names(tools.catalog_tools("notion",).await.unwrap()).contains(&"post-search".into()));
     assert_eq!(tools.catalog_tools("google_mail",).await.unwrap().len(), 11);
     // Built-in and MCP-served types of one provider are listed together.
