@@ -5,6 +5,7 @@ use crate::error::Error;
 use std::collections::BTreeMap;
 
 pub mod agentmail;
+pub mod aws;
 pub mod github;
 pub mod google_chat;
 pub mod inference;
@@ -419,6 +420,7 @@ pub(crate) fn runtime(id: &str, type_id: &str) -> &'static dyn runtime::Runtime 
         ("github", "github_app") => &github::Github,
         ("slack", "slack_app") => &slack::Slack,
         ("google_chat", "app") => &google_chat::GoogleChat,
+        ("aws", "oidc") => &aws::AwsOidc,
         ("agentmail", "inbox") => &agentmail::Agentmail,
         ("linq", "account") => &linq::Linq,
         ("whatsapp", "meta") => &whatsapp::Whatsapp,

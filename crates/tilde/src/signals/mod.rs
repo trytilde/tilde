@@ -79,7 +79,7 @@ pub fn source(provider: &str, typ: &str) -> Option<&'static dyn Source> {
         ("whatsapp", "meta") | ("telnyx", "whatsapp") => Some(&whatsapp::Whatsapp),
         ("sentry", "token") => Some(&sentry::Sentry),
         ("linear", "api_key" | "oauth") => Some(&linear::Linear),
-        ("aws", "iam") => Some(&aws::Aws),
+        ("aws", "iam" | "oidc") => Some(&aws::Aws),
         ("firecrawl", "api") => Some(&firecrawl::Firecrawl),
         _ => None,
     }

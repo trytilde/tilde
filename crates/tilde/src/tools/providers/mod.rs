@@ -63,7 +63,8 @@ pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolPro
         ("whatsapp", "meta") => Some(&whatsapp::Whatsapp { telnyx: false }),
         ("telnyx", "whatsapp") => Some(&whatsapp::Whatsapp { telnyx: true }),
         ("e2b", "api") => Some(&e2b::E2b),
-        ("aws", "iam") => Some(&aws::Aws),
+        ("aws", "iam") => Some(&aws::IAM),
+        ("aws", "oidc") => Some(&aws::OIDC),
         ("modal", "api") => Some(&modal::Modal),
         _ => None,
     }
