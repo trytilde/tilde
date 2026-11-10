@@ -594,3 +594,89 @@ async fn linear_tools_read_comment_and_move_issues() {
     fx.close().await;
     graphql.abort();
 }
+
+/// One connection accepts alarm topics from several accounts and regions, so alarms anywhere
+/// in an organisation reach the same agent; each still needs a valid SNS signature.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn alarms_from_two_accounts_and_regions_reach_one_agent() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let sns_origin = format!("http://{}", listener.local_addr().unwrap());
+    let sns_server = tokio::spawn(
+        axum::serve(
+            listener,
+            axum::Router::new().route(
+                "/SimpleNotificationService-test.pem",
+                axum::routing::get(|| async { CERTIFICATE }),
+            ),
+        )
+        .into_future(),
+    );
+    let mut f = fixture(
+        65,
+        Endpoints([("aws_sns".to_owned(), sns_origin.clone())].into()),
+    )
+    .await;
+    let production = "arn:aws:sns:eu-west-1:111111111111:alerts";
+    let payments = "arn:aws:sns:us-east-1:222222222222:payments-alerts";
+    let connection = f
+        .connection(
+            "aws",
+            "oidc",
+            &[
+                ("role_arn", "arn:aws:iam::111111111111:role/tilde"),
+                ("sns_topic_arns", &format!("{production},\n{payments}")),
+            ],
+            &[],
+        )
+        .await;
+    routine(
+        &f,
+        connection,
+        "aws.cloudwatch.alarm.triggered",
+        "Investigate {{ alarm.name }} in {{ alarm.account_id }} ({{ alarm.region }}).",
+        &[],
+    )
+    .await;
+    let certificate = format!("{sns_origin}/SimpleNotificationService-test.pem");
+    for (id, topic, account, region) in [
+        ("m-a", production, "111111111111", "eu-west-1"),
+        ("m-b", payments, "222222222222", "us-east-1"),
+        (
+            "m-c",
+            "arn:aws:sns:us-east-1:333333333333:other",
+            "333333333333",
+            "us-east-1",
+        ),
+    ] {
+        let alarm = json!({
+            "AlarmName": format!("{account}-errors"), "AWSAccountId": account,
+            "NewStateValue": "ALARM", "OldStateValue": "OK", "NewStateReason": "Threshold Crossed",
+            "AlarmArn": format!("arn:aws:cloudwatch:{region}:{account}:alarm:{account}-errors"),
+            "Trigger": {"MetricName": "Errors", "Namespace": "AWS/Lambda", "Dimensions": []},
+        })
+        .to_string();
+        let message = sns(
+            &[
+                ("Type", "Notification"),
+                ("MessageId", id),
+                ("TopicArn", topic),
+                ("Message", &alarm),
+                ("Timestamp", "2026-11-10T08:15:01.000Z"),
+            ],
+            &certificate,
+        );
+        let status = post(&f, connection, &[], &serde_json::to_vec(&message).unwrap()).await;
+        assert_eq!(status, if id == "m-c" { 400 } else { 204 }, "{topic}");
+    }
+    let mut objectives = [f.wake().await.objective, f.wake().await.objective];
+    objectives.sort();
+    assert!(
+        objectives[0].starts_with("Investigate 111111111111-errors in 111111111111 (eu-west-1).")
+    );
+    assert!(
+        objectives[1].starts_with("Investigate 222222222222-errors in 222222222222 (us-east-1).")
+    );
+    f.idle(Duration::from_millis(500)).await;
+    f.close().await;
+    sns_server.abort();
+}
