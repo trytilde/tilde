@@ -35,6 +35,8 @@ hex.workspace = true
 webpki-roots = "0.26"
 # RSA signatures over provider-published X.509 certificates (SNS messages, Google Chat requests).
 ring = "0.17"
+# RSA key generation and signing for the OIDC issuer (`connections::oidc`); already in the tree via rustls.
+aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
 x509-cert = { version = "0.2", default-features = false, features = ["std"] }
 
 client-aws-kms.workspace = true

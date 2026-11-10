@@ -176,6 +176,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         connection_setup_url,
         ingress_url,
     )?;
+    let connections = match config.oidc_issuer_url.clone() {
+        Some(url) => connections.with_oidc_issuer(url),
+        None => connections,
+    };
     connections.seed().await?;
     connections.backfill_tilde().await?;
     connections.recover().await?;

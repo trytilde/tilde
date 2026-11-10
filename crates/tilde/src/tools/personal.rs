@@ -303,6 +303,7 @@ impl Provider for Personal {
                 values: self.0.connections.resolve(target.connection).await?,
                 http: self.0.connections.http.clone(),
                 endpoints: self.0.connections.endpoints.clone(),
+                oidc: Some(self.0.connections.oidc.clone()),
             };
             provider
                 .invoke(&access, context.call_id, &target.tool_name, input)

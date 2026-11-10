@@ -11,6 +11,7 @@ pub mod iam;
 pub mod identities;
 pub mod inference;
 pub mod memory;
+pub mod oidc;
 pub mod prompts;
 pub mod routines;
 pub mod sandboxes;

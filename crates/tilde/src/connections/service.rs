@@ -40,6 +40,8 @@ pub struct Connections {
     pub(crate) public_event_ingress_url: String,
     pub(crate) http: Http,
     pub(crate) endpoints: Endpoints,
+    /// Tilde's OIDC issuer, for connections that federate with a web identity.
+    pub(crate) oidc: super::oidc::Issuer,
     /// Decrypted credentials of recently used connections. Every credential, status or
     /// assignment change notifies `tilde_sidecar_configuration`, which empties it; the TTL
     /// bounds staleness if that listener is down. `SecretString` values zeroize on eviction.
@@ -90,7 +92,13 @@ impl Connections {
                 return Err(invalid("Public URL cannot contain a query"));
             }
         }
+        let oidc = super::oidc::Issuer::new(
+            pool.clone(),
+            crypto.clone(),
+            format!("{}/oidc", public_event_ingress_url.trim_end_matches('/')),
+        );
         Ok(Self {
+            oidc,
             pool,
             crypto,
             public_url: public_url.trim_end_matches('/').into(),
@@ -543,6 +551,7 @@ impl Connections {
                 .instructions(&typ)
                 .iter()
                 .map(|step| (*step).to_owned())
+                .chain(runtime.connection_instructions(self, connection.id, &typ))
                 .collect(),
             provider_name: provider.name.clone(),
             account_name_label: provider
@@ -924,7 +933,17 @@ impl Connections {
             values: self.resolve(id).await?,
             http: self.http.clone(),
             endpoints: self.endpoints.clone(),
+            oidc: Some(self.oidc.clone()),
         })
+    }
+    /// Serves the OIDC issuer at another public URL than the default `{ingress}/oidc`, such as a
+    /// stable domain in front of the ingress. It must still reach the ingress's `/oidc` routes.
+    pub fn with_oidc_issuer(mut self, url: String) -> Self {
+        self.oidc = super::oidc::Issuer::new(self.pool.clone(), self.crypto.clone(), url);
+        self
+    }
+    pub fn oidc(&self) -> &super::oidc::Issuer {
+        &self.oidc
     }
     pub async fn resolve(&self, id: Uuid) -> Result<Values, Error> {
         if let Some(values) = self.cached_credentials(id) {

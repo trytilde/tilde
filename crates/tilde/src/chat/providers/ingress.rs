@@ -54,6 +54,7 @@ struct Webhooks {
 }
 pub fn router(chat: Chat, connections: Connections) -> axum::Router {
     let routines = crate::routines::Routines::new(connections.pool.clone(), chat.clone());
+    let oidc = connections.oidc.clone().router();
     axum::Router::new()
         .route(
             "/connections/webhooks/{connection_id}",
@@ -65,6 +66,7 @@ pub fn router(chat: Chat, connections: Connections) -> axum::Router {
             connections,
             routines,
         })
+        .merge(oidc)
 }
 #[derive(serde::Deserialize)]
 struct Challenge {
@@ -126,6 +128,7 @@ async fn receive(
             values: s.connections.resolve(id).await?,
             http: s.connections.http.clone(),
             endpoints: s.connections.endpoints.clone(),
+            oidc: None,
         };
         // A chat adapter authenticates its provider's deliveries; signal-only providers are
         // authenticated by the signals module.

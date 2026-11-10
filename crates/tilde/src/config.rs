@@ -129,6 +129,10 @@ pub struct Config {
     /// Origin providers deliver webhooks to when it differs from the public URL.
     #[envconfig(from = "ENGINE_INGRESS_PUBLIC_URL")]
     pub ingress_public_url: Option<String>,
+    /// Tilde's OIDC issuer URL for web identity federation (`aws`/`oidc` connections), when it
+    /// differs from `{ingress public URL}/oidc`. It must route to the ingress's `/oidc` paths.
+    #[envconfig(from = "ENGINE_OIDC_ISSUER_URL")]
+    pub oidc_issuer_url: Option<String>,
     /// Origin agent hosts call back when it differs from the public URL.
     #[envconfig(from = "ENGINE_RUNTIME_PUBLIC_URL")]
     pub runtime_public_url: Option<String>,

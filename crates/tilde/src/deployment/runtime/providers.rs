@@ -36,6 +36,7 @@ impl Runtime {
             values,
             http: crate::connections::oauth::Http::new()?,
             endpoints: Default::default(),
+            oidc: None,
         };
         Ok((
             selected.provider_id.clone(),

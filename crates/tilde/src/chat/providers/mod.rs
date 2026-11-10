@@ -35,6 +35,8 @@ pub struct Access {
     pub values: Values,
     pub(crate) http: crate::connections::oauth::Http,
     pub(crate) endpoints: crate::connections::catalog::Endpoints,
+    /// Mints web identity tokens; absent where no gateway holds the issuer (sidecars).
+    pub(crate) oidc: Option<crate::connections::oidc::Issuer>,
 }
 impl Access {
     pub fn secret(&self, key: &str) -> ToolResult<&str> {
@@ -264,6 +266,7 @@ impl Provider for Channels {
                 values: self.connections.resolve(connection).await?,
                 http: self.connections.http.clone(),
                 endpoints: self.connections.endpoints.clone(),
+                oidc: Some(self.connections.oidc.clone()),
             };
             provider.invoke(&access, &context, name, input).await
         })

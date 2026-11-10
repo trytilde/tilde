@@ -11,6 +11,7 @@ pub mod db;
 pub mod dynamic_client;
 pub mod model;
 pub mod oauth;
+pub mod oidc;
 pub mod rpc;
 pub mod service;
 
