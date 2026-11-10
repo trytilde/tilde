@@ -373,8 +373,10 @@ async fn dynamic_channel_catalog_tracks_ready_assignment_without_exporting_crede
     let configured_channels: std::collections::BTreeSet<_> = configured
         .iter()
         .filter(|p| {
-            // The built-in Tilde provider has no third-party transport to cover here.
+            // The built-in Tilde provider has no third-party transport to cover here; Google
+            // Chat's outbound, callback and identity coverage is `tests/google_chat.rs`.
             p.id != "tilde"
+                && p.id != "google_chat"
                 && p.connection_types
                     .iter()
                     .any(|t| t.capabilities.contains(&Capability::Channel))

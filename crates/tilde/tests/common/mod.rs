@@ -370,4 +370,5 @@ pub fn span(
     assert_eq!(spans.len(), 1, "one {name} span");
     spans.remove(0)
 }
+pub mod host;
 pub mod invocation;
