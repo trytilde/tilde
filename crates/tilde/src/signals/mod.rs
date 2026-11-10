@@ -5,10 +5,12 @@
 //! and `summary`).
 //!
 //! Chat adapters authenticate the webhooks of channel providers. Providers without a chat
-//! adapter (Sentry, Firecrawl) are authenticated by [`verify`].
+//! adapter (Sentry, Firecrawl, Linear, AWS) are authenticated by [`verify`].
 mod agentmail;
+mod aws;
 mod firecrawl;
 mod github;
+mod linear;
 mod linq;
 mod sentry;
 mod slack;
@@ -76,18 +78,27 @@ pub fn source(provider: &str, typ: &str) -> Option<&'static dyn Source> {
         ("linq", "account") => Some(&linq::Linq),
         ("whatsapp", "meta") | ("telnyx", "whatsapp") => Some(&whatsapp::Whatsapp),
         ("sentry", "token") => Some(&sentry::Sentry),
+        ("linear", "api_key" | "oauth") => Some(&linear::Linear),
+        ("aws", "iam") => Some(&aws::Aws),
         ("firecrawl", "api") => Some(&firecrawl::Firecrawl),
         _ => None,
     }
 }
 
 /// Authenticates a delivery for a signal-only provider, one no chat adapter verifies.
-pub fn verify(provider: &str, access: &Access, headers: &HeaderMap, body: &[u8]) -> ToolResult<()> {
+pub async fn verify(
+    provider: &str,
+    access: &Access,
+    headers: &HeaderMap,
+    body: &[u8],
+) -> ToolResult<()> {
     use crate::chat::providers::ingress::{header, hmac_verify};
     let (name, key, prefix) = match provider {
         // A Sentry integration signs the exact body with its client secret.
         "sentry" => ("sentry-hook-signature", "client_secret", ""),
         "firecrawl" => ("x-firecrawl-signature", "webhook_secret", "sha256="),
+        "linear" => ("linear-signature", "webhook_secret", ""),
+        "aws" => return aws::verify(access, body).await,
         _ => return Err(ConnectError::not_found("Unknown webhook provider")),
     };
     let signature = header(headers, name)?
@@ -98,7 +109,19 @@ pub fn verify(provider: &str, access: &Access, headers: &HeaderMap, body: &[u8])
     let secret = access
         .secret(key)
         .map_err(|_| ConnectError::unauthenticated("Signals are not configured"))?;
-    hmac_verify(secret.as_bytes(), body, &signature)
+    hmac_verify(secret.as_bytes(), body, &signature)?;
+    if provider == "linear" {
+        // Linear signs `webhookTimestamp` (milliseconds) with the body; a replay older than a
+        // minute is refused, as Linear recommends.
+        let sent = serde_json::from_slice::<Value>(body)
+            .ok()
+            .and_then(|p| p["webhookTimestamp"].as_i64())
+            .ok_or_else(|| ConnectError::unauthenticated("Missing webhook timestamp"))?;
+        if chrono::Utc::now().timestamp_millis().abs_diff(sent) > 60_000 {
+            return Err(ConnectError::unauthenticated("Expired webhook"));
+        }
+    }
+    Ok(())
 }
 
 /// The values a template may name: the signal's data with the common fields beside it.

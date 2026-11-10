@@ -3,6 +3,9 @@
 //! session whose every request is SigV4-signed for `aws-mcp` in us-east-1 with the connection's
 //! IAM credentials. The connection's region reaches the server as `_meta.AWS_REGION`, the
 //! default for operations that name no region.
+//!
+//! The same connection emits CloudWatch alarm signals from an SNS topic's HTTPS subscription
+//! (`signals::aws`); the IAM credentials play no part in that, the accepted topics do.
 use super::ToolProvider;
 use crate::chat::{providers::Access, tools::ToolResult};
 use crate::connections::{categories::CATEGORY_CLOUD_INFRASTRUCTURE, model};
@@ -20,7 +23,7 @@ pub fn definition() -> model::Provider {
         account_name_label: Some("AWS account or role".into()),
         icon_url: Some("/provider-icons/aws.svg".into()),
         instructions: Some(
-            "AWS cloud operations, regional availability, documentation, skills, file transfer, and sandboxed multi-step API execution through the official AWS MCP Server. Requests are authenticated with encrypted AWS IAM credentials and SigV4."
+            "AWS cloud operations, regional availability, documentation, skills, file transfer, and sandboxed multi-step API execution through the official AWS MCP Server. Requests are authenticated with encrypted AWS IAM credentials and SigV4. CloudWatch alarms reach routines as signals through an SNS topic subscribed to this connection's webhook URL."
                 .into(),
         ),
         id: "aws".into(),
@@ -36,10 +39,11 @@ pub fn definition() -> model::Provider {
                     "access_key_id":{"type":"string","title":"Access key ID","minLength":1,"description":"Access key of the IAM principal or temporary session."},
                     "secret_access_key":{"type":"string","title":"Secret access key","minLength":1,"writeOnly":true},
                     "session_token":{"type":"string","title":"Session token","writeOnly":true,"description":"Required when the access key belongs to a temporary session."},
-                    "region":{"type":"string","title":"Default region","default":SIGNING_REGION,"pattern":"^[a-z]{2}(-[a-z]+)+-\\d$","description":"Used by tools when an operation names no region."}
+                    "region":{"type":"string","title":"Default region","default":SIGNING_REGION,"pattern":"^[a-z]{2}(-[a-z]+)+-\\d$","description":"Used by tools when an operation names no region."},
+                    "sns_topic_arns":{"type":"string","title":"Alarm SNS topic ARNs","maxLength":4000,"description":"Optional. To receive CloudWatch alarms as signals, subscribe this connection's webhook URL (HTTPS protocol) to the SNS topics your alarms notify and list those topic ARNs here, separated by commas. Messages from other topics are refused; the subscription is confirmed automatically."}
                 },"required":["access_key_id","secret_access_key"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Signal],
         }],
     }
 }

@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 pub mod agentmail;
 pub mod github;
+pub mod google_chat;
 pub mod inference;
 pub mod linq;
 pub mod slack;
@@ -17,6 +18,7 @@ pub fn builtins() -> Vec<Provider> {
     let mut providers: Vec<Provider> = vec![
         github::definition(),
         slack::definition(),
+        google_chat::definition(),
         agentmail::definition(),
         linq::definition(),
         whatsapp::definition(),
@@ -35,6 +37,7 @@ pub fn builtins() -> Vec<Provider> {
         crate::tools::providers::google::search_console::definition(),
         crate::tools::providers::google::analytics::definition(),
         crate::tools::providers::sentry::definition(),
+        crate::tools::providers::linear::definition(),
         crate::tools::providers::posthog::definition(),
         crate::tools::providers::firecrawl::definition(),
         crate::tools::providers::stripe::definition(),
@@ -415,6 +418,7 @@ pub(crate) fn runtime(id: &str, type_id: &str) -> &'static dyn runtime::Runtime 
     match (id, type_id) {
         ("github", "github_app") => &github::Github,
         ("slack", "slack_app") => &slack::Slack,
+        ("google_chat", "app") => &google_chat::GoogleChat,
         ("agentmail", "inbox") => &agentmail::Agentmail,
         ("linq", "account") => &linq::Linq,
         ("whatsapp", "meta") => &whatsapp::Whatsapp,

@@ -12,6 +12,7 @@ pub mod e2b;
 pub mod firecrawl;
 pub mod github;
 pub mod google;
+pub mod linear;
 pub mod linq;
 pub mod modal;
 pub mod payload;
@@ -51,6 +52,8 @@ pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolPro
         ("github", "github_app" | "oauth") => Some(&github::ACCESS_TOKEN),
         ("github", "pat") => Some(&github::PERSONAL_TOKEN),
         ("slack", "slack_app") => Some(&slack::Slack),
+        ("linear", "api_key") => Some(&linear::API_KEY),
+        ("linear", "oauth") => Some(&linear::OAUTH),
         ("posthog", "api") => Some(&posthog::Posthog),
         ("firecrawl", "api") => Some(&firecrawl::Firecrawl),
         ("stripe", "api") => Some(&stripe::Stripe),

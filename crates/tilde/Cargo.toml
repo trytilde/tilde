@@ -33,6 +33,9 @@ hmac.workspace = true
 sha2.workspace = true
 hex.workspace = true
 webpki-roots = "0.26"
+# RSA signatures over provider-published X.509 certificates (SNS messages, Google Chat requests).
+ring = "0.17"
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
 
 client-aws-kms.workspace = true
 client-aws-config.workspace = true

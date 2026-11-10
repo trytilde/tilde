@@ -3708,6 +3708,7 @@ dependencies = [
  "prost",
  "rand 0.8.8",
  "reqwest",
+ "ring",
  "rotel",
  "rust-embed",
  "rustls",
@@ -3730,6 +3731,7 @@ dependencies = [
  "url",
  "uuid",
  "webpki-roots 0.26.11",
+ "x509-cert",
  "zeroize",
 ]
 

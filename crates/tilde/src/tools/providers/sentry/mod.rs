@@ -70,9 +70,9 @@ pub fn definition() -> model::Provider {
                 id: "token".into(),
                 name: "Sentry auth token".into(),
                 credential_source: model::CredentialSource::Static {
-                    schema: json!({"type":"object","properties":{"auth_token":{"type":"string","title":"Auth token","description":"An organization or personal auth token, e.g. sntrys_...","minLength":1,"writeOnly":true},"client_secret":{"type":"string","title":"Integration client secret","description":"Optional. To receive issue events as signals, create an internal integration with this connection's webhook URL, subscribe it to issue events and paste its client secret here.","writeOnly":true}},"required":["auth_token"],"additionalProperties":false}),
+                    schema: json!({"type":"object","properties":{"auth_token":{"type":"string","title":"Auth token","description":"An organization or personal auth token, e.g. sntrys_...","minLength":1,"writeOnly":true},"client_secret":{"type":"string","title":"Integration client secret","description":"Optional. To receive signals, create an internal integration with this connection's webhook URL, subscribe it to Issue events, turn on Alert Rule Action so alert rules can notify it, and paste its client secret here.","writeOnly":true}},"required":["auth_token"],"additionalProperties":false}),
                 },
-                // Issue webhooks of an internal integration, signed with its client secret.
+                // Issue and alert webhooks of an internal integration, signed with its client secret.
                 capabilities: vec![model::Capability::Tool, model::Capability::Signal],
             },
             model::ConnectionType {

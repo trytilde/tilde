@@ -5,6 +5,7 @@ use crate::proto::tilde::types::v1 as types;
 pub mod agentmail;
 pub(crate) mod files;
 pub mod github;
+pub mod google_chat;
 pub mod ingress;
 pub mod linq;
 pub mod slack;
@@ -111,6 +112,7 @@ pub trait Adapter: Send + Sync {
 pub(crate) fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     match (provider, typ) {
         ("slack", "slack_app") => Some(&slack::Slack),
+        ("google_chat", "app") => Some(&google_chat::GoogleChat),
         ("github", "github_app") => Some(&github::Github),
         ("agentmail", "inbox") => Some(&agentmail::Agentmail),
         ("linq", "account") => Some(&linq::Linq),
