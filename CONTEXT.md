@@ -152,7 +152,9 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   parsed by a shared module (`sandbox_patch`) Modal also uses; Modal, which manages sandboxes
   over its gRPC API and works inside one through its task command router; AWS, which offers a
   fixed snapshot of the official AWS MCP Server's tools and calls it over MCP with every
-  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`.
+  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`; Linear
+  (personal API key or OAuth app) over its GraphQL API: `get_issue`, `search_issues`,
+  `create_comment` and `update_issue_state` (by state name or ID within the issue's team).
 - Tool host: a customer-hosted tool backend. Like an agent host it is never dialed. A
   connected host opens `tilde.tool_host.v1.ToolHostService.Watch` with its token, publishes its
   tools and answers calls through `Respond`; a Lambda host is its function ARN, invoked
@@ -183,8 +185,8 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   prefix, or `api_key` as a query parameter. The curated servers carried over from trytilde/api
   (Notion, Linear, HubSpot, Vercel, Neon, Salesforce, documentation servers and others) are
   built-in providers in `tools/mcp_catalog.rs`, one connection type per way to reach the server;
-  a server of a service Tilde already integrates (Slack, AgentMail, Stripe) joins that provider
-  as `mcp_*` types. Any other server is added by URL as a registered (configured) provider of its
+  a server of a service Tilde already integrates (Slack, AgentMail, Stripe, Linear) joins that
+  provider as `mcp_*` types. Any other server is added by URL as a registered (configured) provider of its
   own: the MCP server is the adapter that lets a registered type declare the tool capability, so
   it is registered like any provider. It is listed on the Remote servers page beside
   tool hosts, not in the catalog, with the same 12-hour health history: every five minutes one
@@ -342,14 +344,24 @@ bundled tools out) and its bundled tools.
   source; registration refuses a mismatch. GitHub App (issues, pull requests, comments, reviews, CI check runs), Slack,
   AgentMail, Linq, WhatsApp (Meta and Telnyx) connections reuse their chat webhook and its
   verification; Sentry auth-token connections (signed with an internal integration's client
-  secret) and Firecrawl connections (signed with the account's webhook secret) have no chat
-  adapter and are verified by `signals::verify`. Their secrets are optional setup fields; without
-  one, deliveries are refused. Signal-capable setups show the connection's webhook URL. Bot
+  secret), Firecrawl connections (signed with the account's webhook secret), Linear connections
+  (`Linear-Signature`, an HMAC of the body with the webhook's signing secret, and a
+  `webhookTimestamp` at most a minute old) and AWS connections (CloudWatch alarms through an SNS
+  HTTPS subscription) have no chat adapter and are verified by `signals::verify`. Their secrets
+  (for AWS, the accepted topic ARNs) are optional setup fields; without one, deliveries are
+  refused. SNS messages are checked against the certificate at `SigningCertURL`, fetched only
+  from `https://sns.<topic region>.amazonaws.com`, with the RSA signature over SNS's canonical
+  string (SHA-1 for SignatureVersion 1, SHA-256 for 2); a valid signature proves SNS, not the
+  customer, so only listed topics are accepted, and their subscription confirmation is answered
+  by visiting its SubscribeURL on the same origin. The exact signal names are listed under
+  "Signal catalog" below. Signal-capable setups show the connection's webhook URL. Bot
   senders on GitHub and Slack emit nothing, so a routine cannot trigger itself.
 - Routine: one agent, a name, a prompt, a thread title, an enabled flag (on at creation, toggled
   from the table) and exactly one trigger:
   a five-field cron schedule evaluated in UTC, or one signal type of one signal-capable
-  connection. Prompt and title are `{{ key }}` templates: a signal's context is its data plus
+  connection, narrowed by up to 20 filters (`routine_filters`): each names a context path and
+  the values it may hold, and all must match (for a list value, any element may; scalars compare
+  as their text, a missing path never matches). Prompt and title are `{{ key }}` templates: a signal's context is its data plus
   `provider_delivery_id`, `signal_type` and `summary`; a cron routine's is `scheduled_at`. A
   missing key renders empty; an empty title uses the routine's name. A deleted (soft-deleted)
   agent's routines no longer fire.
@@ -371,6 +383,38 @@ bundled tools out) and its bundled tools.
   setup then opens the routine on it), and "Scheduled routine". The routine dialog has the
   form on the left and the template variables on the right; template fields show variables as
   inline badges (`components/template-input.tsx`).
+
+### Signal catalog
+
+Exact signal types per provider/connection type, as `ListSignalTypes` returns them. Routine
+templates and filters name paths of a signal's context: its data below plus
+`provider_delivery_id`, `signal_type` and `summary`.
+
+- Linear (`linear`, types `api_key` and `oauth`; webhook secret field `webhook_secret`):
+  `linear.issue.created`, `linear.issue.updated`, `linear.issue.removed`,
+  `linear.comment.created`, `linear.comment.updated`, `linear.comment.removed`. Data:
+  `action`, `url`, `organization_id`, `actor {id,name,email}`, `issue {id, identifier, title,
+  description, url, priority, priority_label, state {name,type}, team {key,name}, labels [names],
+  assignee {id,name,email}}`, `comment {id, body, url, user}` (comment events, else null) and
+  `changed` (updatedFrom keys). Changes by apps or integrations emit nothing.
+- Sentry (`sentry`, type `token`; field `client_secret`): `sentry.issue.created`,
+  `sentry.issue.assigned`, `sentry.issue.resolved`, `sentry.issue.unresolved`,
+  `sentry.issue.archived` (also Sentry's older `ignored`), `sentry.issue.regressed` (an
+  unresolve whose `data.issue.substatus` is `regressed`, emitted beside it),
+  `sentry.alert.triggered` (issue alert rules, resource `event_alert`) and
+  `sentry.metric_alert.critical|warning|resolved`. Data is Sentry's payload as sent
+  (`data.issue.*`, `data.event.*`, `data.triggered_rule`, `data.metric_alert`,
+  `data.description_title`, `data.web_url`).
+- AWS (`aws`, type `iam`; field `sns_topic_arns`, comma-separated): `aws.cloudwatch.alarm.triggered`
+  (new state ALARM), `aws.cloudwatch.alarm.resolved` (OK) and
+  `aws.cloudwatch.alarm.insufficient_data`. Data: `topic_arn`, `message_id` and `alarm {name,
+  description, state, previous_state, reason, changed_at, arn, account_id, region, namespace,
+  metric_name, statistic, comparison, threshold, period, evaluation_periods, dimensions {Name:
+  Value}, ecs_service, ecs_cluster, load_balancer, target_group}`; the last four lift the
+  ServiceName, ClusterName, LoadBalancer and TargetGroup dimensions (metric-math alarms report
+  their first metric).
+- Also: `github.*` (GitHub App), `slack.app_mention` and `slack.message.posted`, AgentMail, Linq,
+  WhatsApp and Firecrawl types in `signals/`.
 
 ## Sandboxes
 
@@ -1372,7 +1416,7 @@ An assignment may be pending credential setup. Tools appear only while the conne
 is ready and assigned; invocation IAM grants still filter the catalog.
 
 Chat adapters live under `chat/providers` for Slack, GitHub, AgentMail, Linq, Meta
-WhatsApp and Telnyx WhatsApp. They own dynamic tool definitions and provider wire
+WhatsApp, Telnyx WhatsApp and Google Chat. They own dynamic tool definitions and provider wire
 formats. Tool names include the connection ID to distinguish multiple accounts. Meta
 read/typing actions are not advertised for Telnyx, and email has no reaction tool.
 Connection credentials resolve through the existing encrypted store and refresh path.
@@ -1435,7 +1479,23 @@ connections together. Neither read needs an additional invocation-state query.
 Development falls back to public `.env.example` defaults; private `.env` and
 `.env.local` override them. Tests use `.env.test` and start local storage when
 using its default endpoint.
-All six chat adapters have isolated outbound/inbound fixture coverage.
+The six original chat adapters have isolated outbound/inbound fixture coverage; Google Chat is
+covered end to end (signed request, agent host wake, reply to a fake Chat API).
+
+A Google Chat app (`google_chat`/`app`) is a Chat API app with an HTTP endpoint (not a
+Workspace add-on) whose endpoint is the connection's webhook URL. Its credentials are the
+JWT-bearer grant of the project's service account (`issuer` = client_email, `private_key`,
+scope `chat.bot`), minting Chat API tokens on refresh, and the Cloud `project_number`: Google
+signs each request with a JWT from `chat@system.gserviceaccount.com` whose audience is that
+number ("Authentication Audience: Project Number"), verified against Chat's published
+certificates. Google delivers space messages only when they @mention the app (or run its slash
+commands) and every DM; the agent sees `argumentText`, the message without the mention. A DM is
+one external thread (`spaces/AAA`), a space thread another (`spaces/AAA/threads/BBB`), which is
+also the `conversation` its `sendMessage` tool replies to; `updateMessage` edits a sent
+message (there is no automatic streaming edit, as with Slack). Senders are their Google email,
+which Google vouches for, so the adapter attests identities: private access allows an added
+email at once. The webhook answers `{}` (no synchronous reply). Attachments are not yet
+ingested.
 
 
 ## RPC audience boundaries
