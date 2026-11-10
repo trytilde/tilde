@@ -288,8 +288,9 @@ pub async fn published(
         sync::{Arc, LazyLock, Mutex},
         time::Instant,
     };
-    static CACHE: LazyLock<Mutex<HashMap<String, (Instant, Arc<String>)>>> =
-        LazyLock::new(Default::default);
+    /// URL to when it was fetched and its body.
+    type Cache = Mutex<HashMap<String, (Instant, Arc<String>)>>;
+    static CACHE: LazyLock<Cache> = LazyLock::new(Default::default);
     if let Some((at, body)) = CACHE.lock().ok().and_then(|c| c.get(url).cloned())
         && at.elapsed() < ttl
     {
