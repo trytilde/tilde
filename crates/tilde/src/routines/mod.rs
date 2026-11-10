@@ -1,7 +1,8 @@
 //! Routines prompt an agent when one trigger fires: a five-field UTC cron schedule, or one signal
 //! type of one signal-capable connection. Every firing starts a run in a new thread; the prompt and
 //! thread title are `{{ key }}` templates rendered against the signal's context (`signals::context`)
-//! or, for a cron routine, `scheduled_at`. `routine_runs` records each firing once per fire key, so
+//! or, for a cron routine, `scheduled_at`. A signal routine may also carry filters on that context
+//! (`alarm.state` is `ALARM`, `issue.team.key` is `ENG` or `OPS`); it fires only when all match. `routine_runs` records each firing once per fire key, so
 //! a redelivered webhook or a second replica claiming the same due time starts nothing.
 //!
 //! Cron routines are claimed and rescheduled in one transaction before they fire, which makes a
@@ -35,8 +36,35 @@ pub enum Trigger {
     Signal {
         connection_id: Uuid,
         signal_type: String,
+        filters: Vec<Filter>,
     },
 }
+/// One condition on a signal's context: the value at `path` (dotted, as templates name it)
+/// equals one of `values`. For a list, any element may; strings compare bare and other scalars
+/// as their JSON text, so `true` and `42` are written as such. A missing path never matches.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Filter {
+    pub path: String,
+    pub values: Vec<String>,
+}
+impl Filter {
+    pub fn matches(&self, context: &serde_json::Value) -> bool {
+        use serde_json::Value;
+        let pointer = format!("/{}", self.path.replace('.', "/"));
+        let text = |value: &Value| match value {
+            Value::String(value) => Some(value.clone()),
+            Value::Null | Value::Array(_) | Value::Object(_) => None,
+            other => Some(other.to_string()),
+        };
+        let allowed = |value: &Value| text(value).is_some_and(|text| self.values.contains(&text));
+        match context.pointer(&pointer) {
+            Some(Value::Array(items)) => items.iter().any(allowed),
+            Some(value) => allowed(value),
+            None => false,
+        }
+    }
+}
+const MAX_FILTERS: usize = 20;
 pub struct Routine {
     pub id: Uuid,
     pub agent_id: Uuid,
@@ -85,21 +113,33 @@ impl Routines {
         Self { pool, chat }
     }
     pub async fn list(&self, agent: Uuid) -> Result<Vec<Routine>, Error> {
-        let rows = db::routine_list_all(&self.pool.get().await?, Some(agent), None).await?;
-        Ok(rows.into_iter().map(routine_model).collect())
+        self.read(Some(agent), None).await
     }
     pub async fn get(&self, id: Uuid) -> Result<Routine, Error> {
-        db::routine_list_all(&self.pool.get().await?, None, Some(id))
+        self.read(None, Some(id))
             .await?
             .into_iter()
             .next()
-            .map(routine_model)
             .ok_or_else(|| Error::Invalid("Routine not found".into()))
+    }
+    async fn read(&self, agent: Option<Uuid>, id: Option<Uuid>) -> Result<Vec<Routine>, Error> {
+        let client = self.pool.get().await?;
+        let rows = db::routine_list_all(&client, agent, id).await?;
+        let ids = rows.iter().map(|r| r.id).collect::<Vec<_>>();
+        let mut filters = filters_by_routine(db::filter_list_all(&client, &ids).await?);
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let routine_filters = filters.remove(&r.id).unwrap_or_default();
+                routine_model(r, routine_filters)
+            })
+            .collect())
     }
     pub async fn create(&self, agent: Uuid, input: RoutineInput) -> Result<Routine, Error> {
         let next = self.validate(&input).await?;
-        let client = self.pool.get().await?;
-        if crate::connections::db::agent_exists_opt(&client, agent)
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        if crate::connections::db::agent_exists_opt(&tx, agent)
             .await?
             .is_none()
         {
@@ -108,7 +148,7 @@ impl Routines {
         let id = Uuid::new_v4();
         let (schedule, connection, signal_type) = columns(&input.trigger);
         db::routine_insert_execute(
-            &client,
+            &tx,
             id,
             agent,
             input.name.trim(),
@@ -121,6 +161,8 @@ impl Routines {
             next,
         )
         .await?;
+        write_filters(&tx, id, &input.trigger).await?;
+        tx.commit().await?;
         drop(client);
         self.get(id).await
     }
@@ -128,8 +170,10 @@ impl Routines {
     pub async fn update(&self, id: Uuid, input: RoutineInput) -> Result<Routine, Error> {
         let next = self.validate(&input).await?;
         let (schedule, connection, signal_type) = columns(&input.trigger);
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
         let updated = db::routine_update_execute(
-            &self.pool.get().await?,
+            &tx,
             id,
             input.name.trim(),
             &input.prompt,
@@ -144,6 +188,9 @@ impl Routines {
         if updated == 0 {
             return Err(Error::Invalid("Routine not found".into()));
         }
+        write_filters(&tx, id, &input.trigger).await?;
+        tx.commit().await?;
+        drop(client);
         self.get(id).await
     }
     pub async fn delete(&self, id: Uuid) -> Result<(), Error> {
@@ -186,7 +233,9 @@ impl Routines {
             Trigger::Signal {
                 connection_id,
                 signal_type,
+                filters,
             } => {
+                validate_filters(filters)?;
                 if !self
                     .signal_source(*connection_id)
                     .await?
@@ -208,17 +257,16 @@ impl Routines {
     pub async fn signal(&self, connection: Uuid, slug: &str, batch: Vec<Signal>) {
         for signal in batch {
             let matches = async {
-                Ok::<_, Error>(
-                    db::routine_signal_matches_all(
-                        &self.pool.get().await?,
-                        connection,
-                        &signal.signal_type,
-                    )
-                    .await?,
-                )
+                let client = self.pool.get().await?;
+                let matches =
+                    db::routine_signal_matches_all(&client, connection, &signal.signal_type)
+                        .await?;
+                let ids = matches.iter().map(|r| r.id).collect::<Vec<_>>();
+                let filters = filters_by_routine(db::filter_list_all(&client, &ids).await?);
+                Ok::<_, Error>((matches, filters))
             }
             .await;
-            let matches = match matches {
+            let (matches, mut filters) = match matches {
                 Ok(matches) => matches,
                 Err(error) => {
                     tracing::warn!(%error, %connection, "Routine signal lookup failed");
@@ -227,6 +275,10 @@ impl Routines {
             };
             let context = signals::context(&signal);
             for r in matches {
+                let routine_filters = filters.remove(&r.id).unwrap_or_default();
+                if !routine_filters.iter().all(|f| f.matches(&context)) {
+                    continue;
+                }
                 let objective = format!(
                     "{}\n\nSignal `{}` from connection `{slug}`: {}\n```json\n{}\n```",
                     cut(signals::render(&r.prompt, &context), PROMPT_BYTES),
@@ -352,16 +404,79 @@ fn columns(trigger: &Trigger) -> (Option<&str>, Option<Uuid>, Option<&str>) {
         Trigger::Signal {
             connection_id,
             signal_type,
+            ..
         } => (None, Some(*connection_id), Some(signal_type)),
     }
 }
-fn routine_model(r: db::RoutineRow) -> Routine {
+fn validate_filters(filters: &[Filter]) -> Result<(), Error> {
+    if filters.len() > MAX_FILTERS {
+        return Err(Error::Invalid("A routine takes at most 20 filters".into()));
+    }
+    for filter in filters {
+        let path = filter.path.trim();
+        if path.is_empty()
+            || path.len() > 200
+            || path.split('.').any(|segment| {
+                segment.is_empty()
+                    || !segment
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            })
+        {
+            return Err(Error::Invalid(
+                "Filter paths are dotted keys such as alarm.state".into(),
+            ));
+        }
+        if filter.values.is_empty()
+            || filter.values.len() > 50
+            || filter.values.iter().any(|v| v.chars().count() > 500)
+        {
+            return Err(Error::Invalid(
+                "Each filter needs 1-50 values of at most 500 characters".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+/// Replaces a routine's filters; a cron trigger leaves it with none.
+async fn write_filters(
+    tx: &crate::database::Transaction<'_>,
+    routine: Uuid,
+    trigger: &Trigger,
+) -> Result<(), Error> {
+    db::filter_clear_execute(tx, routine).await?;
+    if let Trigger::Signal { filters, .. } = trigger {
+        for (position, filter) in filters.iter().enumerate() {
+            db::filter_insert_execute(
+                tx,
+                routine,
+                position as i32,
+                filter.path.trim(),
+                &filter.values,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+fn filters_by_routine(rows: Vec<db::FilterRow>) -> std::collections::HashMap<Uuid, Vec<Filter>> {
+    let mut out = std::collections::HashMap::<Uuid, Vec<Filter>>::new();
+    for row in rows {
+        out.entry(row.routine_id).or_default().push(Filter {
+            path: row.path,
+            values: row.allowed,
+        });
+    }
+    out
+}
+fn routine_model(r: db::RoutineRow, filters: Vec<Filter>) -> Routine {
     let trigger = match (r.schedule, r.connection_id, r.signal_type) {
         (Some(schedule), _, _) => Trigger::Cron { schedule },
         // The table's check constraint guarantees one trigger or the other.
         (None, connection, signal_type) => Trigger::Signal {
             connection_id: connection.unwrap_or_default(),
             signal_type: signal_type.unwrap_or_default(),
+            filters,
         },
     };
     Routine {

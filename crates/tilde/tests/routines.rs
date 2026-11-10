@@ -93,6 +93,7 @@ async fn signals_and_schedules_start_runs_in_new_threads() {
     let signal = |signal_type: &str| Trigger::Signal {
         connection_id: connection,
         signal_type: signal_type.into(),
+        filters: vec![],
     };
     assert!(
         routines
@@ -403,6 +404,7 @@ impl Fixture {
                     trigger: Trigger::Signal {
                         connection_id: connection,
                         signal_type: signal_type.into(),
+                        filters: vec![],
                     },
                 },
             )
@@ -460,6 +462,7 @@ async fn sentry_issue_webhooks_are_signals_verified_by_client_secret() {
                 trigger: Trigger::Signal {
                     connection_id: connection,
                     signal_type: "sentry.issue.created".into(),
+                    filters: vec![],
                 },
             },
         )

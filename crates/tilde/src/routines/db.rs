@@ -125,3 +125,24 @@ pub async fn signal_connection_opt(
 ) -> DbResult<Option<SignalConnectionRow>> {
     Ok(q::signal_connection::run().bind(db, &id).opt().await?)
 }
+pub use q::filter_list::Record as FilterRow;
+pub async fn filter_list_all(
+    db: &impl GenericClient,
+    routines: &[Uuid],
+) -> DbResult<Vec<FilterRow>> {
+    Ok(q::filter_list::run().bind(db, &routines).all().await?)
+}
+pub async fn filter_insert_execute(
+    db: &impl GenericClient,
+    routine: Uuid,
+    position: i32,
+    path: &str,
+    allowed: &[String],
+) -> DbResult<u64> {
+    Ok(q::filter_insert::run()
+        .bind(db, &routine, &position, &path, &allowed)
+        .await?)
+}
+pub async fn filter_clear_execute(db: &impl GenericClient, routine: Uuid) -> DbResult<u64> {
+    Ok(q::filter_clear::run().bind(db, &routine).await?)
+}

@@ -1,5 +1,5 @@
 //! Management surface for an agent's routines.
-use super::{Routine, RoutineInput, Routines, Trigger};
+use super::{Filter, Routine, RoutineInput, Routines, Trigger};
 use crate::error::Error;
 use crate::proto::tilde::management::v1 as management;
 use crate::services::tilde::management::v1::RoutineService;
@@ -33,6 +33,14 @@ fn trigger_model(trigger: Option<&management::RoutineTrigger>) -> Result<Trigger
         Some(Kind::Signal(signal)) => Ok(Trigger::Signal {
             connection_id: id(&signal.connection_id)?,
             signal_type: signal.signal_type.clone(),
+            filters: signal
+                .filters
+                .iter()
+                .map(|f| Filter {
+                    path: f.key.clone(),
+                    values: f.values.clone(),
+                })
+                .collect(),
         }),
         None => Err(Error::Invalid(
             "A routine needs a cron or a signal trigger".into(),
@@ -56,9 +64,18 @@ fn routine_wire(r: Routine) -> management::Routine {
                 Trigger::Signal {
                     connection_id,
                     signal_type,
+                    filters,
                 } => Kind::Signal(Box::new(management::SignalTrigger {
                     connection_id: connection_id.to_string(),
                     signal_type,
+                    filters: filters
+                        .into_iter()
+                        .map(|f| management::SignalFilter {
+                            key: f.path,
+                            values: f.values,
+                            ..Default::default()
+                        })
+                        .collect(),
                     ..Default::default()
                 })),
             }),

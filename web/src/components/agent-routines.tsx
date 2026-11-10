@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Link } from "@tanstack/react-router";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
-import { CableIcon, ChevronDownIcon, ClockIcon, PencilIcon, PlusIcon, ZapIcon } from "lucide-react";
+import {
+  CableIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  PencilIcon,
+  PlusIcon,
+  XIcon,
+  ZapIcon,
+} from "lucide-react";
 import type {
   Routine,
   SignalType,
@@ -440,6 +448,8 @@ type RoutineForm = {
   schedule: string;
   connectionId: string;
   signalType: string;
+  /** Values are edited as one comma-separated list per filter. */
+  filters: { key: string; values: string }[];
 };
 type TemplateField = "prompt" | "threadTitle";
 
@@ -481,8 +491,13 @@ function RoutineDialog({
             ? editing.connectionId
             : "",
       signalType: trigger?.case === "signal" ? trigger.value.signalType : "",
+      filters:
+        trigger?.case === "signal"
+          ? trigger.value.filters.map((f) => ({ key: f.key, values: f.values.join(", ") }))
+          : [],
     },
   });
+  const filters = useFieldArray({ control: form.control, name: "filters" });
   const { errors, isSubmitting } = form.formState;
   const connectionId = form.watch("connectionId");
   const signalType = form.watch("signalType");
@@ -540,7 +555,17 @@ function RoutineDialog({
             ? { case: "cron" as const, value: { schedule: values.schedule.trim() } }
             : {
                 case: "signal" as const,
-                value: { connectionId: values.connectionId, signalType: values.signalType },
+                value: {
+                  connectionId: values.connectionId,
+                  signalType: values.signalType,
+                  filters: values.filters.map((f) => ({
+                    key: f.key.trim(),
+                    values: f.values
+                      .split(",")
+                      .map((v) => v.trim())
+                      .filter(Boolean),
+                  })),
+                },
               },
       },
     };
@@ -690,6 +715,60 @@ function RoutineDialog({
                       {errors.connectionId?.message ?? errors.signalType?.message}
                     </p>
                   )}
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label>Only when</Label>
+                    <datalist id="routine-filter-keys">
+                      {signalVariables.map((v) => (
+                        <option key={v.key} value={v.key} />
+                      ))}
+                    </datalist>
+                    {filters.fields.map((field, index) => (
+                      <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <Input
+                          aria-label="Variable"
+                          className="font-mono"
+                          list="routine-filter-keys"
+                          placeholder="alarm.state"
+                          aria-invalid={!!errors.filters?.[index]?.key}
+                          {...form.register(`filters.${index}.key`, {
+                            validate: required("a variable"),
+                          })}
+                        />
+                        <Input
+                          aria-label="Is one of"
+                          placeholder="ALARM, OK"
+                          aria-invalid={!!errors.filters?.[index]?.values}
+                          {...form.register(`filters.${index}.values`, {
+                            validate: required("one or more values"),
+                          })}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Remove filter"
+                          onClick={() => filters.remove(index)}
+                        >
+                          <XIcon />
+                        </Button>
+                      </div>
+                    ))}
+                    <p className="m-0 text-xs text-muted-foreground">
+                      {filters.fields.length === 0
+                        ? "Every signal of this type starts a run."
+                        : "Runs start only when each variable equals one of its comma-separated values; for a list, any item may."}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="justify-self-start"
+                      disabled={filters.fields.length >= 20}
+                      onClick={() => filters.append({ key: "", values: "" })}
+                    >
+                      <PlusIcon /> Add filter
+                    </Button>
+                  </div>
                 </div>
               )}
               <div className="grid gap-2">
