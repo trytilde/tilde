@@ -1,0 +1,3 @@
+kind: Added
+body: AWS connections reach other accounts through assumed roles (assume_role_arns, external_id, an account_id argument on every AWS tool and aws_list_accounts), and a new oidc connection type federates with Tilde's own OpenID Connect issuer (ENGINE_OIDC_ISSUER_URL, discovery and JWKS under /oidc) instead of access keys.
+time: 2026-11-10T18:00:00.000000+01:00

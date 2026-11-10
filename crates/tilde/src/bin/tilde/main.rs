@@ -170,16 +170,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         origins.push(url::Url::parse(value)?.origin().ascii_serialization());
     }
     let boundary = network::Boundary::new(address, config.allow_network, origins)?;
+    let default_issuer = format!("{}/oidc", ingress_url.trim_end_matches('/'));
     let connections = tilde::connections::service::Connections::new(
         pool.clone(),
         encryption.clone(),
         connection_setup_url,
         ingress_url,
     )?;
-    let connections = match config.oidc_issuer_url.clone() {
-        Some(url) => connections.with_oidc_issuer(url),
-        None => connections,
-    };
+    // One issuer and key set for the registry; connections are one consumer of it.
+    let oidc = tilde::oidc::Issuer::new(
+        pool.clone(),
+        encryption.clone(),
+        config.oidc_issuer_url.clone().unwrap_or(default_issuer),
+    );
+    let connections = connections.with_oidc_issuer(oidc);
     connections.seed().await?;
     connections.backfill_tilde().await?;
     connections.recover().await?;

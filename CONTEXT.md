@@ -132,6 +132,37 @@ account identity. An inference assignment may carry an alias, unique per agent a
 provider id; the agent can call `ctx.inference("fast")` instead of the slug, and the route
 resolves the alias from the same in-memory map (gateway loader or sidecar configuration).
 
+### OIDC issuer
+
+The registry has one OpenID Connect issuer and one signing key set (`crate::oidc`), independent
+of any provider; components mint tokens from it for a relying party by subject and audience. Its
+only consumer so far is workload federation from connections (subject `connection:<id>`); the
+subjects of people and agents are not defined yet.
+The issuer URL is `ENGINE_OIDC_ISSUER_URL`, by default the event ingress origin plus `/oidc`;
+the ingress serves `/oidc/.well-known/openid-configuration` and `/oidc/jwks`, so a custom issuer
+must route to those paths over HTTPS. Tokens are RS256 JWTs valid for five minutes with `iss` the
+issuer, `aud` the relying party (`sts.amazonaws.com` for AWS) and `sub` chosen by the consumer
+(`connection:<connection id>` for connections). Signing keys are 2048-bit RSA (aws-lc-rs), generated on first use, sealed by the encryption
+crate (`oidc_signing_keys`, binding `oidc_signing_key`/kid/`private_key`); the newest signs, a key
+older than 30 days is replaced at the next signing (`Issuer::rotate` forces it), and superseded
+keys stay in the JWKS until they are 37 days old.
+
+For an `aws`/`oidc` connection the operator, once per account: adds an IAM OpenID Connect
+provider with the issuer URL and audience `sts.amazonaws.com` (AWS trusts the issuer's public CA;
+the console's Get thumbprint fills a thumbprint if asked), then gives the connection's role this
+trust policy (the setup page shows it with the real issuer and connection ID):
+
+```json
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+ "Principal":{"Federated":"arn:aws:iam::<ACCOUNT_ID>:oidc-provider/<issuer host and path>"},
+ "Action":"sts:AssumeRoleWithWebIdentity",
+ "Condition":{"StringEquals":{"<issuer host and path>:aud":"sts.amazonaws.com",
+  "<issuer host and path>:sub":"connection:<connection id>"}}}]}
+```
+
+Roles in other accounts (`assume_role_arns`) trust the connection's role (or IAM user) as an AWS
+principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
+
 ## Tools
 
 - Tool capability: a connection type's declaration that its provider ships tools. Unlike
@@ -152,7 +183,14 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   parsed by a shared module (`sandbox_patch`) Modal also uses; Modal, which manages sandboxes
   over its gRPC API and works inside one through its task command router; AWS, which offers a
   fixed snapshot of the official AWS MCP Server's tools and calls it over MCP with every
-  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`; Linear
+  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`. An AWS connection
+  is IAM access keys (`iam`) or a role federated with Tilde's OIDC issuer (`oidc`, no keys:
+  `AssumeRoleWithWebIdentity` into `role_arn`). Either may list roles in other accounts
+  (`assume_role_arns`, optional `external_id`): every AWS tool takes an optional `account_id`, and
+  a call naming a listed role's account runs with `sts:AssumeRole` credentials (session
+  `tilde-<connection id>`), cached until five minutes before they expire; an unlisted account is
+  refused, and `aws_list_accounts` names the reachable ones. Several AWS connections (one per
+  account) are simply several tool sources (`aws_prod.*`, `aws_staging.*`); Linear
   (personal API key or OAuth app) over its GraphQL API: `get_issue`, `search_issues`,
   `create_comment` and `update_issue_state` (by state name or ID within the issue's team).
 - Tool host: a customer-hosted tool backend. Like an agent host it is never dialed. A
@@ -405,7 +443,8 @@ templates and filters name paths of a signal's context: its data below plus
   `sentry.metric_alert.critical|warning|resolved`. Data is Sentry's payload as sent
   (`data.issue.*`, `data.event.*`, `data.triggered_rule`, `data.metric_alert`,
   `data.description_title`, `data.web_url`).
-- AWS (`aws`, type `iam`; field `sns_topic_arns`, comma-separated): `aws.cloudwatch.alarm.triggered`
+- AWS (`aws`, types `iam` and `oidc`; field `sns_topic_arns`, comma-separated, any number of
+  accounts and regions in one connection): `aws.cloudwatch.alarm.triggered`
   (new state ALARM), `aws.cloudwatch.alarm.resolved` (OK) and
   `aws.cloudwatch.alarm.insufficient_data`. Data: `topic_arn`, `message_id` and `alarm {name,
   description, state, previous_state, reason, changed_at, arn, account_id, region, namespace,

@@ -1,11 +1,14 @@
-//! Tilde as an OpenID Connect identity provider, so a connection can federate into a cloud
-//! account without long-lived keys (`aws`/`oidc`: STS `AssumeRoleWithWebIdentity`).
+//! The registry's OpenID Connect issuer: one issuer URL and one signing key set, from which any
+//! Tilde component mints tokens for a relying party. Today its only consumer is workload
+//! federation from connections (`aws`/`oidc`: audience `sts.amazonaws.com`, subject
+//! `connection:<connection id>`); subjects for people and agents are not defined yet. Claims and
+//! key storage are not tied to any consumer: [`Issuer::mint`] takes the subject and audience.
 //!
 //! The issuer is a public URL (`ENGINE_OIDC_ISSUER_URL`, by default the event ingress origin
 //! plus `/oidc`) that serves the discovery document at `{issuer}/.well-known/openid-configuration`
 //! and the JWKS at `{issuer}/jwks`; both routes live on the public event ingress under `/oidc`,
 //! so a custom issuer URL must reach those paths. Tokens are RS256 JWTs for one audience, valid
-//! for five minutes, whose subject names the connection (`connection:<id>`).
+//! for five minutes.
 //!
 //! Signing keys are 2048-bit RSA, generated on first use, sealed by the encryption crate and
 //! stored in `oidc_signing_keys`. The newest key signs. A key older than [`ROTATE_DAYS`] is

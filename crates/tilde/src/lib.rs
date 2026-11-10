@@ -11,6 +11,7 @@ pub mod deployment;
 pub mod encryption;
 pub mod error;
 pub mod network;
+pub mod oidc;
 pub mod pricing;
 
 pub mod chat;

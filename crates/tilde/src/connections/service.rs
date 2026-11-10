@@ -40,8 +40,8 @@ pub struct Connections {
     pub(crate) public_event_ingress_url: String,
     pub(crate) http: Http,
     pub(crate) endpoints: Endpoints,
-    /// Tilde's OIDC issuer, for connections that federate with a web identity.
-    pub(crate) oidc: super::oidc::Issuer,
+    /// The registry's OIDC issuer; connections federating with a web identity mint from it.
+    pub(crate) oidc: crate::oidc::Issuer,
     /// Decrypted credentials of recently used connections. Every credential, status or
     /// assignment change notifies `tilde_sidecar_configuration`, which empties it; the TTL
     /// bounds staleness if that listener is down. `SecretString` values zeroize on eviction.
@@ -92,7 +92,7 @@ impl Connections {
                 return Err(invalid("Public URL cannot contain a query"));
             }
         }
-        let oidc = super::oidc::Issuer::new(
+        let oidc = crate::oidc::Issuer::new(
             pool.clone(),
             crypto.clone(),
             format!("{}/oidc", public_event_ingress_url.trim_end_matches('/')),
@@ -936,13 +936,13 @@ impl Connections {
             oidc: Some(self.oidc.clone()),
         })
     }
-    /// Serves the OIDC issuer at another public URL than the default `{ingress}/oidc`, such as a
-    /// stable domain in front of the ingress. It must still reach the ingress's `/oidc` routes.
-    pub fn with_oidc_issuer(mut self, url: String) -> Self {
-        self.oidc = super::oidc::Issuer::new(self.pool.clone(), self.crypto.clone(), url);
+    /// Uses the registry's issuer (`crate::oidc`) instead of the default one at
+    /// `{ingress}/oidc`; connections are one of its consumers.
+    pub fn with_oidc_issuer(mut self, issuer: crate::oidc::Issuer) -> Self {
+        self.oidc = issuer;
         self
     }
-    pub fn oidc(&self) -> &super::oidc::Issuer {
+    pub fn oidc(&self) -> &crate::oidc::Issuer {
         &self.oidc
     }
     pub async fn resolve(&self, id: Uuid) -> Result<Values, Error> {

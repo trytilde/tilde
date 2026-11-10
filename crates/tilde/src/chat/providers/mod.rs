@@ -36,7 +36,7 @@ pub struct Access {
     pub(crate) http: crate::connections::oauth::Http,
     pub(crate) endpoints: crate::connections::catalog::Endpoints,
     /// Mints web identity tokens; absent where no gateway holds the issuer (sidecars).
-    pub(crate) oidc: Option<crate::connections::oidc::Issuer>,
+    pub(crate) oidc: Option<crate::oidc::Issuer>,
 }
 impl Access {
     pub fn secret(&self, key: &str) -> ToolResult<&str> {
