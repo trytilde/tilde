@@ -36,7 +36,8 @@ function Github() {
             </Button>
           </div>
         </div>
-      ) : (
+      ) : step === "github_create" || step === "github_existing" ? (
+        // Only a step's own fields are registered: `register` runs even while `Page` hides them.
         <Form setup={setup} form={form}>
           {step === "github_create" ? (
             <>
@@ -56,7 +57,8 @@ function Github() {
                   Organization
                   <Input
                     required
-                    pattern="[A-Za-z0-9-]+"
+                    pattern="[A-Za-z0-9\-]+"
+                    title="Letters, numbers and hyphens"
                     {...form.register("account", { required: true })}
                   />
                 </Label>
@@ -96,7 +98,7 @@ function Github() {
             </>
           )}
         </Form>
-      )}
+      ) : null}
     </Page>
   );
 }

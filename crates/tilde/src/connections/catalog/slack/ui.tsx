@@ -33,7 +33,8 @@ function Slack() {
             </Button>
           </div>
         </div>
-      ) : (
+      ) : step === "slack_create" || step === "slack_existing" ? (
+        // Only a step's own fields are registered: `register` runs even while `Page` hides them.
         <Form setup={setup} form={form}>
           {step === "slack_create" ? (
             <>
@@ -92,7 +93,7 @@ function Slack() {
             </>
           )}
         </Form>
-      )}
+      ) : null}
     </Page>
   );
 }

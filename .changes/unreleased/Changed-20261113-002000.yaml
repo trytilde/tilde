@@ -1,0 +1,3 @@
+kind: Changed
+body: "Connection setup forms: `Form` from `@trytilde/connection-ui` validates only the fields it renders and shows every validation failure in the page instead of relying on browser bubbles, which sandboxed setup frames can hide. The GitHub App and Slack app pages register only the current step's fields, so Continue on \"Create an app\" no longer does nothing, and the GitHub organization pattern is valid under the `v` regex flag."
+time: 2026-11-13T00:20:00.000000+00:00
