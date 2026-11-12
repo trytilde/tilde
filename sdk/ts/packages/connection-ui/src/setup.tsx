@@ -3,10 +3,10 @@ import { LoadingReveal } from "./loading-reveal.js";
 import { ProviderPage } from "./provider-page.js";
 import { Input } from "./components/input.js";
 import { Label } from "./components/controls.js";
-import { useForm, FormProvider, type UseFormReturn } from "react-hook-form";
+import { useForm, FormProvider, type FieldErrors, type UseFormReturn } from "react-hook-form";
 import type { SetupValues } from "@trytilde/sdk/connection-setup";
 import { Button, buttonVariants } from "./components/button.js";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
 
@@ -232,25 +232,64 @@ export function Form({
   children: ReactNode;
   onSubmit?: (values: SetupValues) => Promise<unknown>;
 }) {
+  const [issues, setIssues] = useState<string[]>([]);
+  async function send(values: SetupValues) {
+    setIssues([]);
+    const input = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
+    // Reset only this form's credential fields; the associated account-name field keeps its value.
+    form.reset(
+      Object.fromEntries(
+        Object.keys(values).map((key) => [key, form.formState.defaultValues?.[key] ?? ""]),
+      ),
+    );
+    await (onSubmit ? onSubmit(values) : setup.submit(input));
+  }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const controls = [...event.currentTarget.elements] as HTMLInputElement[];
+    // Native constraints (required, pattern, type) are reported here rather than by the browser:
+    // sandboxed provider frames can swallow validation bubbles, leaving Continue doing nothing.
+    const invalid = controls.filter((control) => control.willValidate && !control.validity.valid);
+    if (invalid.length) {
+      setIssues(invalid.map((control) => `${label(control)}: ${control.validationMessage}`));
+      invalid[0].focus();
+      return;
+    }
+    const rendered = new Set(controls.map((control) => control.name).filter(Boolean));
+    const report = (errors: FieldErrors<SetupValues>) =>
+      setIssues(
+        Object.entries(errors).map(([name, error]) => {
+          const control = controls.find((control) => control.name === name);
+          const message =
+            error?.message ||
+            (error?.type === "required" ? "This field is required" : "This value is invalid");
+          return `${control ? label(control) : name}: ${message}`;
+        }),
+      );
+    void form.handleSubmit(send, (errors) => {
+      // `register()` runs while a page renders, even for steps `Page` is not showing, so a page
+      // can hold rules for fields the person cannot see or fill. Only rendered fields count; the
+      // provider still validates every submitted value on the server.
+      const hidden = Object.keys(errors).filter((name) => !rendered.has(name));
+      if (!hidden.length) return report(errors);
+      form.unregister(hidden);
+      void form.handleSubmit(send, report)();
+    })();
+  }
   return (
     <FormProvider {...form}>
-      <form
-        id={setup.formId}
-        className="space-y-4"
-        onSubmit={form.handleSubmit(async (values) => {
-          const input = Object.fromEntries(
-            Object.entries(values).filter(([, value]) => value !== ""),
-          );
-          // Reset only this form's credential fields; the associated account-name field keeps its value.
-          form.reset(
-            Object.fromEntries(
-              Object.keys(values).map((key) => [key, form.formState.defaultValues?.[key] ?? ""]),
-            ),
-          );
-          await (onSubmit ? onSubmit(values) : setup.submit(input));
-        })}
-      >
+      <form id={setup.formId} className="space-y-4" noValidate onSubmit={submit}>
         {children}
+        {!!issues.length && (
+          <div role="alert" className="text-sm text-destructive">
+            <p>Check these fields:</p>
+            <ul className="list-disc pl-5">
+              {issues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex justify-end">
           <Button
             type="submit"
@@ -264,6 +303,15 @@ export function Form({
       </form>
     </FormProvider>
   );
+}
+/** A control's visible label text, without the text of the control itself (select options). */
+function label(control: HTMLInputElement) {
+  const text = [...(control.labels?.[0]?.childNodes ?? [])]
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent)
+    .join("")
+    .trim();
+  return text || control.getAttribute("aria-label") || control.name;
 }
 export function mount(App: () => ReactNode) {
   createRoot(document.getElementById("root")!).render(<App />);
