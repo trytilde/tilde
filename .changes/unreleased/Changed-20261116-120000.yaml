@@ -1,3 +1,0 @@
-kind: Changed
-body: Tilde is now licensed under AGPL-3.0-only. The client SDKs (TypeScript and Python), `proto/` and `tilde-contracts` stay Apache-2.0; the CLI follows the gateway (AGPL-3.0-only). Releases before this one remain available under Apache-2.0.
-time: 2026-11-16T12:00:00.000000+00:00
