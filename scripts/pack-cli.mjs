@@ -60,7 +60,7 @@ for (const target of targets) {
         name: `@trytilde/cli-${target.npm}`,
         version,
         description: `Tilde CLI binary for ${target.os} ${target.cpu}`,
-        license: "Apache-2.0",
+        license: "AGPL-3.0-only",
         repository: {
           type: "git",
           url: "https://github.com/trytilde/tilde",
