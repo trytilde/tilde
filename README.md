@@ -118,6 +118,8 @@ task check   # Generated code, formatting, lint and Clippy
 
 ## Open source vs. paid
 
-This repository is available under the [Apache 2.0 license](LICENSE).
+Tilde is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only): the gateway, CLI and web UI. If you run a modified Tilde as a network service, you must offer its source to that service's users.
+
+The client SDKs and contracts stay under the [Apache 2.0 license](sdk/LICENSE), so you can use them in proprietary applications: everything under `sdk/` (except the CLI package and `agent-avatar`, which is MIT), `proto/` and `crates/tilde-contracts`. Releases before 4.0.0 remain available under Apache 2.0.
 
 [Tilde Cloud and Tilde Enterprise](https://trytilde.ai/docs/editions) add operator sign-in through your identity provider, roles and groups, management API keys, and, in Tilde Cloud, Tilde's managed OAuth apps for tools. Tilde Enterprise runs in your own infrastructure with our support.

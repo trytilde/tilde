@@ -21,6 +21,8 @@ Tilde's goal is to be the ubiqutous harness for AI agents. We want to focus on a
 - Never assume backwards compatability, always ask first. if not eneded, assume no consumers. drop fields from interfaces and contracts or sql tables
 - keep docs folder clean, only add docs to the folder when asked. if required to share conext to subagents, then delete them after. document in code in the relevant files.
 
+- Licensing: the repository is AGPL-3.0-only; `sdk/` (except `sdk/ts/packages/cli`, `sdk/py/packages/tilde-cli` and MIT `agent-avatar`), `proto/` and `crates/tilde-contracts` are Apache-2.0 so applications can embed them. New SDK packages get the Apache `LICENSE` and `"license": "Apache-2.0"`; anything ported from Tilde Cloud keeps these licences.
+
 # Don'ts
 
 - dont overload or use package.json for script, prefer TaskFile for dev scripts. If too complicated, use bash scripts in scripts folder for more complicated orchestration that taskfile must call

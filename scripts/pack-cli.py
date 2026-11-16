@@ -26,7 +26,7 @@ METADATA = """Metadata-Version: 2.1
 Name: trytilde-cli
 Version: {version}
 Summary: {summary}
-License: Apache-2.0
+License: AGPL-3.0-only
 Project-URL: Homepage, https://trytilde.ai
 Project-URL: Source, https://github.com/trytilde/tilde
 Requires-Python: >=3.9
