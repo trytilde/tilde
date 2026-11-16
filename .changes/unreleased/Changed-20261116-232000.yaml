@@ -1,3 +1,3 @@
 kind: Changed
-body: '`@trytilde/chat-ui` now has the Dispatch (openbot) chat look: grouped grey and black bubbles, day separators, a header with the agent avatar, a find bar, a floating pill composer and queue, hover Reply and Copy, and session rows with agent avatars, unread dots and a ⌘K search, in light and dark. The `--tc-*` CSS variables are replaced by Dispatch''s palette variables.'
+body: "`@trytilde/chat-ui` now has the Dispatch (openbot) chat look: grouped grey and black bubbles, day separators, a header with the agent avatar, a find bar, a floating pill composer and queue, hover Reply and Copy, and session rows with agent avatars, unread dots and a ⌘K search, in light and dark. The `--tc-*` CSS variables are replaced by Dispatch's palette variables."
 time: 2026-11-16T23:20:00.000000+00:00
