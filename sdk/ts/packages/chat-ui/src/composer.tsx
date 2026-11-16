@@ -1,6 +1,6 @@
-// Adapted from trytilde/dispatch packages/ui. See ../LICENSE.dispatch.
+// From trytilde/dispatch packages/ui/src/chat-composer.tsx (a655a4f). See ../LICENSE.dispatch.
+// A textarea stands in for Dispatch's TipTap markdown input; replies render above the dock.
 "use client";
-import { Button, Textarea } from "@trytilde/connection-ui";
 import {
   useEffect,
   useRef,
@@ -11,7 +11,8 @@ import {
   type FormEventHandler,
   type RefObject,
 } from "react";
-import { PlusIcon, ReplyIcon, SendIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
+import { PlusIcon, SendIcon } from "./dispatch/icons.js";
 
 export interface ComposerAttachment {
   id: string;
@@ -24,11 +25,6 @@ export interface ComposerAttachment {
   previewUrl?: string;
 }
 
-export interface ComposerReply {
-  label: string;
-  text: string;
-}
-
 export interface ChatComposerProps {
   agentAvailable: boolean;
   busy: boolean;
@@ -37,7 +33,6 @@ export interface ChatComposerProps {
   expanded: boolean;
   draft: string;
   error?: string;
-  reply?: ComposerReply;
   attachments: readonly ComposerAttachment[];
   inputRef: RefObject<HTMLTextAreaElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -48,7 +43,6 @@ export interface ChatComposerProps {
   onDragStateChange: (active: boolean) => void;
   onFilesAdded: (files: FileList) => void;
   onRemoveAttachment: (id: string) => void;
-  onCancelReply: () => void;
   onStop: () => void;
 }
 
@@ -76,7 +70,6 @@ export function ChatComposer({
   expanded,
   draft,
   error = "",
-  reply,
   attachments,
   inputRef,
   fileInputRef,
@@ -87,7 +80,6 @@ export function ChatComposer({
   onDragStateChange,
   onFilesAdded,
   onRemoveAttachment,
-  onCancelReply,
   onStop,
 }: ChatComposerProps) {
   const hasContent = Boolean(draft.trim() || attachments.length);
@@ -136,23 +128,6 @@ export function ChatComposer({
           onFilesAdded(event.dataTransfer.files);
         }}
       >
-        {reply ? (
-          <div className="reply-preview">
-            <ReplyIcon />
-            <span>
-              <strong>{reply.label}</strong>
-              <small>{reply.text}</small>
-            </span>
-            <Button
-              aria-label="Cancel reply"
-              onClick={onCancelReply}
-              type="button"
-              disabled={submitting}
-            >
-              ×
-            </Button>
-          </div>
-        ) : null}
         {attachments.length ? (
           <div className="attachment-tray">
             {attachments.map((attachment) => (
@@ -170,14 +145,14 @@ export function ChatComposer({
                       : attachment.error || formatBytes(attachment.size)}
                   </small>
                 </span>
-                <Button
+                <button
                   type="button"
                   onClick={() => onRemoveAttachment(attachment.id)}
                   aria-label="Remove file"
                   disabled={submitting}
                 >
-                  ×
-                </Button>
+                  <XIcon aria-hidden />
+                </button>
                 {attachment.status === "uploading" ? (
                   <i style={{ width: `${attachment.progress * 100}%` }} />
                 ) : null}
@@ -188,7 +163,7 @@ export function ChatComposer({
         {dragging ? <div className="drop-overlay">Drop files to attach</div> : null}
         {attachmentMenuOpen ? (
           <div className="composer-attachment-menu" role="menu" aria-label="Add to message">
-            <Button
+            <button
               role="menuitem"
               type="button"
               onClick={() => {
@@ -203,7 +178,7 @@ export function ChatComposer({
                 <strong>Add photos &amp; files</strong>
                 <small>Upload from your computer</small>
               </span>
-            </Button>
+            </button>
           </div>
         ) : null}
         <div className="composer-input-grid">
@@ -218,7 +193,7 @@ export function ChatComposer({
                 event.target.value = "";
               }}
             />
-            <Button
+            <button
               className="attach-button"
               type="button"
               disabled={!agentAvailable || submitting}
@@ -229,61 +204,66 @@ export function ChatComposer({
               title="Add photos and files"
             >
               <PlusIcon />
-            </Button>
+            </button>
           </div>
-          <Textarea
-            aria-label="Message"
-            disabled={!agentAvailable || submitting}
-            ref={inputRef}
-            placeholder={
-              agentAvailable
-                ? busy
-                  ? "Write another message to queue…"
-                  : "Write a message…"
-                : "No agent is available."
-            }
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            onPaste={(event) => {
-              if (!submitting && event.clipboardData.files.length) {
-                event.preventDefault();
-                onFilesAdded(event.clipboardData.files);
+          <div className="markdown-prompt-frame">
+            <textarea
+              className="markdown-prompt-input"
+              rows={1}
+              aria-label="Message"
+              disabled={!agentAvailable || submitting}
+              ref={inputRef}
+              placeholder={
+                agentAvailable
+                  ? busy
+                    ? "Write another message to queue…"
+                    : "Write a message…"
+                  : "No agent is available."
               }
-            }}
-            onBlur={onBlur}
-            onFocus={onFocus}
-            onKeyDown={(event) => {
-              const coarsePointer =
-                event.currentTarget.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")
-                  .matches ?? false;
-              if (
-                shouldSubmitComposerKey({
-                  key: event.key,
-                  shiftKey: event.shiftKey,
-                  metaKey: event.metaKey,
-                  ctrlKey: event.ctrlKey,
-                  composing: event.nativeEvent.isComposing,
-                  coarsePointer,
-                })
-              ) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              onPaste={(event) => {
+                if (!submitting && event.clipboardData.files.length) {
+                  event.preventDefault();
+                  onFilesAdded(event.clipboardData.files);
+                }
+              }}
+              onBlur={onBlur}
+              onFocus={onFocus}
+              onKeyDown={(event) => {
+                const coarsePointer =
+                  event.currentTarget.ownerDocument.defaultView?.matchMedia?.("(pointer: coarse)")
+                    .matches ?? false;
+                if (
+                  shouldSubmitComposerKey({
+                    key: event.key,
+                    shiftKey: event.shiftKey,
+                    metaKey: event.metaKey,
+                    ctrlKey: event.ctrlKey,
+                    composing: event.nativeEvent.isComposing,
+                    coarsePointer,
+                  })
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
+          </div>
           <div className="composer-actions">
-            {busy ? (
-              <Button className="stop-button" type="button" onClick={onStop} aria-label="Stop">
+            {busy && !hasContent ? (
+              <button className="stop-button" type="button" onClick={onStop} aria-label="Stop">
                 <span aria-hidden="true" className="composer-stop-glyph" />
-              </Button>
-            ) : null}
-            <Button
-              type="submit"
-              aria-label="Send message"
-              disabled={!agentAvailable || !hasContent || submitting}
-            >
-              <SendIcon />
-            </Button>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                aria-label="Send message"
+                disabled={!agentAvailable || !hasContent || submitting}
+              >
+                <SendIcon />
+              </button>
+            )}
           </div>
         </div>
       </form>

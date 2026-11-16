@@ -152,6 +152,7 @@ it("loads history, sends as the server-resolved identity, renders live messages 
     ),
   );
   await screen.findByText("Live answer");
+  fireEvent.click(screen.getByRole("button", { name: "Find in conversation" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Search messages" }), {
     target: { value: "older" },
   });
@@ -169,7 +170,7 @@ it("searches the provider and coordinates sidebar rename and per-user unread cha
   fireEvent.click(await screen.findByRole("button", { name: "Conversation" }));
   expect(select).toHaveBeenCalledWith("session", "agent");
   fireEvent.click(screen.getByLabelText("Actions for Conversation"));
-  fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
   fireEvent.change(screen.getByLabelText("Conversation name"), {
     target: { value: "Updated title" },
   });
@@ -177,7 +178,7 @@ it("searches the provider and coordinates sidebar rename and per-user unread cha
   await waitFor(() =>
     expect(api.renameSession).toHaveBeenCalledWith({ threadId: "session", title: "Updated title" }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Mark unread" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Mark unread" }));
   await waitFor(() =>
     expect(api.setReadState).toHaveBeenCalledWith({
       threadId: "session",

@@ -1524,12 +1524,16 @@ projection; hydration restores their order and resume publishes their new invoca
 `@trytilde/chat-proxy` owns server credentials, trusted identity resolution, configured agent
 selection, and streaming Connect forwarding. It allows only the provider contract and never
 forwards browser cookies or credentials upstream. `@trytilde/chat-next` adapts Web requests
-and async catch-all route params. `@trytilde/chat-ui` exports Chat and ListSessions, reusing
-Dispatch's composer and markdown presentation with native history, search, read state,
-attachments, live replay and queue controls. The browser receives no provider key. Components
+and async catch-all route params. `@trytilde/chat-ui` exports Chat and ListSessions with
+Dispatch's (openbot's) chat look: the pane, header, grouped bubbles, day separators, find bar,
+prompt dock, composer and queue, and the sidebar rows with `@trytilde/agent-avatar` avatars.
+Native history, search, read state, attachments, live replay and queue controls drive them;
+Reply and Copy are hover actions on each message. In a session with more than one other
+participant, a group's first bubble names its sender. The browser receives no provider key. Components
 sharing a proxy and UI identity invalidate each other's lists; unmount aborts streams and
 revokes attachment object URLs. These packages build through `task build:chat`, including
-SDK pack/publish workflows, and are exercised by `task test:chat-ui`.
+SDK pack/publish workflows, and are exercised by `task test:chat-ui`. `task preview:chat-ui`
+serves them against in-browser fixtures (light, dark, phone width) for visual comparison.
 
 ## PostgreSQL notifications
 

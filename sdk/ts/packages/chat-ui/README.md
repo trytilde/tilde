@@ -23,7 +23,9 @@ export function Conversations({ userId }: { userId: string }) {
 
 `identity` is a stable UI/cache identity, not authorization. The server proxy independently resolves the authenticated user. Change this prop when signing in as another user; unmount the components on sign-out. `Chat.agentId` is optional for a single-agent proxy; supplying it avoids discovery requests for a multi-agent sidebar.
 
-The components own requests and clean up subscriptions and attachment object URLs on unmount. Mutations invalidate mounted sidebars sharing the proxy and identity; background sidebar refresh also observes other tabs. CSS is scoped to `.tilde-chat` and does not reset the host page. Its `--tc-bg`, `--tc-ink`, `--tc-muted`, `--tc-line`, and `--tc-accent` variables may be overridden. Give Chat a bounded height for history scrolling. React 19 is a peer dependency. No router, API key or Next.js dependency is required in the browser.
+The components own requests and clean up subscriptions and attachment object URLs on unmount. Mutations invalidate mounted sidebars sharing the proxy and identity; background sidebar refresh also observes other tabs. CSS is scoped to `.tilde-chat` and does not reset the host page. Dispatch's palette variables (`--page`, `--ink`, `--line`, `--accent`, `--bubble-agent`, `--bubble-user`, …) may be overridden on `.tilde-chat`. Give Chat a bounded height for history scrolling. React 19 is a peer dependency. No router, API key or Next.js dependency is required in the browser.
+
+The look is Dispatch's (openbot's) chat: grey agent bubbles on the left, black user bubbles on the right, grouped consecutive messages, centred day separators, a pill composer with `+` and a round send button, and a session list with agent avatars, unread dots and a ⌘K search. Reply and Copy appear on hover. Light and dark follow a `.dark` class on an ancestor. Run `task preview:chat-ui` for a fixture-backed preview at `/chat-ui-preview.html`.
 
 Use `@trytilde/chat-next` for Next.js routes or `@trytilde/chat-proxy` with any Web Request/Response server. Builds run via `task build:chat`. Dispatch-derived files retain their MIT attribution in `LICENSE.dispatch`.
 
@@ -31,7 +33,7 @@ Use `@trytilde/chat-next` for Next.js routes or `@trytilde/chat-proxy` with any 
 
 Read-only transcript presentation using the original Dispatch components:
 `ConversationMessage`, `ToolChipsBlock`, `TraceBlock`, and its Markdown/code renderer.
-Sources: `trytilde/dispatch` commit `2ecb27d`, `packages/ui/src/chat-components.tsx`,
+Sources: `trytilde/dispatch` commits `2ecb27d` and `a655a4f` (the live chat surface: `openbot-ui.css`, `chat-components.tsx`, `chat-composer.tsx`, `transcript-components.tsx`, `activity-queue.tsx`, `workspace-icons.tsx`, `sidebar-components.tsx`), `packages/ui/src/chat-components.tsx`,
 `beautiful-ui/blocks/{tool-chips-block,trace-block}.tsx`, `markdown-components.tsx`,
 and the matching chat/palette rules from `openbot-ui.css` and `beautiful-ui/upstream/globals.css`.
 See LICENSE.dispatch and LICENSE.beautiful-ui.

@@ -474,65 +474,6 @@
   --ob-shadow-window-ambient: #00000000;
   --ob-shadow-window-edge: #00000000;
 }
-.tilde-chat.rich-chat .message-list {
-  width: min(820px, 100%);
-  min-height: 100%;
-  padding: 10px 0 36px;
-  gap: 24px;
-}
-.tilde-chat.rich-chat .message {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  gap: 7px;
-  align-self: stretch;
-}
-.tilde-chat.rich-chat .message.user {
-  width: min(78%, 650px);
-  align-self: flex-end;
-  align-items: stretch;
-}
-.tilde-chat .message-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 18px;
-  color: var(--ink-3);
-  font-size: 10px;
-}
-.tilde-chat .message-meta > span {
-  color: var(--ink-2);
-  font-weight: 700;
-}
-.tilde-chat .message-meta time {
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.tilde-chat .message-meta button {
-  margin-left: auto;
-  padding: 2px 5px;
-  border-radius: 5px;
-  opacity: 0;
-  color: var(--ink-3);
-  background: transparent;
-  font-size: 9px;
-  transition: opacity 0.15s ease;
-}
-.tilde-chat .message:hover .message-meta time,
-.tilde-chat .message:hover .message-meta button {
-  opacity: 1;
-}
-.tilde-chat.rich-chat .message.user > .message-parts,
-.tilde-chat.rich-chat .message.user > .markdown {
-  padding: 11px 14px;
-  border-radius: 15px;
-  background: var(--field);
-}
-.tilde-chat .message-parts {
-  min-width: 0;
-  display: grid;
-  gap: 10px;
-}
 .tilde-chat .markdown {
   min-width: 0;
   color: var(--ink);
@@ -857,30 +798,6 @@
 .tilde-chat .reasoning-part > .markdown {
   margin: 0 11px 11px;
 }
-@media (max-width: 720px) {
-  .tilde-chat.rich-chat .message.user {
-    width: 88%;
-  }
-}
-.tilde-chat .thinking-inline {
-  max-width: 740px;
-  margin: auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--ink-3);
-  font-size: 12px;
-}
-
-.tilde-chat.rich-chat .message-list {
-  width: 100%;
-  max-width: none;
-}
-
-.tilde-chat.rich-chat .message.user > .message-parts,
-.tilde-chat.rich-chat .message.user > .markdown {
-  background: #1d1d20;
-}
 
 .tilde-chat.rich-chat .markdown {
   font-size: 12px;
@@ -928,6 +845,849 @@
 
 .tilde-chat .message-menu button:hover {
   background: #77777717;
+}
+
+.tilde-chat .message-actions {
+  position: absolute;
+  z-index: 10;
+  top: -17px;
+  left: 8px;
+  height: 28px;
+  padding: 2px;
+  border: 0.5px solid #1414141a;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--page) 96%, transparent);
+  box-shadow: 0 5px 18px #1414141f;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
+}
+
+.tilde-chat .message.user .message-actions {
+  right: 8px;
+  left: auto;
+}
+
+.tilde-chat .message:hover .message-actions,
+.tilde-chat .message:focus-within .message-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.tilde-chat .message-actions > button {
+  width: 24px;
+  height: 23px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.tilde-chat .message-actions > button:hover {
+  color: var(--ink);
+  background: #77777717;
+}
+
+.tilde-chat .message-actions svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tilde-chat .message-menu {
+  top: 31px;
+  right: 0;
+}
+
+.tilde-chat {
+  min-width: 0;
+  color: var(--ink);
+  background: var(--page);
+  font-family: var(--font-sans-face);
+  font-size: 13px;
+  line-height: 18px;
+  -webkit-font-smoothing: antialiased;
+  --font-mono: var(--font-mono-face);
+}
+
+.tilde-chat .trace-source {
+  color: var(--ink-3);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.tilde-chat .trace-source:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.tilde-chat .trace-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.tilde-chat .trace-notice {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.tilde-chat :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@source "./**/*.{js,ts,tsx}";
+
+/* ── Dispatch chat surface ─────────────────────────────────────────────────
+ * Ported from trytilde/dispatch packages/ui/src/openbot-ui.css (a655a4f) in source order:
+ * every rule for the chat pane, header, find bar, messages, separators, skeleton, prompt dock,
+ * composer and queue. `.rich-chat` scopes map to `.tilde-chat.rich-chat` and bare selectors to
+ * `.tilde-chat`, which keeps Dispatch's relative specificity. */
+
+.tilde-chat .chat-title {
+  min-width: 0;
+}
+.tilde-chat .chat-title h2 {
+  overflow: hidden;
+  max-width: 400px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .chat-title form input {
+  width: min(400px, 45vw);
+  margin-top: 2px;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 15px;
+  font-weight: 650;
+}
+.tilde-chat .chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tilde-chat .chat-actions > span {
+  overflow: hidden;
+  max-width: 170px;
+  margin-right: 5px;
+  color: var(--ink-3);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .chat-actions button {
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: var(--ink-2);
+  background: transparent;
+  font-size: 10px;
+}
+.tilde-chat .chat-actions button:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.tilde-chat .conversation-loading {
+  height: 100%;
+  width: 100%;
+}
+.tilde-chat .conversation-skeleton {
+  height: 100%;
+  min-height: 100%;
+  padding: 12px 0 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  pointer-events: none;
+}
+.tilde-chat .conversation-skeleton-row {
+  width: min(72%, 560px);
+  display: flex;
+  align-items: flex-end;
+}
+.tilde-chat .conversation-skeleton-row.user {
+  width: min(58%, 440px);
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.tilde-chat .conversation-skeleton-bubble {
+  min-width: 0;
+  padding: 11px 13px;
+  border-radius: 18px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--bubble-agent);
+}
+.tilde-chat .conversation-skeleton-row.user .conversation-skeleton-bubble {
+  background: var(--bubble-user);
+}
+.tilde-chat .conversation-skeleton-bubble.compact {
+  flex: 0 1 76%;
+}
+.tilde-chat .conversation-skeleton-bubble.medium {
+  flex: 0 1 82%;
+}
+.tilde-chat .conversation-skeleton-bubble.short {
+  flex: 0 1 48%;
+}
+.tilde-chat .conversation-skeleton-bubble > i {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  display: block;
+  background: var(--skeleton-agent-line);
+}
+.tilde-chat .conversation-skeleton-bubble > i:last-child {
+  width: 62%;
+}
+.tilde-chat .conversation-skeleton-row.user .conversation-skeleton-bubble > i {
+  background: var(--skeleton-user-line);
+}
+.tilde-chat .scroll-latest {
+  position: absolute;
+  z-index: 30;
+  bottom: 94px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  min-height: 29px;
+  padding: 7px 11px;
+  border: 0.5px solid var(--line-strong);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  font-size: 11px;
+  line-height: 15px;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%);
+}
+.tilde-chat .scroll-latest:hover {
+  background: color-mix(in srgb, var(--surface) 92%, var(--ink));
+}
+.tilde-chat .scroll-latest > span {
+  white-space: nowrap;
+}
+.tilde-chat .scroll-latest > svg {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  stroke-width: 1.8;
+}
+.tilde-chat.rich-chat .message-list {
+  width: min(820px, 100%);
+  min-height: 100%;
+  padding: 10px 0 36px;
+  gap: 24px;
+}
+.tilde-chat.rich-chat .message {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  gap: 7px;
+  align-self: stretch;
+}
+.tilde-chat.rich-chat .message.user {
+  width: min(78%, 650px);
+  align-self: flex-end;
+  align-items: stretch;
+}
+.tilde-chat .message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.tilde-chat .message-meta > span {
+  color: var(--ink-2);
+  font-weight: 700;
+}
+.tilde-chat .message-meta time {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.tilde-chat .message-meta button {
+  margin-left: auto;
+  padding: 2px 5px;
+  border-radius: 5px;
+  opacity: 0;
+  color: var(--ink-3);
+  background: transparent;
+  font-size: 9px;
+  transition: opacity 0.15s ease;
+}
+.tilde-chat .message:hover .message-meta time,
+.tilde-chat .message:hover .message-meta button {
+  opacity: 1;
+}
+.tilde-chat.rich-chat .message.user > .message-parts,
+.tilde-chat.rich-chat .message.user > .markdown {
+  padding: 11px 14px;
+  border-radius: 15px;
+  background: var(--field);
+}
+.tilde-chat .message-parts {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.tilde-chat.rich-chat .composer {
+  position: relative;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.tilde-chat.rich-chat .composer.dragging {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+.tilde-chat .drop-overlay {
+  position: absolute;
+  inset: 5px;
+  z-index: 2;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.tilde-chat .attachment-tray {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+}
+.tilde-chat .pending-file {
+  position: relative;
+  flex: 0 0 190px;
+  overflow: hidden;
+  padding: 7px 27px 7px 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface);
+}
+.tilde-chat .pending-file .attachment-glyph {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  background: var(--accent-tint);
+}
+.tilde-chat .pending-file .file-thumb {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 7px;
+  object-fit: cover;
+  box-shadow: var(--shadow-hairline);
+}
+.tilde-chat .pending-file > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+}
+.tilde-chat .pending-file strong,
+.tilde-chat .pending-file small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .pending-file strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.tilde-chat .pending-file small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.tilde-chat .pending-file > button {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  color: var(--ink-3);
+  background: transparent;
+}
+.tilde-chat .pending-file > i {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+.tilde-chat .pending-file.error {
+  border-color: color-mix(in srgb, var(--red) 35%, var(--line));
+}
+.tilde-chat .composer-toolbar,
+.tilde-chat .composer-toolbar > div {
+  display: flex;
+  align-items: center;
+}
+.tilde-chat .composer-toolbar .composer-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+}
+.tilde-chat .composer-toolbar {
+  justify-content: space-between;
+}
+.tilde-chat .composer-toolbar > div {
+  min-width: 0;
+  gap: 8px;
+}
+.tilde-chat.rich-chat .composer-toolbar .attach-button {
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  background: var(--surface);
+  font-size: 17px;
+  font-weight: 300;
+}
+.tilde-chat.rich-chat .composer-toolbar .stop-button {
+  color: var(--surface);
+  background: var(--red);
+  font-size: 10px;
+}
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .conversation {
+    padding-inline: 17px;
+  }
+}
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer {
+    margin-inline: 12px;
+  }
+}
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .message.user {
+    width: 88%;
+  }
+}
+@media (max-width: 720px) {
+  .tilde-chat .chat-actions > span,
+  .tilde-chat .chat-actions button:nth-of-type(2) {
+    display: none;
+  }
+}
+.tilde-chat .composer button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+.tilde-chat .chat-pane {
+  position: relative;
+  min-width: 0;
+  /* Grid items default to min-height:auto, which lets the transcript row grow past the
+     viewport instead of handing its overflow to the scroll container below. */
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+.tilde-chat .chat-pane > header {
+  height: 67px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tilde-chat .chat-pane header h2 {
+  margin-top: 3px;
+  font-size: 15px;
+}
+.tilde-chat .conversation {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(24px, 5vw, 70px);
+}
+.tilde-chat .thinking-inline {
+  max-width: 740px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.tilde-chat .composer {
+  margin: 0 clamp(18px, 4vw, 56px) 22px;
+  padding: 11px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.15s ease-out;
+}
+.tilde-chat .composer textarea {
+  width: 100%;
+  min-height: 55px;
+  max-height: 170px;
+  border: 0;
+  resize: none;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.tilde-chat .composer > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tilde-chat .composer span {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.tilde-chat .composer button {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--surface);
+  background: var(--ink);
+}
+.tilde-chat .chat-pane {
+  min-width: 0;
+  /* Grid items default to min-height:auto, which lets the transcript row grow past the
+     viewport instead of handing its overflow to the scroll container below. */
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+.tilde-chat .chat-pane > header {
+  height: 67px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tilde-chat .chat-pane header h2 {
+  margin-top: 3px;
+  font-size: 15px;
+}
+.tilde-chat .conversation {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(24px, 5vw, 70px);
+}
+.tilde-chat .composer {
+  margin: 0 clamp(18px, 4vw, 56px) 22px;
+  padding: 11px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.15s ease-out;
+}
+.tilde-chat .composer textarea {
+  width: 100%;
+  min-height: 55px;
+  max-height: 170px;
+  border: 0;
+  resize: none;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+.tilde-chat .composer > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tilde-chat .composer span {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.tilde-chat .composer button {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--surface);
+  background: var(--ink);
+}
+@media (max-width: 760px) {
+  .tilde-chat .chat-pane {
+    border: 0;
+  }
+}
+
+.tilde-chat.rich-chat .composer > .attachment-tray {
+  justify-content: flex-start;
+}
+.tilde-chat.rich-chat .composer > .drop-overlay {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+}
+
+.tilde-chat.rich-chat .chat-pane > .chat-header {
+  position: relative;
+  z-index: 4;
+  -webkit-app-region: drag;
+}
+
+.tilde-chat.rich-chat .chat-pane > .chat-header button {
+  -webkit-app-region: no-drag;
+}
+
+.tilde-chat.rich-chat .avatar > .agent-avatar-mark {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tilde-chat .agent-avatar-mark {
+  overflow: visible;
+}
+
+.tilde-chat.rich-chat .chat-pane {
+  background: var(--page);
+}
+
+.tilde-chat.rich-chat .chat-pane > header {
+  height: 52px;
+  min-height: 52px;
+  padding-inline: 16px;
+  border-bottom: 0.5px solid var(--line);
+  background: var(--canvas);
+}
+
+.tilde-chat.rich-chat .chat-title .eyebrow {
+  display: none;
+}
+
+.tilde-chat.rich-chat .chat-title h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tilde-chat.rich-chat .chat-actions button {
+  border: 1px solid transparent;
+  font-size: 11px;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.tilde-chat.rich-chat .chat-actions button.active {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.tilde-chat.rich-chat .conversation {
+  padding: 24px clamp(22px, 4vw, 60px);
+  scrollbar-color: #ffffff18 transparent;
+}
+
+.tilde-chat.rich-chat .message-list {
+  width: 100%;
+  max-width: none;
+}
+
+.tilde-chat.rich-chat .message.user > .message-parts,
+.tilde-chat.rich-chat .message.user > .markdown {
+  background: #1d1d20;
+}
+
+.tilde-chat.rich-chat .composer {
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto 16px;
+  padding: 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 0.5px var(--line-strong);
+  transition:
+    padding 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.12s ease,
+    transform 0.12s ease;
+}
+
+.tilde-chat.rich-chat .composer textarea {
+  height: 44px;
+  min-height: 44px;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--ink);
+  font-size: 14px;
+  transition: height 0.12s ease;
+}
+
+.tilde-chat.rich-chat .composer.expanded {
+  padding: 10px;
+  box-shadow:
+    inset 0 0 0 0.5px #fcfcfc38,
+    0 10px 30px #00000024;
+}
+
+.tilde-chat.rich-chat .composer-toolbar {
+  transition:
+    opacity 0.12s ease,
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tilde-chat.rich-chat .composer:not(.expanded) .composer-toolbar > div:first-child > span {
+  opacity: 0;
+  transform: translateY(2px);
+}
+
+.tilde-chat.rich-chat .composer-toolbar > div:first-child > span {
+  transition:
+    opacity 0.12s ease,
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tilde-chat.rich-chat .composer button {
+  color: #101011;
+  background: #ededee;
+}
+.tilde-chat.rich-chat .chat-pane > .chat-header {
+  height: 38px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-bottom: 0;
+  background: var(--page);
+}
+
+.tilde-chat .chat-identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tilde-chat .chat-identity > .avatar,
+.tilde-chat .chat-identity > .agent-avatar {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+}
+
+.tilde-chat.rich-chat .chat-title {
+  min-width: 0;
+  display: grid;
+  gap: 0;
+}
+
+.tilde-chat.rich-chat .chat-title h2,
+.tilde-chat.rich-chat .chat-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tilde-chat.rich-chat .chat-title h2 {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 520;
+  line-height: 13px;
+}
+
+.tilde-chat.rich-chat .chat-title > span {
+  color: var(--ink-3);
+  font-size: 9px;
+  line-height: 10px;
+}
+
+.tilde-chat.rich-chat .chat-title form input {
+  width: min(260px, 35vw);
+  height: 24px;
+  padding: 0 7px;
+  border: 0.5px solid #ffffff26;
+  border-radius: 5px;
+  color: #ececee;
+  background: #1c1c1e;
+  font-size: 11px;
+  outline: none;
+}
+
+.tilde-chat.rich-chat .chat-actions {
+  gap: 4px;
+}
+
+.tilde-chat.rich-chat .chat-actions > button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.tilde-chat.rich-chat .chat-actions button:hover,
+.tilde-chat.rich-chat .chat-actions button.active {
+  color: var(--ink);
+  background: #77777717;
+}
+
+.tilde-chat.rich-chat .chat-actions svg,
+.tilde-chat.rich-chat .composer button svg {
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tilde-chat.rich-chat .chat-actions svg circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.tilde-chat.rich-chat .conversation {
+  padding: 16px clamp(18px, 4vw, 52px) 12px;
+  background: var(--page);
 }
 
 .tilde-chat.rich-chat .message-list {
@@ -1033,15 +1793,19 @@
 }
 
 .tilde-chat .message-footer {
-  min-height: 16px;
-  padding: 2px 3px 0;
+  min-height: 12px;
+  height: 12px;
+  line-height: 12px;
+  font-size: 9px;
+  padding: 0 3px;
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
-.tilde-chat .message.user .message-footer {
+.tilde-chat .message-footer {
   justify-content: flex-end;
+  align-self: stretch;
 }
 
 .tilde-chat .message-footer time {
@@ -1056,62 +1820,164 @@
   opacity: 1;
 }
 
-.tilde-chat .message-actions {
-  position: absolute;
-  z-index: 10;
-  top: -17px;
-  left: 8px;
-  height: 28px;
-  padding: 2px;
-  border: 0.5px solid #1414141a;
-  border-radius: 7px;
-  display: flex;
+.tilde-chat.rich-chat .composer {
+  width: min(640px, calc(100% - 32px));
+  margin: 0 auto 16px;
+  padding: 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--canvas);
+  box-shadow:
+    inset 0 0 0 0.5px #1414141a,
+    0 8px 24px #14141412;
+}
+
+.tilde-chat.rich-chat .composer textarea {
+  height: 42px;
+  min-height: 42px;
+  padding: 5px 4px 7px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.tilde-chat.rich-chat .composer textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.tilde-chat .reply-preview {
+  min-height: 42px;
+  margin: 0 2px 6px;
+  padding: 6px 7px;
+  border-left: 2px solid #14141466;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 24px;
   align-items: center;
-  background: color-mix(in srgb, var(--page) 96%, transparent);
-  box-shadow: 0 5px 18px #1414141f;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(2px);
-  transition:
-    opacity 0.1s ease,
-    transform 0.1s ease;
+  gap: 7px;
+  color: var(--ink-2);
+  background: #77777710;
+  border-radius: 4px 7px 7px 4px;
 }
 
-.tilde-chat .message.user .message-actions {
-  right: 8px;
-  left: auto;
+.tilde-chat .reply-preview > svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.tilde-chat .message:hover .message-actions,
-.tilde-chat .message:focus-within .message-actions {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
+.tilde-chat .reply-preview > span {
+  min-width: 0;
+  display: grid;
 }
 
-.tilde-chat .message-actions > button {
-  width: 24px;
-  height: 23px;
-  border-radius: 4px;
+.tilde-chat .reply-preview strong,
+.tilde-chat .reply-preview small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tilde-chat .reply-preview strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 520;
+}
+
+.tilde-chat .reply-preview small {
+  color: var(--ink-3);
+  font-size: 9px;
+}
+
+.tilde-chat .reply-preview > button {
+  width: 24px !important;
+  height: 24px !important;
+  color: var(--ink-3) !important;
+  background: transparent !important;
+  font-size: 16px;
+}
+
+.tilde-chat.rich-chat .composer-toolbar {
+  min-height: 28px;
+}
+
+.tilde-chat.rich-chat .composer-toolbar > div:first-child > span {
+  color: var(--ink-3);
+  font-size: 9px;
+}
+
+.tilde-chat.rich-chat .composer .attach-button,
+.tilde-chat.rich-chat .composer .composer-actions > button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
   display: grid;
   place-items: center;
+}
+
+.tilde-chat.rich-chat .composer .attach-button {
   color: var(--ink-2);
   background: transparent;
 }
 
-.tilde-chat .message-actions > button:hover {
+.tilde-chat.rich-chat .composer .attach-button:hover {
   color: var(--ink);
   background: #77777717;
 }
 
-.tilde-chat .message-actions svg {
-  width: 14px;
-  height: 14px;
+.tilde-chat.rich-chat .composer .composer-actions > button {
+  color: var(--page);
+  background: var(--ink);
 }
 
-.tilde-chat .message-menu {
-  top: 31px;
-  right: 0;
+.tilde-chat.rich-chat .composer .composer-actions > button:disabled {
+  color: var(--ink-3);
+  background: var(--hover);
+}
+
+.tilde-chat.rich-chat .composer .stop-button {
+  color: var(--page);
+  background: var(--ink);
+}
+
+.tilde-chat.rich-chat .composer .stop-button > .composer-stop-glyph {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-pane {
+    min-width: 0;
+    width: 100%;
+    border: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-pane > .chat-header {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-title h2 {
+    max-width: calc(100vw - 120px);
+  }
+}
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .conversation {
+    min-width: 0;
+    width: 100%;
+    padding-inline: 16px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1122,18 +1988,109 @@
     min-width: 0;
     max-width: 100%;
   }
+}
 
+@media (max-width: 720px) {
   .tilde-chat.rich-chat .message.user {
     width: fit-content;
     max-width: min(88%, 640px, calc(100% - 82px));
   }
+}
 
+@media (max-width: 720px) {
   .tilde-chat.rich-chat .message-bubble,
   .tilde-chat.rich-chat .message-content,
   .tilde-chat.rich-chat .message-part {
     min-width: 0;
     max-width: 100%;
   }
+}
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer {
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+    margin: 0 12px 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .tilde-chat .conversation-outline-panel {
+    right: 8px;
+    max-width: calc(100vw - 16px);
+  }
+}
+.tilde-chat .chat-find-bar {
+  height: 34px;
+  padding-inline: 6px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ob-text-secondary);
+  background: var(--ob-bg-elevated);
+  box-shadow:
+    inset 0 0 0 0.5px var(--ob-border-weak),
+    0 10px 20px -3px var(--ob-shadow-popover-ambient),
+    0 4px 6px -4px var(--ob-shadow-popover-key),
+    0 0 0 1px var(--ob-shadow-ring);
+}
+
+.tilde-chat .chat-find-icon {
+  width: 22px;
+  color: var(--ob-text-tertiary);
+  text-align: center;
+}
+
+.tilde-chat .chat-find-bar input {
+  width: 148px;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ob-text-primary);
+  background: transparent;
+  font: inherit;
+}
+
+.tilde-chat .chat-find-bar > span[role="status"] {
+  min-width: 40px;
+  padding-right: 4px;
+  color: var(--ob-text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tilde-chat .chat-find-bar > span[role="status"].empty {
+  color: var(--ob-text-danger);
+}
+
+.tilde-chat .chat-find-bar > i {
+  width: 0.5px;
+  height: 18px;
+  margin-inline: 2px;
+  background: var(--ob-border-default);
+}
+
+.tilde-chat .chat-find-bar button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ob-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tilde-chat .chat-find-bar button:hover:not(:disabled) {
+  color: var(--ob-text-primary);
+  background: var(--ob-bg-hover);
+}
+
+.tilde-chat .chat-find-bar button:disabled {
+  color: var(--ob-text-disabled);
+  cursor: default;
 }
 
 .tilde-chat .message-send-notice button {
@@ -1143,6 +2100,21 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.tilde-chat .transcript-time-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ob-text-tertiary);
+  font-size: 10px;
+}
+
+.tilde-chat .transcript-time-separator > span {
+  height: 0.5px;
+  flex: 1;
+  background: var(--ob-border-default);
 }
 
 .tilde-chat .message-send-notice {
@@ -1160,6 +2132,429 @@
 .tilde-chat .message-send-notice button {
   padding: 0 2px;
   font-size: 10px;
+}
+
+.tilde-chat .system-event {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+}
+
+.tilde-chat .system-event-label {
+  color: var(--ob-text-secondary);
+}
+
+.tilde-chat .system-event-label[data-tone="tertiary"] {
+  color: var(--ob-text-tertiary);
+}
+
+.tilde-chat .system-event-chip {
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 0.5px solid var(--ob-border-weak);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ob-text-secondary);
+  background: var(--ob-bg-subtle);
+  font: inherit;
+}
+
+.tilde-chat button.system-event-chip {
+  cursor: pointer;
+}
+.tilde-chat.rich-chat .composer {
+  position: relative;
+  width: min(680px, calc(100% - 32px));
+  margin-bottom: 16px;
+  padding: 6px;
+  border: 0.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 150ms ease,
+    border-radius 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.tilde-chat.rich-chat .composer:focus-within {
+  border-color: var(--line-strong);
+}
+
+.tilde-chat.rich-chat .composer.expanded,
+.tilde-chat.rich-chat .composer:has(.attachment-tray),
+.tilde-chat.rich-chat .composer:has(.reply-preview) {
+  border-radius: 24px;
+}
+
+.tilde-chat.rich-chat .composer > .composer-input-grid {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 4px;
+}
+
+.tilde-chat.rich-chat .composer > .reply-preview {
+  display: grid;
+}
+
+.tilde-chat .composer-attachment-control,
+.tilde-chat .composer-actions {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tilde-chat .composer-attachment-menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 5px;
+  border: 0.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  animation: composer-menu-in 120ms ease-out both;
+}
+
+.tilde-chat .composer-attachment-menu > button {
+  width: 100%;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.tilde-chat .composer-attachment-menu > button:hover {
+  background: var(--hover);
+}
+
+.tilde-chat .composer-attachment-menu-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  background: var(--field);
+  font-size: 15px;
+}
+
+.tilde-chat .composer-attachment-menu > button > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tilde-chat .composer-attachment-menu strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.tilde-chat .composer-attachment-menu small {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.tilde-chat.rich-chat .composer textarea {
+  width: 100%;
+  height: 28px;
+  min-height: 28px;
+  max-height: 100px;
+  padding: 5px 4px;
+  resize: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tilde-chat.rich-chat .composer.expanded .composer-input-grid {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+}
+
+.tilde-chat.rich-chat .composer.expanded textarea {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 54px;
+  padding: 7px 8px;
+}
+
+.tilde-chat.rich-chat .composer.expanded .composer-attachment-control,
+.tilde-chat.rich-chat .composer.expanded .composer-actions {
+  grid-row: 2;
+}
+
+.tilde-chat.rich-chat .composer.expanded .composer-actions {
+  grid-column: 3;
+}
+
+.tilde-chat.rich-chat .composer .attach-button,
+.tilde-chat.rich-chat .composer .composer-actions > button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.tilde-chat.rich-chat .composer .attach-button:active,
+.tilde-chat.rich-chat .composer .composer-actions > button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.tilde-chat.rich-chat .composer-shell {
+  position: relative;
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto 16px;
+}
+
+.tilde-chat.rich-chat .composer-shell > .composer {
+  width: 100%;
+  margin: 0;
+}
+
+.tilde-chat .composer-error-pill {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: min(620px, calc(100vw - 48px));
+  padding: 7px 11px;
+  border: 0.5px solid color-mix(in srgb, var(--red) 24%, var(--line));
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  font-size: 11px;
+  line-height: 15px;
+  transform: translateX(-50%);
+}
+
+.tilde-chat .composer-error-pill > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tilde-chat .composer-error-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.tilde-chat.rich-chat .composer > .attachment-tray {
+  margin: 0;
+  padding: 1px 4px 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tilde-chat.rich-chat .composer .pending-file {
+  flex-basis: auto;
+  max-width: 240px;
+  min-height: 27px;
+  padding: 3px 27px 3px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--field);
+  box-shadow: var(--shadow-hairline);
+}
+
+.tilde-chat.rich-chat .composer .pending-file .file-icon,
+.tilde-chat.rich-chat .composer .pending-file .file-thumb {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  border-radius: 999px;
+}
+
+.tilde-chat.rich-chat .composer .pending-file strong {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.tilde-chat.rich-chat .composer .pending-file small {
+  display: none;
+}
+.tilde-chat .queue-panel {
+  --queue-composer-overlap: 12px;
+  --queue-bottom-margin: 0px;
+  position: relative;
+  z-index: auto;
+  width: min(656px, calc(100% - 56px));
+  max-height: none;
+  margin: 0 auto var(--queue-bottom-margin);
+  overflow: visible;
+  border: 0.5px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.tilde-chat .queue-viewport {
+  overflow: visible;
+  border-radius: inherit;
+}
+
+.tilde-chat .queue-list {
+  /* Transforms never enlarge the scrollable list; the drag preview paints
+   * separately outside this containment boundary. */
+  contain: paint;
+  margin: 0;
+  padding: 4px 0;
+  display: grid;
+  gap: 2px;
+  list-style: none;
+}
+
+.tilde-chat .queue-panel[data-variant="embedded"] {
+  --queue-bottom-margin: calc(-1 * var(--queue-composer-overlap));
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.tilde-chat .queue-panel[data-variant="embedded"] .queue-list {
+  padding-bottom: calc(4px + var(--queue-composer-overlap));
+}
+
+.tilde-chat .queue-item {
+  min-height: 32px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+  cursor: grab;
+  transition: opacity 150ms ease;
+}
+
+.tilde-chat .queue-item:active {
+  cursor: grabbing;
+}
+
+.tilde-chat .queue-item[data-dragging="true"] {
+  opacity: 0;
+}
+
+.tilde-chat .queue-drag-layer {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.tilde-chat .queue-drag-preview {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.tilde-chat .queue-item[data-pending="true"] {
+  cursor: default;
+}
+
+.tilde-chat .queue-grip {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--ink-3) 70%, transparent);
+}
+
+.tilde-chat .queue-grip svg,
+.tilde-chat .queue-item button svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.75;
+}
+
+.tilde-chat .queue-message {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.tilde-chat .queue-pending {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.tilde-chat .queue-item button {
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink-3);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.tilde-chat .queue-item button:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.tilde-chat .queue-item .queue-delete:hover {
+  color: var(--red);
+}
+
+.tilde-chat .queue-item .queue-delete,
+.tilde-chat .queue-item .queue-edit {
+  width: 24px;
+  padding: 0;
+}
+
+.tilde-chat.rich-chat .composer-shell {
+  z-index: 1;
 }
 
 .tilde-chat .message-parts.media-gallery {
@@ -1191,507 +2586,1321 @@
   height: 364px;
 }
 
-.tilde-chat {
-  min-width: 0;
-  color: var(--ink);
-  background: var(--page);
-  font-family: var(--font-sans-face);
-  font-size: 13px;
-  line-height: 18px;
-  -webkit-font-smoothing: antialiased;
-  --font-mono: var(--font-mono-face);
+@media (max-width: 560px) {
+  .tilde-chat.rich-chat .composer-shell,
+  .tilde-chat .queue-panel {
+    width: calc(100% - 20px);
+  }
 }
 
-.tilde-chat .message-list {
-  height: auto;
-  min-height: 0;
-  overflow: visible;
-  padding: 16px 24px;
+@media (max-width: 560px) {
+  .tilde-chat .queue-item {
+    padding-inline: 7px;
+  }
 }
 
-.tilde-chat .trace-source {
-  color: var(--ink-3);
-  font-size: 10px;
-  cursor: pointer;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-pane > .chat-header {
+    height: 56px;
+    min-height: 56px;
+    padding: 6px 8px;
+    gap: 4px;
+  }
 }
 
-.tilde-chat .trace-source:hover {
-  color: var(--ink);
-  text-decoration: underline;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-identity {
+    min-width: 0;
+    flex: 1;
+  }
 }
 
-.tilde-chat .trace-sources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-actions > button {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-.tilde-chat .trace-notice {
-  color: var(--ink-2);
-  font-size: 12px;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer-shell {
+    position: fixed;
+    z-index: 10;
+    right: 4px;
+    bottom: max(2px, env(safe-area-inset-bottom));
+    left: 4px;
+    width: calc(100% - 8px);
+    max-width: calc(100% - 8px);
+    margin: 0;
+    padding: 0;
+    align-self: end;
+    background: transparent;
+  }
 }
 
-.tilde-chat :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer {
+    padding: 4px;
+    border-color: var(--line-strong);
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+    box-shadow: 0 1px 8px color-mix(in srgb, var(--ink) 10%, transparent);
+    backdrop-filter: blur(14px);
+  }
 }
 
-@source "./**/*.{js,ts,tsx}";
-
-/* Dispatch's conversation frame; the host owns scrolling and its header. */
-.tilde-chat.rich-chat .conversation {
-  min-height: 0;
-  padding: 16px clamp(18px, 4vw, 52px) 12px;
-  background: var(--page);
-}
-.tilde-chat.rich-chat .message-list {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 12px 0 30px;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .conversation {
+    padding-bottom: 72px;
+  }
 }
 
-/* Scoped styles: mounting chat never resets the host application's page. */
-.tilde-chat.tc-live {
-  --tc-bg: #fff;
-  --tc-ink: #24211e;
-  --tc-muted: #77716a;
-  --tc-line: #e8e3dc;
-  --tc-accent: #3563d9;
-  box-sizing: border-box;
-  color: var(--tc-ink);
-  background: var(--tc-bg);
-  font:
-    14px/1.5 system-ui,
-    sans-serif;
-  min-width: 0;
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer > .composer-input-grid,
+  .tilde-chat.rich-chat .composer.expanded .composer-input-grid {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    gap: 2px;
+  }
 }
-.tilde-chat.tc-live * {
-  box-sizing: border-box;
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer textarea,
+  .tilde-chat.rich-chat .composer.expanded textarea {
+    min-height: 40px;
+    padding: 9px 5px;
+    font-size: 16px !important;
+    line-height: 22px;
+  }
 }
-.tilde-chat.tc-live button,
-.tilde-chat.tc-live input,
-.tilde-chat.tc-live textarea {
-  font: inherit;
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer .attach-button,
+  .tilde-chat.rich-chat .composer .composer-actions > button {
+    width: 40px;
+    height: 40px;
+  }
 }
-.tilde-chat.tc-live button {
-  cursor: pointer;
-  border: 1px solid transparent;
-  background: transparent;
-  color: inherit;
-  border-radius: 8px;
-  padding: 5px 9px;
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer-attachment-control,
+  .tilde-chat.rich-chat .composer-actions {
+    min-height: 40px;
+  }
 }
-.tilde-chat.tc-live button:hover {
-  background: #eeeae4;
+
+@media (max-width: 720px) {
+  .tilde-chat .composer-attachment-menu {
+    left: -2px;
+    right: -42px;
+  }
 }
-.tilde-chat.tc-live button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.tilde-chat.tc-live :focus-visible {
-  outline: 2px solid var(--tc-accent);
-  outline-offset: 2px;
-}
-.tilde-chat.tc-live input,
-.tilde-chat.tc-live textarea {
-  color: inherit;
-  background: var(--tc-bg);
-  border: 1px solid var(--tc-line);
-  border-radius: 8px;
-  padding: 8px;
-  min-width: 0;
-}
-.tilde-chat.tc-live a {
-  color: var(--tc-accent);
-}
-.tilde-chat.tc-live svg {
-  width: 18px;
-  height: 18px;
-}
-.tilde-chat.tc-live [role="alert"] {
-  color: #aa2830;
-}
-.tilde-chat.tc-live small {
-  color: var(--tc-muted);
-}
-.tc-window {
-  display: flex;
-  flex-direction: column;
+.tilde-chat.rich-chat .composer-dock {
   position: relative;
-  height: 100%;
-  min-height: 320px;
-  overflow: hidden;
+  z-index: 1;
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto 16px;
 }
-.tc-header {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 22px;
-  border-bottom: 1px solid var(--tc-line);
+
+.tilde-chat.rich-chat .composer-dock > .queue-panel {
+  width: calc(100% - 24px);
 }
-.tc-header > div {
-  flex: 1;
-  display: grid;
-}
-.tc-header input {
-  max-width: 220px;
-}
-.tc-transcript {
-  overflow-y: auto;
-  flex: 1;
-  padding: 24px;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-.tc-message {
-  max-width: 850px;
-  margin: 0 auto 22px;
-  overflow-wrap: anywhere;
-}
-.tc-message.tc-own {
-  background: #f4f1ec;
-  border-radius: 16px;
-  padding: 12px 16px;
-  max-width: 650px;
-  margin-left: auto;
-  margin-right: 0;
-}
-.tc-message p {
-  margin: 0.5em 0;
-}
-.tc-message footer {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--tc-muted);
-  font-size: 12px;
-}
-.tc-message blockquote {
-  border-left: 3px solid var(--tc-line);
-  padding-left: 10px;
-  margin: 8px 0;
-  color: var(--tc-muted);
-}
-.tc-message pre,
-.tc-tool pre {
-  overflow: auto;
-  white-space: pre-wrap;
-  background: #f6f4f0;
-  padding: 12px;
-  border-radius: 8px;
-}
-.tc-message table {
-  border-collapse: collapse;
+
+.tilde-chat.rich-chat .composer-dock > .composer-shell {
+  position: relative;
+  inset: auto;
   width: 100%;
+  max-width: none;
+  margin: 0;
 }
-.tc-message th,
-.tc-message td {
-  border: 1px solid var(--tc-line);
-  padding: 6px;
+
+.tilde-chat.rich-chat .composer-dock > .composer-shell > .composer {
+  max-width: none;
 }
-.tc-empty {
-  padding: 20px;
-  color: var(--tc-muted);
-  text-align: center;
+
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .composer-dock {
+    width: calc(100% - 8px);
+    margin: 0 4px max(2px, env(safe-area-inset-bottom));
+    align-self: end;
+  }
 }
-.tc-latest {
-  position: absolute;
-  bottom: 150px;
-  align-self: center;
-  background: white !important;
-  box-shadow: 0 2px 10px #0002;
-}
-.tc-tool,
-.tc-reasoning {
-  max-width: 850px;
-  margin: 8px auto;
-  color: var(--tc-muted);
-}
-.tc-attachment {
-  margin: 8px 0;
-  border: 1px solid var(--tc-line);
-  border-radius: 10px;
-  padding: 8px;
-}
-.tc-attachment img,
-.tc-attachment video {
-  display: block;
-  max-width: 100%;
-  max-height: 320px;
-  object-fit: contain;
-}
-.tc-attachment audio {
-  max-width: 100%;
-}
-.tilde-chat.tc-live .composer-shell {
-  padding: 12px 22px 20px;
-}
-.tilde-chat.tc-live .composer {
-  position: relative;
-  border: 1px solid var(--tc-line);
-  border-radius: 18px;
-  padding: 8px;
-  box-shadow: 0 2px 10px #00000008;
-}
-.tilde-chat.tc-live .composer-input-grid {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-.tilde-chat.tc-live .composer textarea {
-  flex: 1;
-  resize: vertical;
-  min-height: 48px;
-  max-height: 240px;
-  border: 0;
-  padding: 12px 6px;
-}
-.tilde-chat.tc-live .composer.expanded textarea {
-  min-height: 110px;
-}
-.tilde-chat.tc-live .composer-attachment-control {
-  position: relative;
-}
-.tilde-chat.tc-live .composer button {
-  flex-shrink: 0;
-}
-.tilde-chat.tc-live .send-button {
-  background: var(--tc-ink);
-  color: white;
-}
-.tilde-chat.tc-live .composer-error-pill {
-  padding: 8px;
-  color: #aa2830;
-}
-.tilde-chat.tc-live .attachment-tray {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px;
-}
-.tilde-chat.tc-live .pending-file {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 250px;
-  padding: 8px;
-  border: 1px solid var(--tc-line);
-  border-radius: 10px;
-}
-.tilde-chat.tc-live .pending-file > span {
-  display: grid;
-  overflow: hidden;
-}
-.tilde-chat.tc-live .pending-file strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tilde-chat.tc-live .file-thumb {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-.tilde-chat.tc-live .reply-preview {
-  display: flex;
-  gap: 8px;
-  padding: 8px;
-}
-.tilde-chat.tc-live .reply-preview > span {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-.tilde-chat.tc-live .reply-preview small {
-  max-height: 42px;
-  overflow: hidden;
-}
-.tilde-chat.tc-live .drop-overlay {
-  position: absolute;
-  inset: 0;
-  background: #e8edffe8;
-  display: grid;
-  place-items: center;
-  border: 2px dashed var(--tc-accent);
-  border-radius: 16px;
-  z-index: 2;
+.tilde-chat .chat-prompt {
+  background: transparent;
   pointer-events: none;
 }
-.tilde-chat.tc-live .composer-attachment-menu {
-  position: absolute;
-  bottom: 100%;
-  background: white;
-  border: 1px solid var(--tc-line);
-  padding: 8px;
-  border-radius: 10px;
-  box-shadow: 0 5px 20px #0002;
+.tilde-chat .chat-prompt > * {
+  pointer-events: auto;
 }
-.tilde-chat.tc-live .composer-attachment-menu button {
-  display: flex;
-  gap: 8px;
-}
-.tilde-chat.tc-live .composer-attachment-menu span {
-  display: grid;
-}
-.tc-queue {
-  list-style: none;
-  margin: 0;
-  padding: 4px 22px;
-  max-height: 180px;
-  overflow: auto;
-}
-.tc-queue li {
+.tilde-chat .prompt-reply {
+  width: calc(100% - 24px);
+  margin: 0 auto 10px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
-  gap: 3px;
-  background: #f5f2ed;
-  border-radius: 8px;
-  margin: 4px 0;
-  padding: 5px;
-}
-.tc-queue li > span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tc-queue button {
-  font-size: 12px;
-  padding: 4px;
-}
-.tc-sidebar {
-  height: 100%;
-  overflow: auto;
-  background: #f3efe8;
-  padding: 16px;
-  min-width: 230px;
-}
-.tc-sidebar > header {
-  display: grid;
   gap: 12px;
-  margin-bottom: 20px;
+  border: 0.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
-.tc-sidebar input {
-  width: 100%;
-}
-.tc-agent-group > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.tc-agent-group h3 {
-  font-size: 13px;
-}
-.tc-agent-group ul {
-  list-style: none;
-  padding: 0;
-  margin: 4px 0;
-}
-.tc-agent-group li {
-  display: flex;
-  align-items: center;
-  border-radius: 10px;
-  position: relative;
-}
-.tc-agent-group li.tc-selected {
-  background: white;
-  box-shadow: 0 1px 4px #0001;
-}
-.tc-session-select {
+.tilde-chat .prompt-reply > div {
   min-width: 0;
   flex: 1;
-  text-align: left;
 }
-.tc-session-select > span {
-  display: block;
+.tilde-chat .prompt-reply strong {
+  font-size: 11px;
+  color: var(--ink-2);
 }
-.tc-session-select strong,
-.tc-session-select small {
-  display: block;
+.tilde-chat .prompt-reply p {
+  margin: 3px 0 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--ink-3);
 }
-.tc-session-select strong {
-  font-weight: 500;
-}
-.tc-unread {
-  float: left;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--tc-accent);
-  margin: 7px 6px 0 0;
-}
-.tc-session-menu summary {
-  cursor: pointer;
-  padding: 8px;
-  list-style: none;
-}
-.tc-session-menu > div {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 3;
-  background: white;
-  border: 1px solid var(--tc-line);
-  box-shadow: 0 4px 12px #0002;
+.tilde-chat .prompt-reply button {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
   display: grid;
-  border-radius: 8px;
-  padding: 6px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--ink-2);
 }
-.tc-rename {
-  position: sticky;
-  bottom: 0;
-  background: white;
-  border: 1px solid var(--tc-line);
-  padding: 12px;
-  border-radius: 10px;
+.tilde-chat .prompt-reply button svg {
+  width: 14px;
+  height: 14px;
 }
-.tc-rename label {
-  display: block;
+.tilde-chat .prompt-notices {
+  position: relative;
+  min-height: 30px;
   margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.tilde-chat .prompt-notices > * {
+  pointer-events: auto;
+}
+.tilde-chat .prompt-status {
+  grid-column: 3;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 0.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--red);
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  box-shadow: var(--shadow-hairline);
+}
+.tilde-chat .prompt-status[data-kind="action-needed"] {
+  color: var(--orange);
+}
+.tilde-chat .prompt-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.tilde-chat .chat-prompt .prompt-notices .scroll-latest {
+  max-width: none;
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  inset: auto;
+  transform: none;
+  margin: 0;
+  justify-self: center;
+}
+.tilde-chat.rich-chat .chat-pane:has(> .chat-prompt) {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.tilde-chat.rich-chat .chat-pane:has(> .chat-prompt) > .conversation {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: calc(var(--composer-dock-height, 72px) + 24px);
+}
+.tilde-chat.rich-chat .chat-pane > .chat-prompt {
+  position: absolute;
+  z-index: 10;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  width: min(680px, calc(100% - 32px));
+  margin: 0 auto;
+}
+.tilde-chat.rich-chat .composer .pending-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(260px, 100%);
+  padding: 4px 6px;
+}
+.tilde-chat.rich-chat .composer .pending-file > span:not(.attachment-glyph) {
+  min-width: 0;
+  flex: 1;
+}
+.tilde-chat.rich-chat .composer .pending-file strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat.rich-chat .composer .pending-file .file-thumb,
+.tilde-chat.rich-chat .composer .pending-file .attachment-glyph {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--hover);
+}
+.tilde-chat.rich-chat .composer .pending-file button {
+  position: static;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hover);
+}
+@media (max-width: 720px) {
+  .tilde-chat.rich-chat .chat-pane > .chat-prompt {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    bottom: max(2px, env(safe-area-inset-bottom));
+    width: calc(100% - 8px);
+    margin: 0;
+  }
+}
+@media (max-width: 720px) {
+  .tilde-chat .prompt-notices {
+    grid-template-columns: 1fr auto 1fr;
+    gap: 4px;
+  }
+}
+.tilde-chat .chat-header {
+  position: relative;
+}
+.tilde-chat .chat-header .chat-identity {
+  min-width: 0;
+  flex: 1;
+}
+.tilde-chat .chat-header .chat-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tilde-chat .chat-header .chat-title h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .chat-header .chat-name-edit {
+  display: grid;
+  place-items: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--ink-3);
+  background: transparent;
+}
+.tilde-chat .chat-name-edit svg {
+  width: 13px;
+  height: 13px;
+}
+.tilde-chat .chat-header .chat-actions[hidden] {
+  display: none;
+}
+.tilde-chat .chat-header-find {
+  flex: 0 1 320px;
+  min-width: 0;
+  margin-left: auto;
+}
+.tilde-chat .chat-header[data-find-open="true"] .chat-identity {
+  flex: 1;
+  max-width: calc(100% - 326px);
+}
+.tilde-chat .chat-header[data-find-open="true"] .chat-name-edit {
+  display: none;
+}
+.tilde-chat .chat-find-bar {
+  width: 320px;
+  max-width: 100%;
+  gap: 0;
+}
+.tilde-chat .chat-find-icon {
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+}
+.tilde-chat .chat-find-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.7;
+}
+.tilde-chat .chat-find-bar input {
+  width: auto;
+  flex: 1;
+}
+.tilde-chat .chat-find-bar button {
+  flex: 0 0 22px;
+  width: 22px;
+}
+.tilde-chat .chat-find-bar > i {
+  margin-inline: 2px;
+  flex: 0 0 0.5px;
 }
 @media (max-width: 600px) {
-  .tc-header {
-    padding: 12px;
-    flex-wrap: wrap;
-  }
-  .tc-header input {
-    max-width: 100%;
-    width: 100%;
-  }
-  .tc-transcript {
-    padding: 12px;
-  }
-  .tilde-chat.tc-live .composer-shell {
-    padding: 8px;
-  }
-  .tc-queue {
-    padding: 4px 8px;
-    max-height: 130px;
-  }
-  .tc-queue li {
-    flex-wrap: wrap;
-  }
-  .tc-queue li > span {
-    flex-basis: 100%;
+  .tilde-chat .chat-header[data-find-open="true"] .chat-title {
+    display: none;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .tilde-chat.tc-live * {
-    scroll-behavior: auto !important;
-    animation: none !important;
-    transition: none !important;
+@media (max-width: 600px) {
+  .tilde-chat .chat-header-find {
+    flex: 0 1 320px;
+    max-width: calc(100% - 34px);
+  }
+}
+@media (max-width: 600px) {
+  .tilde-chat .chat-header[data-find-open="true"] .chat-identity {
+    flex: 0 0 28px;
+    max-width: 28px;
   }
 }
 
-.tilde-chat.tc-live .composer-stop-glyph {
+.tilde-chat .chat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.tilde-chat .chat-header .chat-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tilde-chat .chat-header .chat-title .chat-participant-names {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tilde-chat.rich-chat .composer.prompt-restricted {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 24px;
+}
+.tilde-chat .prompt-restricted > button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hover);
+  color: var(--ink-3);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tilde-chat .prompt-restricted > button svg {
+  width: 16px;
+  height: 16px;
+}
+.tilde-chat .prompt-restricted p {
+  flex: 1;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+.tilde-chat .prompt-source-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.tilde-chat .prompt-join-link {
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.tilde-chat .chat-event {
+  width: 100%;
+  min-width: 0;
+  margin: 10px 0;
+  color: var(--ink-2);
+}
+.tilde-chat .chat-event > * {
+  max-width: 100%;
+}
+.tilde-chat .queue-viewport,
+.tilde-chat .queue-list,
+.tilde-chat .queue-list > .queue-item {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.tilde-chat .queue-list {
+  max-width: 100%;
+}
+.tilde-chat .queue-item .queue-message {
+  flex: 1 1 0px;
+  width: 0;
+}
+.tilde-chat .prompt-above {
+  min-width: 0;
+  pointer-events: none;
+}
+.tilde-chat .prompt-above > * {
+  pointer-events: auto;
+}
+.tilde-chat .chat-prompt .prompt-above .queue-panel {
+  width: 100%;
+}
+.tilde-chat .scroll-latest {
+  min-width: max-content;
+  max-width: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.tilde-chat .scroll-latest,
+.tilde-chat .prompt-status {
+  border: 0.5px solid var(--line);
+  box-shadow: 0 2px 7px -1px var(--ob-shadow-inline-key);
+}
+.tilde-chat .prompt-reply-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--ink-3);
+}
+.tilde-chat .chat-header .chat-people-edit {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  padding: 0;
+  color: var(--ink-3);
+  background: transparent;
+}
+.tilde-chat .chat-header .chat-people-edit svg {
+  width: 15px;
+  height: 15px;
+}
+.tilde-chat .chat-header[data-find-open="true"] .chat-people-edit {
+  display: none;
+}
+.tilde-chat.rich-chat .composer .pending-file button {
+  line-height: 1;
+}
+.tilde-chat.rich-chat .composer .pending-file button svg {
   display: block;
   width: 12px;
   height: 12px;
-  background: currentColor;
-  border-radius: 2px;
+}
+.tilde-chat.rich-chat .composer .prompt-join-link {
+  display: inline;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: none;
+  font: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.tilde-chat .prompt-join-link[aria-disabled="true"] {
+  cursor: wait;
+}
+
+.tilde-chat.rich-chat .composer .markdown-prompt-frame {
+  grid-column: 2;
+  min-width: 0;
+  align-self: center;
+}
+.tilde-chat.rich-chat .composer.expanded .markdown-prompt-frame {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.tilde-chat .markdown-prompt-input {
+  min-height: 28px;
+  max-height: min(480px, 55dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 5px 4px;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tilde-chat .composer:has(.markdown-prompt-input > :nth-child(2)),
+.tilde-chat .composer:has(.markdown-prompt-input ul, .markdown-prompt-input ol) {
+  border-radius: 24px;
+}
+.tilde-chat .markdown-prompt-input p {
+  margin: 0;
+}
+.tilde-chat .markdown-prompt-input p:only-child:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+}
+.tilde-chat .markdown-prompt-input:has(> p:only-child > br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--ink-3);
+  position: absolute;
+  pointer-events: none;
+}
+.tilde-chat .markdown-prompt-input ul,
+.tilde-chat .markdown-prompt-input ol {
+  padding-left: 22px;
+  margin: 4px 0;
+}
+.tilde-chat .markdown-prompt-input ul {
+  list-style: disc;
+}
+.tilde-chat .markdown-prompt-input ol {
+  list-style: decimal;
+}
+.tilde-chat .markdown-prompt-input li {
+  display: list-item;
+}
+.tilde-chat .markdown-prompt-input strong {
+  font-weight: 650;
+}
+.tilde-chat .markdown-prompt-input em {
+  font-style: italic;
+}
+.tilde-chat .markdown-prompt-input blockquote {
+  border-left: 2px solid var(--line-strong);
+  margin: 4px 0;
+  padding-left: 10px;
+}
+.tilde-chat .markdown-prompt-input pre {
+  padding: 6px;
+  background: var(--hover);
+  border-radius: 6px;
+  white-space: pre-wrap;
+}
+
+.tilde-chat .message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+  max-width: 100%;
+  align-self: stretch;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.tilde-chat .message.user .message-attachments {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+.tilde-chat .message-attachments:first-child {
+  margin-top: 0;
+}
+.tilde-chat .message-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: min(300px, 100%);
+  padding: 5px 8px;
+  border: 0.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+.tilde-chat .message-attachment-chip .file-thumb,
+.tilde-chat .message-attachment-chip .attachment-glyph {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--hover);
+}
+.tilde-chat .message-attachment-chip .attachment-glyph svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+}
+.tilde-chat .message-attachment-chip > span:last-child {
+  min-width: 0;
+}
+.tilde-chat .message-attachment-chip strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 500;
+}
+.tilde-chat .message-attachment-chip small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+@media (max-width: 720px) {
+  .tilde-chat .markdown-prompt-input {
+    font-size: 16px;
+    line-height: 22px;
+  }
+}
+.tilde-chat .message-bubble:has(.audio-player) {
+  padding: 8px 12px;
+}
+.tilde-chat.rich-chat .message.continued-previous {
+  margin-top: 0;
+}
+.tilde-chat.rich-chat .message:not(.user) + .message:not(.user),
+.tilde-chat.rich-chat .message.user + .message.user {
+  margin-top: 0;
+}
+.tilde-chat .transcript-time-separator {
+  justify-content: center;
+  margin: 18px 0 12px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 650;
+}
+.tilde-chat .transcript-time-separator:first-child {
+  margin-top: 0;
+}
+.tilde-chat.rich-chat .composer.prompt-restricted .prompt-source-label {
+  font: inherit;
+  color: inherit;
+}
+.tilde-chat .message[data-tone="warning"] > .message-bubble {
+  background: var(--ob-fill-warning);
+  color: var(--warning-ink, #141414);
+}
+.tilde-chat .message[data-tone="warning"] .message-bubble p {
+  margin: 0;
+  font: inherit;
+}
+
+.tilde-chat .message-notice {
+  display: flex;
+  align-self: stretch;
+  justify-content: flex-start;
+  margin-top: 2px;
+}
+.tilde-chat .message.user .message-notice {
+  justify-content: flex-end;
+}
+.tilde-chat .message-notice > .message-send-notice {
+  width: auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.tilde-chat .message-notice > .message-send-notice {
+  margin: 0;
+}
+/* ── Tilde ──────────────────────────────────────────────────────────────────
+ * The embeddable frame around Dispatch's chat pane, and the session list (a CSS port of
+ * Dispatch's sidebar rows in workspace-sidebar.tsx and sidebar-components.tsx). Resets use
+ * :where() so every Dispatch rule above still wins, and nothing leaks to the host page. */
+:where(.tilde-chat) *,
+:where(.tilde-chat) ::before,
+:where(.tilde-chat) ::after {
+  box-sizing: border-box;
+}
+:where(.tilde-chat) :is(button, input, textarea) {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+:where(.tilde-chat) button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+:where(.tilde-chat) button:disabled {
+  cursor: default;
+}
+:where(.tilde-chat) :is(h2, h3, p, ol, ul, blockquote, figure) {
+  margin: 0;
+}
+/* Hosts often give headings a display face; chat headings stay in the system stack. */
+.tilde-chat :is(h1, h2, h3, h4) {
+  font-family: inherit;
+}
+:where(.tilde-chat) :is(ol, ul) {
+  padding: 0;
+  list-style: none;
+}
+:where(.tilde-chat) svg {
+  flex-shrink: 0;
+}
+
+/* AgentAvatar's own layout (packages/agent-avatar), so hosts need not scan its Tailwind classes. */
+.tilde-chat [data-avatar-key] {
+  position: relative;
+  display: flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+.tilde-chat [data-avatar-key] > .agent-avatar-orbit {
+  position: absolute;
+  inset: -4%;
+  transition: opacity 200ms;
+}
+.tilde-chat [data-avatar-key] > .agent-avatar-mark {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Chat: the pane fills whatever bounded box the host gives it. */
+.tilde-chat.tc-chat {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tilde-chat.tc-chat > .chat-pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.tilde-chat.tc-chat .chat-pane > .chat-header {
+  display: flex;
+  height: 52px;
+  min-height: 52px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+}
+.tilde-chat.tc-chat .chat-pane > .conversation {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Dispatch's 4vw gutter assumes a full-window pane; embedded panes use its preview gutter. */
+  padding-inline: 28px;
+}
+@media (max-width: 720px) {
+  .tilde-chat.tc-chat .chat-pane > .conversation {
+    padding-inline: 16px;
+  }
+}
+.tilde-chat .message-list {
+  display: flex;
+  flex-direction: column;
+}
+.tilde-chat .chat-title .chat-status {
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 14px;
+}
+.tilde-chat .chat-actions {
+  display: flex;
+  align-items: center;
+}
+.tilde-chat .chat-actions > .chat-resume {
+  width: auto;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--field);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tilde-chat.tc-chat .chat-actions svg circle {
+  /* Dispatch fills circles here for its dot icons; the find glyph is an outline. */
+  fill: none;
+  stroke: currentColor;
+}
+.tilde-chat .chat-header-find {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.tilde-chat .message-sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px 2px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+}
+.tilde-chat .message-sender > [data-avatar-key] {
+  width: 18px;
+  height: 18px;
+}
+.tilde-chat .message-quote {
+  max-width: 100%;
+  margin: 0 0 4px;
+  padding: 4px 10px;
+  overflow: hidden;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .message.user .message-quote {
+  align-self: flex-end;
+}
+.dark .tilde-chat .message-actions,
+.dark .tilde-chat .message-menu {
+  border-color: var(--line-strong);
+  box-shadow: 0 5px 18px #0000005c;
+}
+.dark .tilde-chat :is(.message-actions, .message-menu) button:hover {
+  background: var(--hover);
+}
+.tilde-chat .message-menu button {
+  font-size: 12px;
+}
+.tilde-chat .tc-load-earlier {
+  align-self: center;
+  margin: 0 0 16px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  background: var(--hover);
+  font-size: 12px;
+}
+.tilde-chat .tc-load-earlier:hover {
+  color: var(--ink);
+  background: var(--hover-2);
+}
+.tilde-chat .tc-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: auto;
+  padding: 32px 16px;
+  color: var(--ink-3);
+  font-size: 13px;
+  text-align: center;
+}
+.tilde-chat .tc-state button {
+  padding: 5px 12px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--field);
+  font-size: 12px;
+  font-weight: 500;
+}
+.tilde-chat .tc-attachment {
+  max-width: min(360px, 100%);
+  margin: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--bubble-agent);
+  font-size: 12px;
+}
+.tilde-chat .tc-attachment :is(img, video) {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+}
+.tilde-chat .tc-attachment figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--ink-2);
+}
+.tilde-chat .tc-attachment a {
+  color: var(--ink);
+}
+
+/* Session list. */
+.tilde-chat.tc-sessions {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--rail-surface);
+}
+.tilde-chat .tc-sessions-search {
+  padding: 12px 12px 4px;
+}
+.tilde-chat .tc-search {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-3);
+  background: var(--inset);
+  font-size: 12.5px;
+  line-height: 18px;
+  transition: background-color 150ms;
+}
+.tilde-chat .tc-search:hover {
+  background: var(--hover);
+}
+.tilde-chat .tc-search:focus-within {
+  border-color: var(--line-strong);
+}
+.tilde-chat .tc-search > svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.tilde-chat .tc-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  outline: none;
+  font-size: 12.5px;
+}
+.tilde-chat .tc-search input::placeholder {
+  color: var(--ink-3);
+}
+.tilde-chat .tc-search kbd {
+  display: flex;
+  height: 18px;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: 5px;
+  color: var(--ink-3);
+  background: var(--surface);
+  box-shadow: var(--shadow-hairline);
+  font-family: inherit;
+  font-size: 10px;
+}
+.tilde-chat .tc-sessions-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+}
+.tilde-chat .tc-agent-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px 4px 8px;
+}
+.tilde-chat .tc-agent-group h3 {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+}
+.tilde-chat .tc-agent-group > header > button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ink-2);
+  transition: background-color 150ms;
+}
+.tilde-chat .tc-agent-group > header > button:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.tilde-chat .tc-agent-group svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+.tilde-chat .tc-agent-group ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tilde-chat .tc-agent-group li {
+  position: relative;
+}
+.tilde-chat .tc-group-empty {
+  padding: 4px 8px 8px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.tilde-chat .tc-session-row {
+  display: flex;
+  width: 100%;
+  height: 54px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: 8px;
+  text-align: left;
+  transition:
+    background-color 150ms,
+    transform 150ms;
+}
+.tilde-chat button.tc-session-row:hover {
+  background: var(--hover);
+}
+.tilde-chat button.tc-session-row:active {
+  transform: scale(0.98);
+}
+.tilde-chat li[data-selected] > .tc-session-row {
+  background: var(--hover-2);
+}
+.tilde-chat .tc-session-meta {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 1px;
+}
+.tilde-chat .tc-session-meta > strong {
+  overflow: hidden;
+  padding-right: 22px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .tc-session-row[data-unread] .tc-session-meta > strong {
+  font-weight: 600;
+}
+.tilde-chat .tc-session-meta > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tilde-chat .tc-session-meta small {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.375;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tilde-chat .tc-session-row[data-unread] small {
+  color: var(--ink-2);
+}
+.tilde-chat .tc-unread {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.tilde-chat .tc-session-menu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.tilde-chat .tc-session-menu > summary {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.tilde-chat .tc-session-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.tilde-chat li:hover .tc-session-menu > summary,
+.tilde-chat .tc-session-menu > summary:focus-visible,
+.tilde-chat .tc-session-menu[open] > summary {
+  opacity: 1;
+}
+.tilde-chat .tc-session-menu > summary:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.tilde-chat .tc-session-menu > summary svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.tilde-chat .tc-session-menu > div {
+  position: absolute;
+  z-index: 20;
+  top: 26px;
+  right: 0;
+  width: 164px;
+  padding: 4px;
+  border: 0.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+.tilde-chat .tc-session-menu > div > button {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  color: var(--ink);
+  font-size: 12.5px;
+  text-align: left;
+}
+.tilde-chat .tc-session-menu > div > button:hover {
+  background: var(--hover);
+}
+.tilde-chat .tc-more {
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+}
+.tilde-chat .tc-more:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.tilde-chat .tc-session-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+.tilde-chat .tc-skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: var(--hover-2);
+}
+.tilde-chat .tc-session-skeletons .tc-session-meta {
+  gap: 8px;
+}
+.tilde-chat .tc-session-skeletons i {
+  display: block;
+  width: 42%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--hover-2);
+}
+.tilde-chat .tc-session-skeletons i + i {
+  width: 68%;
+  height: 8px;
+  background: var(--hover);
+}
+.tilde-chat .tc-rename {
+  position: absolute;
+  z-index: 30;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 0.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  font-size: 12.5px;
+}
+.tilde-chat .tc-rename label {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.tilde-chat .tc-rename > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Markdown inside the dark user bubble keeps the bubble's ink. */
+.tilde-chat .message.user .ob-markdown__inline-code {
+  color: inherit;
+  background: #fcfcfc26 !important;
+}
+.tilde-chat .message.user .ob-markdown__link {
+  color: inherit;
+  text-decoration: underline;
+}
+/* Agent bubbles sit on the left edge, so their menu opens rightwards. */
+.tilde-chat .message:not(.user) .message-menu {
+  right: auto;
+  left: 0;
+}
+/* Keyboard reorder buttons stay out of the way until the row is hovered or focused. */
+.tilde-chat .queue-item > button[aria-label^="Move"] {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.tilde-chat .queue-item:is(:hover, :focus-within) > button[aria-label^="Move"] {
+  width: 24px;
+  opacity: 1;
 }

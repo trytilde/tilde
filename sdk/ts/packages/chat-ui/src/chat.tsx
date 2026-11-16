@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Button, Input } from "@trytilde/connection-ui";
+import { ReplyIcon, XIcon } from "lucide-react";
+import { AgentAvatar } from "@trytilde/agent-avatar";
 import {
   ToolDisplay,
   type Message,
@@ -13,6 +14,20 @@ import type { Session } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_p
 import { ChatComposer, type ComposerAttachment } from "./composer.js";
 import { MarkdownText } from "./markdown.js";
 import { AttachmentView } from "./attachments.js";
+import { QueuePanel } from "./queue.js";
+import { ConversationMessage } from "./dispatch/conversation-message.js";
+import { ToolChipsBlock, type ToolChipRow } from "./dispatch/tool-chips-block.js";
+import { TraceBlock } from "./dispatch/trace-block.js";
+import { SearchIcon } from "./dispatch/icons.js";
+import {
+  ChatComposerDock,
+  ChatFindBar,
+  ConversationSkeleton,
+  ScrollToLatestButton,
+  ThinkingIndicator,
+  TranscriptTimeSeparator,
+  dayKey,
+} from "./dispatch/chat-surface.js";
 import {
   randomUUID,
   chatClient,
@@ -70,6 +85,9 @@ function ChatWindow({
   const [matches, setMatches] = useState<Message[]>([]);
   const [matchCursor, setMatchCursor] = useState("");
   const [searching, setSearching] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [menuFor, setMenuFor] = useState<string>();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
@@ -476,267 +494,377 @@ function ChatWindow({
       setPaging(false);
     }
   }
+  const me = session?.thread?.participants.find((p) => p.userId === user?.id);
+  const others = session?.thread?.participants.filter((p) => p.id !== me?.id) ?? [];
+  const agentName = agent?.name || "Chat";
+  const shown = search ? matches : messages;
+  const rows = shown.map((message, index) => {
+    const sameSender = (other?: Message) =>
+      other?.participantId === message.participantId && day(other) === day(message);
+    return {
+      message,
+      own: message.participantId === me?.id,
+      showDay: !search && day(shown[index - 1]) !== day(message),
+      continuedPrevious: sameSender(shown[index - 1]),
+      continuedNext: sameSender(shown[index + 1]),
+    };
+  });
+  const visibleTools = Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN);
+  function jumpToLatest() {
+    stick.current = true;
+    scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: "smooth" });
+    setLatest(false);
+  }
+  function stepMatch(delta: number) {
+    if (!matches.length) return;
+    const next = (matchIndex + delta + matches.length) % matches.length;
+    setMatchIndex(next);
+    scroll.current
+      ?.querySelector(`[data-message-id="${CSS.escape(matches[next].id)}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
   return (
-    <section className={`tilde-chat tc-live tc-window ${className}`} aria-label="Chat">
-      <header className="tc-header">
-        <div>
-          <strong>{session?.thread?.title || agent?.name || "Chat"}</strong>
-          <small>{reconnecting ? "Reconnecting…" : busy ? "Working…" : agent?.name}</small>
-        </div>
-        <Input
-          aria-label="Search messages"
-          placeholder="Find in conversation"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        {session?.run && ["waiting", "failed"].includes(session.run.status) && !busy && (
-          <Button onClick={() => void act(() => client!.resumeRun({ id: session.run!.id }))}>
-            Resume
-          </Button>
-        )}
-      </header>
-      {loading && <p role="status">Loading conversation…</p>}
-      {!loading && !user && error && <Button onClick={onRetry}>Retry connection</Button>}
-      <div
-        className="tc-transcript"
-        ref={scroll}
-        onScroll={() => {
-          const el = scroll.current!;
-          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-          setLatest(!stick.current);
-          if (stick.current) markRead();
-        }}
-      >
-        {!search && before && (
-          <Button disabled={paging} onClick={() => void older()}>
-            {paging ? "Loading…" : "Load earlier messages"}
-          </Button>
-        )}
-        {!loading && !messages.length && (
-          <p className="tc-empty">Start a conversation with {agent?.name}.</p>
-        )}
-        {searching && <p role="status">Searching…</p>}
-        {search && !searching && !matches.length && <p>No matching messages</p>}
-        {search && matchCursor && (
-          <Button
-            onClick={() =>
-              void act(async () => {
-                const page = await client!.searchMessages({
-                  threadId: sessionId,
-                  query: search,
-                  pageToken: matchCursor,
-                  pageSize: 30,
-                });
-                setMatches((old) => [...old, ...page.messages]);
-                setMatchCursor(page.nextPageToken);
-              })
-            }
-          >
-            More matches
-          </Button>
-        )}
-        {(search ? matches : messages).map((message) => {
-          const own =
-            message.participantId ===
-            session?.thread?.participants.find((p) => p.userId === user?.id)?.id;
-          const name =
-            session?.thread?.participants.find((p) => p.id === message.participantId)?.name ||
-            (own ? "You" : agent?.name);
-          return (
-            <article
-              key={message.id}
-              className={`tc-message ${own ? "tc-own" : ""}`}
-              aria-label={`${name} message`}
-            >
-              <small>{name}</small>
-              {message.inReplyToMessageId && (
-                <blockquote>
-                  {messages.find((m) => m.id === message.inReplyToMessageId)?.text ||
-                    "Reply to earlier message"}
-                </blockquote>
-              )}
-              <MarkdownText text={message.text} />
-              {client &&
-                message.attachments.map((attachment) => (
-                  <AttachmentView key={attachment.id} client={client} attachment={attachment} />
-                ))}
-              <footer>
-                <time
-                  dateTime={
-                    message.createdAt
-                      ? new Date(Number(message.createdAt.seconds) * 1000).toISOString()
-                      : undefined
-                  }
-                >
-                  {message.createdAt
-                    ? new Date(Number(message.createdAt.seconds) * 1000).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : ""}
-                </time>
-                <Button
-                  onClick={() => {
-                    setReply(message);
-                    inputRef.current?.focus();
-                  }}
-                >
-                  Reply
-                </Button>
-                <Button onClick={() => void navigator.clipboard.writeText(message.text)}>
-                  Copy
-                </Button>
-                {message.status === "aborted" && <span>Interrupted</span>}
-              </footer>
-            </article>
-          );
-        })}
-        {reasoning && (
-          <details className="tc-reasoning">
-            <summary>Reasoning</summary>
-            <MarkdownText text={reasoning} />
-          </details>
-        )}
-        {/* The server already withholds hidden calls and summary-only detail; this only lays out
-            what arrives. */}
-        {Object.values(tools)
-          .filter((tool) => tool.display !== ToolDisplay.HIDDEN)
-          .map((tool) =>
-            tool.display === ToolDisplay.SUMMARY ? (
-              <p key={tool.id} className="tc-tool">
-                {tool.summary || tool.name} · {tool.status}
-              </p>
+    <section className={`tilde-chat rich-chat tc-chat ${className}`} aria-label="Chat">
+      <div className="chat-pane">
+        <header className="chat-header" data-find-open={findOpen || undefined}>
+          <div className="chat-identity">
+            {agent ? (
+              <AgentAvatar id={agent.id} state={busy ? "working" : "idle"} />
             ) : (
-              <details key={tool.id} className="tc-tool">
-                <summary>
-                  {tool.summary || tool.name} · {tool.status}
-                </summary>
-                <pre>{tool.inputJson}</pre>
-                <pre>{tool.outputJson || tool.error}</pre>
-              </details>
-            ),
-          )}
-        {typing && <p role="status">{typing} is typing…</p>}
-      </div>
-      {latest && (
-        <Button
-          className="tc-latest"
-          onClick={() => {
-            stick.current = true;
-            scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: "smooth" });
-            setLatest(false);
-            setSearch("");
+              <span className="agent-avatar">{agentName.charAt(0).toUpperCase()}</span>
+            )}
+            <div className="chat-title">
+              <h2
+                title={
+                  session?.thread?.title ? `${agentName} · ${session.thread.title}` : agentName
+                }
+              >
+                <span className="chat-participant-names">{agentName}</span>
+                {session?.thread?.title ? (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    <span>{session.thread.title}</span>
+                  </>
+                ) : null}
+              </h2>
+              {reconnecting || busy ? (
+                <span className="chat-status" role="status">
+                  {reconnecting ? "Reconnecting…" : "Working…"}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          {findOpen ? (
+            <div className="chat-header-find">
+              <ChatFindBar
+                query={search}
+                matchCount={matches.length}
+                currentOrdinal={matches.length ? matchIndex + 1 : 0}
+                loading={searching}
+                onQueryChange={(value) => {
+                  setSearch(value);
+                  setMatchIndex(0);
+                }}
+                onStepNext={() => stepMatch(1)}
+                onStepPrevious={() => stepMatch(-1)}
+                onClose={() => {
+                  setFindOpen(false);
+                  setSearch("");
+                }}
+              />
+            </div>
+          ) : null}
+          <div className="chat-actions" hidden={findOpen}>
+            {session?.run && ["waiting", "failed"].includes(session.run.status) && !busy ? (
+              <button
+                type="button"
+                className="chat-resume"
+                onClick={() => void act(() => client!.resumeRun({ id: session.run!.id }))}
+              >
+                Resume
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label="Find in conversation"
+              title="Find in conversation"
+              onClick={() => setFindOpen(true)}
+            >
+              <SearchIcon />
+            </button>
+          </div>
+        </header>
+        <div
+          className="conversation"
+          aria-live="polite"
+          ref={scroll}
+          onScroll={() => {
+            const el = scroll.current!;
+            stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+            setLatest(!stick.current);
+            if (stick.current) markRead();
           }}
         >
-          Jump to latest
-        </Button>
-      )}
-      {queue.length > 0 && (
-        <ol className="tc-queue" aria-label="Queued messages">
-          {queue.map((item, index) => (
-            <li
-              key={item.id}
-              draggable
-              onDragStart={(event) => event.dataTransfer.setData("text/tilde-queue", item.id)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                const id = event.dataTransfer.getData("text/tilde-queue");
-                if (queue.some((q) => q.id === id))
-                  void act(() =>
-                    client!.reorderQueuedMessage({ threadId: sessionId, id, beforeId: item.id }),
-                  );
-              }}
-            >
-              <span>{item.text}</span>
-              <Button
-                aria-label="Move queued message up"
-                disabled={index === 0}
-                onClick={() =>
-                  void act(() =>
-                    client!.reorderQueuedMessage({
-                      threadId: sessionId,
-                      id: item.id,
-                      beforeId: queue[index - 1].id,
-                    }),
-                  )
-                }
+          {loading ? (
+            <ConversationSkeleton />
+          ) : (
+            <div className="message-list">
+              {!user && error ? (
+                <div className="tc-state" role="alert">
+                  <p>{error}</p>
+                  <button type="button" onClick={onRetry}>
+                    Retry connection
+                  </button>
+                </div>
+              ) : null}
+              {!search && before ? (
+                <button
+                  type="button"
+                  className="tc-load-earlier"
+                  disabled={paging}
+                  onClick={() => void older()}
+                >
+                  {paging ? "Loading…" : "Load earlier messages"}
+                </button>
+              ) : null}
+              {user && !messages.length ? (
+                <div className="tc-state">
+                  {agent ? <AgentAvatar id={agent.id} /> : null}
+                  <p>Start a conversation with {agent?.name}.</p>
+                </div>
+              ) : null}
+              {search && !searching && !matches.length ? (
+                <p className="tc-state">No matching messages</p>
+              ) : null}
+              {rows.map(({ message, own, showDay, continuedPrevious, continuedNext }) => {
+                const created = message.createdAt
+                  ? new Date(Number(message.createdAt.seconds) * 1000)
+                  : undefined;
+                const sender =
+                  others.length > 1 && !own
+                    ? session?.thread?.participants.find((p) => p.id === message.participantId)
+                    : undefined;
+                const quoted = message.inReplyToMessageId
+                  ? messages.find((m) => m.id === message.inReplyToMessageId)?.text ||
+                    "Reply to earlier message"
+                  : undefined;
+                return (
+                  <Fragment key={message.id}>
+                    {showDay && created ? (
+                      <TranscriptTimeSeparator dateTime={dayKey(created)} />
+                    ) : null}
+                    <ConversationMessage
+                      messageId={message.id}
+                      role={own ? "user" : "assistant"}
+                      createdAt={created?.toISOString() ?? ""}
+                      continuedPrevious={continuedPrevious}
+                      continuedNext={continuedNext}
+                      mediaOnly={!message.text.trim() && message.attachments.length > 0}
+                      sender={
+                        sender ? (
+                          <>
+                            {sender.agentId ? <AgentAvatar id={sender.agentId} /> : null}
+                            <span>{sender.name}</span>
+                          </>
+                        ) : undefined
+                      }
+                      quote={quoted}
+                      attachments={
+                        client && message.attachments.length
+                          ? message.attachments.map((attachment) => (
+                              <AttachmentView
+                                key={attachment.id}
+                                client={client}
+                                attachment={attachment}
+                              />
+                            ))
+                          : undefined
+                      }
+                      notice={message.status === "aborted" ? "Interrupted" : undefined}
+                      menuOpen={menuFor === message.id}
+                      onReply={() => {
+                        setReply(message);
+                        inputRef.current?.focus();
+                      }}
+                      onToggleMenu={() =>
+                        setMenuFor((open) => (open === message.id ? undefined : message.id))
+                      }
+                      onCopy={() => {
+                        setMenuFor(undefined);
+                        void navigator.clipboard.writeText(message.text);
+                      }}
+                    >
+                      {message.text.trim() ? <MarkdownText text={message.text} /> : null}
+                    </ConversationMessage>
+                  </Fragment>
+                );
+              })}
+              {search && matchCursor ? (
+                <button
+                  type="button"
+                  className="tc-load-earlier"
+                  onClick={() =>
+                    void act(async () => {
+                      const page = await client!.searchMessages({
+                        threadId: sessionId,
+                        query: search,
+                        pageToken: matchCursor,
+                        pageSize: 30,
+                      });
+                      setMatches((old) => [...old, ...page.messages]);
+                      setMatchCursor(page.nextPageToken);
+                    })
+                  }
+                >
+                  More matches
+                </button>
+              ) : null}
+              {!search && reasoning ? (
+                <div className="chat-event" role="group" aria-label="Reasoning">
+                  <TraceBlock
+                    activeLabel="Thinking"
+                    doneLabel="Reasoning"
+                    working={busy}
+                    rows={reasoning
+                      .split(/\n{2,}/)
+                      .filter(Boolean)
+                      .map((text, i) => ({ id: String(i), primary: text, prose: true }))}
+                  />
+                </div>
+              ) : null}
+              {/* The server already withholds hidden calls and summary-only detail; this only
+                  lays out what arrives. */}
+              {!search && visibleTools.length ? (
+                <div className="chat-event" role="group" aria-label="Tool calls">
+                  <ToolChipsBlock
+                    headerLabel={`${visibleTools.length} tool call${visibleTools.length === 1 ? "" : "s"}`}
+                    rows={visibleTools.map(toolRow)}
+                  />
+                </div>
+              ) : null}
+              {!search && typing ? (
+                <ThinkingIndicator>{typing} is typing…</ThinkingIndicator>
+              ) : null}
+              {!search && !typing && busy ? (
+                <ThinkingIndicator>{agentName} is working…</ThinkingIndicator>
+              ) : null}
+            </div>
+          )}
+        </div>
+        <ChatComposerDock>
+          {reply ? (
+            <div className="prompt-reply" aria-label="Replying to message">
+              <ReplyIcon className="prompt-reply-icon" aria-hidden />
+              <div>
+                <strong>
+                  {session?.thread?.participants.find((p) => p.id === reply.participantId)?.name ||
+                    agentName}
+                </strong>
+                <p>{reply.text}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Cancel reply"
+                disabled={submitting}
+                onClick={() => setReply(undefined)}
               >
-                ↑
-              </Button>
-              <Button
-                aria-label="Move queued message down"
-                disabled={index === queue.length - 1}
-                onClick={() =>
-                  void act(() =>
-                    client!.reorderQueuedMessage({
-                      threadId: sessionId,
-                      id: item.id,
-                      beforeId: queue[index + 2]?.id ?? "",
-                    }),
-                  )
-                }
-              >
-                ↓
-              </Button>
-              <Button
-                onClick={() =>
-                  void act(() => client!.steerQueuedMessage({ threadId: sessionId, id: item.id }))
-                }
-              >
-                Steer now
-              </Button>
-              <Button
-                onClick={() =>
-                  void act(async () => {
-                    await client!.removeQueuedMessage({ threadId: sessionId, id: item.id });
-                    form.setValue("draft", item.text);
-                    inputRef.current?.focus();
-                  })
-                }
-              >
-                Edit
-              </Button>
-              <Button
-                onClick={() =>
-                  void act(() => client!.removeQueuedMessage({ threadId: sessionId, id: item.id }))
-                }
-              >
-                Remove
-              </Button>
-            </li>
-          ))}
-        </ol>
-      )}
-      <ChatComposer
-        agentAvailable={!!client && !loading}
-        busy={busy}
-        submitting={submitting}
-        dragging={dragging}
-        expanded={draft.includes("\n")}
-        draft={draft}
-        error={error}
-        reply={reply ? { label: "Replying", text: reply.text } : undefined}
-        attachments={files}
-        inputRef={inputRef}
-        fileInputRef={fileInputRef}
-        onSubmit={form.handleSubmit(send)}
-        onDraftChange={(value) => {
-          form.setValue("draft", value);
-          if (!value || Date.now() - lastTyping.current > 2000) sendTyping(!!value);
-        }}
-        onDragStateChange={setDragging}
-        onFilesAdded={addFiles}
-        onRemoveAttachment={removeFile}
-        onCancelReply={() => setReply(undefined)}
-        onStop={() =>
-          void act(() => client!.cancelInvocation({ invocationId: session!.run!.invocationId }))
-        }
-        onFocus={() => sendTyping(true)}
-        onBlur={() => sendTyping(false)}
-      />
+                <XIcon aria-hidden />
+              </button>
+            </div>
+          ) : (
+            <div className="prompt-above">
+              {latest ? (
+                <div className="prompt-notices">
+                  <ScrollToLatestButton
+                    onClick={() => {
+                      jumpToLatest();
+                      setSearch("");
+                    }}
+                  />
+                </div>
+              ) : null}
+              {queue.length > 0 ? (
+                <QueuePanel
+                  items={queue}
+                  onMove={(id, beforeId) =>
+                    void act(() =>
+                      client!.reorderQueuedMessage({ threadId: sessionId, id, beforeId }),
+                    )
+                  }
+                  onSteer={(id) =>
+                    void act(() => client!.steerQueuedMessage({ threadId: sessionId, id }))
+                  }
+                  onEdit={(item) =>
+                    void act(async () => {
+                      await client!.removeQueuedMessage({ threadId: sessionId, id: item.id });
+                      form.setValue("draft", item.text);
+                      inputRef.current?.focus();
+                    })
+                  }
+                  onRemove={(id) =>
+                    void act(() => client!.removeQueuedMessage({ threadId: sessionId, id }))
+                  }
+                />
+              ) : null}
+            </div>
+          )}
+          <ChatComposer
+            agentAvailable={!!client && !loading}
+            busy={busy}
+            submitting={submitting}
+            dragging={dragging}
+            expanded={draft.includes("\n")}
+            draft={draft}
+            error={error}
+            attachments={files}
+            inputRef={inputRef}
+            fileInputRef={fileInputRef}
+            onSubmit={form.handleSubmit(send)}
+            onDraftChange={(value) => {
+              form.setValue("draft", value);
+              if (!value || Date.now() - lastTyping.current > 2000) sendTyping(!!value);
+            }}
+            onDragStateChange={setDragging}
+            onFilesAdded={addFiles}
+            onRemoveAttachment={removeFile}
+            onStop={() =>
+              void act(() => client!.cancelInvocation({ invocationId: session!.run!.invocationId }))
+            }
+            onFocus={() => sendTyping(true)}
+            onBlur={() => sendTyping(false)}
+          />
+        </ChatComposerDock>
+      </div>
     </section>
   );
+}
+function day(message?: Message) {
+  return message?.createdAt ? dayKey(new Date(Number(message.createdAt.seconds) * 1000)) : "";
+}
+function toolRow(tool: ToolCall): ToolChipRow {
+  const failed = Boolean(tool.error) || /fail|error/.test(tool.status);
+  const detail =
+    tool.display === ToolDisplay.SUMMARY
+      ? undefined
+      : [
+          ...(tool.inputJson ? [{ text: "Input" }, ...lines(tool.inputJson)] : []),
+          ...(tool.outputJson ? [{ text: "Output" }, ...lines(tool.outputJson)] : []),
+          ...(tool.error ? lines(tool.error, "error") : []),
+        ];
+  return {
+    id: tool.id,
+    icon: "tool",
+    label: tool.summary || tool.name,
+    chip: tool.summary ? tool.name : undefined,
+    mono: true,
+    detailMono: true,
+    detail: detail?.length ? detail : undefined,
+    failed,
+    pending: !failed && /running|pending|started/.test(tool.status),
+  };
+}
+function lines(text: string, tone?: "error") {
+  return text.split("\n").map((line) => ({ text: line, ...(tone ? { tone } : {}) }));
 }
 function sortMessages(messages: Message[]) {
   return messages.sort(

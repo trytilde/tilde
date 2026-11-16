@@ -1,19 +1,29 @@
-// From trytilde/dispatch chat-components.tsx; trace source action and timestamp label added.
-import type { ReactNode, SVGProps } from "react";
+// From trytilde/dispatch packages/ui/src/chat-components.tsx (a655a4f). See ../../LICENSE.dispatch.
+// Added: a group sender line, the quoted reply, hover Reply/Copy actions, and trace navigation.
+import type { ReactNode } from "react";
+import { MoreIcon, ReplyIcon } from "./icons.js";
+
 export interface ConversationMessageProps {
   role: string;
   createdAt: string;
   timestampLabel?: string;
+  messageId?: string;
+  tone?: "warning";
+  /** Shown above the first bubble of a group, e.g. the sender in a multi-party chat. */
+  sender?: ReactNode;
+  /** The message this one replies to. */
+  quote?: ReactNode;
+  attachments?: ReactNode;
+  notice?: ReactNode;
   onInspect?: () => void;
   continuedPrevious?: boolean;
   continuedNext?: boolean;
   /** Message is attachments only — the bubble renders bare. */
   mediaOnly?: boolean;
-  children: ReactNode;
+  children?: ReactNode;
   menuOpen?: boolean;
   onReply?: () => void;
   onToggleMenu?: () => void;
-  onStartThread?: () => void;
   onCopy?: () => void;
 }
 
@@ -21,6 +31,12 @@ export function ConversationMessage({
   role,
   createdAt,
   timestampLabel,
+  messageId,
+  tone,
+  sender,
+  quote,
+  attachments,
+  notice,
   onInspect,
   continuedPrevious = false,
   continuedNext = false,
@@ -29,15 +45,20 @@ export function ConversationMessage({
   menuOpen = false,
   onReply,
   onToggleMenu,
-  onStartThread,
   onCopy,
 }: ConversationMessageProps) {
   return (
     <article
+      data-message-id={messageId}
+      data-tone={tone}
       aria-label={role === "user" ? "Your message" : "Agent message"}
       className={`message ${role} ${continuedPrevious ? "continued-previous" : "group-start"} ${continuedNext ? "continued-next" : ""} ${mediaOnly ? "media-only" : ""}`}
     >
-      <div className="message-bubble">{children}</div>
+      {sender && !continuedPrevious ? <div className="message-sender">{sender}</div> : null}
+      {quote ? <blockquote className="message-quote">{quote}</blockquote> : null}
+      {children ? <div className="message-bubble">{children}</div> : null}
+      {attachments ? <div className="message-attachments">{attachments}</div> : null}
+      {notice ? <div className="message-notice">{notice}</div> : null}
       <div className="message-footer">
         <time dateTime={createdAt}>{timestampLabel ?? formatTime(createdAt)}</time>
         {onInspect && (
@@ -49,24 +70,24 @@ export function ConversationMessage({
       {onReply || onToggleMenu ? (
         <div className="message-actions">
           {onReply ? (
-            <button aria-label="Reply" onClick={onReply}>
+            <button type="button" aria-label="Reply" title="Reply" onClick={onReply}>
               <ReplyIcon />
             </button>
           ) : null}
           {onToggleMenu ? (
-            <button aria-label="More message actions" onClick={onToggleMenu}>
-              <MoreIcon />
+            <button
+              type="button"
+              aria-label="More message actions"
+              aria-expanded={menuOpen}
+              onClick={onToggleMenu}
+            >
+              <MoreIcon className="more-icon" />
             </button>
           ) : null}
           {menuOpen ? (
             <div className="message-menu" role="menu">
-              {onStartThread ? (
-                <button role="menuitem" onClick={onStartThread}>
-                  Start a thread
-                </button>
-              ) : null}
               {onCopy ? (
-                <button role="menuitem" onClick={onCopy}>
+                <button type="button" role="menuitem" onClick={onCopy}>
                   Copy
                 </button>
               ) : null}
@@ -78,26 +99,9 @@ export function ConversationMessage({
   );
 }
 
-function formatTime(value: string): string {
+export function formatTime(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.valueOf())
     ? ""
-    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-export function MoreIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" {...props}>
-      <circle cx="3.25" cy="8" r="1" />
-      <circle cx="8" cy="8" r="1" />
-      <circle cx="12.75" cy="8" r="1" />
-    </svg>
-  );
-}
-
-export function ReplyIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" {...props}>
-      <path d="m6.75 4-4 4 4 4M3.25 8h5.5c2.25 0 3.75 1.2 4 3.5" />
-    </svg>
-  );
+    : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
