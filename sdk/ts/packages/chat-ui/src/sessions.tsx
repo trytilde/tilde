@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AgentAvatar } from "@trytilde/agent-avatar";
 import { useForm } from "react-hook-form";
 import { Button, Input } from "@trytilde/connection-ui";
 import type { Session } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
+import { MoreIcon, PlusIcon, SearchIcon } from "./dispatch/icons.js";
 import { chatClient, changed, errorText, listAgents, subscribe, type ChatAgent } from "./client.js";
 export interface ListSessionsProps {
   identity: string;
@@ -37,11 +39,22 @@ function Sessions({
   const [editing, setEditing] = useState<{ id: string; agentId: string }>();
   const [busy, setBusy] = useState(false);
   const form = useForm({ defaultValues: { title: "" } });
+  const searchRef = useRef<HTMLInputElement>(null);
   const refresh = () => setVersion((value) => value + 1);
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query), 200);
     return () => clearTimeout(timer);
   }, [query]);
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if (event.key === "k" && (event.metaKey || event.ctrlKey) && !event.defaultPrevented) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", focusSearch);
+    return () => document.removeEventListener("keydown", focusSearch);
+  }, []);
   useEffect(() => {
     const stop = subscribe(proxy, identity, refresh);
     const timer = setInterval(() => {
@@ -130,103 +143,161 @@ function Sessions({
     });
   }
   return (
-    <nav className={`tilde-chat tc-live tc-sidebar ${className}`} aria-label="Chat sessions">
-      <header>
-        <strong>Conversations</strong>
-        <Input
-          aria-label="Search conversations and messages"
-          placeholder="Search conversations…"
-          value={query}
-          onChange={(event) => {
-            setGroups([]);
-            setQuery(event.target.value);
-          }}
-        />
-      </header>
-      {error && (
-        <p role="alert">
-          {error}
-          <Button onClick={refresh}>Retry</Button>
-        </p>
-      )}
-      {loading && <p role="status">Loading conversations…</p>}
-      {groups.map((group) => (
-        <section key={group.agent.id} className="tc-agent-group">
-          <header>
-            <h3>{group.agent.name}</h3>
-            <Button
-              disabled={busy}
-              aria-label={`New conversation with ${group.agent.name}`}
-              onClick={() => void create(group.agent)}
-            >
-              +
-            </Button>
-          </header>
-          {!group.sessions.length && (
-            <p className="tc-empty">
-              {search ? "No matching conversations" : "No conversations yet"}
-            </p>
-          )}
-          <ul>
-            {group.sessions.map((session) => {
-              const thread = session.thread!;
-              const selected =
-                thread.id === selectedSessionId &&
-                (!selectedAgentId || selectedAgentId === group.agent.id);
-              return (
-                <li key={thread.id} className={selected ? "tc-selected" : ""}>
-                  <Button
-                    className="tc-session-select"
-                    aria-current={selected ? "page" : undefined}
-                    onClick={() => onSelectSession(thread.id, group.agent.id)}
-                  >
-                    <span>
-                      {session.unread && <span className="tc-unread" aria-label="Unread" />}
-                      <strong>{thread.title}</strong>
-                      <small>{session.preview}</small>
-                    </span>
-                  </Button>
-                  <details className="tc-session-menu">
-                    <summary aria-label={`Actions for ${thread.title}`}>•••</summary>
-                    <div>
-                      <Button
-                        disabled={busy}
-                        onClick={() => {
-                          setEditing({ id: thread.id, agentId: group.agent.id });
-                          form.reset({ title: thread.title });
-                        }}
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          void act(async () => {
-                            const client = chatClient(proxy, group.agent.id);
-                            const current = await client.getSession({ threadId: thread.id });
-                            await client.setReadState({
-                              threadId: thread.id,
-                              throughSequence: session.unread ? current.sequence : 0n,
-                              unread: !session.unread,
+    <nav className={`tilde-chat tc-sessions ${className}`} aria-label="Chat sessions">
+      <div className="tc-sessions-search">
+        <label className="tc-search">
+          <SearchIcon />
+          <input
+            ref={searchRef}
+            aria-label="Search conversations and messages"
+            placeholder="Search"
+            value={query}
+            onChange={(event) => {
+              setGroups([]);
+              setQuery(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") event.currentTarget.blur();
+            }}
+          />
+          <kbd aria-hidden="true">⌘K</kbd>
+        </label>
+      </div>
+      <div className="tc-sessions-list">
+        {error && (
+          <div className="tc-state" role="alert">
+            <p>{error}</p>
+            <button type="button" onClick={refresh}>
+              Retry
+            </button>
+          </div>
+        )}
+        {loading && (
+          <div aria-label="Loading conversations" className="tc-session-skeletons" role="status">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div aria-hidden="true" className="tc-session-row" key={index}>
+                <span className="tc-skeleton-avatar" />
+                <span className="tc-session-meta">
+                  <i />
+                  <i />
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && !error && !groups.length && (
+          <p className="tc-state">No agents are available.</p>
+        )}
+        {groups.map((group) => (
+          <section key={group.agent.id} className="tc-agent-group">
+            <header>
+              <h3>{group.agent.name}</h3>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={`New conversation with ${group.agent.name}`}
+                title={`New conversation with ${group.agent.name}`}
+                onClick={() => void create(group.agent)}
+              >
+                <PlusIcon />
+              </button>
+            </header>
+            {!group.sessions.length && (
+              <p className="tc-group-empty">
+                {search ? "No matching conversations" : "No conversations yet"}
+              </p>
+            )}
+            <ul>
+              {group.sessions.map((session) => {
+                const thread = session.thread!;
+                const selected =
+                  thread.id === selectedSessionId &&
+                  (!selectedAgentId || selectedAgentId === group.agent.id);
+                const working = ["pending", "running"].includes(
+                  session.run?.invocationStatus ?? "",
+                );
+                return (
+                  <li key={thread.id} data-selected={selected || undefined}>
+                    <button
+                      type="button"
+                      className="tc-session-row"
+                      aria-current={selected ? "page" : undefined}
+                      aria-labelledby={`tc-title-${thread.id}`}
+                      aria-describedby={session.preview ? `tc-preview-${thread.id}` : undefined}
+                      data-unread={session.unread || undefined}
+                      onClick={() => onSelectSession(thread.id, group.agent.id)}
+                    >
+                      <AgentAvatar
+                        id={group.agent.id}
+                        state={working ? "loading" : selected ? "listening" : "idle"}
+                      />
+                      <span className="tc-session-meta">
+                        <strong id={`tc-title-${thread.id}`}>{thread.title}</strong>
+                        <span>
+                          {session.preview ? (
+                            <small id={`tc-preview-${thread.id}`}>{session.preview}</small>
+                          ) : null}
+                          {session.unread && (
+                            <span className="tc-unread" aria-label="Unread" role="status" />
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                    <details className="tc-session-menu">
+                      <summary aria-label={`Actions for ${thread.title}`}>
+                        <MoreIcon />
+                      </summary>
+                      <div role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={busy}
+                          onClick={(event) => {
+                            event.currentTarget.closest("details")?.removeAttribute("open");
+                            setEditing({ id: thread.id, agentId: group.agent.id });
+                            form.reset({ title: thread.title });
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={busy}
+                          onClick={(event) => {
+                            event.currentTarget.closest("details")?.removeAttribute("open");
+                            void act(async () => {
+                              const client = chatClient(proxy, group.agent.id);
+                              const current = await client.getSession({ threadId: thread.id });
+                              await client.setReadState({
+                                threadId: thread.id,
+                                throughSequence: session.unread ? current.sequence : 0n,
+                                unread: !session.unread,
+                              });
                             });
-                          })
-                        }
-                      >
-                        {session.unread ? "Mark read" : "Mark unread"}
-                      </Button>
-                    </div>
-                  </details>
-                </li>
-              );
-            })}
-          </ul>
-          {group.next && (
-            <Button disabled={busy} onClick={() => void more(group)}>
-              More conversations
-            </Button>
-          )}
-        </section>
-      ))}
+                          }}
+                        >
+                          {session.unread ? "Mark read" : "Mark unread"}
+                        </button>
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
+            </ul>
+            {group.next && (
+              <button
+                type="button"
+                className="tc-more"
+                disabled={busy}
+                onClick={() => void more(group)}
+              >
+                More conversations
+              </button>
+            )}
+          </section>
+        ))}
+      </div>
       {editing && (
         <form
           className="tc-rename"
@@ -247,12 +318,14 @@ function Sessions({
             {...form.register("title", { required: true, maxLength: 200 })}
           />
           {form.formState.errors.title && <p role="alert">Enter a name of up to 200 characters.</p>}
-          <Button type="submit" disabled={busy}>
-            Save
-          </Button>
-          <Button type="button" onClick={() => setEditing(undefined)}>
-            Cancel
-          </Button>
+          <div>
+            <Button type="button" variant="ghost" onClick={() => setEditing(undefined)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              Save
+            </Button>
+          </div>
         </form>
       )}
     </nav>

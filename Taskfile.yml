@@ -195,6 +195,12 @@ tasks:
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
       - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
 
+  preview:chat-ui:
+    desc: Serve chat-ui's visual preview (light, dark, phone width) against in-browser fixtures
+    cmds:
+      - pnpm --dir web run contracts
+      - pnpm --dir web exec vite --open /chat-ui-preview.html
+
   build:chat:
     desc: Build the chat UI, reverse proxy and Next.js adapter
     cmds:
