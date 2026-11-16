@@ -2,6 +2,7 @@ import { ChatService } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb
 
 export interface ChatAgentConfig {
   agentId: string;
+  /** The agent's chat key (`tilde_chat_...`), or a Tilde Cloud embed key that names the agent. */
   apiKey: string;
   /** Gateway origin. Defaults to the hosted Tilde API. */
   baseUrl?: string;
@@ -43,7 +44,7 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
         url.password ||
         url.search ||
         url.hash ||
-        !agent.apiKey.startsWith("tilde_chat_")
+        !(agent.apiKey.startsWith("tilde_chat_") || agent.apiKey.startsWith("tilde_embed_"))
       )
         throw new Error("Invalid chat provider configuration");
       return [agent.agentId, { ...agent, base: base.replace(/\/$/, "") }];

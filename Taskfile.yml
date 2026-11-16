@@ -193,7 +193,7 @@ tasks:
       - task: build:chat
       - scripts/with-sccache.sh cargo build -p tilde --bin tilde
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
-      - pnpm --dir web exec vitest run src/chat-ui.test.tsx
+      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
 
   build:chat:
     desc: Build the chat UI, reverse proxy and Next.js adapter
@@ -281,7 +281,7 @@ tasks:
       - scripts/with-postgres.sh node sdk/ts/packages/sdk-vercel-ai-node/test/attachments.integration.mjs
       - task: build:chat
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
-      - pnpm --dir web exec vitest run src/chat-ui.test.tsx
+      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
 
   queries:generate:
     desc: Generate Cornucopia bindings against disposable Postgres (append -- --check to verify)

@@ -354,6 +354,28 @@ importers:
         specifier: 2.14.1
         version: 2.14.1(@bufbuild/protobuf@2.14.1)
 
+  packages/embed:
+    dependencies:
+      '@trytilde/chat-ui':
+        specifier: workspace:*
+        version: link:../chat-ui
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+
+  packages/embed-server:
+    dependencies:
+      '@trytilde/chat-proxy':
+        specifier: workspace:*
+        version: link:../chat-proxy
+
   packages/sdk:
     dependencies:
       '@bufbuild/protobuf':
