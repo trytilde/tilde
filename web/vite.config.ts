@@ -13,6 +13,9 @@ export default defineConfig({
       "@trytilde/chat-ui": fileURLToPath(
         new URL("../sdk/ts/packages/chat-ui/src/index.ts", import.meta.url),
       ),
+      "@trytilde/chat-proxy": fileURLToPath(
+        new URL("../sdk/ts/packages/chat-proxy/src/index.ts", import.meta.url),
+      ),
       "@trytilde/agent-avatar": fileURLToPath(
         new URL("../sdk/ts/packages/agent-avatar/src/agent-avatar.tsx", import.meta.url),
       ),
