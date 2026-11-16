@@ -1,3 +1,0 @@
-kind: Added
-body: "`@trytilde/embed` and `@trytilde/embed-server`: embed Tilde Cloud dashboards (themed, auto-sized, with navigation and action events), agent chats and connection setup for your application's own users, behind one server handler holding an embed key; a Next.js adapter. `@trytilde/chat-proxy` also accepts an embed key that names the agent."
-time: 2026-11-16T21:00:00+00:00
