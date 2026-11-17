@@ -67,11 +67,7 @@ export interface Embed {
    */
   handle(request: Request, path?: readonly string[]): Promise<Response>;
   /** A space frame and token for `user`. Null when the project's policies refuse it. */
-  openSpace(
-    user: EmbedUser,
-    environment: string,
-    space: string,
-  ): Promise<SpaceSession | null>;
+  openSpace(user: EmbedUser, environment: string, space: string): Promise<SpaceSession | null>;
   /** A token for `user` at the environment's gateway, to call the ontology's API yourself. */
   ontologyToken(user: EmbedUser, environment: string): Promise<OntologyToken>;
   /** A short-lived setup page where `user` connects their own account for `provider`. */
