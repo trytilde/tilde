@@ -2,10 +2,10 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import {
   mountConnectionSetup,
-  mountDashboard,
+  mountSpace,
   type ConnectionSetupOptions,
-  type DashboardOptions,
-  type MountedDashboard,
+  type SpaceOptions,
+  type MountedSpace,
 } from "./index.js";
 
 export * from "./index.js";
@@ -14,17 +14,17 @@ export { Chat, ListSessions, type ChatProps, type ListSessionsProps } from "@try
 /** The chat proxy `@trytilde/embed-server` mounts: pass it as `<Chat proxy={...}>`. */
 export const chatProxy = (endpoint = "/api/tilde") => `${endpoint.replace(/\/$/, "")}/chat`;
 
-export type DashboardProps = DashboardOptions & { className?: string; style?: CSSProperties };
+export type SpaceProps = SpaceOptions & { className?: string; style?: CSSProperties };
 
-/** A dashboard for the signed-in user (see `mountDashboard`). */
-export function Dashboard({ className, style, ...options }: DashboardProps) {
+/** A space for the signed-in user (see `mountSpace`). */
+export function Space({ className, style, ...options }: SpaceProps) {
   const element = useRef<HTMLDivElement>(null);
-  const mounted = useRef<MountedDashboard | null>(null);
+  const mounted = useRef<MountedSpace | null>(null);
   const latest = useRef(options);
   latest.current = options;
-  const { endpoint, environment, dashboard } = options;
+  const { endpoint, environment, space } = options;
   useEffect(() => {
-    const current = mountDashboard(element.current!, {
+    const current = mountSpace(element.current!, {
       ...latest.current,
       onNavigate: (to) => latest.current.onNavigate?.(to),
       onEvent: (name, detail) => latest.current.onEvent?.(name, detail),
@@ -35,7 +35,7 @@ export function Dashboard({ className, style, ...options }: DashboardProps) {
       current.unmount();
       mounted.current = null;
     };
-  }, [endpoint, environment, dashboard]);
+  }, [endpoint, environment, space]);
   const theme = JSON.stringify(options.theme ?? null);
   useEffect(() => {
     if (latest.current.theme) mounted.current?.setTheme(latest.current.theme);
