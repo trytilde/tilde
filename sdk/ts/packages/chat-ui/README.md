@@ -21,6 +21,8 @@ export function Conversations({ userId }: { userId: string }) {
 }
 ```
 
+The proxy may be on another origin; requests carry cookies (`credentials: "include"`), so a cross-origin proxy must allow credentialed CORS from your app.
+
 `identity` is a stable UI/cache identity, not authorization. The server proxy independently resolves the authenticated user. Change this prop when signing in as another user; unmount the components on sign-out. `Chat.agentId` is optional for a single-agent proxy; supplying it avoids discovery requests for a multi-agent sidebar.
 
 The components own requests and clean up subscriptions and attachment object URLs on unmount. Mutations invalidate mounted sidebars sharing the proxy and identity; background sidebar refresh also observes other tabs. CSS is scoped to `.tilde-chat` and does not reset the host page. Dispatch's palette variables (`--page`, `--ink`, `--line`, `--accent`, `--bubble-agent`, `--bubble-user`, …) may be overridden on `.tilde-chat`. Give Chat a bounded height for history scrolling. React 19 is a peer dependency. No router, API key or Next.js dependency is required in the browser.
