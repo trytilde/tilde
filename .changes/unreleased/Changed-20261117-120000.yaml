@@ -1,3 +1,0 @@
-kind: Changed
-body: "`@trytilde/embed` and `@trytilde/embed-server`: dashboards are now spaces. `mountDashboard` is `mountSpace` (option `space`), React's `<Dashboard>` is `<Space>`, the server's `openDashboard` is `openSpace` and its route is `POST spaces/session` (body `{environment, space}`); they call Tilde Cloud's `EmbedService.OpenSpace`. No aliases for the old names."
-time: 2026-11-17T12:00:00.000000+00:00
