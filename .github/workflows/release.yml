@@ -137,14 +137,20 @@ jobs:
           path: dist/npm
       - name: Publish unpublished SDK packages
         run: |
+          # One package failing (e.g. a new one not yet trusted) must not block the rest.
+          failed=()
           for tarball in dist/npm/*.tgz; do
             spec="$(tar -xOzf "$tarball" package/package.json | jq -r '.name + "@" + .version')"
             if npm view "$spec" version > /dev/null 2>&1; then
               echo "$spec is already published"
-            else
-              npm publish "$tarball" --access public --tag latest
+            elif ! npm publish "$tarball" --access public --tag latest; then
+              failed+=("$spec")
             fi
           done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Not published: ${failed[*]}"
+            exit 1
+          fi
   # PyPI trusted publishing: each project trusts this repository's release.yml in its own
   # environment, pypi-<project>. PyPI allows one pending publisher per owner, repository,
   # workflow and environment, so the environment is what tells the seven projects apart. No
