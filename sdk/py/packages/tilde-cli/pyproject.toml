@@ -8,7 +8,7 @@
 # with cargo. `task sdk:py:pack` skips it deliberately.
 [project]
 name = "trytilde-cli"
-version = "5.0.0"
+version = "5.0.1"
 description = "The Tilde CLI: develop, deploy and inspect Tilde agents"
 readme = "README.md"
 license = "AGPL-3.0-only"
