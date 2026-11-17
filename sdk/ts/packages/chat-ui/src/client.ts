@@ -12,6 +12,8 @@ export const chatClient = (proxy: string, agentId: string) =>
     createConnectTransport({
       baseUrl: `${proxy.replace(/\/$/, "")}/${encodeURIComponent(agentId)}`,
       useBinaryFormat: true,
+      // The proxy may live on another origin (an app's API host) and authenticate by cookie.
+      fetch: (input, init) => fetch(input, { ...init, credentials: "include" }),
     }),
   );
 export type ChatClient = ReturnType<typeof chatClient>;
@@ -20,7 +22,7 @@ export const errorText = (error: unknown) =>
 export async function listAgents(proxy: string, signal: AbortSignal): Promise<ChatAgent[]> {
   const response = await fetch(`${proxy.replace(/\/$/, "")}/agents`, {
     signal,
-    credentials: "same-origin",
+    credentials: "include",
     cache: "no-store",
   });
   if (!response.ok)
