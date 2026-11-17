@@ -4,9 +4,9 @@ import { createChatProxy, type ChatAgentConfig, type ChatProxy } from "@trytilde
 export interface EmbedUser {
   /** Stable and unique in your application (1 to 256 characters). */
   id: string;
-  /** Dashboards: `principal in Group::"ext:<group>"` in the project's policies. */
+  /** Spaces: `principal in Group::"ext:<group>"` in the project's policies. */
   groups?: string[];
-  /** Dashboards: Cedar tags and `ctx.principal.attrs` (`{ customer: "acme" }`). */
+  /** Spaces: Cedar tags and `ctx.principal.attrs` (`{ customer: "acme" }`). */
   attributes?: Record<string, string>;
 }
 
@@ -26,7 +26,7 @@ export interface EmbedOptions {
   fetch?: typeof globalThis.fetch;
 }
 
-export interface DashboardSession {
+export interface SpaceSession {
   frameUrl: string;
   token: string;
   /** Unix seconds. */
@@ -61,17 +61,13 @@ export interface UserConnection {
 export interface Embed {
   /**
    * Serve the browser package's requests below `mountPath`:
-   * `POST dashboards/session`, `POST connections/setup`, `GET connections`,
+   * `POST spaces/session`, `POST connections/setup`, `GET connections`,
    * `POST connections/<id>/reconnect`, `DELETE connections/<id>`, and the chat proxy under
    * `chat/`. Every request is for the user `resolveIdentity` returns.
    */
   handle(request: Request, path?: readonly string[]): Promise<Response>;
-  /** A dashboard frame and token for `user`. Null when the project's policies refuse it. */
-  openDashboard(
-    user: EmbedUser,
-    environment: string,
-    dashboard: string,
-  ): Promise<DashboardSession | null>;
+  /** A space frame and token for `user`. Null when the project's policies refuse it. */
+  openSpace(user: EmbedUser, environment: string, space: string): Promise<SpaceSession | null>;
   /** A token for `user` at the environment's gateway, to call the ontology's API yourself. */
   ontologyToken(user: EmbedUser, environment: string): Promise<OntologyToken>;
   /** A short-lived setup page where `user` connects their own account for `provider`. */
@@ -170,11 +166,11 @@ export function createEmbed(options: EmbedOptions): Embed {
   });
 
   const embed: Omit<Embed, "handle"> = {
-    async openDashboard(user, environment, dashboard) {
+    async openSpace(user, environment, space) {
       try {
-        const data = await embedCall("OpenDashboard", {
+        const data = await embedCall("OpenSpace", {
           environmentId: environment,
-          dashboard,
+          space,
           user: wire(user),
         });
         return {
@@ -257,12 +253,12 @@ export function createEmbed(options: EmbedOptions): Embed {
 
   async function route(request: Request, path: string[], user: EmbedUser): Promise<Response> {
     const method = request.method;
-    if (method === "POST" && path.join("/") === "dashboards/session") {
+    if (method === "POST" && path.join("/") === "spaces/session") {
       const body = await json(request);
-      if (typeof body.environment !== "string" || typeof body.dashboard !== "string")
-        return failure(400, "invalid_argument", "environment and dashboard are required");
-      const opened = await embed.openDashboard(user, body.environment, body.dashboard);
-      return opened ? answer(opened) : failure(404, "not_found", "Dashboard not found");
+      if (typeof body.environment !== "string" || typeof body.space !== "string")
+        return failure(400, "invalid_argument", "environment and space are required");
+      const opened = await embed.openSpace(user, body.environment, body.space);
+      return opened ? answer(opened) : failure(404, "not_found", "Space not found");
     }
     if (path[0] !== "connections") return failure(404, "not_found", "Unknown route");
     const url = new URL(request.url);

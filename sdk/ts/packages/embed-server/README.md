@@ -1,6 +1,6 @@
 # @trytilde/embed-server
 
-The server half of embedding Tilde in your application: one handler that opens dashboards,
+The server half of embedding Tilde in your application: one handler that opens spaces,
 proxies agent chats and starts connection setup for **your** signed-in users. Pair it with
 `@trytilde/embed` in the browser.
 
@@ -30,15 +30,15 @@ project's ontology and the same conversation identity in agent chats. `groups` b
 `ext:<group>` groups and `attributes` become Cedar tags (`principal.getTag("customer")`) and
 `ctx.principal.attrs`, so the project's policies decide what each user sees.
 
-Routes below `mountPath` (default `/api/tilde`): `POST dashboards/session`, `GET connections`,
+Routes below `mountPath` (default `/api/tilde`): `POST spaces/session`, `GET connections`,
 `POST connections/setup`, `POST connections/<id>/reconnect`, `DELETE connections/<id>`
 (`?agent=` when several agents are configured), and the chat proxy under `chat/`
 (`<Chat proxy="/api/tilde/chat">`). Cross-origin requests are refused, and the embed key never
 leaves your server.
 
-Server-side calls: `openDashboard(user, environment, dashboard)`, `ontologyToken(user,
+Server-side calls: `openSpace(user, environment, space)`, `ontologyToken(user,
 environment)` (to call the ontology's API yourself), `createConnectionSetup({ user, agent,
 provider })`, `listConnections`, `reconnectConnection` and `deleteConnection`.
 
-Dashboards and embed keys are Tilde Cloud features. With open-source Tilde, use
+Spaces and embed keys are Tilde Cloud features. With open-source Tilde, use
 `@trytilde/chat-proxy` with each agent's chat key for chats.

@@ -1,10 +1,10 @@
 /**
- * Tilde in your application's pages: dashboards, connection setup and (from
+ * Tilde in your application's pages: spaces, connection setup and (from
  * `@trytilde/embed/react`) agent chats, all talking to your server's `@trytilde/embed-server`
  * handler, which holds the embed key and says who the signed-in user is.
  */
 
-/** Colours and shape of a dashboard; any CSS value. Unknown tokens are ignored. */
+/** Colours and shape of a space; any CSS value. Unknown tokens are ignored. */
 export interface ThemeTokens {
   canvas?: string;
   surface?: string;
@@ -27,11 +27,11 @@ export interface Theme {
   scheme?: "light" | "dark";
 }
 
-export interface DashboardOptions {
+export interface SpaceOptions {
   /** Where your server mounted `@trytilde/embed-server`. Defaults to `/api/tilde`. */
   endpoint?: string;
   environment: string;
-  dashboard: string;
+  space: string;
   theme?: Theme;
   /** Size the frame to its content (default true). Frames built before this keep `height`. */
   autoResize?: boolean;
@@ -46,13 +46,13 @@ export interface DashboardOptions {
   fetch?: typeof globalThis.fetch;
 }
 
-export interface MountedDashboard {
+export interface MountedSpace {
   frame: HTMLIFrameElement;
   setTheme(theme: Theme): void;
   unmount(): void;
 }
 
-interface DashboardSession {
+interface SpaceSession {
   frameUrl: string;
   token: string;
   expiresAt: number;
@@ -87,16 +87,16 @@ async function request<T>(
 }
 
 /**
- * Put a dashboard in `element`: a sandboxed frame of Tilde's dashboards host, given short-lived
+ * Put a space in `element`: a sandboxed frame of Tilde's spaces host, given short-lived
  * tokens for your signed-in user (renewed before they expire). The frame's origin is opaque, so
  * messages go to its window with target `*` and only its window's messages are read.
  */
-export function mountDashboard(element: HTMLElement, options: DashboardOptions): MountedDashboard {
+export function mountSpace(element: HTMLElement, options: SpaceOptions): MountedSpace {
   const fetcher = options.fetch ?? globalThis.fetch.bind(globalThis);
   const session = () =>
-    request<DashboardSession>(fetcher, `${base(options.endpoint)}/dashboards/session`, {
+    request<SpaceSession>(fetcher, `${base(options.endpoint)}/spaces/session`, {
       method: "POST",
-      body: JSON.stringify({ environment: options.environment, dashboard: options.dashboard }),
+      body: JSON.stringify({ environment: options.environment, space: options.space }),
     });
   const frame = document.createElement("iframe");
   // allow-forms: React forms need submit events; the frame's CSP still blocks submissions.
@@ -106,7 +106,7 @@ export function mountDashboard(element: HTMLElement, options: DashboardOptions):
   frame.style.width = "100%";
   frame.style.height = options.height ?? "600px";
   let theme = options.theme;
-  let first: Promise<DashboardSession> | undefined = session();
+  let first: Promise<SpaceSession> | undefined = session();
   let closed = false;
   const fail = (error: unknown) =>
     options.onError?.(error instanceof Error ? error : new Error(String(error)));

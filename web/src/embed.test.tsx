@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { createEmbed } from "../../sdk/ts/packages/embed-server/src/index";
-import { mountConnectionSetup, mountDashboard } from "../../sdk/ts/packages/embed/src/index";
+import { mountConnectionSetup, mountSpace } from "../../sdk/ts/packages/embed/src/index";
 
 /** Tilde's API as the embed server sees it: records each call, answers like Connect JSON. */
 function fakeTilde() {
@@ -15,7 +15,7 @@ function fakeTilde() {
       identity: headers.get("x-tilde-identity"),
       body,
     });
-    if (url.endsWith(".EmbedService/OpenDashboard")) {
+    if (url.endsWith(".EmbedService/OpenSpace")) {
       if (body.user.groups.includes("blocked"))
         return Response.json({ code: "not_found", message: "Not found" }, { status: 404 });
       return Response.json({
@@ -46,7 +46,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-it("mounts a dashboard for the signed-in user through the app's own server", async () => {
+it("mounts a space for the signed-in user through the app's own server", async () => {
   const tilde = fakeTilde();
   const embed = createEmbed({
     apiKey: "tilde_embed_secret",
@@ -69,9 +69,9 @@ it("mounts a dashboard for the signed-in user through the app's own server", asy
   const navigated: string[] = [];
   const element = document.createElement("div");
   document.body.appendChild(element);
-  const mounted = mountDashboard(element, {
+  const mounted = mountSpace(element, {
     environment: "env-1",
-    dashboard: "pipeline",
+    space: "pipeline",
     fetch: browserFetch,
     theme: { tokens: { accent: "#ff0000" }, scheme: "dark" },
     onNavigate: (to) => navigated.push(to),
@@ -81,11 +81,11 @@ it("mounts a dashboard for the signed-in user through the app's own server", asy
   expect(frame.src).toBe("https://env-1-dash.cloud.test/pipeline/?v=abc");
   expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
   expect(tilde.calls[0]).toMatchObject({
-    url: "https://api.cloud.test/tilde.ontology_control.v1.EmbedService/OpenDashboard",
+    url: "https://api.cloud.test/tilde.ontology_control.v1.EmbedService/OpenSpace",
     auth: "Bearer tilde_embed_secret",
     body: {
       environmentId: "env-1",
-      dashboard: "pipeline",
+      space: "pipeline",
       user: { id: "ann", groups: ["acme"], attributes: { customer: "acme" } },
     },
   });
@@ -98,7 +98,7 @@ it("mounts a dashboard for the signed-in user through the app's own server", asy
     window.dispatchEvent(new MessageEvent("message", { data, source: frameWindow }));
   window.dispatchEvent(new MessageEvent("message", { data: { tilde: "ready" }, source: window }));
   expect(posted).toEqual([]);
-  fromFrame({ tilde: "ready", dashboard: "pipeline", version: "abc" });
+  fromFrame({ tilde: "ready", space: "pipeline", version: "abc" });
   await vi.waitFor(() => expect(posted).toHaveLength(2));
   expect(posted[0]).toEqual({ tilde: "theme", tokens: { accent: "#ff0000" }, scheme: "dark" });
   expect(posted[1]).toEqual({ tilde: "token", token: "token-1", expiresAt: 1900000000 });
@@ -113,12 +113,12 @@ it("mounts a dashboard for the signed-in user through the app's own server", asy
   mounted.unmount();
   expect(element.querySelector("iframe")).toBeNull();
 
-  // Without a session the server refuses before Tilde is called; a refused dashboard is a 404.
+  // Without a session the server refuses before Tilde is called; a refused space is a 404.
   const before = tilde.calls.length;
   const anonymous = await embed.handle(
-    new Request("https://app.test/api/tilde/dashboards/session", {
+    new Request("https://app.test/api/tilde/spaces/session", {
       method: "POST",
-      body: JSON.stringify({ environment: "env-1", dashboard: "pipeline" }),
+      body: JSON.stringify({ environment: "env-1", space: "pipeline" }),
     }),
   );
   expect(anonymous.status).toBe(401);
@@ -129,7 +129,7 @@ it("mounts a dashboard for the signed-in user through the app's own server", asy
     resolveIdentity: () => ({ id: "bob", groups: ["blocked"] }),
   });
   expect(
-    await blocked.openDashboard({ id: "bob", groups: ["blocked"] }, "env-1", "pipeline"),
+    await blocked.openSpace({ id: "bob", groups: ["blocked"] }, "env-1", "pipeline"),
   ).toBeNull();
 });
 
