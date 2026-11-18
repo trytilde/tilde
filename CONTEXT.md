@@ -420,6 +420,14 @@ bundled tools out) and its bundled tools.
   images kept for 31 days, past the longest terminate-after. The sweeper also renews a running
   E2B VM's TTL before E2B would pause it, and puts a Modal VM to sleep before its 24-hour
   lifetime ends; it never sleeps a sandbox with operations in flight, which keep it in use.
+- Sandbox egress wiring (the process side): the registration that issues the session also issues
+  an egress token, kept in memory the same way, for the gateway's egress route. Each registration's
+  `egress_env` joins the blueprint's environment with `{token}` replaced (variables naming the
+  token are skipped while the process has none), and its `git` rewrites replace a marked block in
+  `/etc/gitconfig` (`url.<url>.insteadOf`, and for the gateway origin an empty helper followed by
+  `!tilde sandbox credential`); no rewrites removes the block. `tilde sandbox credential get`
+  answers git from the loopback API (`/v1/egress/credential`) only for the gateway's protocol and
+  host, as `x-access-token` and the egress token.
 
 ## Memory
 

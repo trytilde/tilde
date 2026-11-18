@@ -44,6 +44,7 @@ tokio = { version = "1", features = [
 ] }
 toml = "0.9"
 url.workspace = true
+zeroize.workspace = true
 webpki-roots = "0.26"
 
 [target.'cfg(unix)'.dependencies]

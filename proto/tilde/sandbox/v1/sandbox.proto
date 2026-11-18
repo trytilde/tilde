@@ -19,11 +19,23 @@ message ConnectResponse { oneof frame { SandboxRegistered registered = 1; Sandbo
 // The first frame of every Connect. `session_token` is set only when an enrollment token was
 // exchanged; the process keeps it in memory for reconnects. `env` is the blueprint's environment,
 // current as of this Connect, for every shell in the VM.
+//
+// Egress: `egress_token` is issued with the session and kept in memory the same way; it
+// authenticates requests to `{TILDE_URL}/sandboxes/egress/{slug}/…` (Bearer, or as git's Basic
+// password) for the sandbox's lifetime. `egress_env` (current as of this Connect, like `env`) is
+// for every shell too; the process replaces `{token}` in its values with the egress token. `git`
+// rewrites belong in the system git config (`url.<url>.insteadOf`), with the process's
+// `tilde sandbox credential` as the credential helper for `TILDE_URL`.
 message SandboxRegistered {
   string sandbox_id = 1;
   optional string session_token = 2 [debug_redact = true];
   repeated EnvVar env = 3;
+  optional string egress_token = 4 [debug_redact = true];
+  repeated EnvVar egress_env = 5;
+  repeated GitRewrite git = 6;
 }
+// `git config url.<url>.insteadOf <instead_of>`.
+message GitRewrite { string url = 1; string instead_of = 2; }
 message EnvVar { string name = 1; string value = 2 [debug_redact = true]; }
 message SandboxPing {}
 // One operation for the process to run: exec, exec_output, read_file, write_file, edit_file,

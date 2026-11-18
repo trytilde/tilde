@@ -3760,6 +3760,7 @@ dependencies = [
  "toml",
  "url",
  "webpki-roots 0.26.11",
+ "zeroize",
 ]
 
 [[package]]

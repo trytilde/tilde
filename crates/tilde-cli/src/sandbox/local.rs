@@ -32,6 +32,7 @@ pub(super) async fn serve(
         .route("/v1/health", get(health))
         .route("/v1/tools", get(list))
         .route("/v1/tools/{name}", post(invoke))
+        .route("/v1/egress/credential", get(egress_credential))
         .layer(middleware::from_fn(move |request, next| {
             guard(port, request, next)
         }))
@@ -164,6 +165,15 @@ async fn invoke(
     }
 }
 
+/// The egress token, for `tilde sandbox credential`.
+async fn egress_credential(State(daemon): State<Arc<Daemon>>) -> Response {
+    let token = daemon.egress_token.lock().unwrap().clone();
+    match token {
+        Some(token) => Json(json!({"url": daemon.url, "password": token.as_str()})).into_response(),
+        None => error(StatusCode::NOT_FOUND, "This sandbox has no egress token"),
+    }
+}
+
 fn http() -> Result<reqwest::Client> {
     // No proxy: a VM-wide HTTP_PROXY must not capture loopback calls.
     Ok(reqwest::Client::builder()
@@ -237,5 +247,45 @@ pub async fn call(listen: SocketAddr, name: &str, input: Option<String>) -> Resu
         .await
         .with_context(|| unreachable(listen))?;
     println!("{}", answer(response).await?);
+    Ok(())
+}
+
+/// Answer git's `get` with the egress token when it asks for the gateway this process connects
+/// to; anything else (other hosts, `store`, `erase`) gets no answer.
+pub async fn credential(listen: SocketAddr, action: &str) -> Result<()> {
+    if action != "get" {
+        return Ok(());
+    }
+    let mut input = String::new();
+    std::io::Read::read_to_string(&mut std::io::stdin(), &mut input)
+        .context("Could not read git's request")?;
+    let asked: std::collections::HashMap<&str, &str> = input
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .collect();
+    let response = http()?
+        .get(format!("http://{listen}/v1/egress/credential"))
+        .send()
+        .await
+        .with_context(|| unreachable(listen))?;
+    if !response.status().is_success() {
+        return Ok(());
+    }
+    let body: Value = response.json().await?;
+    let gateway = body["url"].as_str().and_then(|u| url::Url::parse(u).ok());
+    let Some(gateway) = gateway else {
+        return Ok(());
+    };
+    let host = match gateway.port() {
+        Some(port) => format!("{}:{port}", gateway.host_str().unwrap_or_default()),
+        None => gateway.host_str().unwrap_or_default().to_owned(),
+    };
+    if asked.get("protocol") != Some(&gateway.scheme()) || asked.get("host") != Some(&host.as_str())
+    {
+        return Ok(());
+    }
+    if let Some(password) = body["password"].as_str() {
+        println!("username=x-access-token\npassword={password}");
+    }
     Ok(())
 }

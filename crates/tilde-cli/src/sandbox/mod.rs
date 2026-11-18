@@ -7,6 +7,12 @@
 //! blueprint's environment, which commands receive directly and login shells pick up from
 //! `~/.tilde/sandbox.env`. A loopback-only HTTP API lets anything in the VM call the
 //! blueprint's tools; `tools` and `call` are its command-line clients.
+//!
+//! Egress: the first registration also carries an egress token, kept in memory like the session,
+//! which authenticates requests through the gateway's egress route to the blueprint's granted
+//! connections (their credentials never enter the VM). Each registration's egress environment
+//! joins the blueprint's (`{token}` filled in) and its git rewrites go to the system git config
+//! with `tilde sandbox credential` answering git for the gateway from this process.
 mod local;
 mod ops;
 
@@ -44,6 +50,17 @@ enum SandboxCommand {
     Tools(Tools),
     /// Invoke one of this sandbox's tools and print its output JSON.
     Call(Call),
+    /// Git credential helper for the gateway's egress route (`get`; `store` and `erase` do
+    /// nothing). The connect process configures git to use it.
+    Credential(Credential),
+}
+
+#[derive(Args)]
+struct Credential {
+    /// get, store or erase, as git passes it.
+    action: String,
+    #[arg(long, default_value = local::DEFAULT_LISTEN)]
+    listen: SocketAddr,
 }
 
 #[derive(Args)]
@@ -86,6 +103,7 @@ pub async fn run(args: Sandbox) -> Result<()> {
         SandboxCommand::Connect(args) => connect(args).await,
         SandboxCommand::Tools(args) => local::tools(args.listen, args.json).await,
         SandboxCommand::Call(args) => local::call(args.listen, &args.name, args.input).await,
+        SandboxCommand::Credential(args) => local::credential(args.listen, &args.action).await,
     }
 }
 
@@ -103,7 +121,16 @@ struct Daemon {
     workspace: Arc<ops::Workspace>,
     /// Where `.tilde/sandbox.env` and the shell profiles live; None skips writing them.
     home: Option<PathBuf>,
+    /// The gateway's runtime origin, which egress routes live under.
+    url: String,
+    /// Authenticates egress requests for the sandbox's lifetime; issued with the session.
+    egress_token: Mutex<Option<zeroize::Zeroizing<String>>>,
+    /// The git config file egress rewrites go to; None skips writing it.
+    gitconfig: Option<PathBuf>,
 }
+
+/// The system git config, which every user's git reads.
+const GITCONFIG: &str = "/etc/gitconfig";
 
 async fn connect(args: Connect) -> Result<()> {
     // SAFETY: nothing else reads the environment yet; children must never inherit the token.
@@ -120,6 +147,7 @@ async fn connect(args: Connect) -> Result<()> {
         args.token,
         workdir,
         std::env::var_os("HOME").map(PathBuf::from),
+        Some(PathBuf::from(GITCONFIG)),
     )?);
     let (bound, _server) = local::serve(daemon.clone(), args.listen).await?;
     eprintln!("tilde sandbox: tools API on http://{bound}");
@@ -127,7 +155,13 @@ async fn connect(args: Connect) -> Result<()> {
 }
 
 impl Daemon {
-    fn new(url: &str, token: String, workdir: PathBuf, home: Option<PathBuf>) -> Result<Self> {
+    fn new(
+        url: &str,
+        token: String,
+        workdir: PathBuf,
+        home: Option<PathBuf>,
+        gitconfig: Option<PathBuf>,
+    ) -> Result<Self> {
         let base = base_url(url)?;
         let config = ClientConfig::new(
             base.parse()
@@ -140,6 +174,9 @@ impl Daemon {
             connected: AtomicBool::new(false),
             workspace: Arc::new(ops::Workspace::new(workdir)),
             home,
+            url: base.trim_end_matches('/').to_owned(),
+            egress_token: Mutex::new(None),
+            gitconfig,
         })
     }
 
@@ -216,11 +253,37 @@ impl Daemon {
         if let Some(session) = registration.session_token {
             *self.token.lock().unwrap() = session;
         }
-        let env: Vec<(String, String)> = registration
+        if let Some(egress) = registration.egress_token {
+            *self.egress_token.lock().unwrap() = Some(zeroize::Zeroizing::new(egress));
+        }
+        let egress = self.egress_token.lock().unwrap().clone();
+        let mut env: Vec<(String, String)> = registration
             .env
             .into_iter()
             .map(|var| (var.name, var.value))
             .collect();
+        // Egress variables naming the token wait for one (a process that enrolled before
+        // egress existed has none until it re-enrolls).
+        env.extend(registration.egress_env.into_iter().filter_map(|var| {
+            match (&egress, var.value.contains("{token}")) {
+                (_, false) => Some((var.name, var.value)),
+                (Some(token), true) => Some((var.name, var.value.replace("{token}", token))),
+                (None, true) => None,
+            }
+        }));
+        if let Some(path) = &self.gitconfig {
+            let rewrites: Vec<(String, String)> = registration
+                .git
+                .into_iter()
+                .map(|rewrite| (rewrite.url, rewrite.instead_of))
+                .collect();
+            if let Err(error) = write_gitconfig(path, &self.url, &rewrites) {
+                eprintln!(
+                    "tilde sandbox: could not write {} ({error:#})",
+                    path.display()
+                );
+            }
+        }
         if let Some(home) = &self.home
             && let Err(error) = write_env(home, &env)
         {
@@ -273,6 +336,54 @@ impl Daemon {
             }
         }
     }
+}
+
+const GIT_BEGIN: &str = "# BEGIN tilde sandbox egress";
+const GIT_END: &str = "# END tilde sandbox egress";
+
+/// Replace the egress block of the git config at `path`: each rewrite as `url.<url>.insteadOf`,
+/// and this process as the only credential helper for the gateway. No rewrites removes it.
+fn write_gitconfig(path: &Path, gateway: &str, rewrites: &[(String, String)]) -> Result<()> {
+    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let mut kept = String::new();
+    let mut inside = false;
+    for line in existing.lines() {
+        match line {
+            GIT_BEGIN => inside = true,
+            GIT_END => inside = false,
+            _ if !inside => {
+                kept.push_str(line);
+                kept.push('\n');
+            }
+            _ => {}
+        }
+    }
+    let quote = |value: &str| value.replace('\\', "\\\\").replace('"', "\\\"");
+    if !rewrites.is_empty() {
+        kept.push_str(GIT_BEGIN);
+        kept.push('\n');
+        for (url, instead_of) in rewrites {
+            kept.push_str(&format!(
+                "[url \"{}\"]\n\tinsteadOf = \"{}\"\n",
+                quote(url),
+                quote(instead_of)
+            ));
+        }
+        // The empty helper drops helpers configured elsewhere for this URL.
+        kept.push_str(&format!(
+            "[credential \"{}\"]\n\thelper =\n\thelper = \"!tilde sandbox credential\"\n",
+            quote(gateway)
+        ));
+        kept.push_str(GIT_END);
+        kept.push('\n');
+    }
+    if kept == existing {
+        return Ok(());
+    }
+    let staged = path.with_extension("tilde.tmp");
+    std::fs::write(&staged, kept)?;
+    std::fs::rename(&staged, path)?;
+    Ok(())
 }
 
 /// Rewrite `~/.tilde/sandbox.env` with exactly `env`, readable only by this user, and make sure
@@ -509,6 +620,7 @@ mod tests {
                 "enroll-1".into(),
                 workdir.path().to_path_buf(),
                 Some(home.path().to_path_buf()),
+                Some(home.path().join("gitconfig")),
             )
             .unwrap(),
         );
@@ -521,16 +633,32 @@ mod tests {
         });
 
         let home_dir = home.path().to_str().unwrap();
-        first
-            .send(registered(
-                Some("session-1"),
-                &[
-                    ("GREETING", "it's here"),
-                    ("HOME", home_dir),
-                    ("bad-name", "x"),
-                ],
-            ))
-            .unwrap();
+        let mut first_registration = registered(
+            Some("session-1"),
+            &[
+                ("GREETING", "it's here"),
+                ("HOME", home_dir),
+                ("bad-name", "x"),
+            ],
+        );
+        let route = format!("http://{address}/sandboxes/egress/github");
+        if let Some(Frame::Registered(registration)) = &mut first_registration.frame {
+            registration.egress_token = Some("egress-1".into());
+            registration.egress_env = [("GITHUB_TOKEN", "{token}"), ("GITHUB_API_URL", &route)]
+                .map(|(name, value)| wire::EnvVar {
+                    name: name.into(),
+                    value: value.to_owned(),
+                    ..Default::default()
+                })
+                .to_vec();
+            registration.git = vec![wire::GitRewrite {
+                url: format!("{route}/"),
+                instead_of: "https://github.com/".into(),
+                ..Default::default()
+            }];
+        }
+        std::fs::write(home.path().join("gitconfig"), "[user]\n\tname = Agent\n").unwrap();
+        first.send(first_registration).unwrap();
         // The in-memory env first, then the same variable as login shells read it from the file.
         let exec = operate(
             &first,
@@ -543,6 +671,36 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(exec["stdout"], "it's here|it's here");
+        // Egress: the token fills the egress environment, git rewrites the upstream to the route
+        // with this process as the gateway's only credential helper, which the local API serves.
+        let egress = operate(
+            &first,
+            &mut responses,
+            "exec",
+            json!({ "command": ". \"$HOME/.tilde/sandbox.env\"; printf '%s %s' \"$GITHUB_TOKEN\" \"$GITHUB_API_URL\"" }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(egress["stdout"], format!("egress-1 {route}"));
+        let gitconfig = std::fs::read_to_string(home.path().join("gitconfig")).unwrap();
+        assert!(
+            gitconfig.starts_with("[user]\n\tname = Agent\n"),
+            "{gitconfig}"
+        );
+        assert!(
+            gitconfig.contains(&format!(
+                "[url \"{route}/\"]\n\tinsteadOf = \"https://github.com/\"\n[credential \"http://{address}\"]\n\thelper =\n\thelper = \"!tilde sandbox credential\"\n"
+            )),
+            "{gitconfig}"
+        );
+        let credential: Value = reqwest::get(format!("http://{local}/v1/egress/credential"))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(credential["password"], "egress-1");
+        assert_eq!(credential["url"], format!("http://{address}"));
         assert_eq!(exec["stderr"], "oops\n");
         assert_eq!(exec["exit_code"], 3);
         assert_eq!(exec["timed_out"], false);
@@ -688,6 +846,18 @@ mod tests {
             env.contains("export REGION='eu'\n") && !env.contains("GREETING"),
             "{env}"
         );
+        // Without grants the egress block goes; the reconnect keeps the token in memory.
+        assert_eq!(
+            std::fs::read_to_string(home.path().join("gitconfig")).unwrap(),
+            "[user]\n\tname = Agent\n"
+        );
+        let credential: Value = reqwest::get(format!("http://{local}/v1/egress/credential"))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(credential["password"], "egress-1");
         let profile = std::fs::read_to_string(home.path().join(".profile")).unwrap();
         assert_eq!(
             profile.matches(".tilde/sandbox.env").count(),
