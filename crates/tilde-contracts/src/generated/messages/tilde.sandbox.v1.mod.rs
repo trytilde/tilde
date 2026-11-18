@@ -35,6 +35,7 @@ pub mod __buffa {
         reg.register_json_any(super::__CONNECT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CONNECT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_REGISTERED_JSON_ANY);
+        reg.register_json_any(super::__GIT_REWRITE_JSON_ANY);
         reg.register_json_any(super::__ENV_VAR_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_PING_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_OPERATION_JSON_ANY);
@@ -58,6 +59,10 @@ pub use self::__buffa::view::ConnectResponseOwnedView;
 pub use self::__buffa::view::SandboxRegisteredView;
 #[doc(inline)]
 pub use self::__buffa::view::SandboxRegisteredOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GitRewriteView;
+#[doc(inline)]
+pub use self::__buffa::view::GitRewriteOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::EnvVarView;
 #[doc(inline)]

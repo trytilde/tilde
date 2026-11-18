@@ -442,6 +442,13 @@ pub mod connect_response {
 /// The first frame of every Connect. `session_token` is set only when an enrollment token was
 /// exchanged; the process keeps it in memory for reconnects. `env` is the blueprint's environment,
 /// current as of this Connect, for every shell in the VM.
+///
+/// Egress: `egress_token` is issued with the session and kept in memory the same way; it
+/// authenticates requests to `{TILDE_URL}/sandboxes/egress/{slug}/…` (Bearer, or as git's Basic
+/// password) for the sandbox's lifetime. `egress_env` (current as of this Connect, like `env`) is
+/// for every shell too; the process replaces `{token}` in its values with the egress token. `git`
+/// rewrites belong in the system git config (`url.<url>.insteadOf`), with the process's
+/// `tilde sandbox credential` as the credential helper for `TILDE_URL`.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -468,6 +475,28 @@ pub struct SandboxRegistered {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub env: ::buffa::alloc::vec::Vec<EnvVar>,
+    /// Field 4: `egress_token`
+    #[serde(
+        rename = "egressToken",
+        alias = "egress_token",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub egress_token: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Field 5: `egress_env`
+    #[serde(
+        rename = "egressEnv",
+        alias = "egress_env",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub egress_env: ::buffa::alloc::vec::Vec<EnvVar>,
+    /// Field 6: `git`
+    #[serde(
+        rename = "git",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub git: ::buffa::alloc::vec::Vec<GitRewrite>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -478,6 +507,9 @@ impl ::core::fmt::Debug for SandboxRegistered {
             .field("sandbox_id", &self.sandbox_id)
             .field("session_token", &::core::format_args!("[REDACTED]"))
             .field("env", &self.env)
+            .field("egress_token", &::core::format_args!("[REDACTED]"))
+            .field("egress_env", &self.egress_env)
+            .field("git", &self.git)
             .finish()
     }
 }
@@ -497,6 +529,16 @@ impl SandboxRegistered {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.session_token = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::egress_token`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_egress_token(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.egress_token = Some(value.into());
         self
     }
 }
@@ -534,6 +576,25 @@ impl ::buffa::Message for SandboxRegistered {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.egress_token {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.egress_env {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.git {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -553,6 +614,25 @@ impl ::buffa::Message for SandboxRegistered {
         for v in &self.env {
             ::buffa::types::put_len_delimited_header(
                 3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.egress_token {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        for v in &self.egress_env {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.git {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -602,6 +682,42 @@ impl ::buffa::Message for SandboxRegistered {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.env.push(elem);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .egress_token
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.egress_env.push(elem);
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.git.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -613,6 +729,9 @@ impl ::buffa::Message for SandboxRegistered {
         self.sandbox_id.clear();
         self.session_token = ::core::option::Option::None;
         self.env.clear();
+        self.egress_token = ::core::option::Option::None;
+        self.egress_env.clear();
+        self.git.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -643,6 +762,156 @@ pub const __SANDBOX_REGISTERED_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     type_url: "type.googleapis.com/tilde.sandbox.v1.SandboxRegistered",
     to_json: ::buffa::type_registry::any_to_json::<SandboxRegistered>,
     from_json: ::buffa::type_registry::any_from_json::<SandboxRegistered>,
+    is_wkt: false,
+};
+/// `git config url.<url>.insteadOf <instead_of>`.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GitRewrite {
+    /// Field 1: `url`
+    #[serde(
+        rename = "url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub url: ::buffa::alloc::string::String,
+    /// Field 2: `instead_of`
+    #[serde(
+        rename = "insteadOf",
+        alias = "instead_of",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub instead_of: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GitRewrite {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GitRewrite")
+            .field("url", &self.url)
+            .field("instead_of", &self.instead_of)
+            .finish()
+    }
+}
+impl GitRewrite {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.sandbox.v1.GitRewrite";
+}
+::buffa::impl_default_instance!(GitRewrite);
+impl ::buffa::MessageName for GitRewrite {
+    const PACKAGE: &'static str = "tilde.sandbox.v1";
+    const NAME: &'static str = "GitRewrite";
+    const FULL_NAME: &'static str = "tilde.sandbox.v1.GitRewrite";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.sandbox.v1.GitRewrite";
+}
+impl ::buffa::Message for GitRewrite {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        if !self.instead_of.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.instead_of) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        if !self.instead_of.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.instead_of, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.url, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.instead_of, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.url.clear();
+        self.instead_of.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GitRewrite {
+    const PROTO_FQN: &'static str = "tilde.sandbox.v1.GitRewrite";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GitRewrite {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GIT_REWRITE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.sandbox.v1.GitRewrite",
+    to_json: ::buffa::type_registry::any_to_json::<GitRewrite>,
+    from_json: ::buffa::type_registry::any_from_json::<GitRewrite>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

@@ -668,6 +668,13 @@ impl ::serde::Serialize for ConnectResponseOwnedView {
 /// The first frame of every Connect. `session_token` is set only when an enrollment token was
 /// exchanged; the process keeps it in memory for reconnects. `env` is the blueprint's environment,
 /// current as of this Connect, for every shell in the VM.
+///
+/// Egress: `egress_token` is issued with the session and kept in memory the same way; it
+/// authenticates requests to `{TILDE_URL}/sandboxes/egress/{slug}/…` (Bearer, or as git's Basic
+/// password) for the sandbox's lifetime. `egress_env` (current as of this Connect, like `env`) is
+/// for every shell too; the process replaces `{token}` in its values with the egress token. `git`
+/// rewrites belong in the system git config (`url.<url>.insteadOf`), with the process's
+/// `tilde sandbox credential` as the credential helper for `TILDE_URL`.
 #[derive(Clone, Default)]
 pub struct SandboxRegisteredView<'a> {
     /// Field 1: `sandbox_id`
@@ -676,6 +683,15 @@ pub struct SandboxRegisteredView<'a> {
     pub session_token: ::core::option::Option<&'a str>,
     /// Field 3: `env`
     pub env: ::buffa::RepeatedView<'a, super::super::__buffa::view::EnvVarView<'a>>,
+    /// Field 4: `egress_token`
+    pub egress_token: ::core::option::Option<&'a str>,
+    /// Field 5: `egress_env`
+    pub egress_env: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::EnvVarView<'a>,
+    >,
+    /// Field 6: `git`
+    pub git: ::buffa::RepeatedView<'a, super::super::__buffa::view::GitRewriteView<'a>>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for SandboxRegisteredView<'a> {
@@ -684,6 +700,9 @@ impl<'a> ::core::fmt::Debug for SandboxRegisteredView<'a> {
             .field("sandbox_id", &self.sandbox_id)
             .field("session_token", &::core::format_args!("[REDACTED]"))
             .field("env", &self.env)
+            .field("egress_token", &::core::format_args!("[REDACTED]"))
+            .field("egress_env", &self.egress_env)
+            .field("git", &self.git)
             .finish()
     }
 }
@@ -729,6 +748,13 @@ impl<'a> ::buffa::MessageView<'a> for SandboxRegisteredView<'a> {
                 )?;
                 view.session_token = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.egress_token = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             3u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -742,6 +768,42 @@ impl<'a> ::buffa::MessageView<'a> for SandboxRegisteredView<'a> {
                 view.env
                     .push(
                         <super::super::__buffa::view::EnvVarView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::EnvVarView>(),
+                )?;
+                view.egress_env
+                    .push(
+                        <super::super::__buffa::view::EnvVarView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::GitRewriteView>(),
+                )?;
+                view.git
+                    .push(
+                        <super::super::__buffa::view::GitRewriteView as ::buffa::MessageView>::decode_view_ctx(
                             sub,
                             __sub_ctx,
                         )?,
@@ -776,6 +838,17 @@ impl<'a> ::buffa::MessageView<'a> for SandboxRegisteredView<'a> {
                 .iter()
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            egress_token: self.egress_token.map(|s| s.to_string()),
+            egress_env: self
+                .egress_env
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            git: self
+                .git
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -794,6 +867,25 @@ impl<'a> ::buffa::ViewEncode<'a> for SandboxRegisteredView<'a> {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         for v in &self.env {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.egress_token {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        for v in &self.egress_env {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.git {
             let __slot = __cache.reserve();
             let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
@@ -821,6 +913,25 @@ impl<'a> ::buffa::ViewEncode<'a> for SandboxRegisteredView<'a> {
         for v in &self.env {
             ::buffa::types::put_len_delimited_header(
                 3u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.egress_token {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        for v in &self.egress_env {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.git {
+            ::buffa::types::put_len_delimited_header(
+                6u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -855,6 +966,15 @@ impl<'__a> ::serde::Serialize for SandboxRegisteredView<'__a> {
         }
         if !self.env.is_empty() {
             __map.serialize_entry("env", &*self.env)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.egress_token {
+            __map.serialize_entry("egressToken", __v)?;
+        }
+        if !self.egress_env.is_empty() {
+            __map.serialize_entry("egressEnv", &*self.egress_env)?;
+        }
+        if !self.git.is_empty() {
+            __map.serialize_entry("git", &*self.git)?;
         }
         __map.end()
     }
@@ -968,6 +1088,25 @@ impl SandboxRegisteredOwnedView {
     ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::EnvVarView<'_>> {
         &self.0.reborrow().env
     }
+    /// Field 4: `egress_token`
+    #[must_use]
+    pub fn egress_token(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().egress_token
+    }
+    /// Field 5: `egress_env`
+    #[must_use]
+    pub fn egress_env(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::EnvVarView<'_>> {
+        &self.0.reborrow().egress_env
+    }
+    /// Field 6: `git`
+    #[must_use]
+    pub fn git(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::GitRewriteView<'_>> {
+        &self.0.reborrow().git
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<SandboxRegisteredView<'static>>>
 for SandboxRegisteredOwnedView {
@@ -992,6 +1131,274 @@ impl ::buffa::HasMessageView for super::super::SandboxRegistered {
     type ViewHandle = SandboxRegisteredOwnedView;
 }
 impl ::serde::Serialize for SandboxRegisteredOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// `git config url.<url>.insteadOf <instead_of>`.
+#[derive(Clone, Debug, Default)]
+pub struct GitRewriteView<'a> {
+    /// Field 1: `url`
+    pub url: &'a str,
+    /// Field 2: `instead_of`
+    pub instead_of: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for GitRewriteView<'a> {
+    type Owned = super::super::GitRewrite;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.url = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.instead_of = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::GitRewrite, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::GitRewrite, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::GitRewrite {
+            url: self.url.to_string(),
+            instead_of: self.instead_of.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for GitRewriteView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        if !self.instead_of.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.instead_of) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        if !self.instead_of.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.instead_of, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for GitRewriteView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
+            __map.serialize_entry("url", self.url)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.instead_of) {
+            __map.serialize_entry("insteadOf", self.instead_of)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for GitRewriteView<'a> {
+    const PACKAGE: &'static str = "tilde.sandbox.v1";
+    const NAME: &'static str = "GitRewrite";
+    const FULL_NAME: &'static str = "tilde.sandbox.v1.GitRewrite";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.sandbox.v1.GitRewrite";
+}
+::buffa::impl_default_view_instance!(GitRewriteView);
+::buffa::impl_view_reborrow!(GitRewriteView);
+/** Self-contained, `'static` owned view of a `GitRewrite` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GitRewriteView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GitRewriteView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct GitRewriteOwnedView(::buffa::OwnedView<GitRewriteView<'static>>);
+impl GitRewriteOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GitRewriteOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GitRewriteOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::GitRewrite,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GitRewriteOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`GitRewriteView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &GitRewriteView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::GitRewrite {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `url`
+    #[must_use]
+    pub fn url(&self) -> &'_ str {
+        self.0.reborrow().url
+    }
+    /// Field 2: `instead_of`
+    #[must_use]
+    pub fn instead_of(&self) -> &'_ str {
+        self.0.reborrow().instead_of
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<GitRewriteView<'static>>>
+for GitRewriteOwnedView {
+    fn from(inner: ::buffa::OwnedView<GitRewriteView<'static>>) -> Self {
+        GitRewriteOwnedView(inner)
+    }
+}
+impl ::core::convert::From<GitRewriteOwnedView>
+for ::buffa::OwnedView<GitRewriteView<'static>> {
+    fn from(wrapper: GitRewriteOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<GitRewriteView<'static>>>
+for GitRewriteOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<GitRewriteView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::GitRewrite {
+    type View<'a> = GitRewriteView<'a>;
+    type ViewHandle = GitRewriteOwnedView;
+}
+impl ::serde::Serialize for GitRewriteOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,
