@@ -1,0 +1,17 @@
+#!/bin/sh
+# Starts dockerd in the background unless it already runs, and waits until it answers.
+set -eu
+socket=/var/run/docker.sock
+ready() { [ -S "$socket" ] && /usr/bin/docker version >/dev/null 2>&1; }
+ready && exit 0
+exec 9>/var/run/start-dockerd.lock
+flock 9
+ready && exit 0
+nohup dockerd >/var/log/dockerd.log 2>&1 &
+for _ in $(seq 1 60); do
+    ready && exit 0
+    sleep 0.5
+done
+echo "dockerd did not start; its log (/var/log/dockerd.log) ends with:" >&2
+tail -n 20 /var/log/dockerd.log >&2
+exit 1

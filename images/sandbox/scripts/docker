@@ -1,0 +1,7 @@
+#!/bin/sh
+# Docker CLI that starts the daemon on first use (see start-dockerd). A DOCKER_HOST elsewhere is
+# used as it is.
+if [ -z "${DOCKER_HOST:-}" ] && ! [ -S /var/run/docker.sock ]; then
+    /usr/local/bin/start-dockerd || exit 1
+fi
+exec /usr/bin/docker "$@"

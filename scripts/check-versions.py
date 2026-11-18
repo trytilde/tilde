@@ -45,6 +45,9 @@ for manifest in sorted((root / "sdk/py/packages").glob("*/pyproject.toml")):
                 f"{manifest.relative_to(root)} pins {name.strip()} at {pin}, not {version}"
             )
 
+dockerfile = (root / "images/sandbox/Dockerfile").read_text()
+assert f"ARG TILDE_VERSION={version}\n" in dockerfile, "images/sandbox/Dockerfile version differs from VERSION"
+
 # The platform packages the CLI publishes are generated at pack time, so the only thing to keep
 # in step here is the launcher and the target table both existing.
 targets = json.loads((root / "packaging/targets.json").read_text())
