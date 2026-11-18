@@ -1,6 +1,6 @@
 name: Sandbox image
-# Public ghcr.io/trytilde/tilde-sandbox: Debian with the `tilde` CLI from a GitHub release's
-# archives. Release calls it once the release exists; dispatch publishes it for a version that is
+# Public ghcr.io/trytilde/tilde-sandbox: a Debian sandbox image (Node.js, Python, agent tools) with
+# the `tilde` CLI from a GitHub release's archives. Release calls it once the release exists; dispatch publishes it for a version that is
 # already released.
 on:
   workflow_call:
@@ -19,7 +19,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -55,7 +55,7 @@ jobs:
             ${{ env.IMAGE }}:latest
           labels: |
             org.opencontainers.image.title=Tilde sandbox
-            org.opencontainers.image.description=Debian with the Tilde CLI, for Tilde sandboxes
+            org.opencontainers.image.description=Debian sandbox image with the Tilde CLI, Node.js, Python and agent tools
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -63,4 +63,4 @@ jobs:
       - name: Smoke-test pushed image
         run: |
           test "$(docker run --rm "$IMAGE:$VERSION" tilde --version)" = "tilde $VERSION"
-          docker run --rm "$IMAGE:$VERSION" sh -c 'tilde sandbox credential --help >/dev/null && git --version && id -u | grep -qx 0'
+          docker run --rm "$IMAGE:$VERSION" sh -c 'tilde sandbox credential --help >/dev/null && id -u | grep -qx 0 && node --version && python --version && uv --version && pnpm --version && gh --version && jq --version && rg --version && fd --version'
