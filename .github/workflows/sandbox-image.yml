@@ -1,0 +1,66 @@
+name: Sandbox image
+# Public ghcr.io/trytilde/tilde-sandbox: Debian with the `tilde` CLI from a GitHub release's
+# archives. Release calls it once the release exists; dispatch publishes it for a version that is
+# already released.
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Released version, e.g. 5.1.0
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve image names
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "IMAGE=ghcr.io/${OWNER,,}/tilde-sandbox" >> "$GITHUB_ENV"
+          echo "MINOR=${VERSION%.*}" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/sandbox.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          build-args: TILDE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:${{ env.MINOR }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.title=Tilde sandbox
+            org.opencontainers.image.description=Debian with the Tilde CLI, for Tilde sandboxes
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+      - name: Smoke-test pushed image
+        run: |
+          test "$(docker run --rm "$IMAGE:$VERSION" tilde --version)" = "tilde $VERSION"
+          docker run --rm "$IMAGE:$VERSION" sh -c 'tilde sandbox credential --help >/dev/null && git --version && id -u | grep -qx 0'
