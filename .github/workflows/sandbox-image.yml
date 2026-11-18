@@ -1,7 +1,7 @@
 name: Sandbox image
 # Public ghcr.io/trytilde/tilde-sandbox: a Debian sandbox image (Node.js, Python, agent tools) with
-# the `tilde` CLI from a GitHub release's archives. Release calls it once the release exists; dispatch publishes it for a version that is
-# already released.
+# the `tilde` CLI from a GitHub release's archives. Release calls it once the release exists;
+# dispatch publishes it for a version that is already released.
 on:
   workflow_call:
     inputs:
