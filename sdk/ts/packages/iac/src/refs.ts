@@ -56,10 +56,27 @@ function ref<Tool extends string>(slug: string, type?: string): ConnectionRef<To
   return connection;
 }
 
-/** Any connection by its full slug; its tool names are plain strings, validated by preflight. */
+/**
+ * The organization's connections by slug, filled in by the `.d.ts` that `tilde iac types`
+ * writes (module augmentation of `@trytilde/iac`): each slug's connection type and tool names.
+ * Empty until then, so every slug takes plain strings.
+ */
+export interface Connections {}
+type Known<Slug extends string> = Slug extends keyof Connections ? Connections[Slug] : never;
+type ToolsOf<Slug extends string> =
+  Known<Slug> extends { tools: infer Tool extends string } ? Tool : string;
+type TypeOf<Slug extends string> =
+  Known<Slug> extends { type: infer Type extends string } ? Type : string;
+
+/**
+ * Any connection by its full slug. A slug `tilde iac types` generated takes its own type and
+ * tool names (a typo does not compile); any other takes plain strings, which preflight checks.
+ */
 export const connection = {
-  ref: (slug: string, options: { type?: string } = {}): ConnectionRef<string> =>
-    ref(slug, options.type),
+  ref: <Slug extends string>(
+    slug: Slug,
+    options: { type?: TypeOf<Slug> } = {},
+  ): ConnectionRef<ToolsOf<Slug>> => ref(slug, options.type),
 };
 
 /** A typed provider of the catalog: `github.ref("acme")` is the connection `github/acme`. */

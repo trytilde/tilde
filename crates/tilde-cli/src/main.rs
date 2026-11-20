@@ -7,6 +7,7 @@ mod deploy;
 mod dev;
 mod discover;
 mod doctor;
+mod iac;
 mod project;
 mod registry;
 #[cfg(unix)]
@@ -36,6 +37,8 @@ enum Command {
     Deploy(deploy::Deploy),
     /// Check this project, its SDK and the gateway.
     Doctor(doctor::Doctor),
+    /// Tools for `@trytilde/iac` specs.
+    Iac(iac::Iac),
     /// Inside a sandbox VM: serve the agent's operations, and call the sandbox's tools.
     #[cfg(unix)]
     Sandbox(sandbox::Sandbox),
@@ -48,6 +51,7 @@ async fn main() {
         Command::Dev(args) => dev::run(args).await,
         Command::Deploy(args) => deploy::run(args).await,
         Command::Doctor(args) => doctor::run(args).await,
+        Command::Iac(args) => iac::run(args).await,
         #[cfg(unix)]
         Command::Sandbox(args) => sandbox::run(args).await,
     };

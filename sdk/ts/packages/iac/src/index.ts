@@ -12,7 +12,7 @@
 import type { ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
 
 export { ALL, connection, catalogProvider } from "./refs.js";
-export type { All, ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
+export type { All, ConnectionRef, Connections, RemovedSource, ToolSelection } from "./refs.js";
 // Typed catalog providers, generated: rerun `task iac:catalog` when the provider catalog changes.
 export * from "./catalog.js";
 
