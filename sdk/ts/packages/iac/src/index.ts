@@ -9,10 +9,11 @@
  * Nothing is removed because it is missing from a spec: an entry with `delete: true` removes it.
  * The JSON built here is the `AgentSpec` protobuf JSON the server takes.
  */
-import type { ConnectionRef, ToolSelection } from "./refs.js";
+import type { ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
 
 export { ALL, connection, catalogProvider } from "./refs.js";
-export type { All, ConnectionRef, ToolSelection } from "./refs.js";
+export type { All, ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
+// Typed catalog providers, generated: rerun `task iac:catalog` when the provider catalog changes.
 export * from "./catalog.js";
 
 /** Marks values `tilde deploy` collects; shared with `@trytilde/sdk`'s reader by its key. */
@@ -98,8 +99,8 @@ export type Agent = {
   toolMode?: "direct" | "dynamic";
   /** Alias to inference connection, such as `{ default: openai.ref("prod") }`. */
   inference?: Record<string, ConnectionRef | Deleted>;
-  /** `github.ref("acme").tools("get_issue")`, or `{ connection, delete: true }` to remove one. */
-  tools?: (ToolSelection | { connection: ConnectionRef; delete: true })[];
+  /** `github.ref("acme").tools("github_get_issue")`; `ref.tools({ delete: true })` removes one. */
+  tools?: (ToolSelection | RemovedSource)[];
   sandbox?: Blueprint;
   routines?: Routine[];
   deploy?: Deploy;

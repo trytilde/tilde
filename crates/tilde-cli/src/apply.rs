@@ -12,6 +12,18 @@ use tilde_contracts::proto::tilde::management::v1 as wire;
 /// The request for `declarations`: its agents as discovered, the code's declarations and the
 /// external ID on the one agent that deploys this entry, and the CI's commit details.
 pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::ApplyRequest> {
+    // The spec owns the agent and its deploy target.
+    for (set, flag) in [
+        (args.agent_id.is_some(), "--agent-id (TILDE_AGENT_ID)"),
+        (args.target.is_some(), "--target"),
+        (args.function_arn.is_some(), "--function-arn"),
+    ] {
+        if set {
+            bail!(
+                "{flag} does not apply to @trytilde/iac specs: the agent's spec names its agent and deploy target"
+            );
+        }
+    }
     let mut agents = declarations.agents.clone();
     let deploying: Vec<usize> = agents
         .iter()
@@ -24,18 +36,33 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
             "Several agents in this entry declare deploy; an entry module deploys one agent's code"
         );
     }
+    let declares = ["prompts", "skills", "tools"].iter().any(|kind| {
+        declarations.value[kind]
+            .as_array()
+            .is_some_and(|items| !items.is_empty())
+    });
+    if deploying.is_empty() && declares {
+        bail!(
+            "This entry declares prompts, skills or tools, but no exported agent declares deploy: \
+             add `deploy: gateway()` (or `lambda(arn)`, `sidecar()`) to the agent whose code this is"
+        );
+    }
     if let Some(&i) = deploying.first() {
         let deployment = agents[i]["deployment"]
             .as_object_mut()
             .context("deployment is an object")?;
-        // Stable across reruns: the CI run, else the content of what is deployed, so an
-        // unchanged deploy registers nothing new.
+        // Stable across reruns: the CI run, else the content of what is deployed (and its commit
+        // when known), so an unchanged deploy registers nothing new.
         let external = args.external_id.clone().unwrap_or_else(|| {
             match (variable("GITHUB_REPOSITORY"), variable("GITHUB_RUN_ID")) {
                 (Some(repository), Some(run)) => format!("{repository}:{run}"),
                 _ => format!(
                     "sha256:{}",
-                    digest(&json!([declarations.value, deployment.clone()]))
+                    digest(&json!([
+                        declarations.value,
+                        deployment.clone(),
+                        variable("GITHUB_SHA")
+                    ]))
                 ),
             }
         });
@@ -77,7 +104,7 @@ pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
         .apply_with_options(request(args, declarations)?, crate::api::options())
         .await
         .map_err(|error| match error.code {
-            connectrpc::ErrorCode::Unimplemented | connectrpc::ErrorCode::NotFound => anyhow::anyhow!(
+            connectrpc::ErrorCode::Unimplemented => anyhow::anyhow!(
                 "This Tilde server does not support declarative apply; upgrade it to deploy @trytilde/iac specs"
             ),
             _ => crate::api::failed("Apply", error),
@@ -87,6 +114,11 @@ pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
         println!("{}", serde_json::to_string(&response)?);
     } else {
         eprint!("{}", render(&response, client.gateway()));
+        for change in response.changes.iter().filter(|c| {
+            c.kind == "deployment" && c.action.as_known() == Some(wire::ChangeAction::Unchanged)
+        }) {
+            eprintln!("Deployment {} already registered (no token)", change.key);
+        }
         // `TOKEN=$(tilde deploy)` keeps working for a dial-in deployment registered just now.
         if let [token] = response
             .agents
@@ -187,7 +219,7 @@ mod tests {
             url: Some(url),
             agent_id: None,
             api_key: None,
-            target: "gateway".into(),
+            target: None,
             function_arn: None,
             external_id: None,
             label: None,
@@ -273,6 +305,33 @@ mod tests {
             again.agents[0].deployment.as_option().unwrap().external_id,
             deployment.external_id
         );
+    }
+
+    #[test]
+    fn code_without_a_deploying_agent_and_flags_the_spec_owns_are_refused() {
+        let declarations = |prompts: Value| Declarations {
+            value: json!({"prompts": prompts, "skills": [], "tools": []}),
+            digest: "test".into(),
+            agents: vec![json!({"key": "triage", "name": "Triage"})],
+            team: None,
+        };
+        let error = super::request(
+            &args("http://x".into()),
+            &declarations(json!([{"name": "p"}])),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("no exported agent declares deploy"),
+            "{error}"
+        );
+        // Specs without code declarations configure agents only.
+        super::request(&args("http://x".into()), &declarations(json!([]))).unwrap();
+        let mut flagged = args("http://x".into());
+        flagged.agent_id = Some("11111111-2222-4333-8444-555555555555".into());
+        let error = super::request(&flagged, &declarations(json!([]))).unwrap_err();
+        assert!(error.to_string().contains("--agent-id"), "{error}");
     }
 
     #[test]

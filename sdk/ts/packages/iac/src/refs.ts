@@ -17,10 +17,14 @@ export type ToolSelection<Tool extends string = string> = {
   untypedTools(...names: string[]): ToolSelection<Tool>;
 };
 
+/** `ref.tools({ delete: true })`: the agent stops using the connection's tools. */
+export type RemovedSource = { readonly connection: ConnectionRef<string>; readonly delete: true };
+
 export type ConnectionRef<Tool extends string = string> = {
   readonly slug: string;
   /** The connection type preflight requires, such as `github_app`. */
   readonly type?: string;
+  tools(remove: { delete: true }): RemovedSource;
   tools(...names: (Tool | All)[]): ToolSelection<Tool>;
   untypedTools(...names: string[]): ToolSelection<Tool>;
 };
@@ -43,7 +47,10 @@ function ref<Tool extends string>(slug: string, type?: string): ConnectionRef<To
   const connection: ConnectionRef<Tool> = Object.freeze({
     slug,
     type,
-    tools: (...names: (Tool | All)[]) => selection(connection, names),
+    tools: ((...names: (Tool | All | { delete: true })[]) =>
+      typeof names[0] === "object"
+        ? Object.freeze({ connection, delete: true as const })
+        : selection(connection, names as (Tool | All)[])) as ConnectionRef<Tool>["tools"],
     untypedTools: (...names: string[]) => selection(connection, names),
   });
   return connection;

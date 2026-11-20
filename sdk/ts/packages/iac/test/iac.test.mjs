@@ -29,7 +29,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
     tools: [
       github.ref("acme").tools("github_get_issue").untypedTools("new_tool").tools(ALL),
       linear.untypedTools("x").tools("get_issue"),
-      { connection: connection.ref("sentry/acme"), delete: true },
+      connection.ref("sentry/acme").tools({ delete: true }),
     ],
     sandbox: blueprint({
       name: "box",

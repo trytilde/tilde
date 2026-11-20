@@ -21,8 +21,9 @@ pub struct Deploy {
     /// Required by Tilde Cloud; open-source Tilde needs none.
     #[arg(long, env = "TILDE_API_KEY", hide_env_values = true)]
     pub api_key: Option<String>,
-    #[arg(long, default_value = "gateway", value_parser = ["gateway", "sidecar", "lambda"])]
-    pub target: String,
+    /// Without specs; default gateway. A spec's `deploy` names its own target.
+    #[arg(long, value_parser = ["gateway", "sidecar", "lambda"])]
+    pub target: Option<String>,
     /// Required for, and only for, a Lambda target.
     #[arg(long)]
     pub function_arn: Option<String>,
@@ -73,9 +74,6 @@ pub fn ci_metadata() -> wire::RegisterDeploymentRequest {
 }
 
 pub async fn run(args: Deploy) -> Result<()> {
-    if (args.target == "lambda") != args.function_arn.is_some() {
-        bail!("--function-arn is required for a lambda target, and only for lambda");
-    }
     let project = Project::find(&args.dir)?;
     let entry = match &args.entry {
         Some(entry) => entry.clone(),
@@ -86,6 +84,10 @@ pub async fn run(args: Deploy) -> Result<()> {
     // is registered, as before specs existed.
     if !declarations.agents.is_empty() {
         return crate::apply::run(&args, &declarations).await;
+    }
+    let target = args.target.as_deref().unwrap_or("gateway");
+    if (target == "lambda") != args.function_arn.is_some() {
+        bail!("--function-arn is required for a lambda target, and only for lambda");
     }
 
     if args.dry_run {
@@ -99,7 +101,7 @@ pub async fn run(args: Deploy) -> Result<()> {
     let client = Client::new(url, args.api_key.clone())?;
 
     let mut request = ci_metadata();
-    request.target = target_of(&args.target).into();
+    request.target = target_of(target).into();
     request.target_reference = args.function_arn.clone();
     request.label = args.label.clone();
     // A GitHub run is the natural release id: stable across reruns of the same run.

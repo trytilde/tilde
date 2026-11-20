@@ -293,6 +293,7 @@ tasks:
 
   iac:catalog:
     desc: Regenerate @trytilde/iac's typed providers from the built-in catalog of a disposable server
+    # Rerun whenever a built-in provider, connection type or tool changes; catalog.ts is committed.
     dotenv: [".env.test.local", ".env.test"]
     cmds:
       - scripts/with-sccache.sh cargo build -p tilde
