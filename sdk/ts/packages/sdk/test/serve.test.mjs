@@ -6,14 +6,16 @@ import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { RunService, serve } from "../dist/index.js";
 
 const run = async () => {};
+function setEnv(values) {
+  for (const [k, v] of Object.entries(values)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+}
 function withEnv(values, body) {
   const saved = Object.fromEntries(Object.keys(values).map((k) => [k, process.env[k]]));
-  for (const [k, v] of Object.entries(values))
-    v === undefined ? delete process.env[k] : (process.env[k] = v);
-  return Promise.resolve(body()).finally(() => {
-    for (const [k, v] of Object.entries(saved))
-      v === undefined ? delete process.env[k] : (process.env[k] = v);
-  });
+  setEnv(values);
+  return Promise.resolve(body()).finally(() => setEnv(saved));
 }
 const plain = {
   TILDE_DISCOVERY: undefined,
