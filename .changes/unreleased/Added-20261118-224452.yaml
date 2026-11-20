@@ -1,3 +1,0 @@
-kind: Added
-body: "Sandbox images to try Tilde sandboxes with: `ghcr.io/trytilde/sandbox-debian-node`, `sandbox-debian-python` and `sandbox-debian-full` (both, plus Docker Engine and Docker Compose). Each is Debian with the `tilde` CLI of the same release and common agent tools (git, gh, jq, ripgrep, fd, build tools), and is tagged with the release version."
-time: 2026-11-18T22:44:52+00:00
