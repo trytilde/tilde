@@ -31,12 +31,39 @@ struct Types {
     out: PathBuf,
 }
 
-/// One connection as the declarations type it: its tools (empty: it serves none), `None` when
-/// none could be listed, which leaves its tool names plain strings.
+/// One slug as the declarations type it: its connection type, and its tools (empty: it serves
+/// none). `None` leaves that part plain strings.
 pub struct Typed {
     pub slug: String,
-    pub type_id: String,
+    pub type_id: Option<String>,
     pub tools: Option<Vec<String>>,
+}
+
+/// Several ready connections may share a slug (it is unique per agent and capability, not per
+/// organization), and the declarations hold one entry per slug: the same type keeps the union of
+/// their tools; different types, or any connection whose tools are unknown, leave that part
+/// plain strings.
+fn merge(typed: Vec<Typed>) -> Vec<Typed> {
+    let mut merged: Vec<Typed> = Vec::new();
+    for entry in typed {
+        let Some(kept) = merged.iter_mut().find(|kept| kept.slug == entry.slug) else {
+            merged.push(entry);
+            continue;
+        };
+        if kept.type_id != entry.type_id {
+            kept.type_id = None;
+            kept.tools = None;
+            continue;
+        }
+        kept.tools = match (kept.tools.take(), entry.tools) {
+            (Some(mut tools), Some(more)) => {
+                tools.extend(more);
+                Some(tools)
+            }
+            _ => None,
+        };
+    }
+    merged
 }
 
 pub async fn run(args: Iac) -> Result<()> {
@@ -53,7 +80,7 @@ pub async fn run(args: Iac) -> Result<()> {
     Ok(())
 }
 
-/// The ready connections (slugs are unique among those) and the tools each offers.
+/// The ready connections and the tools each offers, one entry per slug.
 pub async fn collect(client: &Client) -> Result<Vec<Typed>> {
     let mut connections = Vec::new();
     let mut page_token = String::new();
@@ -122,11 +149,11 @@ pub async fn collect(client: &Client) -> Result<Vec<Typed>> {
         };
         typed.push(Typed {
             slug: connection.slug,
-            type_id: connection.type_id,
+            type_id: Some(connection.type_id),
             tools,
         });
     }
-    Ok(typed)
+    Ok(merge(typed))
 }
 
 /// The declarations: one `Connections` entry per connection, sorted by slug.
@@ -141,23 +168,28 @@ pub fn render(connections: &[Typed]) -> String {
     let mut sorted: Vec<&Typed> = connections.iter().collect();
     sorted.sort_by(|a, b| a.slug.cmp(&b.slug));
     for connection in sorted {
+        let kind = connection
+            .type_id
+            .as_deref()
+            .map(|t| format!("type: {}", quote(t)));
         let tools = match &connection.tools {
-            None => String::new(),
-            Some(names) if names.is_empty() => "; tools: never".into(),
+            None => None,
+            Some(names) if names.is_empty() => Some("tools: never".to_owned()),
             Some(names) => {
                 let mut names = names.clone();
                 names.sort();
                 names.dedup();
                 let union: Vec<String> = names.iter().map(|n| quote(n)).collect();
-                format!("; tools: {}", union.join(" | "))
+                Some(format!("tools: {}", union.join(" | ")))
             }
         };
-        let _ = writeln!(
-            out,
-            "    {}: {{ type: {}{tools} }};",
-            quote(&connection.slug),
-            quote(&connection.type_id)
-        );
+        let fields: Vec<String> = kind.into_iter().chain(tools).collect();
+        let fields = if fields.is_empty() {
+            "{}".to_owned()
+        } else {
+            format!("{{ {} }}", fields.join("; "))
+        };
+        let _ = writeln!(out, "    {}: {fields};", quote(&connection.slug));
     }
     out.push_str("  }\n}\n");
     out
@@ -188,7 +220,12 @@ mod tests {
             id: id.into(),
             slug: slug.into(),
             provider_id: provider.into(),
-            type_id: "api".into(),
+            type_id: if id.ends_with("-oauth") {
+                "oauth"
+            } else {
+                "api"
+            }
+            .into(),
             status: "ready".into(),
             capabilities: if tools {
                 vec![types::Capability::Tool.into()]
@@ -219,9 +256,13 @@ mod tests {
                         connections.push(connection("c-mcp", "acme_mcp/prod", true));
                         connections.push(connection("c-empty", "empty_mcp/new", true));
                         connections.push(connection("c-openai", "openai/prod", false));
+                        // Ready connections of different agents may share a slug.
+                        connections.push(connection("c-linear-2", "linear/acme", true));
+                        connections.push(connection("c-github", "github/acme", true));
+                        connections.push(connection("c-github-oauth", "github/acme", true));
                         String::new()
                     };
-                    // Slugs are unique among ready connections only.
+                    // A connection whose setup failed is not typed.
                     if request.status.as_deref() != Some("ready") {
                         connections.push(types::Connection {
                             status: "failed".into(),
@@ -248,6 +289,15 @@ mod tests {
                             ..Default::default()
                         }),
                         "c-empty" => proto(wire::ListProviderToolsResponse::default()),
+                        "c-linear-2" | "c-github" | "c-github-oauth" => {
+                            proto(wire::ListProviderToolsResponse {
+                                tools: vec![wire::ProviderTool {
+                                    name: "search_issues".into(),
+                                    ..Default::default()
+                                }],
+                                ..Default::default()
+                            })
+                        }
                         _ => (
                             StatusCode::SERVICE_UNAVAILABLE,
                             [(header::CONTENT_TYPE, "application/json")],
@@ -274,7 +324,13 @@ mod tests {
             [
                 ("acme_mcp/prod", None),
                 ("empty_mcp/new", None),
-                ("linear/acme", Some(vec!["get_issue".to_owned()])),
+                // Two connections of different types under one slug: plain strings.
+                ("github/acme", None),
+                // Two of one type: the union of their tools.
+                (
+                    "linear/acme",
+                    Some(vec!["get_issue".to_owned(), "search_issues".to_owned()])
+                ),
                 ("openai/prod", Some(Vec::new())),
             ]
         );
@@ -291,17 +347,17 @@ mod tests {
         let text = render(&[
             Typed {
                 slug: "linear/acme".into(),
-                type_id: "api_key".into(),
+                type_id: Some("api_key".into()),
                 tools: Some(vec!["search_issues".into(), "get_issue".into()]),
             },
             Typed {
                 slug: "acme_mcp/prod".into(),
-                type_id: "oauth".into(),
+                type_id: Some("oauth".into()),
                 tools: None,
             },
             Typed {
                 slug: "openai/prod".into(),
-                type_id: "api".into(),
+                type_id: Some("api".into()),
                 tools: Some(Vec::new()),
             },
         ]);
