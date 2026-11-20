@@ -479,3 +479,53 @@ def create_lambda_handler(
         asyncio.run(main())
 
     return handler
+
+
+def serve(
+    *,
+    run: RunFn,
+    checkpoint: CheckpointFn | None = None,
+    ready: ReadyFn | None = None,
+    gateway_url: str | None = None,
+    deployment_token: str | None = None,
+    instance_id: str | None = None,
+    on_registered: Callable[[run_pb2.RunRegistered], None] | None = None,
+    tracing: Literal["existing"] | None = None,
+    logging: Literal["existing"] | None = None,
+    deployment_logging: DeploymentLogging | None = None,
+) -> Callable[[Any, Any], None]:
+    """Host the agent wherever its module runs, so one entry serves every deploy target.
+
+    Inside AWS Lambda (``AWS_LAMBDA_FUNCTION_NAME`` is set) it returns the Lambda handler:
+    ``handler = serve(run=run)``. With a deployment token (``deployment_token`` or
+    ``TILDE_DEPLOYMENT_TOKEN``) it runs the dial-in host until SIGINT/SIGTERM, so call it last
+    in the entry module. Otherwise (``tilde deploy`` reading the module, tests, a plain import)
+    it does nothing.
+    """
+
+    def outside_lambda(_event: Any, _context: Any = None) -> None:
+        raise RuntimeError("This handler only runs in AWS Lambda")
+
+    if discovering():
+        return outside_lambda
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        return create_lambda_handler(
+            run=run,
+            checkpoint=checkpoint,
+            tracing=tracing,
+            logging=logging,
+            deployment_logging=deployment_logging,
+        )
+    if deployment_token or os.environ.get("TILDE_DEPLOYMENT_TOKEN"):
+        run_connected_agent(
+            run=run,
+            checkpoint=checkpoint,
+            ready=ready,
+            gateway_url=gateway_url,
+            deployment_token=deployment_token,
+            instance_id=instance_id,
+            on_registered=on_registered,
+            tracing=tracing,
+            logging=logging,
+        )
+    return outside_lambda
