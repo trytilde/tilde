@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http2";
 import { once } from "node:events";
+import { spawn } from "node:child_process";
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { RunService, serve } from "../dist/index.js";
 
@@ -43,6 +44,68 @@ void test("inside Lambda serve is the Lambda handler", async () => {
       (error) => !/only runs in AWS Lambda/.test(error.message),
     );
   });
+});
+
+void test("inside Lambda a deployment token does not start a dial-in host", async () => {
+  await withEnv(
+    { ...plain, AWS_LAMBDA_FUNCTION_NAME: "agent", TILDE_DEPLOYMENT_TOKEN: "deployment-secret" },
+    async () => {
+      const served = serve({ run });
+      assert.equal(served.agent, undefined);
+      await assert.rejects(
+        served({ notAField: 1 }),
+        (error) => !/only runs in AWS Lambda/.test(error.message),
+      );
+    },
+  );
+});
+
+void test("a dial-in host closes and exits on SIGTERM", { timeout: 15000 }, async () => {
+  const watched = Promise.withResolvers();
+  const aborted = Promise.withResolvers();
+  const gateway = createServer(
+    connectNodeAdapter({
+      routes(router) {
+        router.service(RunService, {
+          async *watch(request, ctx) {
+            yield { frame: { case: "registered", value: { instanceId: request.instanceId } } };
+            watched.resolve();
+            await new Promise((resolve) => ctx.signal.addEventListener("abort", resolve));
+            aborted.resolve();
+          },
+          async heartbeat() {
+            return {};
+          },
+        });
+      },
+    }),
+  );
+  gateway.listen(0, "127.0.0.1");
+  await once(gateway, "listening");
+  const sdk = new URL("../dist/index.js", import.meta.url).href;
+  const child = spawn(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import { serve } from ${JSON.stringify(sdk)}; serve({ run: async () => {} });`,
+    ],
+    {
+      env: {
+        PATH: process.env.PATH,
+        TILDE_GATEWAY_URL: `http://127.0.0.1:${gateway.address().port}`,
+        TILDE_DEPLOYMENT_TOKEN: "deployment-secret",
+      },
+      stdio: "inherit",
+    },
+  );
+  const exited = once(child, "exit");
+  await watched.promise;
+  child.kill("SIGTERM");
+  const [code] = await exited;
+  assert.equal(code, 0);
+  await aborted.promise;
+  gateway.close();
 });
 
 void test("with a deployment token serve dials in", { timeout: 10000 }, async () => {

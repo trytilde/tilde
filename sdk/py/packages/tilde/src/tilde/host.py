@@ -499,8 +499,9 @@ def serve(
     Inside AWS Lambda (``AWS_LAMBDA_FUNCTION_NAME`` is set) it returns the Lambda handler:
     ``handler = serve(run=run)``. With a deployment token (``deployment_token`` or
     ``TILDE_DEPLOYMENT_TOKEN``) it runs the dial-in host until SIGINT/SIGTERM, so call it last
-    in the entry module. Otherwise (``tilde deploy`` reading the module, tests, a plain import)
-    it does nothing.
+    in the entry module; it blocks, so it cannot run inside an event loop (use
+    ``connect_agent`` there). Otherwise (``tilde deploy`` reading the module, tests, a plain
+    import) it does nothing.
     """
 
     def outside_lambda(_event: Any, _context: Any = None) -> None:
@@ -517,6 +518,15 @@ def serve(
             deployment_logging=deployment_logging,
         )
     if deployment_token or os.environ.get("TILDE_DEPLOYMENT_TOKEN"):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError(
+                "serve() runs a blocking host, so it cannot run inside an event loop: "
+                "await connect_agent(...) there instead"
+            )
         run_connected_agent(
             run=run,
             checkpoint=checkpoint,
