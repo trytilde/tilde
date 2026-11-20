@@ -7,6 +7,7 @@ pub mod env_value {
     #[derive(Clone, PartialEq)]
     pub enum Value {
         Literal(::buffa::alloc::string::String),
+        Secret(::buffa::alloc::boxed::Box<super::super::super::SecretRef>),
     }
     impl ::core::fmt::Debug for Value {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
@@ -16,10 +17,21 @@ pub mod env_value {
                         .field(&::core::format_args!("[REDACTED]"))
                         .finish()
                 }
+                Self::Secret(value) => f.debug_tuple("Secret").field(value).finish(),
             }
         }
     }
     impl ::buffa::Oneof for Value {}
+    impl From<super::super::super::SecretRef> for Value {
+        fn from(v: super::super::super::SecretRef) -> Self {
+            Self::Secret(::buffa::alloc::boxed::Box::new(v))
+        }
+    }
+    impl From<super::super::super::SecretRef> for ::core::option::Option<Value> {
+        fn from(v: super::super::super::SecretRef) -> Self {
+            Self::Some(Value::from(v))
+        }
+    }
     impl serde::Serialize for Value {
         fn serialize<S: serde::Serializer>(
             &self,
@@ -30,6 +42,9 @@ pub mod env_value {
             match self {
                 Self::Literal(v) => {
                     map.serialize_entry("literal", v)?;
+                }
+                Self::Secret(v) => {
+                    map.serialize_entry("secret", v)?;
                 }
             }
             map.end()

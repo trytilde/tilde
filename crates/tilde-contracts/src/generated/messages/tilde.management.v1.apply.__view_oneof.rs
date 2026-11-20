@@ -7,6 +7,11 @@ pub mod env_value {
     #[derive(Clone)]
     pub enum Value<'a> {
         Literal(&'a str),
+        Secret(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::__buffa::view::SecretRefView<'a>,
+            >,
+        ),
     }
     impl<'a> ::core::fmt::Debug for Value<'a> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
@@ -16,6 +21,7 @@ pub mod env_value {
                         .field(&::core::format_args!("[REDACTED]"))
                         .finish()
                 }
+                Self::Secret(value) => f.debug_tuple("Secret").field(value).finish(),
             }
         }
     }

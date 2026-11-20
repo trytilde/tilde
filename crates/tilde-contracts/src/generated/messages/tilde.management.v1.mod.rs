@@ -212,6 +212,7 @@ pub mod __buffa {
         reg.register_json_any(super::__TOOL_SOURCE_SPEC_JSON_ANY);
         reg.register_json_any(super::__BLUEPRINT_SPEC_JSON_ANY);
         reg.register_json_any(super::__ENV_VALUE_JSON_ANY);
+        reg.register_json_any(super::__SECRET_REF_JSON_ANY);
         reg.register_json_any(super::__EGRESS_SPEC_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_SPEC_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_TRIGGER_SPEC_JSON_ANY);
@@ -1041,6 +1042,10 @@ pub use self::__buffa::view::BlueprintSpecOwnedView;
 pub use self::__buffa::view::EnvValueView;
 #[doc(inline)]
 pub use self::__buffa::view::EnvValueOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SecretRefView;
+#[doc(inline)]
+pub use self::__buffa::view::SecretRefOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::EgressSpecView;
 #[doc(inline)]
