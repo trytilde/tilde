@@ -31,7 +31,8 @@ struct Types {
     out: PathBuf,
 }
 
-/// One connection as the declarations type it: its tools, `None` when they could not be listed.
+/// One connection as the declarations type it: its tools (empty: it serves none), `None` when
+/// none could be listed, which leaves its tool names plain strings.
 pub struct Typed {
     pub slug: String,
     pub type_id: String,
@@ -41,6 +42,19 @@ pub struct Typed {
 pub async fn run(args: Iac) -> Result<()> {
     let Command::Types(args) = args.command;
     let client = Client::new(&args.url, args.api_key.clone())?;
+    let typed = collect(&client).await?;
+    std::fs::write(&args.out, render(&typed))
+        .with_context(|| format!("Could not write {}", args.out.display()))?;
+    eprintln!(
+        "Wrote {} connection(s) to {}",
+        typed.len(),
+        args.out.display()
+    );
+    Ok(())
+}
+
+/// The ready connections (slugs are unique among those) and the tools each offers.
+pub async fn collect(client: &Client) -> Result<Vec<Typed>> {
     let mut connections = Vec::new();
     let mut page_token = String::new();
     loop {
@@ -50,6 +64,7 @@ pub async fn run(args: Iac) -> Result<()> {
                 wire::ListConnectionsRequest {
                     page_size: 100,
                     page_token: page_token.clone(),
+                    status: Some("ready".into()),
                     ..Default::default()
                 },
                 options(),
@@ -70,10 +85,10 @@ pub async fn run(args: Iac) -> Result<()> {
             .capabilities
             .iter()
             .any(|c| c.as_known() == Some(types::Capability::Tool));
+        // A connection that serves tools but lists none now (an MCP server not yet discovered,
+        // a listing that failed) keeps plain-string tool names rather than failing the file.
         let tools = if serves_tools {
-            // A connection whose tools cannot be listed now (not ready, server down) keeps
-            // plain-string tool names rather than failing the whole file.
-            match client
+            let listed = client
                 .tools
                 .list_provider_tools_with_options(
                     wire::ListProviderToolsRequest {
@@ -83,15 +98,16 @@ pub async fn run(args: Iac) -> Result<()> {
                     options(),
                 )
                 .await
-            {
-                Ok(listed) => Some(
-                    listed
-                        .into_owned()
-                        .tools
-                        .into_iter()
-                        .map(|t| t.name)
-                        .collect(),
-                ),
+                .map(|listed| listed.into_owned().tools);
+            match listed {
+                Ok(tools) if !tools.is_empty() => Some(tools.into_iter().map(|t| t.name).collect()),
+                Ok(_) => {
+                    eprintln!(
+                        "{}: lists no tools yet; its tool names stay plain strings",
+                        connection.slug
+                    );
+                    None
+                }
                 Err(error) => {
                     eprintln!(
                         "{}: tools not listed ({}); its tool names stay plain strings",
@@ -110,14 +126,7 @@ pub async fn run(args: Iac) -> Result<()> {
             tools,
         });
     }
-    std::fs::write(&args.out, render(&typed))
-        .with_context(|| format!("Could not write {}", args.out.display()))?;
-    eprintln!(
-        "Wrote {} connection(s) to {}",
-        typed.len(),
-        args.out.display()
-    );
-    Ok(())
+    Ok(typed)
 }
 
 /// The declarations: one `Connections` entry per connection, sorted by slug.
@@ -157,6 +166,125 @@ pub fn render(connections: &[Typed]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        Router,
+        body::Bytes,
+        http::{StatusCode, header},
+        response::{IntoResponse, Response},
+        routing::post,
+    };
+    use buffa::Message;
+
+    fn proto<M: Message>(message: M) -> Response {
+        (
+            [(header::CONTENT_TYPE, "application/proto")],
+            message.encode_to_vec(),
+        )
+            .into_response()
+    }
+    fn connection(id: &str, slug: &str, tools: bool) -> types::Connection {
+        let (provider, _) = slug.split_once('/').unwrap();
+        types::Connection {
+            id: id.into(),
+            slug: slug.into(),
+            provider_id: provider.into(),
+            type_id: "api".into(),
+            status: "ready".into(),
+            capabilities: if tools {
+                vec![types::Capability::Tool.into()]
+            } else {
+                Vec::new()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Against a stand-in management API: two pages of connections, each agent's Tilde chat
+    /// connection left out, a failed and an empty tool listing kept as plain strings, a
+    /// connection without tools offering none, and only ready connections, so a slug whose
+    /// earlier setup failed is not listed twice.
+    #[tokio::test]
+    async fn collects_ready_connections_and_their_tools_across_pages() {
+        let app = Router::new()
+            .route(
+                "/tilde.management.v1.ConnectionsService/ListConnections",
+                post(|body: Bytes| async move {
+                    let request = wire::ListConnectionsRequest::decode_from_slice(&body).unwrap();
+                    let mut connections = Vec::new();
+                    let next_page_token = if request.page_token.is_empty() {
+                        connections.push(connection("c-app", "tilde/agent-app", false));
+                        connections.push(connection("c-linear", "linear/acme", true));
+                        "page-2".to_owned()
+                    } else {
+                        connections.push(connection("c-mcp", "acme_mcp/prod", true));
+                        connections.push(connection("c-empty", "empty_mcp/new", true));
+                        connections.push(connection("c-openai", "openai/prod", false));
+                        String::new()
+                    };
+                    // Slugs are unique among ready connections only.
+                    if request.status.as_deref() != Some("ready") {
+                        connections.push(types::Connection {
+                            status: "failed".into(),
+                            ..connection("c-linear-old", "linear/acme", true)
+                        });
+                    }
+                    proto(wire::ListConnectionsResponse {
+                        connections,
+                        next_page_token,
+                        ..Default::default()
+                    })
+                }),
+            )
+            .route(
+                "/tilde.management.v1.ToolService/ListProviderTools",
+                post(|body: Bytes| async move {
+                    let request = wire::ListProviderToolsRequest::decode_from_slice(&body).unwrap();
+                    match request.connection_id.as_str() {
+                        "c-linear" => proto(wire::ListProviderToolsResponse {
+                            tools: vec![wire::ProviderTool {
+                                name: "get_issue".into(),
+                                ..Default::default()
+                            }],
+                            ..Default::default()
+                        }),
+                        "c-empty" => proto(wire::ListProviderToolsResponse::default()),
+                        _ => (
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            [(header::CONTENT_TYPE, "application/json")],
+                            r#"{"code":"unavailable","message":"server down"}"#,
+                        )
+                            .into_response(),
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let client = Client::new(&url, None).unwrap();
+        let mut typed = collect(&client).await.unwrap();
+        typed.sort_by(|a, b| a.slug.cmp(&b.slug));
+        let summary: Vec<(&str, Option<Vec<String>>)> = typed
+            .iter()
+            .map(|t| (t.slug.as_str(), t.tools.clone()))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                ("acme_mcp/prod", None),
+                ("empty_mcp/new", None),
+                ("linear/acme", Some(vec!["get_issue".to_owned()])),
+                ("openai/prod", Some(Vec::new())),
+            ]
+        );
+        let text = render(&typed);
+        assert_eq!(text.matches("\"linear/acme\"").count(), 1, "{text}");
+        assert!(
+            text.contains("\"empty_mcp/new\": { type: \"api\" };"),
+            "{text}"
+        );
+    }
 
     #[test]
     fn declarations_augment_connections_with_each_slugs_type_and_tools() {
