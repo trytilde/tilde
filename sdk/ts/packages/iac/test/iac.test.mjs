@@ -14,6 +14,7 @@ import {
   lambda,
   openai,
   routine,
+  secret,
 } from "../dist/index.js";
 
 const linear = connection.ref("linear/acme", { type: "api_key" });
@@ -35,7 +36,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
       name: "box",
       provider: connection.ref("e2b/acme"),
       template: "tilde-base",
-      env: { MODE: "strict", OLD: { delete: true } },
+      env: { MODE: "strict", NPM_TOKEN: secret.ref("NPM_TOKEN"), OLD: { delete: true } },
       egress: [egress("github", github.ref("acme"), { pull_requests: true })],
     }),
     routines: [
@@ -76,6 +77,8 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
   );
   assert.equal(parsed.sandbox.env.MODE.value.value, "strict");
   assert.equal(parsed.sandbox.env.OLD.delete, true);
+  assert.equal(parsed.sandbox.env.NPM_TOKEN.value.case, "secret");
+  assert.equal(parsed.sandbox.env.NPM_TOKEN.value.value.name, "NPM_TOKEN");
   assert.equal(parsed.sandbox.egress[0].enabled, true);
   assert.deepEqual(JSON.parse(parsed.sandbox.egress[0].configJson), { pull_requests: true });
   assert.equal(parsed.routines[0].enabled, undefined, "absent enabled is left to people");
@@ -94,6 +97,7 @@ test("ALL is the star and both selection methods accumulate in any order", () =>
 
 test("refs and routines refuse what the server would", () => {
   assert.throws(() => connection.ref("acme"), /provider\/name/);
+  assert.throws(() => secret.ref("npm-token"), /not a valid name/);
   assert.throws(
     () => defineAgent({ key: "a", name: "A", routines: [routine({ name: "R", prompt: "P" })] }),
     /exactly one of cron and signal/,

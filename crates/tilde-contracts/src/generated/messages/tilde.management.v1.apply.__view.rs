@@ -2768,6 +2768,8 @@ impl ::serde::Serialize for BlueprintSpecOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// A variable's value: a literal, or a secret (SecretService) by name, read at launch so rotating
+/// the secret reaches new sandboxes without a deploy.
 #[derive(Clone, Debug, Default)]
 pub struct EnvValueView<'a> {
     /// Field 2: `delete`
@@ -2823,6 +2825,37 @@ impl<'a> ::buffa::MessageView<'a> for EnvValueView<'a> {
                     ),
                 );
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                if let Some(
+                    super::super::__buffa::view::oneof::env_value::Value::Secret(
+                        ref mut existing,
+                    ),
+                ) = view.value
+                {
+                    ::buffa::MessageView::merge_into_view(
+                        &mut **existing,
+                        sub,
+                        __sub_ctx,
+                    )?;
+                } else {
+                    view.value = Some(
+                        super::super::__buffa::view::oneof::env_value::Value::Secret(
+                            ::buffa::alloc::boxed::Box::new(
+                                <super::super::__buffa::view::SecretRefView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            ),
+                        ),
+                    );
+                }
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -2846,16 +2879,31 @@ impl<'a> ::buffa::MessageView<'a> for EnvValueView<'a> {
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::EnvValue {
             delete: self.delete,
-            value: self
-                .value
-                .as_ref()
-                .map(|v| match v {
-                    super::super::__buffa::view::oneof::env_value::Value::Literal(v) => {
-                        super::super::__buffa::oneof::env_value::Value::Literal(
-                            v.to_string(),
-                        )
-                    }
-                }),
+            value: match self.value.as_ref() {
+                ::core::option::Option::Some(v) => {
+                    ::core::option::Option::Some(
+                        match v {
+                            super::super::__buffa::view::oneof::env_value::Value::Literal(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::env_value::Value::Literal(
+                                    v.to_string(),
+                                )
+                            }
+                            super::super::__buffa::view::oneof::env_value::Value::Secret(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::env_value::Value::Secret(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        v.to_owned_from_source(__buffa_src)?,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                }
+                ::core::option::Option::None => ::core::option::Option::None,
+            },
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -2863,7 +2911,7 @@ impl<'a> ::buffa::MessageView<'a> for EnvValueView<'a> {
 }
 impl<'a> ::buffa::ViewEncode<'a> for EnvValueView<'a> {
     #[allow(clippy::needless_borrow, clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -2871,6 +2919,14 @@ impl<'a> ::buffa::ViewEncode<'a> for EnvValueView<'a> {
             match v {
                 super::super::__buffa::view::oneof::env_value::Value::Literal(x) => {
                     size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                super::super::__buffa::view::oneof::env_value::Value::Secret(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
                 }
             }
         }
@@ -2883,7 +2939,7 @@ impl<'a> ::buffa::ViewEncode<'a> for EnvValueView<'a> {
     #[allow(clippy::needless_borrow)]
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -2892,6 +2948,14 @@ impl<'a> ::buffa::ViewEncode<'a> for EnvValueView<'a> {
             match v {
                 super::super::__buffa::view::oneof::env_value::Value::Literal(x) => {
                     ::buffa::types::put_string_field(1u32, x, buf);
+                }
+                super::super::__buffa::view::oneof::env_value::Value::Secret(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
                 }
             }
         }
@@ -2926,6 +2990,9 @@ impl<'__a> ::serde::Serialize for EnvValueView<'__a> {
             match __ov {
                 super::super::__buffa::view::oneof::env_value::Value::Literal(v) => {
                     __map.serialize_entry("literal", v)?;
+                }
+                super::super::__buffa::view::oneof::env_value::Value::Secret(v) => {
+                    __map.serialize_entry("secret", v)?;
                 }
             }
         }
@@ -3056,6 +3123,249 @@ impl ::buffa::HasMessageView for super::super::EnvValue {
     type ViewHandle = EnvValueOwnedView;
 }
 impl ::serde::Serialize for EnvValueOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct SecretRefView<'a> {
+    /// Field 1: `name`
+    pub name: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for SecretRefView<'a> {
+    type Owned = super::super::SecretRef;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::SecretRef, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::SecretRef, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::SecretRef {
+            name: self.name.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for SecretRefView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for SecretRefView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+            __map.serialize_entry("name", self.name)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for SecretRefView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SecretRef";
+    const FULL_NAME: &'static str = "tilde.management.v1.SecretRef";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SecretRef";
+}
+::buffa::impl_default_view_instance!(SecretRefView);
+::buffa::impl_view_reborrow!(SecretRefView);
+/** Self-contained, `'static` owned view of a `SecretRef` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SecretRefView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SecretRefView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct SecretRefOwnedView(::buffa::OwnedView<SecretRefView<'static>>);
+impl SecretRefOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SecretRefOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SecretRefOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::SecretRef,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SecretRefOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`SecretRefView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &SecretRefView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::SecretRef {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `name`
+    #[must_use]
+    pub fn name(&self) -> &'_ str {
+        self.0.reborrow().name
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<SecretRefView<'static>>>
+for SecretRefOwnedView {
+    fn from(inner: ::buffa::OwnedView<SecretRefView<'static>>) -> Self {
+        SecretRefOwnedView(inner)
+    }
+}
+impl ::core::convert::From<SecretRefOwnedView>
+for ::buffa::OwnedView<SecretRefView<'static>> {
+    fn from(wrapper: SecretRefOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<SecretRefView<'static>>>
+for SecretRefOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<SecretRefView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::SecretRef {
+    type View<'a> = SecretRefView<'a>;
+    type ViewHandle = SecretRefOwnedView;
+}
+impl ::serde::Serialize for SecretRefOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

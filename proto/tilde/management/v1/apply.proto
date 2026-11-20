@@ -70,7 +70,10 @@ message BlueprintSpec {
   map<string, EnvValue> env = 6;
   repeated EgressSpec egress = 7;
 }
-message EnvValue { oneof value { string literal = 1 [debug_redact = true]; } bool delete = 2; }
+// A variable's value: a literal, or a secret (SecretService) by name, read at launch so rotating
+// the secret reaches new sandboxes without a deploy.
+message EnvValue { oneof value { string literal = 1 [debug_redact = true]; SecretRef secret = 3; } bool delete = 2; }
+message SecretRef { string name = 1; }
 message EgressSpec { string slug = 1; ConnectionRef connection = 2; string config_json = 3; bool enabled = 4; bool delete = 5; }
 message RoutineSpec {
   string name = 1;
@@ -105,7 +108,7 @@ enum RequiredActionCode {
   REQUIRED_ACTION_CODE_CONNECTION_NOT_READY = 3; REQUIRED_ACTION_CODE_CONNECTION_WRONG_TYPE = 4;
   REQUIRED_ACTION_CODE_CAPABILITY_MISSING = 5; REQUIRED_ACTION_CODE_TOOL_NOT_OFFERED = 6;
   REQUIRED_ACTION_CODE_SIGNAL_NOT_OFFERED = 7; REQUIRED_ACTION_CODE_PERMISSION_DENIED = 8;
-  REQUIRED_ACTION_CODE_TEAM_MISSING = 9;
+  REQUIRED_ACTION_CODE_TEAM_MISSING = 9; REQUIRED_ACTION_CODE_SECRET_MISSING = 10;
 }
 message ApplyResponse {
   ApplyOutcome outcome = 1;

@@ -344,6 +344,7 @@ pub enum RequiredActionCode {
     REQUIRED_ACTION_CODE_SIGNAL_NOT_OFFERED = 7i32,
     REQUIRED_ACTION_CODE_PERMISSION_DENIED = 8i32,
     REQUIRED_ACTION_CODE_TEAM_MISSING = 9i32,
+    REQUIRED_ACTION_CODE_SECRET_MISSING = 10i32,
 }
 impl RequiredActionCode {
     ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -376,6 +377,9 @@ impl RequiredActionCode {
     ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_TEAM_MISSING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TeamMissing: Self = Self::REQUIRED_ACTION_CODE_TEAM_MISSING;
+    ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_SECRET_MISSING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SecretMissing: Self = Self::REQUIRED_ACTION_CODE_SECRET_MISSING;
 }
 impl ::core::default::Default for RequiredActionCode {
     fn default() -> Self {
@@ -509,6 +513,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
                 )
             }
             9i32 => ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_TEAM_MISSING),
+            10i32 => {
+                ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SECRET_MISSING)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -542,6 +549,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
             }
             Self::REQUIRED_ACTION_CODE_TEAM_MISSING => {
                 "REQUIRED_ACTION_CODE_TEAM_MISSING"
+            }
+            Self::REQUIRED_ACTION_CODE_SECRET_MISSING => {
+                "REQUIRED_ACTION_CODE_SECRET_MISSING"
             }
         }
     }
@@ -589,6 +599,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
             "REQUIRED_ACTION_CODE_TEAM_MISSING" => {
                 ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_TEAM_MISSING)
             }
+            "REQUIRED_ACTION_CODE_SECRET_MISSING" => {
+                ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SECRET_MISSING)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -604,6 +617,7 @@ impl ::buffa::Enumeration for RequiredActionCode {
             Self::REQUIRED_ACTION_CODE_SIGNAL_NOT_OFFERED,
             Self::REQUIRED_ACTION_CODE_PERMISSION_DENIED,
             Self::REQUIRED_ACTION_CODE_TEAM_MISSING,
+            Self::REQUIRED_ACTION_CODE_SECRET_MISSING,
         ]
     }
 }
@@ -2337,6 +2351,8 @@ pub const __BLUEPRINT_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     from_json: ::buffa::type_registry::any_from_json::<BlueprintSpec>,
     is_wkt: false,
 };
+/// A variable's value: a literal, or a secret (SecretService) by name, read at launch so rotating
+/// the secret reaches new sandboxes without a deploy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -2385,7 +2401,7 @@ impl ::buffa::Message for EnvValue {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -2393,6 +2409,14 @@ impl ::buffa::Message for EnvValue {
             match v {
                 __buffa::oneof::env_value::Value::Literal(x) => {
                     size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                __buffa::oneof::env_value::Value::Secret(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u64 + ::buffa::encoding::varint_len(inner as u64) as u64
+                            + inner as u64;
                 }
             }
         }
@@ -2404,7 +2428,7 @@ impl ::buffa::Message for EnvValue {
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -2413,6 +2437,14 @@ impl ::buffa::Message for EnvValue {
             match v {
                 __buffa::oneof::env_value::Value::Literal(x) => {
                     ::buffa::types::put_string_field(1u32, x, buf);
+                }
+                __buffa::oneof::env_value::Value::Secret(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        u64::from(__cache.consume_next()),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
                 }
             }
         }
@@ -2442,6 +2474,26 @@ impl ::buffa::Message for EnvValue {
                         ::buffa::types::decode_string(buf)?,
                     ),
                 );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::env_value::Value::Secret(ref mut existing),
+                ) = self.value
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.value = ::core::option::Option::Some(
+                        __buffa::oneof::env_value::Value::Secret(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
             }
             2u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -2532,6 +2584,30 @@ impl<'de> serde::Deserialize<'de> for EnvValue {
                                 );
                             }
                         }
+                        "secret" => {
+                            let v: ::core::option::Option<SecretRef> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            SecretRef,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_value.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'value'",
+                                        ),
+                                    );
+                                }
+                                __oneof_value = Some(
+                                    __buffa::oneof::env_value::Value::Secret(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
                         }
@@ -2576,6 +2652,130 @@ pub mod env_value {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::env_value::Value as ValueView;
 }
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SecretRef {
+    /// Field 1: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SecretRef {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SecretRef").field("name", &self.name).finish()
+    }
+}
+impl SecretRef {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SecretRef";
+}
+::buffa::impl_default_instance!(SecretRef);
+impl ::buffa::MessageName for SecretRef {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SecretRef";
+    const FULL_NAME: &'static str = "tilde.management.v1.SecretRef";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SecretRef";
+}
+impl ::buffa::Message for SecretRef {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SecretRef {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SecretRef";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SecretRef {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SECRET_REF_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SecretRef",
+    to_json: ::buffa::type_registry::any_to_json::<SecretRef>,
+    from_json: ::buffa::type_registry::any_from_json::<SecretRef>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

@@ -58,11 +58,24 @@ export type Blueprint = {
     terminateAfterSeconds?: number;
     connectTimeoutSeconds?: number;
   };
-  /** Non-secret values. Variables not named here (such as ones set in the app) stay. */
-  env?: Record<string, string | Deleted>;
+  /**
+   * A literal (never a secret: it lives in code) or `secret.ref("NAME")`. Variables not named
+   * here (such as ones set in the app) stay.
+   */
+  env?: Record<string, string | SecretRef | Deleted>;
   egress?: Egress[];
 };
 export const blueprint = (spec: Blueprint): Blueprint => spec;
+
+/** A secret set in the app (Connections → Secrets), referenced by name; its value never enters a spec. */
+export type SecretRef = { readonly secret: string };
+export const secret = {
+  ref(name: string): SecretRef {
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(name))
+      throw new Error(`Secret ${name} is not a valid name (letters, digits and underscores)`);
+    return Object.freeze({ secret: name });
+  },
+};
 
 export type Routine = {
   /** The routine's key within its agent. */
@@ -130,7 +143,11 @@ function blueprintJson(spec: Blueprint) {
     env: Object.fromEntries(
       Object.entries(spec.env ?? {}).map(([name, value]) => [
         name,
-        isDeleted(value) ? { delete: true } : { literal: value },
+        isDeleted(value)
+          ? { delete: true }
+          : typeof value === "string"
+            ? { literal: value }
+            : { secret: { name: value.secret } },
       ]),
     ),
     egress: (spec.egress ?? []).map((grant) => ({
