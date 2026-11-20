@@ -128,8 +128,9 @@ export type AgentSpec = { readonly [SPEC]: "agent"; readonly key: string; readon
 /**
  * People (Tilde Cloud). A user is found by email and upserted: a changed `name` updates them (an
  * organization administrator's apply). In a team's apply a declared user is a member of the
- * team; `login: true` (a member) or `login: { role }` also sets their role and invites them to
- * sign in, and `team: { delete: true }` removes them from the team. A group is found by name in
+ * team (joining as a member). `login: true` invites them to sign in and keeps an existing
+ * member's role; `login: { role }` also sets their role. `team: { delete: true }` removes them
+ * from the team. A group is found by name in
  * the team and created if missing. `delete: true` disables a user or deletes a group. A string
  * names an existing or declared one, as a grant's principal or a group member.
  */
@@ -194,10 +195,11 @@ const userJson = (u: User) => ({
   name: u.name ?? "",
   login: !!u.login,
   delete: u.delete ?? false,
+  // Only an explicit role is sent: `login: true` keeps an existing member's role.
   ...(u.team?.delete
     ? { team: { delete: true } }
-    : u.login
-      ? { team: { role: ROLES[u.login === true ? "member" : u.login.role] } }
+    : u.login && u.login !== true
+      ? { team: { role: ROLES[u.login.role] } }
       : {}),
 });
 const groupJson = (g: Group) => ({

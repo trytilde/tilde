@@ -155,7 +155,8 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
     }).json,
   );
   assert.equal(agent.users[0].email, "bob@faro.test");
-  assert.equal(agent.users[0].team.role, 1, "login: true is a member");
+  assert.equal(agent.users[0].login, true);
+  assert.equal(agent.users[0].team, undefined, "login: true sends no role, keeping a member's");
   assert.equal(agent.users[1].team.delete, true);
   assert.deepEqual(
     agent.access.map((g) => [g.principal.case, g.principal.value, g.plane, g.delete]),
