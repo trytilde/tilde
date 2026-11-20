@@ -35,6 +35,7 @@ from tilde.host import (
     create_lambda_handler,
     run_connected_agent,
     run_invocation,
+    serve,
 )
 from tilde.logging import DeploymentLogging, agent_log_processor, configure_deployment_logging
 from tilde.messages import (
@@ -99,6 +100,7 @@ __all__ = [
     "configure_deployment_logging",
     "connect_agent",
     "create_lambda_handler",
+    "serve",
     "create_management_client",
     "create_runtime_client",
     "create_tilde_chat_client",

@@ -1413,3 +1413,41 @@ export function createLambdaHandler(options: InvocationOptions): (event: unknown
     }
   };
 }
+
+export type ServeOptions = ConnectAgentOptions & {
+  /** In Lambda: export startup and background logs with these deployment credentials. */
+  deploymentLogging?: DeploymentLoggingOptions;
+};
+/** The Lambda handler `serve` returns; `agent` is the dial-in host it started, if any. */
+export type Served = ((event: unknown) => Promise<void>) & { readonly agent?: ConnectedAgent };
+
+/**
+ * Hosts the agent wherever its module runs, so one entry serves every deploy target:
+ *
+ * - inside AWS Lambda (`AWS_LAMBDA_FUNCTION_NAME` is set) it builds the Lambda handler; export
+ *   it: `export const handler = serve({ run })`;
+ * - with a deployment token (`deploymentToken` or `TILDE_DEPLOYMENT_TOKEN`) it connects a
+ *   dial-in host, as `connectAgent` does, keeps it on `served.agent`, and on SIGINT or SIGTERM
+ *   closes it and exits;
+ * - otherwise (`tilde deploy` reading the module, tests, a plain import) it does nothing.
+ */
+export function serve(options: ServeOptions): Served {
+  const outsideLambda = async () => {
+    throw new Error("This handler only runs in AWS Lambda");
+  };
+  if (discovering()) return outsideLambda;
+  if (process.env.AWS_LAMBDA_FUNCTION_NAME) return createLambdaHandler(options);
+  if (options.deploymentToken ?? process.env.TILDE_DEPLOYMENT_TOKEN) {
+    const agent = connectAgent(options);
+    // A standalone host: stop watching, let active invocations report, then exit.
+    const stop = () =>
+      void agent
+        .close()
+        .catch((error: unknown) => console.warn("[tilde] closing the host failed:", error))
+        .finally(() => process.exit(0));
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+    return Object.assign(outsideLambda, { agent });
+  }
+  return outsideLambda;
+}
