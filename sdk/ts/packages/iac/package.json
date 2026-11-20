@@ -1,0 +1,29 @@
+{
+  "name": "@trytilde/iac",
+  "version": "5.2.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trytilde/tilde",
+    "directory": "sdk/ts/packages/iac"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs && tsc --noEmit -p test"
+  },
+  "devDependencies": {
+    "@bufbuild/protobuf": "2.14.1",
+    "@trytilde/contracts": "workspace:*"
+  }
+}

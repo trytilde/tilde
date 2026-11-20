@@ -31,9 +31,13 @@ pub struct Deploy {
     pub external_id: Option<String>,
     #[arg(long)]
     pub label: Option<String>,
-    /// Print the declarations as JSON and contact nothing.
+    /// Without `@trytilde/iac` specs: print the declarations as JSON and contact nothing. With
+    /// them: ask the server for the plan and apply nothing.
     #[arg(long)]
     pub dry_run: bool,
+    /// The team new agents and blueprints belong to (Tilde Cloud), overriding `defineProject`.
+    #[arg(long, env = "TILDE_TEAM")]
+    pub team: Option<String>,
     /// Print the deployment id, token and creation status as JSON.
     #[arg(long)]
     pub json: bool,
@@ -77,7 +81,12 @@ pub async fn run(args: Deploy) -> Result<()> {
         Some(entry) => entry.clone(),
         None => project.entry()?,
     };
-    let declarations = discover::declarations(&project, &entry, false).await?;
+    let declarations = discover::declarations(&project, &entry, false, true).await?;
+    // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
+    // is registered, as before specs existed.
+    if !declarations.agents.is_empty() {
+        return crate::apply::run(&args, &declarations).await;
+    }
 
     if args.dry_run {
         println!("{}", serde_json::to_string_pretty(&declarations.value)?);

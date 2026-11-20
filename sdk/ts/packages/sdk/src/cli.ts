@@ -8,13 +8,18 @@
  * `tilde deploy` that has to live in the SDK. The `tilde` CLI runs it and owns everything after:
  * uploading skill files and registering the deployment, once, for every language.
  *
+ * With `TILDE_DISCOVERY_SPECS=1` (set by `tilde deploy`) it prints
+ * `{ "declarations": …, "agents": [AgentSpec…], "team": … }` instead, adding the
+ * `@trytilde/iac` specs the entry exports; readers that predate specs ignore the variable.
+ *
  * The entry is normally built JavaScript (`dist/index.js`); a `.ts` entry relies on Node's own
  * type stripping.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { create, toJsonString } from "@bufbuild/protobuf";
+import { create, fromJson, toJson, toJsonString, type JsonValue } from "@bufbuild/protobuf";
+import { AgentSpecSchema } from "@trytilde/contracts/tilde/management/v1/apply_pb.js";
 import { DeploymentDeclarationsSchema } from "@trytilde/contracts/tilde/management/v1/deployments_pb.js";
 import { ToolDisplay } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 import { PromptFormat } from "@trytilde/contracts/tilde/types/v1/prompt_pb.js";
@@ -98,6 +103,7 @@ function declarationsMessage(found: Declarations) {
 }
 function inventory(entry: string, found: Declarations) {
   const lines = [`tilde declarations: ${relative(process.cwd(), entry) || entry}`];
+  for (const agent of found.agents) lines.push(`  agent   ${agent.key}  ${agent.origin}`);
   for (const prompt of found.prompts)
     lines.push(
       `  prompt  ${prompt.name}  ${PromptFormat[prompt.format].toLowerCase()}  ${prompt.origin}`,
@@ -126,8 +132,10 @@ async function read(argv: string[]) {
     throw error;
   });
   inventory(entry, found);
+  const specs = process.env.TILDE_DISCOVERY_SPECS === "1";
   if (
     !values["allow-empty"] &&
+    !(specs && found.agents.length) &&
     !found.prompts.length &&
     !found.skills.length &&
     !found.tools.length
@@ -135,7 +143,18 @@ async function read(argv: string[]) {
     throw new Error(
       "Nothing to deploy was found: export definePrompt/defineSkills/defineTools values or framework agents from the entry module",
     );
-  return toJsonString(DeploymentDeclarationsSchema, declarationsMessage(found));
+  const declarations = toJsonString(DeploymentDeclarationsSchema, declarationsMessage(found));
+  if (!specs) return declarations;
+  const agents = found.agents.map((agent) => {
+    try {
+      return toJson(AgentSpecSchema, fromJson(AgentSpecSchema, agent.json as JsonValue));
+    } catch (error) {
+      throw new Error(
+        `Agent ${agent.key} is not a valid spec (${agent.origin}): ${(error as Error).message}`,
+      );
+    }
+  });
+  return JSON.stringify({ declarations: JSON.parse(declarations), agents, team: found.team });
 }
 
 async function main() {

@@ -39,6 +39,8 @@ export type DiscoveredTool = {
   outputSchema?: Record<string, unknown>;
   origin: string;
 };
+/** An `@trytilde/iac` agent spec: its key and `AgentSpec` protobuf JSON. */
+export type DiscoveredAgent = { key: string; json: unknown; origin: string };
 export type Discovery = {
   prompts?: DiscoveredPrompt[];
   skills?: DiscoveredSkill[];
@@ -46,6 +48,8 @@ export type Discovery = {
   /** For example a framework agent whose prompts could not be read. */
   warnings?: string[];
 };
+/** Core's own findings add `@trytilde/iac` specs: agents, and a project's team. */
+type CoreDiscovery = Discovery & { agents?: DiscoveredAgent[]; team?: string };
 /** `origin` locates the value, e.g. `dist/index.js#agent`; paths are relative to `projectDir`. */
 export type DiscoveryContext = { origin: string; projectDir: string };
 export type Discoverer = (
@@ -72,6 +76,8 @@ const ADAPTERS = [
 
 export type SkillFile = { path: string; executable: boolean; data: Uint8Array; text?: string };
 export type Declarations = {
+  agents: DiscoveredAgent[];
+  team?: string;
   prompts: (DiscoveredPrompt & { hash: string })[];
   skills: { name: string; files: SkillFile[]; origin: string }[];
   tools: DiscoveredTool[];
@@ -130,8 +136,28 @@ async function readSkillDir(dir: string, origin: string) {
   return { name: frontMatterName(entry.text ?? "") ?? basename(dir), files, origin };
 }
 
-function core(value: unknown, origin: string): Discovery | undefined {
+/** `@trytilde/iac` marks its values with this registered symbol; the SDK does not depend on it. */
+const IAC = Symbol.for("tilde.iac");
+type IacValue = { key?: string; json?: unknown; team?: string; agents?: IacValue[] };
+
+function core(value: unknown, origin: string): CoreDiscovery | undefined {
   if (!value || typeof value !== "object") return undefined;
+  const iac = (value as Record<symbol, unknown>)[IAC];
+  if (iac === "agent") {
+    const agent = value as IacValue;
+    return { agents: [{ key: agent.key!, json: agent.json, origin }] };
+  }
+  if (iac === "project") {
+    const project = value as IacValue;
+    return {
+      team: project.team,
+      agents: (project.agents ?? []).map((agent) => ({
+        key: agent.key!,
+        json: agent.json,
+        origin,
+      })),
+    };
+  }
   const kind = (value as Record<symbol, unknown>)[declaration];
   if (kind === "prompt") {
     const p = value as DiscoveredPrompt;
@@ -193,7 +219,7 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
   process.env.TILDE_DISCOVERY = "1";
   const module = (await import(pathToFileURL(entry).href)) as Record<string, unknown>;
   const adapters: Discoverer[] = [];
-  const found: { discovery: Discovery; origin: string }[] = [];
+  const found: { discovery: CoreDiscovery; origin: string }[] = [];
   for (const name of ADAPTERS) {
     const adapter = await loadAdapter(name, dirname(entry));
     if (adapter?.discover) adapters.push(adapter.discover);
@@ -231,12 +257,36 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
     }
   }
 
-  const declarations: Declarations = { prompts: [], skills: [], tools: [], warnings: [] };
+  const declarations: Declarations = {
+    agents: [],
+    prompts: [],
+    skills: [],
+    tools: [],
+    warnings: [],
+  };
+  const agents = new Map<string, { agent: DiscoveredAgent; digest: string }>();
   const prompts = new Map<string, Declarations["prompts"][number]>();
   const skills = new Map<string, { skill: Declarations["skills"][number]; digest: string }>();
   const tools = new Map<string, { tool: DiscoveredTool; digest: string }>();
-  for (const { discovery } of found) {
+  for (const { discovery, origin } of found) {
     declarations.warnings.push(...(discovery.warnings ?? []));
+    if (discovery.team !== undefined) {
+      if (declarations.team !== undefined && declarations.team !== discovery.team)
+        throw new Error(
+          `Projects name different teams (${declarations.team}, ${discovery.team}) (${origin})`,
+        );
+      declarations.team = discovery.team;
+    }
+    // The same agent exported twice (alone and in a project) is kept once.
+    for (const agent of discovery.agents ?? []) {
+      const digest = canonicalJson(agent.json);
+      const previous = agents.get(agent.key);
+      if (previous && previous.digest !== digest)
+        throw new Error(
+          `Agent ${agent.key} is defined twice differently (${previous.agent.origin}, ${agent.origin})`,
+        );
+      if (!previous) agents.set(agent.key, { agent, digest });
+    }
     for (const prompt of discovery.prompts ?? []) {
       if (!validPromptName(prompt.name))
         throw new Error(`Prompt name ${prompt.name} is invalid (${prompt.origin})`);
@@ -298,6 +348,7 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
     }
   }
   declarations.warnings = [...new Set(declarations.warnings)];
+  declarations.agents = [...agents.values()].map((entry) => entry.agent);
   declarations.prompts = [...prompts.values()];
   declarations.skills = [...skills.values()].map((entry) => entry.skill);
   declarations.tools = [...tools.values()].map((entry) => entry.tool);

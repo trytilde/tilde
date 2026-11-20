@@ -89,14 +89,21 @@ pub struct Declarations {
     pub value: Value,
     /// Stable digest of the declarations, so `tilde dev` can tell a real change from a rebuild.
     pub digest: String,
+    /// `@trytilde/iac` agent specs (`AgentSpec` protobuf JSON) the entry exports, when asked for.
+    pub agents: Vec<Value>,
+    /// The team a `defineProject` names.
+    pub team: Option<String>,
 }
 
 /// `allow_empty` is for `tilde dev`: an agent that declares no prompts, skills or tools is still
 /// worth running, while an empty release is almost always a build that did not happen.
+/// `specs` asks the reader for `@trytilde/iac` specs too (`TILDE_DISCOVERY_SPECS`); readers that
+/// predate them ignore it and print plain declarations.
 pub async fn declarations(
     project: &Project,
     entry: &str,
     allow_empty: bool,
+    specs: bool,
 ) -> Result<Declarations> {
     let Some((program, leading)) = reader(project) else {
         bail!(
@@ -112,6 +119,7 @@ pub async fn declarations(
         .args(&leading)
         .arg(entry)
         .args(allow_empty.then_some("--allow-empty"))
+        .envs(specs.then_some(("TILDE_DISCOVERY_SPECS", "1")))
         .current_dir(&project.dir)
         .stdin(Stdio::null())
         // The reader writes its inventory to stderr; let the user see it as it goes.
@@ -124,11 +132,19 @@ pub async fn declarations(
     }
     let text = String::from_utf8(output.stdout)
         .context("The declaration reader printed output that was not UTF-8")?;
-    let value: Value = serde_json::from_str(text.trim())
+    let mut value: Value = serde_json::from_str(text.trim())
         .context("The declaration reader did not print declaration JSON")?;
+    let (mut agents, mut team) = (Vec::new(), None);
+    if specs && let Some(found) = value.get_mut("declarations").map(Value::take) {
+        agents = value["agents"].as_array().cloned().unwrap_or_default();
+        team = value["team"].as_str().map(str::to_owned);
+        value = found;
+    }
     Ok(Declarations {
         digest: digest(&value),
         value,
+        agents,
+        team,
     })
 }
 

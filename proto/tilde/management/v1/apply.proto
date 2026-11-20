@@ -1,0 +1,143 @@
+syntax = "proto3";
+package tilde.management.v1;
+import "tilde/types/v1/agent.proto";
+import "tilde/types/v1/deployment.proto";
+import "tilde/management/v1/deployments.proto";
+import "tilde/management/v1/routines.proto";
+import "tilde/management/v1/sandboxes.proto";
+import "tilde/management/v1/tools.proto";
+
+// Declarative provisioning: `tilde deploy` sends agent specs written in code and the server makes
+// the registry match them in one transaction. Every resource is upserted by its key (an agent by
+// `key`, a blueprint by name, a routine by name within its agent, a tool source by connection, an
+// inference alias by alias, an egress grant by slug), whoever created it. Nothing is removed
+// because it is missing from a spec: an entry with `delete` removes it. Connections are only ever
+// referenced: a missing, unready or unsuitable one blocks the apply with a required action.
+service ApplyService {
+  rpc Apply(ApplyRequest) returns (ApplyResponse);
+}
+
+message ApplyRequest {
+  // Plan only: the same writes run and are rolled back.
+  bool dry_run = 1;
+  repeated AgentSpec agents = 2;
+  // The slug of the team new agents and blueprints belong to, on servers with teams (Tilde
+  // Cloud); servers without teams ignore it. Shared so one CLI and SDK serve every edition.
+  string team = 3;
+  // Recorded on registered deployments.
+  optional string repository = 4;
+  optional string commit_sha = 5;
+  optional string branch = 6;
+  optional string commit_message = 7;
+  optional string commit_author = 8;
+}
+
+// A connection by slug (`provider/name`, for example `github/acme`), optionally of one type.
+message ConnectionRef { string slug = 1; optional string type = 2; }
+
+message AgentSpec {
+  // Stable identity in code: lowercase letters, digits and dashes, at most 64.
+  string key = 1;
+  // The ID to create the agent with. An existing agent with this ID and no key is taken over.
+  optional string id = 2;
+  string name = 3;
+  string description = 4;
+  tilde.types.v1.Capabilities capabilities = 5;
+  // Absent keeps the current policy (queue for a new agent); likewise tool_mode.
+  optional tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 6;
+  optional ToolMode tool_mode = 7;
+  repeated InferenceAliasSpec inference = 8;
+  repeated ToolSourceSpec tools = 9;
+  optional BlueprintSpec sandbox = 10;
+  repeated RoutineSpec routines = 11;
+  // Registers this deployment unless the agent already has one with its external id.
+  optional DeploymentSpec deployment = 12;
+}
+message InferenceAliasSpec { string alias = 1; ConnectionRef connection = 2; bool delete = 3; }
+// The agent's tools from one connection: exactly `tools` (a kept source's other tools are dropped).
+// `*` among them means every tool the connection offers at apply time.
+message ToolSourceSpec { ConnectionRef connection = 1; repeated string tools = 2; bool delete = 3; }
+// A sandbox blueprint by name, shared by every agent that declares it identically. `env` sets
+// variables; ones it does not name (such as secrets set in the app) stay, and a variable is
+// removed only by its own `delete`.
+message BlueprintSpec {
+  string name = 1;
+  // An E2B or Modal connection.
+  ConnectionRef provider = 2;
+  string template = 3;
+  SandboxReuse reuse = 4;
+  optional SandboxTimings timings = 5;
+  map<string, EnvValue> env = 6;
+  repeated EgressSpec egress = 7;
+}
+message EnvValue { oneof value { string literal = 1 [debug_redact = true]; } bool delete = 2; }
+message EgressSpec { string slug = 1; ConnectionRef connection = 2; string config_json = 3; bool enabled = 4; bool delete = 5; }
+message RoutineSpec {
+  string name = 1;
+  string prompt = 2;
+  string thread_title = 3;
+  RoutineTriggerSpec trigger = 4;
+  // Absent: a new routine is created disabled and its enabled state is then left to people.
+  optional bool enabled = 5;
+  bool delete = 6;
+}
+message RoutineTriggerSpec { oneof kind { CronTrigger cron = 1; SignalTriggerSpec signal = 2; } }
+message SignalTriggerSpec { ConnectionRef connection = 1; string signal_type = 2; repeated SignalFilterSpec filters = 3; }
+// As a routine's SignalFilter: the value at `key` of the signal's context equals one of `values`.
+message SignalFilterSpec { string key = 1; repeated string values = 2; }
+// A deployment the customer already deployed: a Lambda function (a version-qualified ARN is
+// recommended) or a host that dials in.
+message DeploymentSpec {
+  tilde.types.v1.DeploymentTarget target = 1;
+  optional string target_reference = 2;
+  string external_id = 3;
+  optional string label = 4;
+  DeploymentDeclarations declarations = 5;
+}
+
+enum ApplyOutcome { APPLY_OUTCOME_UNSPECIFIED = 0; APPLY_OUTCOME_PLANNED = 1; APPLY_OUTCOME_APPLIED = 2; APPLY_OUTCOME_BLOCKED = 3; }
+enum ChangeAction {
+  CHANGE_ACTION_UNSPECIFIED = 0; CHANGE_ACTION_CREATE = 1; CHANGE_ACTION_UPDATE = 2; CHANGE_ACTION_UNCHANGED = 3;
+  CHANGE_ACTION_REMOVE = 4;
+}
+enum RequiredActionCode {
+  REQUIRED_ACTION_CODE_UNSPECIFIED = 0; REQUIRED_ACTION_CODE_INVALID = 1; REQUIRED_ACTION_CODE_CONNECTION_MISSING = 2;
+  REQUIRED_ACTION_CODE_CONNECTION_NOT_READY = 3; REQUIRED_ACTION_CODE_CONNECTION_WRONG_TYPE = 4;
+  REQUIRED_ACTION_CODE_CAPABILITY_MISSING = 5; REQUIRED_ACTION_CODE_TOOL_NOT_OFFERED = 6;
+  REQUIRED_ACTION_CODE_SIGNAL_NOT_OFFERED = 7; REQUIRED_ACTION_CODE_PERMISSION_DENIED = 8;
+  REQUIRED_ACTION_CODE_TEAM_MISSING = 9;
+}
+message ApplyResponse {
+  ApplyOutcome outcome = 1;
+  repeated Change changes = 2;
+  // BLOCKED: every action a person must take first. Nothing was applied.
+  repeated RequiredAction required_actions = 3;
+  repeated AppliedAgent agents = 4;
+}
+message Change {
+  // agent, inference_alias, tool_source, sandbox_blueprint, egress, agent_sandbox, routine, deployment
+  string kind = 1;
+  // The resource's key, prefixed by its agent's key for agent-owned resources (`bug-fixer/fast`).
+  string key = 2;
+  ChangeAction action = 3;
+  repeated FieldChange fields = 4;
+  // A warning about the change, such as an unqualified Lambda ARN.
+  string note = 5;
+}
+// `sealed`: the value is secret, so before and after are never shown.
+message FieldChange { string field = 1; string before = 2; string after = 3; bool sealed = 4; }
+message RequiredAction {
+  RequiredActionCode code = 1;
+  // What it concerns, such as `bug-fixer/tools/github/acme`.
+  string subject = 2;
+  string message = 3;
+  // Where to fix it: an absolute link into the Tilde app, or a path from its origin.
+  string url = 4;
+}
+// Applied: the agent's ID and, when a deployment was registered, its ID and token.
+message AppliedAgent {
+  string key = 1;
+  string id = 2;
+  string deployment_id = 3;
+  string deployment_token = 4 [debug_redact = true];
+}
