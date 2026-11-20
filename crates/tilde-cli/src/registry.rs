@@ -356,6 +356,8 @@ mod tests {
         let declarations = Declarations {
             agents: Vec::new(),
             team: None,
+            users: Vec::new(),
+            groups: Vec::new(),
             digest: "test".into(),
             value: json!({
                 "prompts": [],

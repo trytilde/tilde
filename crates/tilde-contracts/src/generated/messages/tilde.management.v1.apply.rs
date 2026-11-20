@@ -345,6 +345,7 @@ pub enum RequiredActionCode {
     REQUIRED_ACTION_CODE_PERMISSION_DENIED = 8i32,
     REQUIRED_ACTION_CODE_TEAM_MISSING = 9i32,
     REQUIRED_ACTION_CODE_SECRET_MISSING = 10i32,
+    REQUIRED_ACTION_CODE_SPEC_CONFLICT = 11i32,
 }
 impl RequiredActionCode {
     ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -380,6 +381,9 @@ impl RequiredActionCode {
     ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_SECRET_MISSING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SecretMissing: Self = Self::REQUIRED_ACTION_CODE_SECRET_MISSING;
+    ///Idiomatic alias for [`Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SpecConflict: Self = Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT;
 }
 impl ::core::default::Default for RequiredActionCode {
     fn default() -> Self {
@@ -516,6 +520,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
             10i32 => {
                 ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SECRET_MISSING)
             }
+            11i32 => {
+                ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -552,6 +559,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
             }
             Self::REQUIRED_ACTION_CODE_SECRET_MISSING => {
                 "REQUIRED_ACTION_CODE_SECRET_MISSING"
+            }
+            Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT => {
+                "REQUIRED_ACTION_CODE_SPEC_CONFLICT"
             }
         }
     }
@@ -602,6 +612,9 @@ impl ::buffa::Enumeration for RequiredActionCode {
             "REQUIRED_ACTION_CODE_SECRET_MISSING" => {
                 ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SECRET_MISSING)
             }
+            "REQUIRED_ACTION_CODE_SPEC_CONFLICT" => {
+                ::core::option::Option::Some(Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -618,6 +631,157 @@ impl ::buffa::Enumeration for RequiredActionCode {
             Self::REQUIRED_ACTION_CODE_PERMISSION_DENIED,
             Self::REQUIRED_ACTION_CODE_TEAM_MISSING,
             Self::REQUIRED_ACTION_CODE_SECRET_MISSING,
+            Self::REQUIRED_ACTION_CODE_SPEC_CONFLICT,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum GrantPlane {
+    GRANT_PLANE_UNSPECIFIED = 0i32,
+    GRANT_PLANE_VISIBILITY = 1i32,
+    GRANT_PLANE_OWNERSHIP = 2i32,
+}
+impl GrantPlane {
+    ///Idiomatic alias for [`Self::GRANT_PLANE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::GRANT_PLANE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::GRANT_PLANE_VISIBILITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Visibility: Self = Self::GRANT_PLANE_VISIBILITY;
+    ///Idiomatic alias for [`Self::GRANT_PLANE_OWNERSHIP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Ownership: Self = Self::GRANT_PLANE_OWNERSHIP;
+}
+impl ::core::default::Default for GrantPlane {
+    fn default() -> Self {
+        Self::GRANT_PLANE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for GrantPlane {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for GrantPlane {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = GrantPlane;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(GrantPlane)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<GrantPlane, E> {
+                <GrantPlane as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<GrantPlane, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <GrantPlane as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<GrantPlane, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <GrantPlane as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<GrantPlane, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GrantPlane {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for GrantPlane {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::GRANT_PLANE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::GRANT_PLANE_VISIBILITY),
+            2i32 => ::core::option::Option::Some(Self::GRANT_PLANE_OWNERSHIP),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::GRANT_PLANE_UNSPECIFIED => "GRANT_PLANE_UNSPECIFIED",
+            Self::GRANT_PLANE_VISIBILITY => "GRANT_PLANE_VISIBILITY",
+            Self::GRANT_PLANE_OWNERSHIP => "GRANT_PLANE_OWNERSHIP",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "GRANT_PLANE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::GRANT_PLANE_UNSPECIFIED)
+            }
+            "GRANT_PLANE_VISIBILITY" => {
+                ::core::option::Option::Some(Self::GRANT_PLANE_VISIBILITY)
+            }
+            "GRANT_PLANE_OWNERSHIP" => {
+                ::core::option::Option::Some(Self::GRANT_PLANE_OWNERSHIP)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::GRANT_PLANE_UNSPECIFIED,
+            Self::GRANT_PLANE_VISIBILITY,
+            Self::GRANT_PLANE_OWNERSHIP,
         ]
     }
 }
@@ -684,6 +848,22 @@ pub struct ApplyRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub commit_author: ::core::option::Option<::buffa::alloc::string::String>,
+    /// People of the apply's team (`defineTeam`); agent specs may declare more. See UserSpec.
+    ///
+    /// Field 9: `users`
+    #[serde(
+        rename = "users",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub users: ::buffa::alloc::vec::Vec<UserSpec>,
+    /// Field 10: `groups`
+    #[serde(
+        rename = "groups",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub groups: ::buffa::alloc::vec::Vec<GroupSpec>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -699,6 +879,8 @@ impl ::core::fmt::Debug for ApplyRequest {
             .field("branch", &self.branch)
             .field("commit_message", &self.commit_message)
             .field("commit_author", &self.commit_author)
+            .field("users", &self.users)
+            .field("groups", &self.groups)
             .finish()
     }
 }
@@ -810,6 +992,22 @@ impl ::buffa::Message for ApplyRequest {
         if let Some(ref v) = self.commit_author {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.users {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.groups {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -848,6 +1046,22 @@ impl ::buffa::Message for ApplyRequest {
         }
         if let Some(ref v) = self.commit_author {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        for v in &self.users {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.groups {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -946,6 +1160,30 @@ impl ::buffa::Message for ApplyRequest {
                     buf,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.users.push(elem);
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.groups.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -962,6 +1200,8 @@ impl ::buffa::Message for ApplyRequest {
         self.branch = ::core::option::Option::None;
         self.commit_message = ::core::option::Option::None;
         self.commit_author = ::core::option::Option::None;
+        self.users.clear();
+        self.groups.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1253,6 +1493,31 @@ pub struct AgentSpec {
         DeploymentSpec,
         ::buffa::Inline<DeploymentSpec>,
     >,
+    /// People declared beside the agent (monorepos), merged with the request's by natural key.
+    ///
+    /// Field 13: `users`
+    #[serde(
+        rename = "users",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub users: ::buffa::alloc::vec::Vec<UserSpec>,
+    /// Field 14: `groups`
+    #[serde(
+        rename = "groups",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub groups: ::buffa::alloc::vec::Vec<GroupSpec>,
+    /// Who may see or own the agent.
+    ///
+    /// Field 15: `access`
+    #[serde(
+        rename = "access",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub access: ::buffa::alloc::vec::Vec<GrantSpec>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1272,6 +1537,9 @@ impl ::core::fmt::Debug for AgentSpec {
             .field("sandbox", &self.sandbox)
             .field("routines", &self.routines)
             .field("deployment", &self.deployment)
+            .field("users", &self.users)
+            .field("groups", &self.groups)
+            .field("access", &self.access)
             .finish()
     }
 }
@@ -1399,6 +1667,30 @@ impl ::buffa::Message for AgentSpec {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.users {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.groups {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.access {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1474,6 +1766,30 @@ impl ::buffa::Message for AgentSpec {
                 buf,
             );
             self.deployment.write_to(__cache, buf);
+        }
+        for v in &self.users {
+            ::buffa::types::put_len_delimited_header(
+                13u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.groups {
+            ::buffa::types::put_len_delimited_header(
+                14u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.access {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1606,6 +1922,42 @@ impl ::buffa::Message for AgentSpec {
                     ctx,
                 )?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.users.push(elem);
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.groups.push(elem);
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.access.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1626,6 +1978,9 @@ impl ::buffa::Message for AgentSpec {
         self.sandbox = ::buffa::MessageField::none();
         self.routines.clear();
         self.deployment = ::buffa::MessageField::none();
+        self.users.clear();
+        self.groups.clear();
+        self.access.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4160,6 +4515,871 @@ pub const __DEPLOYMENT_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<DeploymentSpec>,
     is_wkt: false,
 };
+/// People and access are Tilde Cloud's: servers without them refuse a spec declaring any.
+/// A user is found by email, a group by name within the apply's team; each is created if missing
+/// and never updated (a difference is a note). `delete` disables a user or deletes a group.
+/// `login` also makes the user a member of the team and, when invitation email is configured,
+/// invites them; accepting links their sign-in to this user.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UserSpec {
+    /// Field 1: `email`
+    #[serde(
+        rename = "email",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email: ::buffa::alloc::string::String,
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 3: `login`
+    #[serde(
+        rename = "login",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub login: bool,
+    /// Field 4: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UserSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UserSpec")
+            .field("email", &self.email)
+            .field("name", &self.name)
+            .field("login", &self.login)
+            .field("delete", &self.delete)
+            .finish()
+    }
+}
+impl UserSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.UserSpec";
+}
+::buffa::impl_default_instance!(UserSpec);
+impl ::buffa::MessageName for UserSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "UserSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.UserSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.UserSpec";
+}
+impl ::buffa::Message for UserSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if self.login {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.email, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        if self.login {
+            ::buffa::types::put_bool_field(3u32, self.login, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(4u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.login = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.email.clear();
+        self.name.clear();
+        self.login = false;
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UserSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.UserSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UserSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __USER_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.UserSpec",
+    to_json: ::buffa::type_registry::any_to_json::<UserSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<UserSpec>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GroupSpec {
+    /// Field 1: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    /// Field 2: `members`
+    #[serde(
+        rename = "members",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub members: ::buffa::alloc::vec::Vec<MemberSpec>,
+    /// Field 3: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GroupSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GroupSpec")
+            .field("name", &self.name)
+            .field("members", &self.members)
+            .field("delete", &self.delete)
+            .finish()
+    }
+}
+impl GroupSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GroupSpec";
+}
+::buffa::impl_default_instance!(GroupSpec);
+impl ::buffa::MessageName for GroupSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GroupSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.GroupSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GroupSpec";
+}
+impl ::buffa::Message for GroupSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        for v in &self.members {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        for v in &self.members {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(3u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.members.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.name.clear();
+        self.members.clear();
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GroupSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.GroupSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GroupSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GROUP_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.GroupSpec",
+    to_json: ::buffa::type_registry::any_to_json::<GroupSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<GroupSpec>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MemberSpec {
+    /// Field 1: `email`
+    #[serde(
+        rename = "email",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub email: ::buffa::alloc::string::String,
+    /// Field 2: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MemberSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MemberSpec")
+            .field("email", &self.email)
+            .field("delete", &self.delete)
+            .finish()
+    }
+}
+impl MemberSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemberSpec";
+}
+::buffa::impl_default_instance!(MemberSpec);
+impl ::buffa::MessageName for MemberSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemberSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemberSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemberSpec";
+}
+impl ::buffa::Message for MemberSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.email, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(2u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.email, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.email.clear();
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MemberSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.MemberSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemberSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MEMBER_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.MemberSpec",
+    to_json: ::buffa::type_registry::any_to_json::<MemberSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<MemberSpec>,
+    is_wkt: false,
+};
+/// A grant on the agent: visibility (see it) or ownership (change it) to a user or group.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct GrantSpec {
+    /// Field 3: `plane`
+    #[serde(
+        rename = "plane",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub plane: ::buffa::EnumValue<GrantPlane>,
+    /// Field 4: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(flatten)]
+    pub principal: ::core::option::Option<__buffa::oneof::grant_spec::Principal>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GrantSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GrantSpec")
+            .field("plane", &self.plane)
+            .field("delete", &self.delete)
+            .field("principal", &self.principal)
+            .finish()
+    }
+}
+impl GrantSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GrantSpec";
+}
+::buffa::impl_default_instance!(GrantSpec);
+impl ::buffa::MessageName for GrantSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GrantSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.GrantSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GrantSpec";
+}
+impl ::buffa::Message for GrantSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.principal {
+            match v {
+                __buffa::oneof::grant_spec::Principal::User(x) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                __buffa::oneof::grant_spec::Principal::Group(x) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+            }
+        }
+        {
+            let val = self.plane.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.principal {
+            match v {
+                __buffa::oneof::grant_spec::Principal::User(x) => {
+                    ::buffa::types::put_string_field(1u32, x, buf);
+                }
+                __buffa::oneof::grant_spec::Principal::Group(x) => {
+                    ::buffa::types::put_string_field(2u32, x, buf);
+                }
+            }
+        }
+        {
+            let val = self.plane.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(4u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.principal = ::core::option::Option::Some(
+                    __buffa::oneof::grant_spec::Principal::User(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.principal = ::core::option::Option::Some(
+                    __buffa::oneof::grant_spec::Principal::Group(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.plane = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.principal = ::core::option::Option::None;
+        self.plane = ::buffa::EnumValue::from(0);
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GrantSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.GrantSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for GrantSpec {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = GrantSpec;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct GrantSpec")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<GrantSpec, A::Error> {
+                let mut __f_plane: ::core::option::Option<
+                    ::buffa::EnumValue<GrantPlane>,
+                > = None;
+                let mut __f_delete: ::core::option::Option<bool> = None;
+                let mut __oneof_principal: ::core::option::Option<
+                    __buffa::oneof::grant_spec::Principal,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "plane" => {
+                            __f_plane = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<GrantPlane>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<GrantPlane>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "delete" => {
+                            __f_delete = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = bool;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<bool, D::Error> {
+                                        ::buffa::json_helpers::proto_bool::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "user" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_principal.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'principal'",
+                                        ),
+                                    );
+                                }
+                                __oneof_principal = Some(
+                                    __buffa::oneof::grant_spec::Principal::User(v),
+                                );
+                            }
+                        }
+                        "group" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_principal.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'principal'",
+                                        ),
+                                    );
+                                }
+                                __oneof_principal = Some(
+                                    __buffa::oneof::grant_spec::Principal::Group(v),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <GrantSpec as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_plane {
+                    __r.plane = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_delete {
+                    __r.delete = v;
+                }
+                __r.principal = __oneof_principal;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GrantSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GRANT_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.GrantSpec",
+    to_json: ::buffa::type_registry::any_to_json::<GrantSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<GrantSpec>,
+    is_wkt: false,
+};
+pub mod grant_spec {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::grant_spec::Principal;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::grant_spec::Principal as PrincipalView;
+}
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

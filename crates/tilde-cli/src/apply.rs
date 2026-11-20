@@ -77,6 +77,8 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
         "dryRun": args.dry_run,
         "agents": agents,
         "team": args.team.clone().or_else(|| declarations.team.clone()).unwrap_or_default(),
+        "users": declarations.users,
+        "groups": declarations.groups,
     });
     let mut request: wire::ApplyRequest =
         serde_json::from_value(request).context("The discovered specs are not a valid request")?;
@@ -280,12 +282,17 @@ mod tests {
                 json!({"key": "helper", "name": "Helper"}),
             ],
             team: Some("agents".into()),
+            users: vec![json!({"email": "ada@acme.test", "name": "Ada", "login": true})],
+            groups: vec![json!({"name": "eng", "members": [{"email": "ada@acme.test"}]})],
         };
         // SAFETY: tests in this binary do not read these variables concurrently.
         unsafe { std::env::remove_var("GITHUB_RUN_ID") };
         run(&args(url), &declarations).await.unwrap();
         let request = received.lock().unwrap().take().unwrap();
         assert_eq!(request.team, "agents");
+        assert_eq!(request.users[0].email, "ada@acme.test");
+        assert!(request.users[0].login);
+        assert_eq!(request.groups[0].members[0].email, "ada@acme.test");
         assert_eq!(request.agents.len(), 2);
         let deployment = request.agents[0].deployment.as_option().unwrap();
         assert!(
@@ -314,6 +321,8 @@ mod tests {
             digest: "test".into(),
             agents: vec![json!({"key": "triage", "name": "Triage"})],
             team: None,
+            users: Vec::new(),
+            groups: Vec::new(),
         };
         let error = super::request(
             &args("http://x".into()),

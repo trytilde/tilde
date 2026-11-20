@@ -49,7 +49,13 @@ export type Discovery = {
   warnings?: string[];
 };
 /** Core's own findings add `@trytilde/iac` specs: agents, and a project's team. */
-type CoreDiscovery = Discovery & { agents?: DiscoveredAgent[]; team?: string };
+type CoreDiscovery = Discovery & {
+  agents?: DiscoveredAgent[];
+  team?: string;
+  /** A `defineTeam` value's people, as `UserSpec`/`GroupSpec` protobuf JSON. */
+  users?: unknown[];
+  groups?: unknown[];
+};
 /** `origin` locates the value, e.g. `dist/index.js#agent`; paths are relative to `projectDir`. */
 export type DiscoveryContext = { origin: string; projectDir: string };
 export type Discoverer = (
@@ -78,6 +84,8 @@ export type SkillFile = { path: string; executable: boolean; data: Uint8Array; t
 export type Declarations = {
   agents: DiscoveredAgent[];
   team?: string;
+  users: unknown[];
+  groups: unknown[];
   prompts: (DiscoveredPrompt & { hash: string })[];
   skills: { name: string; files: SkillFile[]; origin: string }[];
   tools: DiscoveredTool[];
@@ -138,7 +146,14 @@ async function readSkillDir(dir: string, origin: string) {
 
 /** `@trytilde/iac` marks its values with this registered symbol; the SDK does not depend on it. */
 const IAC = Symbol.for("tilde.iac");
-type IacValue = { key?: string; json?: unknown; team?: string; agents?: IacValue[] };
+type IacValue = {
+  key?: string;
+  json?: unknown;
+  team?: string;
+  agents?: IacValue[];
+  users?: unknown[];
+  groups?: unknown[];
+};
 
 function core(value: unknown, origin: string): CoreDiscovery | undefined {
   if (!value || typeof value !== "object") return undefined;
@@ -146,6 +161,10 @@ function core(value: unknown, origin: string): CoreDiscovery | undefined {
   if (iac === "agent") {
     const agent = value as IacValue;
     return { agents: [{ key: agent.key!, json: agent.json, origin }] };
+  }
+  if (iac === "team") {
+    const team = value as IacValue;
+    return { team: team.team, users: team.users ?? [], groups: team.groups ?? [] };
   }
   if (iac === "project") {
     const project = value as IacValue;
@@ -259,6 +278,8 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
 
   const declarations: Declarations = {
     agents: [],
+    users: [],
+    groups: [],
     prompts: [],
     skills: [],
     tools: [],
@@ -277,6 +298,9 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
         );
       declarations.team = discovery.team;
     }
+    // The server merges people by email and name, so repeats are harmless.
+    declarations.users.push(...(discovery.users ?? []));
+    declarations.groups.push(...(discovery.groups ?? []));
     // The same agent exported twice (alone and in a project) is kept once.
     for (const agent of discovery.agents ?? []) {
       const digest = canonicalJson(agent.json);

@@ -82,7 +82,10 @@ pub async fn run(args: Deploy) -> Result<()> {
     let declarations = discover::declarations(&project, &entry, false, true).await?;
     // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
     // is registered, as before specs existed.
-    if !declarations.agents.is_empty() {
+    if !declarations.agents.is_empty()
+        || !declarations.users.is_empty()
+        || !declarations.groups.is_empty()
+    {
         return crate::apply::run(&args, &declarations).await;
     }
     let target = args.target.as_deref().unwrap_or("gateway");

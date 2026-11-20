@@ -43,3 +43,12 @@ pub mod routine_trigger_spec {
         ),
     }
 }
+pub mod grant_spec {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Debug)]
+    pub enum Principal<'a> {
+        User(&'a str),
+        Group(&'a str),
+    }
+}

@@ -117,8 +117,94 @@ export type Agent = {
   sandbox?: Blueprint;
   routines?: Routine[];
   deploy?: Deploy;
+  /** People declared beside the agent (monorepos); merged with `defineTeam`'s by email and name. */
+  users?: User[];
+  groups?: Group[];
+  /** Who may see (`visibility`) or change (`ownership`) the agent: `grant(group("eng"), "ownership")`. */
+  access?: Grant[];
 };
 export type AgentSpec = { readonly [SPEC]: "agent"; readonly key: string; readonly json: unknown };
+
+/**
+ * People (Tilde Cloud): a user is found by email, a group by name within the apply's team; each
+ * is created if missing and never updated. `delete: true` disables a user or deletes a group.
+ * `login` invites the user to sign in. A string names an existing or declared one, as a grant's
+ * principal or a group member.
+ */
+export type User = {
+  readonly kind: "user";
+  readonly email: string;
+  readonly name?: string;
+  readonly login?: boolean;
+  readonly delete?: boolean;
+};
+export function user(
+  spec: string | { email: string; name?: string; login?: boolean; delete?: boolean },
+): User {
+  const fields = typeof spec === "string" ? { email: spec } : spec;
+  if (!fields.email.includes("@")) throw new Error(`${fields.email} is not an email address`);
+  return Object.freeze({ kind: "user" as const, ...fields });
+}
+export type Group = {
+  readonly kind: "group";
+  readonly name: string;
+  /** Emails, or `{ email, delete: true }` to remove a member. */
+  readonly members?: readonly (string | { email: string; delete: true })[];
+  readonly delete?: boolean;
+};
+export function group(
+  spec:
+    | string
+    | { name: string; members?: (string | { email: string; delete: true })[]; delete?: boolean },
+): Group {
+  const fields = typeof spec === "string" ? { name: spec } : spec;
+  return Object.freeze({ kind: "group" as const, ...fields });
+}
+export type Grant = {
+  readonly principal: User | Group;
+  readonly plane: "visibility" | "ownership";
+  readonly delete?: boolean;
+};
+export const grant = (
+  principal: User | Group,
+  plane: "visibility" | "ownership",
+  options: { delete?: boolean } = {},
+): Grant => Object.freeze({ principal, plane, ...options });
+export type TeamSpec = {
+  readonly [SPEC]: "team";
+  readonly team: string;
+  readonly users: readonly unknown[];
+  readonly groups: readonly unknown[];
+};
+
+const userJson = (u: User) => ({
+  email: u.email,
+  name: u.name ?? "",
+  login: u.login ?? false,
+  delete: u.delete ?? false,
+});
+const groupJson = (g: Group) => ({
+  name: g.name,
+  members: (g.members ?? []).map((m) =>
+    typeof m === "string" ? { email: m, delete: false } : { email: m.email, delete: true },
+  ),
+  delete: g.delete ?? false,
+});
+const grantJson = (g: Grant) => ({
+  ...(g.principal.kind === "user" ? { user: g.principal.email } : { group: g.principal.name }),
+  plane: g.plane === "ownership" ? "GRANT_PLANE_OWNERSHIP" : "GRANT_PLANE_VISIBILITY",
+  delete: g.delete ?? false,
+});
+
+/** The team's people, declared once for every agent applied with it. Export it from an entry. */
+export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[] }): TeamSpec {
+  return Object.freeze({
+    [SPEC]: "team" as const,
+    team: spec.team,
+    users: (spec.users ?? []).map(userJson),
+    groups: (spec.groups ?? []).map(groupJson),
+  });
+}
 export type ProjectSpec = {
   readonly [SPEC]: "project";
   readonly team?: string;
@@ -209,6 +295,9 @@ export function defineAgent(spec: Agent): AgentSpec {
     ),
     ...(spec.sandbox ? { sandbox: blueprintJson(spec.sandbox) } : {}),
     routines: (spec.routines ?? []).map(routineJson),
+    users: (spec.users ?? []).map(userJson),
+    groups: (spec.groups ?? []).map(groupJson),
+    access: (spec.access ?? []).map(grantJson),
     // The CLI fills the external ID and the code's declarations.
     ...(deploy
       ? {

@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fromJson } from "@bufbuild/protobuf";
-import { AgentSpecSchema } from "@trytilde/contracts/tilde/management/v1/apply_pb.js";
+import {
+  AgentSpecSchema,
+  GroupSpecSchema,
+  UserSpecSchema,
+} from "@trytilde/contracts/tilde/management/v1/apply_pb.js";
 import {
   ALL,
   SPEC,
@@ -15,6 +19,10 @@ import {
   openai,
   routine,
   secret,
+  defineTeam,
+  grant,
+  group,
+  user,
 } from "../dist/index.js";
 
 const linear = connection.ref("linear/acme", { type: "api_key" });
@@ -102,6 +110,55 @@ test("refs and routines refuse what the server would", () => {
     () => defineAgent({ key: "a", name: "A", routines: [routine({ name: "R", prompt: "P" })] }),
     /exactly one of cron and signal/,
   );
+});
+
+test("people: a team's users and groups, and an agent's own with its grants", () => {
+  const team = defineTeam({
+    team: "faro",
+    users: [
+      user({ email: "ada@faro.test", name: "Ada", login: true }),
+      user({ email: "old@faro.test", delete: true }),
+    ],
+    groups: [
+      group({ name: "eng", members: ["ada@faro.test", { email: "old@faro.test", delete: true }] }),
+    ],
+  });
+  assert.equal(team[SPEC], "team");
+  assert.equal(team.team, "faro");
+  const [ada, old] = team.users.map((u) => fromJson(UserSpecSchema, u));
+  assert.deepEqual(
+    [ada.email, ada.name, ada.login, old.delete],
+    ["ada@faro.test", "Ada", true, true],
+  );
+  const eng = fromJson(GroupSpecSchema, team.groups[0]);
+  assert.deepEqual(
+    eng.members.map((m) => [m.email, m.delete]),
+    [
+      ["ada@faro.test", false],
+      ["old@faro.test", true],
+    ],
+  );
+  const agent = fromJson(
+    AgentSpecSchema,
+    defineAgent({
+      key: "triage",
+      name: "Triage",
+      users: [user({ email: "bob@faro.test", name: "Bob" })],
+      access: [
+        grant(group("eng"), "ownership"),
+        grant(user("ada@faro.test"), "visibility", { delete: true }),
+      ],
+    }).json,
+  );
+  assert.equal(agent.users[0].email, "bob@faro.test");
+  assert.deepEqual(
+    agent.access.map((g) => [g.principal.case, g.principal.value, g.plane, g.delete]),
+    [
+      ["group", "eng", 2, false],
+      ["user", "ada@faro.test", 1, true],
+    ],
+  );
+  assert.throws(() => user("not-an-email"), /not an email/);
 });
 
 test("a project carries its team and agents", () => {
