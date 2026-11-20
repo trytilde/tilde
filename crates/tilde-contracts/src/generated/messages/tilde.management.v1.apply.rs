@@ -637,6 +637,154 @@ impl ::buffa::Enumeration for RequiredActionCode {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
+pub enum MemberRole {
+    MEMBER_ROLE_UNSPECIFIED = 0i32,
+    MEMBER_ROLE_MEMBER = 1i32,
+    MEMBER_ROLE_ADMIN = 2i32,
+}
+impl MemberRole {
+    ///Idiomatic alias for [`Self::MEMBER_ROLE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::MEMBER_ROLE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::MEMBER_ROLE_MEMBER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Member: Self = Self::MEMBER_ROLE_MEMBER;
+    ///Idiomatic alias for [`Self::MEMBER_ROLE_ADMIN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Admin: Self = Self::MEMBER_ROLE_ADMIN;
+}
+impl ::core::default::Default for MemberRole {
+    fn default() -> Self {
+        Self::MEMBER_ROLE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MemberRole {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MemberRole {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MemberRole;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(MemberRole)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MemberRole, E> {
+                <MemberRole as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MemberRole, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemberRole as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MemberRole, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemberRole as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MemberRole, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemberRole {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MemberRole {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::MEMBER_ROLE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::MEMBER_ROLE_MEMBER),
+            2i32 => ::core::option::Option::Some(Self::MEMBER_ROLE_ADMIN),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MEMBER_ROLE_UNSPECIFIED => "MEMBER_ROLE_UNSPECIFIED",
+            Self::MEMBER_ROLE_MEMBER => "MEMBER_ROLE_MEMBER",
+            Self::MEMBER_ROLE_ADMIN => "MEMBER_ROLE_ADMIN",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MEMBER_ROLE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::MEMBER_ROLE_UNSPECIFIED)
+            }
+            "MEMBER_ROLE_MEMBER" => {
+                ::core::option::Option::Some(Self::MEMBER_ROLE_MEMBER)
+            }
+            "MEMBER_ROLE_ADMIN" => ::core::option::Option::Some(Self::MEMBER_ROLE_ADMIN),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::MEMBER_ROLE_UNSPECIFIED,
+            Self::MEMBER_ROLE_MEMBER,
+            Self::MEMBER_ROLE_ADMIN,
+        ]
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
 pub enum GrantPlane {
     GRANT_PLANE_UNSPECIFIED = 0i32,
     GRANT_PLANE_VISIBILITY = 1i32,
@@ -4516,10 +4664,12 @@ pub const __DEPLOYMENT_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     is_wkt: false,
 };
 /// People and access are Tilde Cloud's: servers without them refuse a spec declaring any.
-/// A user is found by email, a group by name within the apply's team; each is created if missing
-/// and never updated (a difference is a note). `delete` disables a user or deletes a group.
-/// `login` also makes the user a member of the team and, when invitation email is configured,
-/// invites them; accepting links their sign-in to this user.
+/// A user is found by email and upserted: a changed name is an update (an organization
+/// administrator's). In a team's apply a declared user is a member of the team: `team.role` sets
+/// their role (absent: member when joining, else unchanged) and `team.delete` removes them from
+/// the team. `login` invites them to sign in when invitation email is configured; accepting
+/// links the sign-in to this user. A group is found by name within the apply's team and created
+/// if missing. `delete` disables a user or deletes a group.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -4552,6 +4702,15 @@ pub struct UserSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub delete: bool,
+    /// Field 5: `team`
+    #[serde(
+        rename = "team",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub team: ::buffa::MessageField<
+        TeamMembershipSpec,
+        ::buffa::Inline<TeamMembershipSpec>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -4563,6 +4722,7 @@ impl ::core::fmt::Debug for UserSpec {
             .field("name", &self.name)
             .field("login", &self.login)
             .field("delete", &self.delete)
+            .field("team", &self.team)
             .finish()
     }
 }
@@ -4589,7 +4749,7 @@ impl ::buffa::Message for UserSpec {
     /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
     /// points reject, never a silently wrapped size.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u64;
@@ -4605,12 +4765,20 @@ impl ::buffa::Message for UserSpec {
         if self.delete {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.team.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.team.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::EncodeSink,
     ) {
         #[allow(unused_imports)]
@@ -4626,6 +4794,14 @@ impl ::buffa::Message for UserSpec {
         }
         if self.delete {
             ::buffa::types::put_bool_field(4u32, self.delete, buf);
+        }
+        if self.team.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.team.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -4668,6 +4844,17 @@ impl ::buffa::Message for UserSpec {
                 )?;
                 self.delete = ::buffa::types::decode_bool(buf)?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.team.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -4680,6 +4867,7 @@ impl ::buffa::Message for UserSpec {
         self.name.clear();
         self.login = false;
         self.delete = false;
+        self.team = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4710,6 +4898,160 @@ pub const __USER_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     type_url: "type.googleapis.com/tilde.management.v1.UserSpec",
     to_json: ::buffa::type_registry::any_to_json::<UserSpec>,
     from_json: ::buffa::type_registry::any_from_json::<UserSpec>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TeamMembershipSpec {
+    /// Field 1: `role`
+    #[serde(
+        rename = "role",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub role: ::buffa::EnumValue<MemberRole>,
+    /// Field 2: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TeamMembershipSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TeamMembershipSpec")
+            .field("role", &self.role)
+            .field("delete", &self.delete)
+            .finish()
+    }
+}
+impl TeamMembershipSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.TeamMembershipSpec";
+}
+::buffa::impl_default_instance!(TeamMembershipSpec);
+impl ::buffa::MessageName for TeamMembershipSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "TeamMembershipSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.TeamMembershipSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.TeamMembershipSpec";
+}
+impl ::buffa::Message for TeamMembershipSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(2u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.role = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.role = ::buffa::EnumValue::from(0);
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TeamMembershipSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.TeamMembershipSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TeamMembershipSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TEAM_MEMBERSHIP_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.TeamMembershipSpec",
+    to_json: ::buffa::type_registry::any_to_json::<TeamMembershipSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<TeamMembershipSpec>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

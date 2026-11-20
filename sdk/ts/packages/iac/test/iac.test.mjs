@@ -116,7 +116,7 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
   const team = defineTeam({
     team: "faro",
     users: [
-      user({ email: "ada@faro.test", name: "Ada", login: true }),
+      user({ email: "ada@faro.test", name: "Ada", login: { role: "admin" } }),
       user({ email: "old@faro.test", delete: true }),
     ],
     groups: [
@@ -126,6 +126,7 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
   assert.equal(team[SPEC], "team");
   assert.equal(team.team, "faro");
   const [ada, old] = team.users.map((u) => fromJson(UserSpecSchema, u));
+  assert.equal(ada.team.role, 2, "login: { role } sets the team role");
   assert.deepEqual(
     [ada.email, ada.name, ada.login, old.delete],
     ["ada@faro.test", "Ada", true, true],
@@ -143,7 +144,10 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
     defineAgent({
       key: "triage",
       name: "Triage",
-      users: [user({ email: "bob@faro.test", name: "Bob" })],
+      users: [
+        user({ email: "bob@faro.test", name: "Bob", login: true }),
+        user({ email: "eve@faro.test", team: { delete: true } }),
+      ],
       access: [
         grant(group("eng"), "ownership"),
         grant(user("ada@faro.test"), "visibility", { delete: true }),
@@ -151,6 +155,8 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
     }).json,
   );
   assert.equal(agent.users[0].email, "bob@faro.test");
+  assert.equal(agent.users[0].team.role, 1, "login: true is a member");
+  assert.equal(agent.users[1].team.delete, true);
   assert.deepEqual(
     agent.access.map((g) => [g.principal.case, g.principal.value, g.plane, g.delete]),
     [

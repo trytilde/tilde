@@ -36,7 +36,8 @@ pub struct Deploy {
     /// them: ask the server for the plan and apply nothing.
     #[arg(long)]
     pub dry_run: bool,
-    /// The team new agents and blueprints belong to (Tilde Cloud), overriding `defineProject`.
+    /// The team new agents and blueprints belong to (Tilde Cloud). It must match the team the
+    /// code declares (`defineProject`, `defineTeam`), if any.
     #[arg(long, env = "TILDE_TEAM")]
     pub team: Option<String>,
     /// Print the deployment id, token and creation status as JSON.

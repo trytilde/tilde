@@ -24,6 +24,11 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
             );
         }
     }
+    if let (Some(flag), Some(declared)) = (&args.team, &declarations.team)
+        && flag != declared
+    {
+        bail!("--team {flag} differs from the team the code declares ({declared})");
+    }
     let mut agents = declarations.agents.clone();
     let deploying: Vec<usize> = agents
         .iter()
@@ -337,6 +342,17 @@ mod tests {
         );
         // Specs without code declarations configure agents only.
         super::request(&args("http://x".into()), &declarations(json!([]))).unwrap();
+        let mut other_team = args("http://x".into());
+        other_team.team = Some("other".into());
+        let declared = Declarations {
+            team: Some("faro".into()),
+            ..declarations(json!([]))
+        };
+        let error = super::request(&other_team, &declared).unwrap_err();
+        assert!(
+            error.to_string().contains("differs from the team"),
+            "{error}"
+        );
         let mut flagged = args("http://x".into());
         flagged.agent_id = Some("11111111-2222-4333-8444-555555555555".into());
         let error = super::request(&flagged, &declarations(json!([]))).unwrap_err();

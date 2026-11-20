@@ -220,6 +220,7 @@ pub mod __buffa {
         reg.register_json_any(super::__SIGNAL_FILTER_SPEC_JSON_ANY);
         reg.register_json_any(super::__DEPLOYMENT_SPEC_JSON_ANY);
         reg.register_json_any(super::__USER_SPEC_JSON_ANY);
+        reg.register_json_any(super::__TEAM_MEMBERSHIP_SPEC_JSON_ANY);
         reg.register_json_any(super::__GROUP_SPEC_JSON_ANY);
         reg.register_json_any(super::__MEMBER_SPEC_JSON_ANY);
         reg.register_json_any(super::__GRANT_SPEC_JSON_ANY);
@@ -1078,6 +1079,10 @@ pub use self::__buffa::view::DeploymentSpecOwnedView;
 pub use self::__buffa::view::UserSpecView;
 #[doc(inline)]
 pub use self::__buffa::view::UserSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TeamMembershipSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::TeamMembershipSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GroupSpecView;
 #[doc(inline)]

@@ -126,20 +126,31 @@ export type Agent = {
 export type AgentSpec = { readonly [SPEC]: "agent"; readonly key: string; readonly json: unknown };
 
 /**
- * People (Tilde Cloud): a user is found by email, a group by name within the apply's team; each
- * is created if missing and never updated. `delete: true` disables a user or deletes a group.
- * `login` invites the user to sign in. A string names an existing or declared one, as a grant's
- * principal or a group member.
+ * People (Tilde Cloud). A user is found by email and upserted: a changed `name` updates them (an
+ * organization administrator's apply). In a team's apply a declared user is a member of the
+ * team; `login: true` (a member) or `login: { role }` also sets their role and invites them to
+ * sign in, and `team: { delete: true }` removes them from the team. A group is found by name in
+ * the team and created if missing. `delete: true` disables a user or deletes a group. A string
+ * names an existing or declared one, as a grant's principal or a group member.
  */
 export type User = {
   readonly kind: "user";
   readonly email: string;
   readonly name?: string;
-  readonly login?: boolean;
+  readonly login?: true | { role: "member" | "admin" };
+  readonly team?: { delete: true };
   readonly delete?: boolean;
 };
 export function user(
-  spec: string | { email: string; name?: string; login?: boolean; delete?: boolean },
+  spec:
+    | string
+    | {
+        email: string;
+        name?: string;
+        login?: true | { role: "member" | "admin" };
+        team?: { delete: true };
+        delete?: boolean;
+      },
 ): User {
   const fields = typeof spec === "string" ? { email: spec } : spec;
   if (!fields.email.includes("@")) throw new Error(`${fields.email} is not an email address`);
@@ -177,11 +188,17 @@ export type TeamSpec = {
   readonly groups: readonly unknown[];
 };
 
+const ROLES = { member: "MEMBER_ROLE_MEMBER", admin: "MEMBER_ROLE_ADMIN" } as const;
 const userJson = (u: User) => ({
   email: u.email,
   name: u.name ?? "",
-  login: u.login ?? false,
+  login: !!u.login,
   delete: u.delete ?? false,
+  ...(u.team?.delete
+    ? { team: { delete: true } }
+    : u.login
+      ? { team: { role: ROLES[u.login === true ? "member" : u.login.role] } }
+      : {}),
 });
 const groupJson = (g: Group) => ({
   name: g.name,

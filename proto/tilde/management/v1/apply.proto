@@ -119,11 +119,15 @@ enum RequiredActionCode {
   REQUIRED_ACTION_CODE_TEAM_MISSING = 9; REQUIRED_ACTION_CODE_SECRET_MISSING = 10; REQUIRED_ACTION_CODE_SPEC_CONFLICT = 11;
 }
 // People and access are Tilde Cloud's: servers without them refuse a spec declaring any.
-// A user is found by email, a group by name within the apply's team; each is created if missing
-// and never updated (a difference is a note). `delete` disables a user or deletes a group.
-// `login` also makes the user a member of the team and, when invitation email is configured,
-// invites them; accepting links their sign-in to this user.
-message UserSpec { string email = 1; string name = 2; bool login = 3; bool delete = 4; }
+// A user is found by email and upserted: a changed name is an update (an organization
+// administrator's). In a team's apply a declared user is a member of the team: `team.role` sets
+// their role (absent: member when joining, else unchanged) and `team.delete` removes them from
+// the team. `login` invites them to sign in when invitation email is configured; accepting
+// links the sign-in to this user. A group is found by name within the apply's team and created
+// if missing. `delete` disables a user or deletes a group.
+message UserSpec { string email = 1; string name = 2; bool login = 3; bool delete = 4; TeamMembershipSpec team = 5; }
+message TeamMembershipSpec { MemberRole role = 1; bool delete = 2; }
+enum MemberRole { MEMBER_ROLE_UNSPECIFIED = 0; MEMBER_ROLE_MEMBER = 1; MEMBER_ROLE_ADMIN = 2; }
 message GroupSpec { string name = 1; repeated MemberSpec members = 2; bool delete = 3; }
 message MemberSpec { string email = 1; bool delete = 2; }
 // A grant on the agent: visibility (see it) or ownership (change it) to a user or group.
