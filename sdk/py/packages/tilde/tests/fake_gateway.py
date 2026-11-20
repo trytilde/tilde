@@ -27,6 +27,7 @@ from tilde.runtime.v1.controls_connect import (
 from tilde.runtime.v1.skills_connect import SkillService, SkillServiceASGIApplication
 from tilde.runtime.v1.skills_pb2 import ListSkillsResponse, ReadSkillFileResponse, SkillSummary
 from tilde.types.v1 import chat_pb2 as types
+from tilde.types.v1.heartbeat_pb2 import Heartbeat
 
 NATIVE_SEND = types.ToolDefinition(
     name="sendMessage",
@@ -118,17 +119,21 @@ class FakeGateway(ChatService, InvocationControlService, RunService, SkillServic
         self._auth(ctx)
         return chat_pb2.ListToolsResponse(tools=self.tools)
 
-    async def invoke_tool(self, request: AsyncIterator[chat_pb2.InvokeToolRequest], ctx):
+    async def invoke_tool_stream(self, request: AsyncIterator[chat_pb2.InvokeToolRequest], ctx):
         self._auth(ctx)
         frames = [frame async for frame in request]
         self.tool_calls.append(frames)
-        name = frames[0].name
-        if name == "sendMessage":
+        # Heartbeats precede the result, as Tilde sends them while a tool runs.
+        for _ in range(2):
+            yield chat_pb2.InvokeToolStreamResponse(heartbeat=Heartbeat())
+            await asyncio.sleep(0.02)
+        if frames[0].name == "sendMessage":
             text = "".join(json.loads(f.chunk_json)["textDelta"] for f in frames if f.chunk_json)
-            message = {"id": "m-1", "threadId": "thread-1", "text": text, "status": "complete"}
-            return chat_pb2.InvokeToolResponse(output_json=json.dumps(message))
-        return chat_pb2.InvokeToolResponse(
-            output_json=json.dumps({"ok": True, "input": json.loads(frames[0].input_json)})
+            output = {"id": "m-1", "threadId": "thread-1", "text": text, "status": "complete"}
+        else:
+            output = {"ok": True, "input": json.loads(frames[0].input_json)}
+        yield chat_pb2.InvokeToolStreamResponse(
+            result=chat_pb2.InvokeToolResponse(output_json=json.dumps(output))
         )
 
     async def list_goals(self, request, ctx):

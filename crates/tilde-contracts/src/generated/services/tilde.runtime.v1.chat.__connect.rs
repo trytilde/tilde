@@ -124,6 +124,12 @@ pub type OwnedInvokeToolRequestView = ::buffa::view::OwnedView<
 pub type OwnedInvokeToolResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolResponseView<'static>,
 >;
+///Shorthand for `OwnedView<InvokeToolStreamResponseView<'static>>`.
+pub type OwnedInvokeToolStreamResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolStreamResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListGoalsRequestView<'static>>`.
 pub type OwnedListGoalsRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::runtime::v1::__buffa::view::ListGoalsRequestView<'static>,
@@ -656,6 +662,42 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::InvokeToolStreamResponse>
+for crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolStreamResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::InvokeToolStreamResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolStreamResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::ListGoalsResponse>
 for crate::proto::tilde::runtime::v1::__buffa::view::ListGoalsResponseView<'_> {
     fn encode(
@@ -972,6 +1014,12 @@ pub const CHAT_SERVICE_REGISTER_BUNDLED_TOOLS_SPEC: ::connectrpc::Spec = ::conne
 pub const CHAT_SERVICE_INVOKE_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.runtime.v1.ChatService/InvokeTool",
         ::connectrpc::StreamType::ClientStream,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `InvokeToolStream` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_INVOKE_TOOL_STREAM_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.ChatService/InvokeToolStream",
+        ::connectrpc::StreamType::BidiStream,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the `ListGoals` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -1345,7 +1393,8 @@ pub trait ChatService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the InvokeTool RPC.
+    /// Deprecated for InvokeToolStream; kept while agents on older SDKs call it.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1364,6 +1413,33 @@ pub trait ChatService: Send + Sync + 'static {
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::runtime::v1::InvokeToolResponse,
             > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Runs a tool as InvokeTool does, but streams a heartbeat at least every 10 s while it runs,
+    /// then the result. A long tool call is otherwise silent, and proxies cut silent connections
+    /// (an AWS load balancer after 60 s idle); HTTP/2 PINGs end at the first proxy, so only
+    /// response bytes keep the whole path alive. It shares InvokeTool's request frames until
+    /// InvokeTool is removed.
+    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// buf:lint:ignore RPC_REQUEST_STANDARD_NAME
+    ///
+    /// Each `requests` item is a [`StreamMessage`](::connectrpc::StreamMessage):
+    /// it owns its buffer, is `Send + 'static`, and exposes zero-copy
+    /// accessor methods (`item.name()`), `.view()`, and
+    /// `.to_owned_message()`.
+    fn invoke_tool_stream(
+        &self,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::InboundStream<
+            crate::proto::tilde::runtime::v1::InvokeToolRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            ::connectrpc::ServiceStream<
+                impl ::connectrpc::Encodable<
+                    crate::proto::tilde::runtime::v1::InvokeToolStreamResponse,
+                > + Send + use<Self>,
+            >,
         >,
     > + Send;
     /// Handle the ListGoals RPC.
@@ -1928,6 +2004,27 @@ impl<S: ChatService> ChatServiceExt for S {
                 }),
             )
             .with_spec(CHAT_SERVICE_INVOKE_TOOL_SPEC)
+            .route_view_bidi_stream::<
+                _,
+                _,
+                crate::proto::tilde::runtime::v1::InvokeToolStreamResponse,
+            >(
+                CHAT_SERVICE_SERVICE_NAME,
+                "InvokeToolStream",
+                ::connectrpc::view_bidi_streaming_handler_fn({
+                    let svc = ::std::sync::Arc::clone(&self);
+                    move |ctx, req| {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let req = ::connectrpc::dispatcher::codegen::into_stream_messages::<
+                                crate::proto::tilde::runtime::v1::InvokeToolRequest,
+                            >(req);
+                            svc.invoke_tool_stream(ctx, req).await
+                        }
+                    }
+                }),
+            )
+            .with_spec(CHAT_SERVICE_INVOKE_TOOL_STREAM_SPEC)
             .route_view(
                 CHAT_SERVICE_SERVICE_NAME,
                 "ListGoals",
@@ -2261,6 +2358,12 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::client_streaming()
                         .with_spec(CHAT_SERVICE_INVOKE_TOOL_SPEC),
+                )
+            }
+            "InvokeToolStream" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::bidi_streaming()
+                        .with_spec(CHAT_SERVICE_INVOKE_TOOL_STREAM_SPEC),
                 )
             }
             "ListGoals" => {
@@ -2796,6 +2899,23 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
         };
         let _ = (&ctx, &requests, &format);
         match method {
+            "InvokeToolStream" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let req_stream = ::connectrpc::dispatcher::codegen::decode_message_request_stream::<
+                        crate::proto::tilde::runtime::v1::InvokeToolRequest,
+                    >(requests, format, ctx.decode_options().clone());
+                    let resp = svc.invoke_tool_stream(ctx, req_stream).await?;
+                    Ok(
+                        resp
+                            .map_body(|s| ::connectrpc::dispatcher::codegen::encode_response_stream::<
+                                crate::proto::tilde::runtime::v1::InvokeToolStreamResponse,
+                                _,
+                                _,
+                            >(s, format)),
+                    )
+                })
+            }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
         }
     }
@@ -3490,6 +3610,47 @@ where
                 CHAT_SERVICE_INVOKE_TOOL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 requests,
+                options,
+            )
+            .await
+    }
+    /// Call the InvokeToolStream RPC. Sends a request to /tilde.runtime.v1.ChatService/InvokeToolStream.
+    pub async fn invoke_tool_stream(
+        &self,
+    ) -> Result<
+        ::connectrpc::client::BidiStream<
+            T::ResponseBody,
+            crate::proto::tilde::runtime::v1::InvokeToolRequest,
+            crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolStreamResponseView<
+                'static,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.invoke_tool_stream_with_options(
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the InvokeToolStream RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn invoke_tool_stream_with_options(
+        &self,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::BidiStream<
+            T::ResponseBody,
+            crate::proto::tilde::runtime::v1::InvokeToolRequest,
+            crate::proto::tilde::runtime::v1::__buffa::view::InvokeToolStreamResponseView<
+                'static,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_bidi_stream(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_INVOKE_TOOL_STREAM_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
                 options,
             )
             .await

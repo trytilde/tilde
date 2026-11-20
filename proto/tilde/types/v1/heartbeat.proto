@@ -1,0 +1,6 @@
+syntax = "proto3";
+package tilde.types.v1;
+
+// A frame a long-running RPC streams while its work runs, so proxies with idle timeouts keep
+// the connection open. Clients skip it.
+message Heartbeat {}

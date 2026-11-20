@@ -712,10 +712,11 @@ impl MemoryService for Management {
         let bank = id(&r.bank_id)?;
         let synthesis = r.synthesis.into_option().unwrap_or_default();
         let connection = id(&synthesis.connection_id)?;
-        let saved = self
-            .0
-            .set_synthesis(bank, connection, &synthesis.model, &synthesis.instructions)
-            .await?;
+        // Saving test-calls the model, which a slow model could keep past the idle timeout.
+        let save =
+            self.0
+                .set_synthesis(bank, connection, &synthesis.model, &synthesis.instructions);
+        let saved = crate::rpc::inline("Testing the synthesis model", save).await??;
         Response::ok(management::SetMemorySynthesisResponse {
             synthesis: synthesis_wire(saved).into(),
             ..Default::default()

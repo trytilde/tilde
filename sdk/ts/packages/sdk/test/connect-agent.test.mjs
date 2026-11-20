@@ -102,10 +102,17 @@ void test(
                 ],
               };
             },
-            async invokeTool(requests) {
+            // Heartbeats precede the result, as Tilde sends them while a tool runs.
+            async *invokeToolStream(requests) {
               for await (const frame of requests)
                 serverToolCalls.push([frame.name, JSON.parse(frame.inputJson)]);
-              return { outputJson: JSON.stringify({ routed: true }) };
+              for (let beat = 0; beat < 2; beat++) {
+                yield { frame: { case: "heartbeat", value: {} } };
+                await delay(20);
+              }
+              yield {
+                frame: { case: "result", value: { outputJson: JSON.stringify({ routed: true }) } },
+              };
             },
             async registerBundledTools(request) {
               bundledRegistrations.push(request.tools);

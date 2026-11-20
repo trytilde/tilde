@@ -532,6 +532,39 @@ mod tests {
                 ..Default::default()
             })
         }
+
+        /// A heartbeat, then the result, as Tilde streams a call that takes a while.
+        async fn invoke_tool_stream(
+            &self,
+            ctx: RequestContext,
+            request: ServiceRequest<'_, wire::InvokeToolRequest>,
+        ) -> ServiceResult<
+            connectrpc::ServiceStream<
+                impl connectrpc::Encodable<wire::InvokeToolStreamResponse> + Send + use<>,
+            >,
+        > {
+            use wire::invoke_tool_stream_response::Frame as Stream;
+            self.saw("InvokeToolStream", &ctx);
+            let request = request.to_owned_message();
+            if request.name != "git.token" {
+                return Err(ConnectError::not_found("no such tool"));
+            }
+            let input: Value = serde_json::from_str(&request.input_json).unwrap();
+            let frames = [
+                Stream::Heartbeat(Default::default()),
+                Stream::Result(Box::new(wire::InvokeToolResponse {
+                    output_json: json!({ "token": "ghs_x", "repo": input["repo"] }).to_string(),
+                    ..Default::default()
+                })),
+            ]
+            .map(|frame| {
+                Ok(wire::InvokeToolStreamResponse {
+                    frame: Some(frame),
+                    ..Default::default()
+                })
+            });
+            Response::stream_ok(tokio_stream::iter(frames))
+        }
     }
 
     fn registered(session: Option<&str>, env: &[(&str, &str)]) -> wire::ConnectResponse {
@@ -881,7 +914,7 @@ mod tests {
                 .all(|call| call.ends_with("Bearer session-1")),
             "{seen:?}"
         );
-        assert!(seen.contains(&"InvokeTool Bearer session-1".to_string()));
+        assert!(seen.contains(&"InvokeToolStream Bearer session-1".to_string()));
         assert_eq!(
             seen.iter()
                 .filter(|call| call.starts_with("Connect"))

@@ -44,3 +44,22 @@ pub mod respond_request {
         }
     }
 }
+pub mod invoke_tool_stream_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Debug)]
+    pub enum Frame<'a> {
+        Heartbeat(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::super::super::types::v1::__buffa::view::HeartbeatView<
+                    'a,
+                >,
+            >,
+        ),
+        Result(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::__buffa::view::InvokeToolResponseView<'a>,
+            >,
+        ),
+    }
+}

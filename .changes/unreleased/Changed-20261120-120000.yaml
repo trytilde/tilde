@@ -1,0 +1,3 @@
+kind: Changed
+body: "The TypeScript and Python SDKs call tools over `ChatService/InvokeToolStream`, which streams heartbeats while the tool runs, so tool calls longer than a proxy's idle timeout (such as 60 s behind a load balancer) no longer fail."
+time: 2026-11-20T12:00:00+00:00

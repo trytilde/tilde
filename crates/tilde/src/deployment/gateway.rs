@@ -11,6 +11,8 @@ pub type WatchStream = connectrpc::client::ServerStream<
     <HttpClient as ClientTransport>::ResponseBody,
     wire::__buffa::view::WatchResponseView<'static>,
 >;
+/// How long a streamed relay may go without a frame; the gateway sends one every 10 s.
+const SILENCE: Duration = Duration::from_secs(45);
 #[derive(Clone)]
 pub struct Client {
     inner: SidecarServiceClient<HttpClient>,
@@ -158,9 +160,18 @@ impl Client {
             caller_token: caller_token.into(),
             ..Default::default()
         };
-        self.inner
-            .relay_with_options(request, Self::options())
-            .await
+        // Relayed tool calls can run for minutes: the gateway streams heartbeats, so the call
+        // is bounded by silence rather than total time. A gateway without RelayStream gets the
+        // unary Relay and its 15 s limit.
+        let result = match self.relay_stream(request.clone()).await {
+            Err(error) if error.code == connectrpc::ErrorCode::Unimplemented => self
+                .inner
+                .relay_with_options(request, Self::options())
+                .await
+                .map(|r| r.into_owned().result.into_option()),
+            result => result,
+        };
+        result
             .map_err(|error| match error.code {
                 connectrpc::ErrorCode::PermissionDenied
                 | connectrpc::ErrorCode::Unauthenticated => ChatError::Denied,
@@ -174,10 +185,26 @@ impl Client {
                     error.message.unwrap_or_default()
                 )),
             })?
-            .into_owned()
-            .result
-            .into_option()
             .ok_or(ChatError::Transport)
+    }
+    async fn relay_stream(
+        &self,
+        request: wire::RelayRequest,
+    ) -> std::result::Result<Option<wire::CallResult>, connectrpc::ConnectError> {
+        use wire::relay_stream_response::Frame;
+        let silent = || connectrpc::ConnectError::deadline_exceeded("Gateway relay went silent");
+        let mut stream = tokio::time::timeout(SILENCE, self.inner.relay_stream(request))
+            .await
+            .map_err(|_| silent())??;
+        loop {
+            let frame = tokio::time::timeout(SILENCE, stream.message())
+                .await
+                .map_err(|_| silent())??;
+            let Some(frame) = frame else { return Ok(None) };
+            if let Some(Frame::Result(result)) = frame.to_owned_message().frame {
+                return Ok(Some(*result));
+            }
+        }
     }
     pub async fn upload_attachment(
         &self,

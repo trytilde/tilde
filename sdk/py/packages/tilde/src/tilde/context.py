@@ -731,8 +731,11 @@ class AgentContext:
                 name=name, call_id=call_id, sequence=sequence, finish=True
             )
 
-        response = await self._session.invoke_tool(frames(), **self._rpc())
-        return json.loads(response.output_json)
+        # Heartbeat frames keep proxies with idle timeouts from cutting long tool calls.
+        async for response in self._session.invoke_tool_stream(frames(), **self._rpc()):
+            if response.WhichOneof("frame") == "result":
+                return json.loads(response.result.output_json)
+        raise ConnectError(Code.INTERNAL, "Tool call ended without a result")
 
     async def send_native_message(
         self,

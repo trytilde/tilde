@@ -114,6 +114,25 @@ pub mod hydrate_request {
         ),
     }
 }
+pub mod relay_stream_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, Debug)]
+    pub enum Frame<'a> {
+        Heartbeat(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::super::super::types::v1::__buffa::view::HeartbeatView<
+                    'a,
+                >,
+            >,
+        ),
+        Result(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::__buffa::view::CallResultView<'a>,
+            >,
+        ),
+    }
+}
 pub mod resolve_participant_request {
     #[allow(unused_imports)]
     use super::*;

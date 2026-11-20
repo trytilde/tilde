@@ -1,18 +1,26 @@
 syntax = "proto3";
 package tilde.sandbox.v1;
 import "tilde/types/v1/chat.proto";
+import "tilde/types/v1/heartbeat.proto";
 
 // The `tilde sandbox connect` process inside a sandbox VM. Like a tool host it is never dialed:
 // Tilde launches the VM with a single-use enrollment token, which the process's first Connect
 // exchanges for a session token that authenticates every later request (including reconnecting
 // Connects, for example after the VM was paused and resumed). Over the Connect stream it receives
 // the agent's sandbox operations as frames and answers each through Respond. Processes inside the
-// VM reach the blueprint's tools through it with ListTools and InvokeTool.
+// VM reach the blueprint's tools through it with ListTools and InvokeToolStream.
 service SandboxService {
   rpc Connect(ConnectRequest) returns (stream ConnectResponse);
   rpc Respond(RespondRequest) returns (RespondResponse);
   rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  // Deprecated for InvokeToolStream; kept while sandboxes run an older CLI.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
+  // Runs a tool as InvokeTool does, streaming a heartbeat at least every 10 s while it runs and
+  // then the result, so proxies with idle timeouts never cut a long call.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
+  rpc InvokeToolStream(InvokeToolRequest) returns (stream InvokeToolStreamResponse);
 }
 message ConnectRequest {}
 message ConnectResponse { oneof frame { SandboxRegistered registered = 1; SandboxOperation operation = 2; SandboxPing ping = 3; } }
@@ -53,3 +61,4 @@ message ListToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; }
 // operation `operation_id` names while it runs, else in the sandbox's latest invocation.
 message InvokeToolRequest { string name = 1; string input_json = 2 [debug_redact = true]; optional string operation_id = 3; }
 message InvokeToolResponse { string output_json = 1 [debug_redact = true]; }
+message InvokeToolStreamResponse { oneof frame { tilde.types.v1.Heartbeat heartbeat = 1; InvokeToolResponse result = 2; } }

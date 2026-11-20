@@ -461,6 +461,31 @@ impl SidecarService for Control {
             ..Default::default()
         })
     }
+    async fn relay_stream(
+        &self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, ingress::RelayRequest>,
+    ) -> ServiceResult<
+        connectrpc::ServiceStream<
+            impl connectrpc::Encodable<ingress::RelayStreamResponse> + Send + use<>,
+        >,
+    > {
+        use futures::StreamExt;
+        use ingress::relay_stream_response::Frame;
+        let agent = self.agent(&ctx).await?;
+        let (deployments, request) = (self.0.clone(), r.to_owned_message());
+        let work = async move { deployments.relay(agent, request).await };
+        Response::stream_ok(crate::rpc::with_heartbeats(work).map(|frame| {
+            let frame = match frame {
+                None => Frame::Heartbeat(Default::default()),
+                Some(result) => Frame::Result(Box::new(result?)),
+            };
+            Ok(ingress::RelayStreamResponse {
+                frame: Some(frame),
+                ..Default::default()
+            })
+        }))
+    }
     async fn resolve_participant<'a>(
         &'a self,
         ctx: RequestContext,

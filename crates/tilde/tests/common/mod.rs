@@ -371,3 +371,34 @@ pub fn span(
     spans.remove(0)
 }
 pub mod invocation;
+
+/// A TCP proxy to `target` (`host:port`) that closes both sides once neither has sent a byte for
+/// `idle`, as a load balancer's idle timeout does. Returns its `http://` origin.
+pub async fn idle_proxy(target: String, idle: std::time::Duration) -> String {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        while let Ok((mut client, _)) = listener.accept().await {
+            let mut server = tokio::net::TcpStream::connect(&target).await.unwrap();
+            tokio::spawn(async move {
+                let (mut client_read, mut client_write) = client.split();
+                let (mut server_read, mut server_write) = server.split();
+                let (mut up, mut down) = ([0u8; 16384], [0u8; 16384]);
+                loop {
+                    tokio::select! {
+                        read = tokio::io::AsyncReadExt::read(&mut client_read, &mut up) => match read {
+                            Ok(n) if n > 0 && tokio::io::AsyncWriteExt::write_all(&mut server_write, &up[..n]).await.is_ok() => {}
+                            _ => break,
+                        },
+                        read = tokio::io::AsyncReadExt::read(&mut server_read, &mut down) => match read {
+                            Ok(n) if n > 0 && tokio::io::AsyncWriteExt::write_all(&mut client_write, &down[..n]).await.is_ok() => {}
+                            _ => break,
+                        },
+                        _ = tokio::time::sleep(idle) => break,
+                    }
+                }
+            });
+        }
+    });
+    origin
+}

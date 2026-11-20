@@ -45,6 +45,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TOOLS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_REQUEST_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_TOOL_STREAM_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -99,5 +100,9 @@ pub use self::__buffa::view::InvokeToolRequestOwnedView;
 pub use self::__buffa::view::InvokeToolResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::InvokeToolResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeToolStreamResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeToolStreamResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

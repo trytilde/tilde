@@ -151,18 +151,44 @@ async fn invoke(
             .map(str::to_owned),
         ..Default::default()
     };
-    match daemon
-        .client
-        .invoke_tool_with_options(request, daemon.options())
-        .await
-    {
-        Ok(response) => (
-            [(header::CONTENT_TYPE, "application/json")],
-            response.into_owned().output_json,
-        )
-            .into_response(),
+    match call_tool(&daemon, request).await {
+        Ok(output_json) => {
+            ([(header::CONTENT_TYPE, "application/json")], output_json).into_response()
+        }
         Err(error) => failure(error),
     }
+}
+
+/// InvokeToolStream: Tilde sends a heartbeat every few seconds while the tool runs, so a call
+/// outlasting a proxy's idle timeout (a load balancer's 60 s) survives. A Tilde without it gets
+/// the silent InvokeTool.
+async fn call_tool(
+    daemon: &Daemon,
+    request: wire::InvokeToolRequest,
+) -> Result<String, connectrpc::ConnectError> {
+    use wire::invoke_tool_stream_response::Frame;
+    let mut stream = match daemon
+        .client
+        .invoke_tool_stream_with_options(request.clone(), daemon.options())
+        .await
+    {
+        Err(error) if error.code == Code::Unimplemented => {
+            let response = daemon
+                .client
+                .invoke_tool_with_options(request, daemon.options())
+                .await?;
+            return Ok(response.into_owned().output_json);
+        }
+        stream => stream?,
+    };
+    while let Some(frame) = stream.message().await? {
+        if let Some(Frame::Result(result)) = frame.to_owned_message().frame {
+            return Ok(result.output_json);
+        }
+    }
+    Err(connectrpc::ConnectError::internal(
+        "The tool call ended without a result",
+    ))
 }
 
 /// The egress token, for `tilde sandbox credential`.

@@ -411,8 +411,8 @@ bundled tools out) and its bundled tools.
   `sandbox_calls` queue (as tool host calls do) and it answers with Respond. Each registration
   carries the blueprint's environment, written to `~/.tilde/sandbox.env` and sourced by shell
   profiles. Processes in the VM call the blueprint's tools through its loopback API
-  (`127.0.0.1:4790/v1/tools`) or `tilde sandbox call`, which forwards to `InvokeTool` with the
-  session; tool hosts receive the call's `sandbox_id` (and the agent and thread when the reuse mode
+  (`127.0.0.1:4790/v1/tools`) or `tilde sandbox call`, which forwards to `InvokeToolStream` with
+  the session; tool hosts receive the call's `sandbox_id` (and the agent and thread when the reuse mode
   keys by them). Each call is an `execute_tool` span of the agent's invocation, like its other tool
   calls: commands an exec runs see the operation as `TILDE_SANDBOX_OPERATION`, which
   `tilde sandbox call` passes back, so the call nests under that `sandbox.exec`; a call outside any
@@ -1066,8 +1066,9 @@ Rust domain code is grouped under `agent/{mod,health,rpc}.rs` and
 `thread_id`, and `chat_threads`; registry metrics use `thread_count` and
 `average_turns_per_thread`. This is a breaking rename without legacy aliases.
 
-Chat provider tools use an invocation-scoped ConnectRPC catalog and streaming
-InvokeTool transport. The SDK registers their server-authored descriptions and
+Chat provider tools use an invocation-scoped ConnectRPC catalog and the streaming
+`InvokeToolStream` transport (input frames in, heartbeats then the result out; the older
+`InvokeTool` returns the result alone and stays for older SDKs). The SDK registers their server-authored descriptions and
 schemas as framework tool wrappers before the agent loop. Sending is provider-owned;
 there is no SendMessage RPC or shared sending trait. Providers explicitly publish
 canonical message events through scoped lifecycle helpers. Native text sending is one provider implementation. Connection-backed adapters expose
@@ -1965,3 +1966,15 @@ Counts describe the latest captured trace, so changes without a new trace do not
 them. There is no separate session ClickHouse table, projection worker, or session queue.
 The cleanup migration removes the earlier experimental PostgreSQL projection objects;
 the experimental ClickHouse table is removed with its one-time cleanup SQL.
+
+## Liveness through proxies
+
+A deployment is often reached through a load balancer (Tilde Cloud's is an AWS ALB) that closes a connection after 60 s without bytes
+in either direction, and speaks HTTP/1.1 to Tilde, so HTTP/2 PINGs never cross it. Work that can
+sit silent longer streams its own bytes (`rpc::with_keepalive`, a frame per heartbeat interval,
+10 s): `InvokeToolStream` (chat and sandbox), the sidecar's `RelayStream`, `WatchThread` (an empty
+frame repeating the cursor) and the other server streams' pings. A non-streamed inference call
+still silent after 20 s is answered `200` at once with JSON whitespace every heartbeat until the
+provider's body follows. Management RPCs that wait on outside work give up after 45 s
+(`rpc::INLINE_LIMIT`) with their own error, or let it finish in the background (skill source
+syncs).

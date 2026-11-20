@@ -37,8 +37,8 @@ replacements:
     replace: 'version = "{{.VersionNoPrefix}}"'
   # The sandbox images install the CLI of the same release and are tagged with its version.
   - path: images/sandbox/Dockerfile
-    find: '^ARG TILDE_VERSION=.*$'
-    replace: 'ARG TILDE_VERSION={{.VersionNoPrefix}}'
+    find: "^ARG TILDE_VERSION=.*$"
+    replace: "ARG TILDE_VERSION={{.VersionNoPrefix}}"
   # The Python SDK pins the CLI exactly, so installing it brings the matching binary.
   - path: sdk/py/packages/tilde/pyproject.toml
     find: '^  "trytilde-cli==.*",$'

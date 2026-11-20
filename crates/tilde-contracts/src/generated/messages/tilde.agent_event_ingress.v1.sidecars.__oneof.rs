@@ -327,6 +327,59 @@ pub mod hydrate_request {
         }
     }
 }
+pub mod relay_stream_response {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, PartialEq, Debug)]
+    pub enum Frame {
+        Heartbeat(
+            ::buffa::alloc::boxed::Box<
+                super::super::super::super::super::types::v1::Heartbeat,
+            >,
+        ),
+        Result(::buffa::alloc::boxed::Box<super::super::super::CallResult>),
+    }
+    impl ::buffa::Oneof for Frame {}
+    impl From<super::super::super::super::super::types::v1::Heartbeat> for Frame {
+        fn from(v: super::super::super::super::super::types::v1::Heartbeat) -> Self {
+            Self::Heartbeat(::buffa::alloc::boxed::Box::new(v))
+        }
+    }
+    impl From<super::super::super::super::super::types::v1::Heartbeat>
+    for ::core::option::Option<Frame> {
+        fn from(v: super::super::super::super::super::types::v1::Heartbeat) -> Self {
+            Self::Some(Frame::from(v))
+        }
+    }
+    impl From<super::super::super::CallResult> for Frame {
+        fn from(v: super::super::super::CallResult) -> Self {
+            Self::Result(::buffa::alloc::boxed::Box::new(v))
+        }
+    }
+    impl From<super::super::super::CallResult> for ::core::option::Option<Frame> {
+        fn from(v: super::super::super::CallResult) -> Self {
+            Self::Some(Frame::from(v))
+        }
+    }
+    impl serde::Serialize for Frame {
+        fn serialize<S: serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            use serde::ser::SerializeMap;
+            let mut map = s.serialize_map(Some(1))?;
+            match self {
+                Self::Heartbeat(v) => {
+                    map.serialize_entry("heartbeat", v)?;
+                }
+                Self::Result(v) => {
+                    map.serialize_entry("result", v)?;
+                }
+            }
+            map.end()
+        }
+    }
+}
 pub mod resolve_participant_request {
     #[allow(unused_imports)]
     use super::*;
