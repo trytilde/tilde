@@ -271,9 +271,11 @@ tasks:
       - task: build:connection-ui
       - pnpm --dir web build
       - pnpm --dir sdk/ts build
-      - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk/test/prompts.test.mjs sdk/ts/packages/sdk/test/deploy.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs sdk/ts/examples/langchain-example-agent/test/*.test.mjs sdk/ts/examples/openai-agents-example-agent/test/*.test.mjs
+      - node --test sdk/ts/packages/sdk/test/messages.test.mjs sdk/ts/packages/sdk/test/channels.test.mjs sdk/ts/packages/sdk/test/prompts.test.mjs sdk/ts/packages/sdk/test/deploy.test.mjs sdk/ts/packages/sdk/test/declarations.test.mjs sdk/ts/packages/iac/test/*.test.mjs sdk/ts/packages/sdk-vercel-ai-node/test/*.test.mjs sdk/ts/packages/sdk-langchain-node/test/*.test.mjs sdk/ts/packages/sdk-mastra-node/test/*.test.mjs sdk/ts/packages/sdk-openai-agents-node/test/*.test.mjs sdk/ts/examples/vercel-ai-example-agent/test/*.test.mjs sdk/ts/examples/mastra-example-agent/test/*.test.mjs sdk/ts/examples/langchain-example-agent/test/*.test.mjs sdk/ts/examples/openai-agents-example-agent/test/*.test.mjs
       - task: test:sdk:py
       - pnpm --dir sdk/ts exec tsc --noEmit --strict --skipLibCheck --target ES2023 --module NodeNext packages/sdk/test/channel-types.ts
+      # Typed catalog refs reject a misspelled tool name at compile time.
+      - pnpm --dir sdk/ts/packages/iac exec tsc --noEmit -p test
       - scripts/with-sccache.sh cargo nextest run --workspace --profile ci
       - scripts/with-sccache.sh cargo build --features embedded-web
       - node web/scripts/test-client.mjs
@@ -288,6 +290,15 @@ tasks:
       - task: build:chat
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
       - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
+
+  iac:catalog:
+    desc: Regenerate @trytilde/iac's typed providers from the built-in catalog of a disposable server
+    # Rerun whenever a built-in provider, connection type or tool changes; catalog.ts is committed.
+    dotenv: [".env.test.local", ".env.test"]
+    cmds:
+      - scripts/with-sccache.sh cargo build -p tilde
+      - scripts/with-postgres.sh node scripts/iac-catalog.mjs
+      - pnpm exec vp fmt sdk/ts/packages/iac/src/catalog.ts
 
   queries:generate:
     desc: Generate Cornucopia bindings against disposable Postgres (append -- --check to verify)

@@ -1,6 +1,7 @@
 //! The `tilde` command. Distributed as a standalone binary and as the `@trytilde/cli` and
 //! `trytilde-cli` packages, which install this same binary under the name `tilde`.
 mod api;
+mod apply;
 mod chat;
 mod deploy;
 mod dev;
@@ -30,7 +31,8 @@ struct Args {
 enum Command {
     /// Run this project's agent against a gateway and chat with it locally.
     Dev(dev::Dev),
-    /// Register a release carrying the prompts, skills and tools the code declares.
+    /// Apply the `@trytilde/iac` specs the code exports, or register a release carrying the
+    /// prompts, skills and tools it declares.
     Deploy(deploy::Deploy),
     /// Check this project, its SDK and the gateway.
     Doctor(doctor::Doctor),

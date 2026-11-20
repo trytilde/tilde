@@ -21,8 +21,9 @@ pub struct Deploy {
     /// Required by Tilde Cloud; open-source Tilde needs none.
     #[arg(long, env = "TILDE_API_KEY", hide_env_values = true)]
     pub api_key: Option<String>,
-    #[arg(long, default_value = "gateway", value_parser = ["gateway", "sidecar", "lambda"])]
-    pub target: String,
+    /// Without specs; default gateway. A spec's `deploy` names its own target.
+    #[arg(long, value_parser = ["gateway", "sidecar", "lambda"])]
+    pub target: Option<String>,
     /// Required for, and only for, a Lambda target.
     #[arg(long)]
     pub function_arn: Option<String>,
@@ -31,9 +32,13 @@ pub struct Deploy {
     pub external_id: Option<String>,
     #[arg(long)]
     pub label: Option<String>,
-    /// Print the declarations as JSON and contact nothing.
+    /// Without `@trytilde/iac` specs: print the declarations as JSON and contact nothing. With
+    /// them: ask the server for the plan and apply nothing.
     #[arg(long)]
     pub dry_run: bool,
+    /// The team new agents and blueprints belong to (Tilde Cloud), overriding `defineProject`.
+    #[arg(long, env = "TILDE_TEAM")]
+    pub team: Option<String>,
     /// Print the deployment id, token and creation status as JSON.
     #[arg(long)]
     pub json: bool,
@@ -69,15 +74,21 @@ pub fn ci_metadata() -> wire::RegisterDeploymentRequest {
 }
 
 pub async fn run(args: Deploy) -> Result<()> {
-    if (args.target == "lambda") != args.function_arn.is_some() {
-        bail!("--function-arn is required for a lambda target, and only for lambda");
-    }
     let project = Project::find(&args.dir)?;
     let entry = match &args.entry {
         Some(entry) => entry.clone(),
         None => project.entry()?,
     };
-    let declarations = discover::declarations(&project, &entry, false).await?;
+    let declarations = discover::declarations(&project, &entry, false, true).await?;
+    // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
+    // is registered, as before specs existed.
+    if !declarations.agents.is_empty() {
+        return crate::apply::run(&args, &declarations).await;
+    }
+    let target = args.target.as_deref().unwrap_or("gateway");
+    if (target == "lambda") != args.function_arn.is_some() {
+        bail!("--function-arn is required for a lambda target, and only for lambda");
+    }
 
     if args.dry_run {
         println!("{}", serde_json::to_string_pretty(&declarations.value)?);
@@ -90,7 +101,7 @@ pub async fn run(args: Deploy) -> Result<()> {
     let client = Client::new(url, args.api_key.clone())?;
 
     let mut request = ci_metadata();
-    request.target = target_of(&args.target).into();
+    request.target = target_of(target).into();
     request.target_reference = args.function_arn.clone();
     request.label = args.label.clone();
     // A GitHub run is the natural release id: stable across reruns of the same run.

@@ -168,3 +168,45 @@ test("tilde-declarations reports every prompt, skill and tool the entry declares
     /Tool ping is declared twice with different definitions \(src\/index\.mjs#again\.tools\.ping, src\/index\.mjs#toolClash\.tools\.ping\)/,
   );
 });
+
+const iac = new URL("../../iac/dist/index.js", import.meta.url).href;
+test("with TILDE_DISCOVERY_SPECS the reader adds the @trytilde/iac specs the entry exports", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tilde-specs-"));
+  await writeFile(join(dir, "package.json"), '{"type":"module","main":"index.mjs"}');
+  await writeFile(
+    join(dir, "index.mjs"),
+    `import { definePrompt } from ${JSON.stringify(sdk)};
+import { defineAgent, defineProject, github, gateway } from ${JSON.stringify(iac)};
+export const respond = definePrompt("respond", { template: "Hi" });
+export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gateway(),
+  tools: [github.ref("acme").tools("github_get_issue")] });
+// The same agent again, inside its project, is kept once.
+export const project = defineProject({ team: "faro", agents: [triage] });
+export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Other" }) : undefined;
+`,
+  );
+  const plain = await run(dir, []);
+  assert.equal(plain.code, 0, plain.stderr);
+  assert.equal(
+    JSON.parse(plain.stdout).agents,
+    undefined,
+    "plain declarations without the variable",
+  );
+
+  const specs = await run(dir, [], { TILDE_DISCOVERY_SPECS: "1" });
+  assert.equal(specs.code, 0, specs.stderr);
+  assert.match(specs.stderr, /agent {3}triage {2}index\.mjs#project/);
+  const found = JSON.parse(specs.stdout);
+  assert.equal(found.team, "faro");
+  assert.deepEqual(
+    found.declarations.prompts.map((p) => p.name),
+    ["respond"],
+  );
+  assert.equal(found.agents.length, 1);
+  assert.equal(found.agents[0].deployment.target, "DEPLOYMENT_TARGET_GATEWAY");
+  assert.deepEqual(found.agents[0].tools[0].tools, ["github_get_issue"]);
+
+  const clash = await run(dir, [], { TILDE_DISCOVERY_SPECS: "1", CLASH: "1" });
+  assert.equal(clash.code, 1);
+  assert.match(clash.stderr, /Agent triage is defined twice differently/);
+});

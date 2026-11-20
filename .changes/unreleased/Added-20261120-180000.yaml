@@ -1,0 +1,3 @@
+kind: Added
+body: '`@trytilde/iac`: agent configuration in code (`defineAgent`, `defineProject`, `connection.ref`, `blueprint`, `egress`, `routine`, `lambda`/`gateway`/`sidecar`), with typed catalog providers (`github.ref("acme").tools("github_get_issue")`) whose tool names are string-literal unions generated from the built-in catalog, `ALL` (`"*"`) and `.untypedTools()` for anything else. `tilde deploy` applies the specs an entry exports in one `ApplyService.Apply` call, prints the plan or every required action with its link, supports `--dry-run`, `--json` and `--team`, and exits 2 when blocked; entries without specs register their deployment as before.'
+time: 2026-11-20T18:00:00+02:00

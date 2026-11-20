@@ -379,6 +379,15 @@ importers:
         specifier: workspace:*
         version: link:../chat-proxy
 
+  packages/iac:
+    devDependencies:
+      '@bufbuild/protobuf':
+        specifier: 2.14.1
+        version: 2.14.1
+      '@trytilde/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   packages/sdk:
     dependencies:
       '@bufbuild/protobuf':

@@ -354,6 +354,8 @@ mod tests {
         };
         let digest = hex::encode(sha2::Sha256::digest(png));
         let declarations = Declarations {
+            agents: Vec::new(),
+            team: None,
             digest: "test".into(),
             value: json!({
                 "prompts": [],

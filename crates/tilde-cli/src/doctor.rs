@@ -55,7 +55,7 @@ pub async fn run(args: Doctor) -> Result<()> {
             .map_err(|error| anyhow::anyhow!("{error}"));
         healthy &= report("entry", found);
         if let Ok(entry) = entry {
-            let read = discover::declarations(project, &entry, true)
+            let read = discover::declarations(project, &entry, true, false)
                 .await
                 .map(|declarations| {
                     let count = |group: &str| {

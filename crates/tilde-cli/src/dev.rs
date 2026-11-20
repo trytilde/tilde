@@ -88,7 +88,7 @@ pub async fn run(args: Dev) -> Result<()> {
     };
 
     eprintln!("Reading declarations from {entry}");
-    let mut declarations = discover::declarations(&project, &entry, true).await?;
+    let mut declarations = discover::declarations(&project, &entry, true, false).await?;
     let mut token = dev_deployment(&client, &agent_id, &declarations).await?;
 
     let mut chat_server = None;
@@ -143,7 +143,7 @@ pub async fn run(args: Dev) -> Result<()> {
                     continue;
                 }
                 watched = current;
-                let next = match discover::declarations(&project, &entry, true).await {
+                let next = match discover::declarations(&project, &entry, true, false).await {
                     Ok(next) => next,
                     Err(error) => {
                         eprintln!("Change not applied: {error}");
