@@ -5452,6 +5452,8 @@ pub const __WATCH_THREAD_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     from_json: ::buffa::type_registry::any_from_json::<WatchThreadRequest>,
     is_wkt: false,
 };
+/// A response without `activity` is a keepalive (sent when the thread is quiet, so proxies keep
+/// the stream open); its `cursor` is unchanged.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

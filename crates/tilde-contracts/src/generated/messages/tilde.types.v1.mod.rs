@@ -5,6 +5,7 @@ include!("tilde.types.v1.agent.rs");
 include!("tilde.types.v1.chat.rs");
 include!("tilde.types.v1.connections.rs");
 include!("tilde.types.v1.deployment.rs");
+include!("tilde.types.v1.heartbeat.rs");
 include!("tilde.types.v1.prompt.rs");
 include!("tilde.types.v1.runtime_event.rs");
 include!("tilde.types.v1.skill.rs");
@@ -30,6 +31,7 @@ pub mod __buffa {
         include!("tilde.types.v1.chat.__view.rs");
         include!("tilde.types.v1.connections.__view.rs");
         include!("tilde.types.v1.deployment.__view.rs");
+        include!("tilde.types.v1.heartbeat.__view.rs");
         include!("tilde.types.v1.prompt.__view.rs");
         include!("tilde.types.v1.runtime_event.__view.rs");
         include!("tilde.types.v1.skill.__view.rs");
@@ -97,6 +99,7 @@ pub mod __buffa {
         reg.register_json_any(super::__DEPLOYMENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_DEPLOYMENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_INSTANCE_JSON_ANY);
+        reg.register_json_any(super::__HEARTBEAT_JSON_ANY);
         reg.register_json_any(super::__PROMPT_JSON_ANY);
         reg.register_json_any(super::__PROMPT_SECTION_JSON_ANY);
         reg.register_json_any(super::__PROMPT_VERSION_JSON_ANY);
@@ -307,6 +310,10 @@ pub use self::__buffa::view::AgentDeploymentOwnedView;
 pub use self::__buffa::view::AgentInstanceView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentInstanceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HeartbeatView;
+#[doc(inline)]
+pub use self::__buffa::view::HeartbeatOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::PromptView;
 #[doc(inline)]

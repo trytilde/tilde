@@ -69,6 +69,80 @@ impl Runtime {
     fn sandboxes(&self) -> &Sandboxes {
         &self.0.sandboxes
     }
+    /// A process inside the sandbox calls one of the blueprint's tools. The call is an
+    /// `execute_tool` span of the agent's invocation: inside the operation it runs under, else in
+    /// the sandbox's latest invocation.
+    async fn call_tool(
+        &self,
+        session: db::SessionRow,
+        request: wire::InvokeToolRequest,
+    ) -> Result<Value, ConnectError> {
+        if request.input_json.len() > 64 * 1024 {
+            return Err(ConnectError::invalid_argument(
+                "Tool input is at most 64 KiB",
+            ));
+        }
+        let input: Value = match request.input_json.as_str() {
+            "" => Value::Object(Default::default()),
+            json => serde_json::from_str(json)
+                .map_err(|_| ConnectError::invalid_argument("Invalid tool input JSON"))?,
+        };
+        let operation = request
+            .operation_id
+            .as_deref()
+            .map(crate::chat::id)
+            .transpose()?;
+        let scope = db::trace_scope_opt(
+            &self
+                .sandboxes()
+                .connections
+                .pool
+                .get()
+                .await
+                .map_err(Error::from)?,
+            session.id,
+            operation,
+        )
+        .await
+        .map_err(Error::from)?;
+        let call = Uuid::new_v4();
+        let cx = span(
+            &request.name,
+            call,
+            session.id,
+            scope.as_ref(),
+            &request.input_json,
+        );
+        let _end = crate::telemetry::tracing::context::EndOnDrop(cx.clone());
+        let result = async {
+            let (definition, callee, _) = self
+                .0
+                .load(Owner::Blueprint(session.blueprint_id))
+                .await?
+                .into_iter()
+                .find(|(definition, _, _)| definition.name == request.name)
+                .ok_or_else(|| ConnectError::not_found("The sandbox has no such tool"))?;
+            crate::tools::validate(&definition, &input)?;
+            // Tool hosts are told what the sandbox was launched for, never a traced invocation:
+            // a shared sandbox's latest invocation may be another agent's.
+            self.0
+                .run(
+                    callee,
+                    Caller {
+                        call_id: call,
+                        agent: session.agent_id,
+                        thread: session.thread_id,
+                        sandbox: Some(session.id),
+                    },
+                    input,
+                )
+                .await
+        }
+        .with_context(cx.clone())
+        .await;
+        crate::chat::tools::finish(&cx, &result);
+        result
+    }
     async fn session(&self, ctx: &RequestContext) -> Result<db::SessionRow, ConnectError> {
         db::sandbox_authenticate_opt(
             &self
@@ -236,84 +310,46 @@ impl SandboxService for Runtime {
             ..Default::default()
         })
     }
-    /// A process inside the sandbox calls one of the blueprint's tools. The call is an
-    /// `execute_tool` span of the agent's invocation: inside the operation it runs under, else in
-    /// the sandbox's latest invocation.
+    /// Deprecated for InvokeToolStream; kept while sandboxes run an older CLI.
     async fn invoke_tool<'a>(
         &'a self,
         ctx: RequestContext,
         request: ServiceRequest<'_, wire::InvokeToolRequest>,
     ) -> ServiceResult<impl Encodable<wire::InvokeToolResponse> + Send + use<'a>> {
         let session = self.session(&ctx).await?;
-        let request = request.to_owned_message();
-        if request.input_json.len() > 64 * 1024 {
-            return Err(ConnectError::invalid_argument(
-                "Tool input is at most 64 KiB",
-            ));
-        }
-        let input: Value = match request.input_json.as_str() {
-            "" => Value::Object(Default::default()),
-            json => serde_json::from_str(json)
-                .map_err(|_| ConnectError::invalid_argument("Invalid tool input JSON"))?,
-        };
-        let operation = request
-            .operation_id
-            .as_deref()
-            .map(crate::chat::id)
-            .transpose()?;
-        let scope = db::trace_scope_opt(
-            &self
-                .sandboxes()
-                .connections
-                .pool
-                .get()
-                .await
-                .map_err(Error::from)?,
-            session.id,
-            operation,
-        )
-        .await
-        .map_err(Error::from)?;
-        let call = Uuid::new_v4();
-        let cx = span(
-            &request.name,
-            call,
-            session.id,
-            scope.as_ref(),
-            &request.input_json,
-        );
-        let _end = crate::telemetry::tracing::context::EndOnDrop(cx.clone());
-        let result = async {
-            let (definition, callee, _) = self
-                .0
-                .load(Owner::Blueprint(session.blueprint_id))
-                .await?
-                .into_iter()
-                .find(|(definition, _, _)| definition.name == request.name)
-                .ok_or_else(|| ConnectError::not_found("The sandbox has no such tool"))?;
-            crate::tools::validate(&definition, &input)?;
-            // Tool hosts are told what the sandbox was launched for, never a traced invocation:
-            // a shared sandbox's latest invocation may be another agent's.
-            self.0
-                .run(
-                    callee,
-                    Caller {
-                        call_id: call,
-                        agent: session.agent_id,
-                        thread: session.thread_id,
-                        sandbox: Some(session.id),
-                    },
-                    input,
-                )
-                .await
-        }
-        .with_context(cx.clone())
-        .await;
-        crate::chat::tools::finish(&cx, &result);
+        let output = self.call_tool(session, request.to_owned_message()).await?;
         Response::ok(wire::InvokeToolResponse {
-            output_json: result?.to_string(),
+            output_json: output.to_string(),
             ..Default::default()
         })
+    }
+    /// InvokeTool with a heartbeat while the tool runs, so proxies never cut a long call.
+    async fn invoke_tool_stream(
+        &self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, wire::InvokeToolRequest>,
+    ) -> ServiceResult<
+        connectrpc::ServiceStream<impl Encodable<wire::InvokeToolStreamResponse> + Send + use<>>,
+    > {
+        use futures::StreamExt;
+        use wire::invoke_tool_stream_response::Frame;
+        let session = self.session(&ctx).await?;
+        let request = request.to_owned_message();
+        let runtime = Runtime(self.0.clone());
+        let work = async move { runtime.call_tool(session, request).await };
+        Response::stream_ok(crate::rpc::with_heartbeats(work).map(|frame| {
+            let frame = match frame {
+                None => Frame::Heartbeat(Default::default()),
+                Some(output) => Frame::Result(Box::new(wire::InvokeToolResponse {
+                    output_json: output?.to_string(),
+                    ..Default::default()
+                })),
+            };
+            Ok(wire::InvokeToolStreamResponse {
+                frame: Some(frame),
+                ..Default::default()
+            })
+        }))
     }
 }
 

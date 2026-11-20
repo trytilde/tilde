@@ -7,9 +7,23 @@ use crate::services::tilde::runtime::v1::ChatService;
 use connectrpc::{
     ConnectError, InboundStream, RequestContext, Response, ServiceRequest, ServiceResult,
 };
+use futures::StreamExt;
 use secrecy::SecretString;
 use std::sync::Arc;
 struct Rpc(Chat, Arc<crate::chat::tools::Registry>);
+fn tool_response(
+    output: serde_json::Value,
+) -> Result<runtime_pb::InvokeToolResponse, ConnectError> {
+    let output_json = serde_json::to_string(&output)
+        .map_err(|_| ConnectError::internal("Invalid tool result"))?;
+    if output_json.len() > 1024 * 1024 {
+        return Err(ConnectError::resource_exhausted("Tool result is too large"));
+    }
+    Ok(runtime_pb::InvokeToolResponse {
+        output_json,
+        ..Default::default()
+    })
+}
 impl Rpc {
     async fn scope(&self, ctx: &RequestContext) -> Result<Scope, ConnectError> {
         invocation_scope(&self.0, ctx).await
@@ -271,19 +285,38 @@ impl ChatService for Rpc {
     {
         let scope = self.scope(&ctx).await?;
         let capability = SecretString::from(capability(&ctx)?.to_owned());
-        let output = self
-            .1
-            .invoke(self.0.clone(), scope, capability, requests)
-            .await?;
-        let output_json = serde_json::to_string(&output)
-            .map_err(|_| ConnectError::internal("Invalid tool result"))?;
-        if output_json.len() > 1024 * 1024 {
-            return Err(ConnectError::resource_exhausted("Tool result is too large"));
-        }
-        Response::ok(runtime_pb::InvokeToolResponse {
-            output_json,
-            ..Default::default()
-        })
+        // Boxed: the invocation's future is large, and unoptimized builds otherwise overflow a
+        // worker's stack polling a provider call beneath it.
+        let output = Box::pin(self.1.invoke(self.0.clone(), scope, capability, requests)).await?;
+        Response::ok(tool_response(output)?)
+    }
+    async fn invoke_tool_stream(
+        &self,
+        ctx: RequestContext,
+        requests: InboundStream<runtime_pb::InvokeToolRequest>,
+    ) -> ServiceResult<
+        connectrpc::ServiceStream<
+            impl connectrpc::Encodable<runtime_pb::InvokeToolStreamResponse> + Send + use<>,
+        >,
+    > {
+        use runtime_pb::invoke_tool_stream_response::Frame;
+        let scope = self.scope(&ctx).await?;
+        let capability = SecretString::from(capability(&ctx)?.to_owned());
+        let (chat, tools) = (self.0.clone(), self.1.clone());
+        let work = async move {
+            let output = Box::pin(tools.invoke(chat, scope, capability, requests)).await?;
+            tool_response(output)
+        };
+        Response::stream_ok(crate::rpc::with_heartbeats(work).map(|frame| {
+            let frame = match frame {
+                None => Frame::Heartbeat(Default::default()),
+                Some(result) => Frame::Result(Box::new(result?)),
+            };
+            Ok(runtime_pb::InvokeToolStreamResponse {
+                frame: Some(frame),
+                ..Default::default()
+            })
+        }))
     }
     async fn get_thread<'a>(
         &'a self,

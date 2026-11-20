@@ -806,11 +806,15 @@ export class AgentContext {
         yield { name, callId, sequence: sequence++, chunkJson: encode(chunk) };
       yield { name, callId, sequence, finish: true };
     }
-    const response = await this.session.invokeTool(frames(), {
+    // Heartbeat frames keep proxies with idle timeouts from cutting long tool calls.
+    const responses = this.session.invokeToolStream(frames(), {
       headers: this.#headers,
       signal: this.signal,
     });
-    return JSON.parse(response.outputJson) as JsonValue;
+    for await (const response of responses)
+      if (response.frame.case === "result")
+        return JSON.parse(response.frame.value.outputJson) as JsonValue;
+    throw new ConnectError("Tool call ended without a result", Code.Internal);
   }
   /** Native-thread convenience only. Other providers expose their own sendMessage tool/schema. */
   async sendNativeMessage(

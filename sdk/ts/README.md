@@ -141,7 +141,8 @@ of several waiting objectives a new human message should resume.
 ## Streaming and deployment
 
 Provider tool `execute(input, { toolCallId })` sends completed input over the
-client-streaming `tilde.runtime.v1.ChatService.InvokeTool` RPC. For incremental input, call
+bidirectional `tilde.runtime.v1.ChatService.InvokeToolStream` RPC, which streams heartbeats
+while the tool runs so proxies with idle timeouts keep long calls open. For incremental input, call
 `tool.stream(input, chunks, { toolCallId })`; its chunk format is declared by the
 provider's `chunkSchema`. Framework adapters must supply chunks explicitly:
 registering a bundled tool does not automatically stream model tokens.

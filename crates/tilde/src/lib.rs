@@ -30,5 +30,6 @@ pub mod wikis;
 pub mod telemetry;
 
 mod rpc;
+pub use rpc::set_heartbeat_interval;
 
 pub mod identities;

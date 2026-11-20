@@ -31,6 +31,16 @@ pub mod __buffa {
         include!("tilde.runtime.v1.knowledge.__view.rs");
         include!("tilde.runtime.v1.prompts.__view.rs");
         include!("tilde.runtime.v1.skills.__view.rs");
+        pub mod oneof {
+            #[allow(unused_imports)]
+            use super::*;
+            include!("tilde.runtime.v1.chat.__view_oneof.rs");
+        }
+    }
+    pub mod oneof {
+        #[allow(unused_imports)]
+        use super::*;
+        include!("tilde.runtime.v1.chat.__oneof.rs");
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -71,6 +81,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TOOLS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_REQUEST_JSON_ANY);
         reg.register_json_any(super::__INVOKE_TOOL_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_TOOL_STREAM_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_GOALS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_GOALS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_GOAL_REQUEST_JSON_ANY);
@@ -262,6 +273,10 @@ pub use self::__buffa::view::InvokeToolRequestOwnedView;
 pub use self::__buffa::view::InvokeToolResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::InvokeToolResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeToolStreamResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeToolStreamResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListGoalsRequestView;
 #[doc(inline)]

@@ -256,7 +256,7 @@ impl ManagementSkillService for Management {
         request: ServiceRequest<'_, management::SyncSkillSourceRequest>,
     ) -> ServiceResult<impl Encodable<management::SyncSkillSourceResponse> + Send + use<'a>> {
         let source = id(request.id)?;
-        self.0.sync(source).await?;
+        self.0.sync_inline(source).await?;
         Response::ok(management::SyncSkillSourceResponse {
             source: source_wire(self.0.source(source).await?).into(),
             ..Default::default()
@@ -747,7 +747,7 @@ impl RuntimeSkillService for Runtime {
     ) -> ServiceResult<impl Encodable<runtime::SyncSkillSourceResponse> + Send + use<'a>> {
         let scope = self.scope(&ctx).await?;
         let (source, _) = self.editable_source(&scope, request.source).await?;
-        self.skills.sync(source).await?;
+        self.skills.sync_inline(source).await?;
         let row = self.skills.source(source).await?;
         Response::ok(runtime::SyncSkillSourceResponse {
             commit_sha: row.commit_sha.unwrap_or_default(),

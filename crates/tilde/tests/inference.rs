@@ -732,3 +732,83 @@ async fn identical_provider_ids_route_to_each_agents_own_credentials() {
     upstream_task.abort();
     db.close().await;
 }
+
+/// A non-streamed completion that thinks longer than a proxy's idle timeout: the gateway
+/// answers 200 at once and writes JSON whitespace every heartbeat until the provider's body,
+/// which the client then parses as usual. Here the proxy cuts after 1 s idle, the heartbeat is
+/// 300 ms and the provider takes 3 s; without the keepalive the proxy would cut the call.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn slow_non_streamed_completions_survive_an_idle_timeout_proxy() {
+    tilde::set_heartbeat_interval(std::time::Duration::from_millis(300));
+    let db = Database::new().await;
+    let encryption = Arc::new(Encryption::initialize(&db.pool, seed(47)).await.unwrap());
+    let agents = Agents::new(db.pool.clone(), encryption.clone());
+    let connections = Connections::new(
+        db.pool.clone(),
+        encryption.clone(),
+        "http://127.0.0.1".into(),
+        "http://127.0.0.1".into(),
+    )
+    .unwrap();
+    connections.seed().await.unwrap();
+    let (upstream, upstream_task) = serve(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+            axum::Json(
+                json!({"id": "c1", "choices": [{"message": {"content": "Done"}}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 1}}),
+            )
+        }),
+    ))
+    .await;
+    let agent = create_agent(&agents).await;
+    connect(
+        &connections,
+        "openai",
+        "prod",
+        agent,
+        &[("api_key", "k"), ("base_url", &format!("{upstream}/v1"))],
+    )
+    .await;
+    let loader = inference::gateway::Loader::new(db.pool.clone(), connections.clone());
+    loader.load().await.unwrap();
+    let gateway = Gateway {
+        upstreams: loader.upstreams.clone(),
+        audit: audit::Audit::start(audit::Sink::Postgres(db.pool.clone())),
+    };
+    let chat = Chat::new(db.pool.clone(), encryption, "http://127.0.0.1".into())
+        .with_connections(connections)
+        .with_inference(gateway);
+    let (origin, server) = serve(tilde::iam::listeners::agent_rpc_router(
+        agents,
+        chat.clone(),
+    ))
+    .await;
+    let proxy = common::idle_proxy(
+        origin.trim_start_matches("http://").to_owned(),
+        std::time::Duration::from_secs(1),
+    )
+    .await;
+    let token = invocation(&chat, &db.pool, agent).await;
+    let response = reqwest::Client::builder()
+        .http1_only()
+        .build()
+        .unwrap()
+        .post(format!("{proxy}/inference/openai/prod/chat/completions"))
+        .bearer_auth(token.expose_secret())
+        .json(&json!({"model": "fixture", "messages": [{"role": "user", "content": "Hi"}]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response
+        .text()
+        .await
+        .expect("the body completes through the proxy");
+    assert!(body.starts_with(' '), "{body:?}");
+    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(parsed["choices"][0]["message"]["content"], "Done");
+    server.abort();
+    upstream_task.abort();
+}

@@ -139,7 +139,9 @@ impl ToolService for Rpc {
     ) -> ServiceResult<impl Encodable<management::RefreshConnectionToolsResponse> + Send + use<'a>>
     {
         let connection = id(&request.to_owned_message().connection_id)?;
-        let (tools, changed) = self.0.refresh_connection_tools(connection).await?;
+        let refresh = self.0.refresh_connection_tools(connection);
+        let (tools, changed) =
+            crate::rpc::inline("Listing the connection's tools", refresh).await??;
         Response::ok(management::RefreshConnectionToolsResponse {
             changed,
             tools: tools.into_iter().map(provider_tool).collect(),
@@ -202,7 +204,8 @@ impl ToolService for Rpc {
             }
         };
         let target = target(r.connection_id.as_deref(), r.tool_host_id.as_deref())?;
-        let source = self.0.add_source(owner, target, &r.tool_names).await?;
+        let added = self.0.add_source(owner, target, &r.tool_names);
+        let source = crate::rpc::inline("Listing the source's tools", added).await??;
         Response::ok(management::AddToolSourceResponse {
             source: wire(source).into(),
             ..Default::default()
@@ -383,7 +386,7 @@ impl ToolHostRegistryService for HostRpc {
         request: ServiceRequest<'_, management::RefreshToolHostRequest>,
     ) -> ServiceResult<impl Encodable<management::RefreshToolHostResponse> + Send + use<'a>> {
         let host = id(&request.to_owned_message().id)?;
-        let host = self.0.refresh(host).await?;
+        let host = crate::rpc::inline("Refreshing the tool host", self.0.refresh(host)).await??;
         Response::ok(management::RefreshToolHostResponse {
             tool_host: host_wire(host).into(),
             ..Default::default()

@@ -2,6 +2,7 @@ syntax = "proto3";
 package tilde.runtime.v1;
 import "tilde/runtime/v1/cache.proto";
 import "tilde/types/v1/chat.proto";
+import "tilde/types/v1/heartbeat.proto";
 
 // Callbacks into Tilde derive the acting agent and current thread from a live invocation token. Other-agent targets remain explicit and capability checked.
 
@@ -21,7 +22,17 @@ service ChatService {
   // code and runs in its process, so tools.search can rank them beside server tools. The engine
   // never executes them.
   rpc RegisterBundledTools(RegisterBundledToolsRequest) returns (RegisterBundledToolsResponse);
+  // Deprecated for InvokeToolStream; kept while agents on older SDKs call it.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
   rpc InvokeTool(stream InvokeToolRequest) returns (InvokeToolResponse);
+  // Runs a tool as InvokeTool does, but streams a heartbeat at least every 10 s while it runs,
+  // then the result. A long tool call is otherwise silent, and proxies cut silent connections
+  // (an AWS load balancer after 60 s idle); HTTP/2 PINGs end at the first proxy, so only
+  // response bytes keep the whole path alive. It shares InvokeTool's request frames until
+  // InvokeTool is removed.
+  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
+  rpc InvokeToolStream(stream InvokeToolRequest) returns (stream InvokeToolStreamResponse);
   rpc ListGoals(ListGoalsRequest) returns (ListGoalsResponse);
   rpc CreateGoal(CreateGoalRequest) returns (CreateGoalResponse);
   rpc UpdateGoal(UpdateGoalRequest) returns (UpdateGoalResponse);
@@ -89,6 +100,13 @@ message InvokeToolRequest {
 }
 
 message InvokeToolResponse { string output_json = 1 [debug_redact = true]; }
+
+message InvokeToolStreamResponse {
+  oneof frame {
+    tilde.types.v1.Heartbeat heartbeat = 1;
+    InvokeToolResponse result = 2;
+  }
+}
 
 message ListGoalsRequest {}
 

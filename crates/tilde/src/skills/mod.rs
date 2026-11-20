@@ -471,6 +471,17 @@ impl Skills {
     /// Bring a catalog or git source up to date. Failures are recorded on the source and keep
     /// its current skills; an editor source has nothing to sync. Each sync claims a generation
     /// before fetching, so one that finishes after a newer sync started changes nothing.
+    /// [`Self::sync`] for an RPC: waits up to [`crate::rpc::INLINE_LIMIT`], then lets a long
+    /// sync finish in the background (the source records its outcome) and returns.
+    pub async fn sync_inline(&self, id: Uuid) -> Result<(), Error> {
+        let skills = self.clone();
+        let sync = async move { skills.sync(id).await };
+        let task = tokio::spawn(sync);
+        match tokio::time::timeout(crate::rpc::INLINE_LIMIT, task).await {
+            Ok(joined) => joined.map_err(|_| Error::Invalid("Skill source sync failed".into()))?,
+            Err(_) => Ok(()),
+        }
+    }
     pub async fn sync(&self, id: Uuid) -> Result<(), Error> {
         let source = self.source(id).await?;
         let kind = Kind::parse(&source.kind)?;

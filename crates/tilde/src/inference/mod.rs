@@ -596,8 +596,23 @@ async fn forward(
             );
         }
     };
-    drop(body);
-    let response = match upstream.client.execute(request).await {
+    let send = upstream.client.execute(request);
+    // The body is only decoded for the rare completion still silent after the grace.
+    let response = if kind == Kind::Chat {
+        let mut send = Box::pin(send);
+        match tokio::time::timeout(keepalive_grace(), &mut send).await {
+            Ok(response) => response,
+            Err(_) if !streams(&raw.path, &body) => return keepalive(send, gateway.audit, raw),
+            Err(_) => {
+                drop(body);
+                send.await
+            }
+        }
+    } else {
+        drop(body);
+        send.await
+    };
+    let response = match response {
         Ok(response) => response,
         Err(error) => {
             tracing::warn!(provider=%provider, %error, "Inference provider unreachable");
@@ -606,13 +621,88 @@ async fn forward(
             return refuse(StatusCode::BAD_GATEWAY, "Inference provider unreachable");
         }
     };
-    raw.status = response.status().as_u16();
     let mut out = Response::builder().status(response.status());
     for (name, value) in response.headers() {
         if forwardable_response(name) {
             out = out.header(name, value);
         }
     }
+    out.body(Body::from_stream(tee(response, raw, gateway.audit)))
+        .unwrap_or_else(|_| refuse(StatusCode::BAD_GATEWAY, "Invalid provider response"))
+}
+
+/// Whether a chat request asks for a streamed (SSE) response: `"stream": true` in the body, or a
+/// streaming endpoint (Google's `:streamGenerateContent`, Bedrock's `converse-stream` and
+/// `invoke-with-response-stream`).
+fn streams(path: &str, body: &[u8]) -> bool {
+    if path.to_ascii_lowercase().contains("stream") {
+        return true;
+    }
+    #[derive(serde::Deserialize)]
+    struct Body {
+        #[serde(default)]
+        stream: bool,
+    }
+    serde_json::from_slice::<Body>(body).is_ok_and(|b| b.stream)
+}
+
+/// How long a non-streamed completion may keep its response headers waiting before the
+/// gateway commits to a keepalive response: two heartbeat intervals (20 s), well inside a load
+/// balancer's 60 s idle timeout.
+fn keepalive_grace() -> Duration {
+    crate::rpc::heartbeat_interval() * 2
+}
+
+/// A non-streamed completion that thinks longer than [`keepalive_grace`] sends nothing until it
+/// is done, and proxies on the way back to the agent cut silent connections. The gateway answers
+/// `200 application/json` at once and writes a space every heartbeat interval (JSON allows
+/// leading whitespace, so provider SDKs parse the body unchanged) until the provider's body
+/// follows. The provider's status and headers are lost by then: an error body arrives under 200,
+/// which SDKs reject while parsing it, carrying its message. Errors (rate limits, overload)
+/// almost always answer before the grace runs out and pass through untouched.
+fn keepalive(
+    send: Pin<
+        Box<impl std::future::Future<Output = reqwest::Result<reqwest::Response>> + Send + 'static>,
+    >,
+    audit: audit::Audit,
+    mut raw: audit::Raw,
+) -> Response {
+    use futures::StreamExt;
+    let body = async_stream::stream! {
+        yield Ok::<_, std::io::Error>(Bytes::from_static(b" "));
+        let mut beats = std::pin::pin!(crate::rpc::with_heartbeats(send));
+        while let Some(beat) = beats.next().await {
+            let Some(response) = beat else {
+                yield Ok(Bytes::from_static(b" "));
+                continue;
+            };
+            let response = match response {
+                Ok(response) => response,
+                Err(error) => {
+                    tracing::warn!(provider=%raw.provider.id(), %error, "Inference provider unreachable");
+                    raw.status = StatusCode::BAD_GATEWAY.as_u16();
+                    audit.record(raw);
+                    yield Ok(Bytes::from(serde_json::json!({"error": {"message": "Inference provider unreachable", "type": "tilde_inference_gateway"}}).to_string()));
+                    return;
+                }
+            };
+            let mut frames = tee(response, raw, audit);
+            while let Some(frame) = frames.next().await {
+                yield frame.map_err(std::io::Error::other);
+            }
+            return;
+        }
+    };
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(http::header::CONTENT_TYPE, "application/json")
+        .body(Body::from_stream(body))
+        .unwrap_or_else(|_| refuse(StatusCode::BAD_GATEWAY, "Invalid provider response"))
+}
+
+/// The provider's body, captured for the audit as it streams through.
+fn tee(response: reqwest::Response, mut raw: audit::Raw, audit: audit::Audit) -> Tee {
+    raw.status = response.status().as_u16();
     raw.content_type = response
         .headers()
         .get(http::header::CONTENT_TYPE)
@@ -621,13 +711,11 @@ async fn forward(
     raw.encoded = response
         .headers()
         .contains_key(http::header::CONTENT_ENCODING);
-    let tee = Tee {
+    Tee {
         inner: Box::pin(response.bytes_stream()),
         raw: Some(raw),
-        audit: gateway.audit.clone(),
-    };
-    out.body(Body::from_stream(tee))
-        .unwrap_or_else(|_| refuse(StatusCode::BAD_GATEWAY, "Invalid provider response"))
+        audit,
+    }
 }
 
 /// Relays upstream frames untouched while sharing each `Bytes` (a refcount, not a copy) into

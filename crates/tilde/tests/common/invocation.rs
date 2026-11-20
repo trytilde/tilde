@@ -115,6 +115,10 @@ impl Fixture {
             server,
         }
     }
+    /// Run `f` where the fixture's rows live.
+    pub async fn within<F: std::future::Future>(&self, f: F) -> F::Output {
+        f.await
+    }
     pub async fn tools(&self) -> Vec<Value> {
         let catalog: Value = reqwest::Client::new()
             .post(format!(

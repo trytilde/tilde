@@ -10246,6 +10246,8 @@ impl ::serde::Serialize for WatchThreadRequestOwnedView {
         ::serde::Serialize::serialize(&self.0, __s)
     }
 }
+/// A response without `activity` is a keepalive (sent when the thread is quiet, so proxies keep
+/// the stream open); its `cursor` is unchanged.
 #[derive(Clone, Debug, Default)]
 pub struct WatchThreadResponseView<'a> {
     /// Field 1: `activity`

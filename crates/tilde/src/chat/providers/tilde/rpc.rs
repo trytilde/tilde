@@ -582,13 +582,22 @@ impl ChatService for Rpc {
         let claims = scope(&_ctx)?;
         let chat = self.0.clone();
         let thread = id(request.thread_id)?;
-        let mut stream = self.0.watch_ingress(thread, request.after_cursor).await?;
+        let stream = self.0.watch_ingress(thread, request.after_cursor).await?;
+        let mut last_cursor = request.after_cursor.to_owned();
         Response::stream_ok(async_stream::try_stream! {
             use futures::StreamExt;
+            // A quiet thread still sends a frame per heartbeat interval so proxies keep the
+            // stream open: no activity, the cursor unchanged (clients skip such frames).
+            let mut stream=std::pin::pin!(crate::rpc::with_keepalive(stream));
             while let Some(value)=stream.next().await {
                 if chrono::Utc::now().timestamp()>=claims.exp {Err(ConnectError::unauthenticated("Provider credential expired"))?;}
+                let Some(value)=value else {
+                    yield wire::WatchThreadResponse{cursor:last_cursor.clone(),..Default::default()};
+                    continue;
+                };
                 member(&chat,&claims,thread).await?;
                 let (activity,cursor)=value?;
+                last_cursor.clone_from(&cursor);
                 let Some(activity)=for_end_user(activity) else {continue};
                 yield wire::WatchThreadResponse{activity:activity.into(),cursor,..Default::default()};
             }
