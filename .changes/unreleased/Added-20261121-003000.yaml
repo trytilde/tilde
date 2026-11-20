@@ -1,0 +1,3 @@
+kind: Added
+body: '`@trytilde/iac`: people in code for Tilde Cloud: `defineTeam({ team, users, groups })`, `user()` and `group()` (declared with an object, referenced by email or name), users and groups beside an agent, and `access: [grant(group("eng"), "ownership")]`; users upsert their name, `login: true | { role }` sets the team role and invites, `team: { delete: true }` leaves the team, and `delete: true` disables a user or deletes a group. `tilde deploy` sends them with the agents, or alone for a team-only project.'
+time: 2026-11-21T00:30:00+02:00

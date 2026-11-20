@@ -219,6 +219,11 @@ pub mod __buffa {
         reg.register_json_any(super::__SIGNAL_TRIGGER_SPEC_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_FILTER_SPEC_JSON_ANY);
         reg.register_json_any(super::__DEPLOYMENT_SPEC_JSON_ANY);
+        reg.register_json_any(super::__USER_SPEC_JSON_ANY);
+        reg.register_json_any(super::__TEAM_MEMBERSHIP_SPEC_JSON_ANY);
+        reg.register_json_any(super::__GROUP_SPEC_JSON_ANY);
+        reg.register_json_any(super::__MEMBER_SPEC_JSON_ANY);
+        reg.register_json_any(super::__GRANT_SPEC_JSON_ANY);
         reg.register_json_any(super::__APPLY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CHANGE_JSON_ANY);
         reg.register_json_any(super::__FIELD_CHANGE_JSON_ANY);
@@ -1070,6 +1075,26 @@ pub use self::__buffa::view::SignalFilterSpecOwnedView;
 pub use self::__buffa::view::DeploymentSpecView;
 #[doc(inline)]
 pub use self::__buffa::view::DeploymentSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UserSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::UserSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TeamMembershipSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::TeamMembershipSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GroupSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::GroupSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MemberSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::MemberSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GrantSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::GrantSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ApplyResponseView;
 #[doc(inline)]

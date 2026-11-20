@@ -91,8 +91,11 @@ pub struct Declarations {
     pub digest: String,
     /// `@trytilde/iac` agent specs (`AgentSpec` protobuf JSON) the entry exports, when asked for.
     pub agents: Vec<Value>,
-    /// The team a `defineProject` names.
+    /// The team a `defineProject` or `defineTeam` names.
     pub team: Option<String>,
+    /// A `defineTeam`'s people (`UserSpec`/`GroupSpec` protobuf JSON).
+    pub users: Vec<Value>,
+    pub groups: Vec<Value>,
 }
 
 /// `allow_empty` is for `tilde dev`: an agent that declares no prompts, skills or tools is still
@@ -134,9 +137,12 @@ pub async fn declarations(
         .context("The declaration reader printed output that was not UTF-8")?;
     let mut value: Value = serde_json::from_str(text.trim())
         .context("The declaration reader did not print declaration JSON")?;
-    let (mut agents, mut team) = (Vec::new(), None);
+    let (mut agents, mut team, mut users, mut groups) = (Vec::new(), None, Vec::new(), Vec::new());
     if specs && let Some(found) = value.get_mut("declarations").map(Value::take) {
-        agents = value["agents"].as_array().cloned().unwrap_or_default();
+        let list = |key: &str| value[key].as_array().cloned().unwrap_or_default();
+        agents = list("agents");
+        users = list("users");
+        groups = list("groups");
         team = value["team"].as_str().map(str::to_owned);
         value = found;
     }
@@ -145,6 +151,8 @@ pub async fn declarations(
         value,
         agents,
         team,
+        users,
+        groups,
     })
 }
 

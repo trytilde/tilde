@@ -36,7 +36,8 @@ pub struct Deploy {
     /// them: ask the server for the plan and apply nothing.
     #[arg(long)]
     pub dry_run: bool,
-    /// The team new agents and blueprints belong to (Tilde Cloud), overriding `defineProject`.
+    /// The team new agents and blueprints belong to (Tilde Cloud). It must match the team the
+    /// code declares (`defineProject`, `defineTeam`), if any.
     #[arg(long, env = "TILDE_TEAM")]
     pub team: Option<String>,
     /// Print the deployment id, token and creation status as JSON.
@@ -82,7 +83,10 @@ pub async fn run(args: Deploy) -> Result<()> {
     let declarations = discover::declarations(&project, &entry, false, true).await?;
     // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
     // is registered, as before specs existed.
-    if !declarations.agents.is_empty() {
+    if !declarations.agents.is_empty()
+        || !declarations.users.is_empty()
+        || !declarations.groups.is_empty()
+    {
         return crate::apply::run(&args, &declarations).await;
     }
     let target = args.target.as_deref().unwrap_or("gateway");

@@ -29,6 +29,15 @@ pub struct ApplyRequestView<'a> {
     pub commit_message: ::core::option::Option<&'a str>,
     /// Field 8: `commit_author`
     pub commit_author: ::core::option::Option<&'a str>,
+    /// People of the apply's team (`defineTeam`); agent specs may declare more. See UserSpec.
+    ///
+    /// Field 9: `users`
+    pub users: ::buffa::RepeatedView<'a, super::super::__buffa::view::UserSpecView<'a>>,
+    /// Field 10: `groups`
+    pub groups: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::GroupSpecView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ApplyRequestView<'a> {
@@ -126,6 +135,42 @@ impl<'a> ::buffa::MessageView<'a> for ApplyRequestView<'a> {
                         )?,
                     );
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::UserSpecView>(),
+                )?;
+                view.users
+                    .push(
+                        <super::super::__buffa::view::UserSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::GroupSpecView>(),
+                )?;
+                view.groups
+                    .push(
+                        <super::super::__buffa::view::GroupSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -160,6 +205,16 @@ impl<'a> ::buffa::MessageView<'a> for ApplyRequestView<'a> {
             branch: self.branch.map(|s| s.to_string()),
             commit_message: self.commit_message.map(|s| s.to_string()),
             commit_author: self.commit_author.map(|s| s.to_string()),
+            users: self
+                .users
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            groups: self
+                .groups
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -200,6 +255,22 @@ impl<'a> ::buffa::ViewEncode<'a> for ApplyRequestView<'a> {
         if let Some(ref v) = self.commit_author {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.users {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.groups {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -239,6 +310,22 @@ impl<'a> ::buffa::ViewEncode<'a> for ApplyRequestView<'a> {
         }
         if let Some(ref v) = self.commit_author {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        for v in &self.users {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.groups {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -284,6 +371,12 @@ impl<'__a> ::serde::Serialize for ApplyRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.commit_author {
             __map.serialize_entry("commitAuthor", __v)?;
+        }
+        if !self.users.is_empty() {
+            __map.serialize_entry("users", &*self.users)?;
+        }
+        if !self.groups.is_empty() {
+            __map.serialize_entry("groups", &*self.groups)?;
         }
         __map.end()
     }
@@ -424,6 +517,22 @@ impl ApplyRequestOwnedView {
     #[must_use]
     pub fn commit_author(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().commit_author
+    }
+    /// People of the apply's team (`defineTeam`); agent specs may declare more. See UserSpec.
+    ///
+    /// Field 9: `users`
+    #[must_use]
+    pub fn users(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::UserSpecView<'_>> {
+        &self.0.reborrow().users
+    }
+    /// Field 10: `groups`
+    #[must_use]
+    pub fn groups(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::GroupSpecView<'_>> {
+        &self.0.reborrow().groups
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ApplyRequestView<'static>>>
@@ -775,6 +884,22 @@ pub struct AgentSpecView<'a> {
     pub deployment: ::buffa::MessageFieldView<
         super::super::__buffa::view::DeploymentSpecView<'a>,
     >,
+    /// People declared beside the agent (monorepos), merged with the request's by natural key.
+    ///
+    /// Field 13: `users`
+    pub users: ::buffa::RepeatedView<'a, super::super::__buffa::view::UserSpecView<'a>>,
+    /// Field 14: `groups`
+    pub groups: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::GroupSpecView<'a>,
+    >,
+    /// Who may see or own the agent.
+    ///
+    /// Field 15: `access`
+    pub access: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::GrantSpecView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for AgentSpecView<'a> {
@@ -974,6 +1099,60 @@ impl<'a> ::buffa::MessageView<'a> for AgentSpecView<'a> {
                         )?,
                     );
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::UserSpecView>(),
+                )?;
+                view.users
+                    .push(
+                        <super::super::__buffa::view::UserSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::GroupSpecView>(),
+                )?;
+                view.groups
+                    .push(
+                        <super::super::__buffa::view::GroupSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::GrantSpecView>(),
+                )?;
+                view.access
+                    .push(
+                        <super::super::__buffa::view::GrantSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1046,6 +1225,21 @@ impl<'a> ::buffa::MessageView<'a> for AgentSpecView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            users: self
+                .users
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            groups: self
+                .groups
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            access: self
+                .access
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1118,6 +1312,30 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentSpecView<'a> {
         if self.deployment.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.deployment.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.users {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.groups {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.access {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -1200,6 +1418,30 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentSpecView<'a> {
             );
             self.deployment.write_to(__cache, buf);
         }
+        for v in &self.users {
+            ::buffa::types::put_len_delimited_header(
+                13u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.groups {
+            ::buffa::types::put_len_delimited_header(
+                14u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.access {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -1262,6 +1504,15 @@ impl<'__a> ::serde::Serialize for AgentSpecView<'__a> {
             if let ::core::option::Option::Some(__v) = self.deployment.as_option() {
                 __map.serialize_entry("deployment", __v)?;
             }
+        }
+        if !self.users.is_empty() {
+            __map.serialize_entry("users", &*self.users)?;
+        }
+        if !self.groups.is_empty() {
+            __map.serialize_entry("groups", &*self.groups)?;
+        }
+        if !self.access.is_empty() {
+            __map.serialize_entry("access", &*self.access)?;
         }
         __map.end()
     }
@@ -1449,6 +1700,31 @@ impl AgentSpecOwnedView {
         super::super::__buffa::view::DeploymentSpecView<'_>,
     > {
         &self.0.reborrow().deployment
+    }
+    /// People declared beside the agent (monorepos), merged with the request's by natural key.
+    ///
+    /// Field 13: `users`
+    #[must_use]
+    pub fn users(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::UserSpecView<'_>> {
+        &self.0.reborrow().users
+    }
+    /// Field 14: `groups`
+    #[must_use]
+    pub fn groups(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::GroupSpecView<'_>> {
+        &self.0.reborrow().groups
+    }
+    /// Who may see or own the agent.
+    ///
+    /// Field 15: `access`
+    #[must_use]
+    pub fn access(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::GrantSpecView<'_>> {
+        &self.0.reborrow().access
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<AgentSpecView<'static>>>
@@ -5573,6 +5849,1616 @@ impl ::buffa::HasMessageView for super::super::DeploymentSpec {
     type ViewHandle = DeploymentSpecOwnedView;
 }
 impl ::serde::Serialize for DeploymentSpecOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// People and access are Tilde Cloud's: servers without them refuse a spec declaring any.
+/// A user is found by email and upserted: a changed name is an update (an organization
+/// administrator's). In a team's apply a declared user is a member of the team: `team.role` sets
+/// their role (absent: member when joining, else unchanged) and `team.delete` removes them from
+/// the team. `login` invites them to sign in when invitation email is configured; accepting
+/// links the sign-in to this user. A group is found by name within the apply's team and created
+/// if missing. `delete` disables a user or deletes a group.
+#[derive(Clone, Debug, Default)]
+pub struct UserSpecView<'a> {
+    /// Field 1: `email`
+    pub email: &'a str,
+    /// Field 2: `name`
+    pub name: &'a str,
+    /// Field 3: `login`
+    pub login: bool,
+    /// Field 4: `delete`
+    pub delete: bool,
+    /// Field 5: `team`
+    pub team: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TeamMembershipSpecView<'a>,
+    >,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for UserSpecView<'a> {
+    type Owned = super::super::UserSpec;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.email = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.login = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.delete = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.team.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.team = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TeamMembershipSpecView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::UserSpec, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::UserSpec, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::UserSpec {
+            email: self.email.to_string(),
+            name: self.name.to_string(),
+            login: self.login,
+            delete: self.delete,
+            team: match self.team.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TeamMembershipSpec,
+                        ::buffa::Inline<super::super::TeamMembershipSpec>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for UserSpecView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if self.login {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.team.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.team.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.email, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        if self.login {
+            ::buffa::types::put_bool_field(3u32, self.login, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(4u32, self.delete, buf);
+        }
+        if self.team.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.team.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for UserSpecView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.email) {
+            __map.serialize_entry("email", self.email)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+            __map.serialize_entry("name", self.name)?;
+        }
+        if self.login {
+            __map.serialize_entry("login", &self.login)?;
+        }
+        if self.delete {
+            __map.serialize_entry("delete", &self.delete)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.team.as_option() {
+                __map.serialize_entry("team", __v)?;
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for UserSpecView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "UserSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.UserSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.UserSpec";
+}
+::buffa::impl_default_view_instance!(UserSpecView);
+::buffa::impl_view_reborrow!(UserSpecView);
+/** Self-contained, `'static` owned view of a `UserSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UserSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UserSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct UserSpecOwnedView(::buffa::OwnedView<UserSpecView<'static>>);
+impl UserSpecOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(UserSpecOwnedView(::buffa::OwnedView::decode(bytes)?))
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            UserSpecOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::UserSpec,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            UserSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`UserSpecView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &UserSpecView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::UserSpec {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `email`
+    #[must_use]
+    pub fn email(&self) -> &'_ str {
+        self.0.reborrow().email
+    }
+    /// Field 2: `name`
+    #[must_use]
+    pub fn name(&self) -> &'_ str {
+        self.0.reborrow().name
+    }
+    /// Field 3: `login`
+    #[must_use]
+    pub fn login(&self) -> bool {
+        self.0.reborrow().login
+    }
+    /// Field 4: `delete`
+    #[must_use]
+    pub fn delete(&self) -> bool {
+        self.0.reborrow().delete
+    }
+    /// Field 5: `team`
+    #[must_use]
+    pub fn team(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TeamMembershipSpecView<'_>,
+    > {
+        &self.0.reborrow().team
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<UserSpecView<'static>>>
+for UserSpecOwnedView {
+    fn from(inner: ::buffa::OwnedView<UserSpecView<'static>>) -> Self {
+        UserSpecOwnedView(inner)
+    }
+}
+impl ::core::convert::From<UserSpecOwnedView>
+for ::buffa::OwnedView<UserSpecView<'static>> {
+    fn from(wrapper: UserSpecOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<UserSpecView<'static>>>
+for UserSpecOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<UserSpecView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::UserSpec {
+    type View<'a> = UserSpecView<'a>;
+    type ViewHandle = UserSpecOwnedView;
+}
+impl ::serde::Serialize for UserSpecOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct TeamMembershipSpecView<'a> {
+    /// Field 1: `role`
+    pub role: ::buffa::EnumValue<super::super::MemberRole>,
+    /// Field 2: `delete`
+    pub delete: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for TeamMembershipSpecView<'a> {
+    type Owned = super::super::TeamMembershipSpec;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.role = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.delete = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::TeamMembershipSpec, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::TeamMembershipSpec, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::TeamMembershipSpec {
+            role: self.role,
+            delete: self.delete,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for TeamMembershipSpecView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.role.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(2u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for TeamMembershipSpecView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.role) {
+            __map.serialize_entry("role", &self.role)?;
+        }
+        if self.delete {
+            __map.serialize_entry("delete", &self.delete)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for TeamMembershipSpecView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "TeamMembershipSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.TeamMembershipSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.TeamMembershipSpec";
+}
+::buffa::impl_default_view_instance!(TeamMembershipSpecView);
+::buffa::impl_view_reborrow!(TeamMembershipSpecView);
+/** Self-contained, `'static` owned view of a `TeamMembershipSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TeamMembershipSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TeamMembershipSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct TeamMembershipSpecOwnedView(
+    ::buffa::OwnedView<TeamMembershipSpecView<'static>>,
+);
+impl TeamMembershipSpecOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            TeamMembershipSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            TeamMembershipSpecOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::TeamMembershipSpec,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            TeamMembershipSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`TeamMembershipSpecView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &TeamMembershipSpecView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::TeamMembershipSpec {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `role`
+    #[must_use]
+    pub fn role(&self) -> ::buffa::EnumValue<super::super::MemberRole> {
+        self.0.reborrow().role
+    }
+    /// Field 2: `delete`
+    #[must_use]
+    pub fn delete(&self) -> bool {
+        self.0.reborrow().delete
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<TeamMembershipSpecView<'static>>>
+for TeamMembershipSpecOwnedView {
+    fn from(inner: ::buffa::OwnedView<TeamMembershipSpecView<'static>>) -> Self {
+        TeamMembershipSpecOwnedView(inner)
+    }
+}
+impl ::core::convert::From<TeamMembershipSpecOwnedView>
+for ::buffa::OwnedView<TeamMembershipSpecView<'static>> {
+    fn from(wrapper: TeamMembershipSpecOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<TeamMembershipSpecView<'static>>>
+for TeamMembershipSpecOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<TeamMembershipSpecView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::TeamMembershipSpec {
+    type View<'a> = TeamMembershipSpecView<'a>;
+    type ViewHandle = TeamMembershipSpecOwnedView;
+}
+impl ::serde::Serialize for TeamMembershipSpecOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct GroupSpecView<'a> {
+    /// Field 1: `name`
+    pub name: &'a str,
+    /// Field 2: `members`
+    pub members: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::MemberSpecView<'a>,
+    >,
+    /// Field 3: `delete`
+    pub delete: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for GroupSpecView<'a> {
+    type Owned = super::super::GroupSpec;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.delete = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<super::super::__buffa::view::MemberSpecView>(),
+                )?;
+                view.members
+                    .push(
+                        <super::super::__buffa::view::MemberSpecView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::GroupSpec, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::GroupSpec, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::GroupSpec {
+            name: self.name.to_string(),
+            members: self
+                .members
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            delete: self.delete,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for GroupSpecView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        for v in &self.members {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.name, buf);
+        }
+        for v in &self.members {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(3u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for GroupSpecView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+            __map.serialize_entry("name", self.name)?;
+        }
+        if !self.members.is_empty() {
+            __map.serialize_entry("members", &*self.members)?;
+        }
+        if self.delete {
+            __map.serialize_entry("delete", &self.delete)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for GroupSpecView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GroupSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.GroupSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GroupSpec";
+}
+::buffa::impl_default_view_instance!(GroupSpecView);
+::buffa::impl_view_reborrow!(GroupSpecView);
+/** Self-contained, `'static` owned view of a `GroupSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GroupSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GroupSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct GroupSpecOwnedView(::buffa::OwnedView<GroupSpecView<'static>>);
+impl GroupSpecOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GroupSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GroupSpecOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::GroupSpec,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GroupSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`GroupSpecView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &GroupSpecView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::GroupSpec {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `name`
+    #[must_use]
+    pub fn name(&self) -> &'_ str {
+        self.0.reborrow().name
+    }
+    /// Field 2: `members`
+    #[must_use]
+    pub fn members(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::MemberSpecView<'_>> {
+        &self.0.reborrow().members
+    }
+    /// Field 3: `delete`
+    #[must_use]
+    pub fn delete(&self) -> bool {
+        self.0.reborrow().delete
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<GroupSpecView<'static>>>
+for GroupSpecOwnedView {
+    fn from(inner: ::buffa::OwnedView<GroupSpecView<'static>>) -> Self {
+        GroupSpecOwnedView(inner)
+    }
+}
+impl ::core::convert::From<GroupSpecOwnedView>
+for ::buffa::OwnedView<GroupSpecView<'static>> {
+    fn from(wrapper: GroupSpecOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<GroupSpecView<'static>>>
+for GroupSpecOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<GroupSpecView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::GroupSpec {
+    type View<'a> = GroupSpecView<'a>;
+    type ViewHandle = GroupSpecOwnedView;
+}
+impl ::serde::Serialize for GroupSpecOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct MemberSpecView<'a> {
+    /// Field 1: `email`
+    pub email: &'a str,
+    /// Field 2: `delete`
+    pub delete: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for MemberSpecView<'a> {
+    type Owned = super::super::MemberSpec;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.email = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.delete = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::MemberSpec, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::MemberSpec, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::MemberSpec {
+            email: self.email.to_string(),
+            delete: self.delete,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for MemberSpecView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.email.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.email) as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.email.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.email, buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(2u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for MemberSpecView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.email) {
+            __map.serialize_entry("email", self.email)?;
+        }
+        if self.delete {
+            __map.serialize_entry("delete", &self.delete)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for MemberSpecView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "MemberSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.MemberSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.MemberSpec";
+}
+::buffa::impl_default_view_instance!(MemberSpecView);
+::buffa::impl_view_reborrow!(MemberSpecView);
+/** Self-contained, `'static` owned view of a `MemberSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MemberSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MemberSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct MemberSpecOwnedView(::buffa::OwnedView<MemberSpecView<'static>>);
+impl MemberSpecOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            MemberSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            MemberSpecOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::MemberSpec,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            MemberSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`MemberSpecView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &MemberSpecView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::MemberSpec {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `email`
+    #[must_use]
+    pub fn email(&self) -> &'_ str {
+        self.0.reborrow().email
+    }
+    /// Field 2: `delete`
+    #[must_use]
+    pub fn delete(&self) -> bool {
+        self.0.reborrow().delete
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<MemberSpecView<'static>>>
+for MemberSpecOwnedView {
+    fn from(inner: ::buffa::OwnedView<MemberSpecView<'static>>) -> Self {
+        MemberSpecOwnedView(inner)
+    }
+}
+impl ::core::convert::From<MemberSpecOwnedView>
+for ::buffa::OwnedView<MemberSpecView<'static>> {
+    fn from(wrapper: MemberSpecOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<MemberSpecView<'static>>>
+for MemberSpecOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<MemberSpecView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::MemberSpec {
+    type View<'a> = MemberSpecView<'a>;
+    type ViewHandle = MemberSpecOwnedView;
+}
+impl ::serde::Serialize for MemberSpecOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// A grant on the agent: visibility (see it) or ownership (change it) to a user or group.
+#[derive(Clone, Debug, Default)]
+pub struct GrantSpecView<'a> {
+    /// Field 3: `plane`
+    pub plane: ::buffa::EnumValue<super::super::GrantPlane>,
+    /// Field 4: `delete`
+    pub delete: bool,
+    pub principal: ::core::option::Option<
+        super::super::__buffa::view::oneof::grant_spec::Principal<'a>,
+    >,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for GrantSpecView<'a> {
+    type Owned = super::super::GrantSpec;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.plane = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.delete = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.principal = Some(
+                    super::super::__buffa::view::oneof::grant_spec::Principal::User(
+                        ::buffa::types::borrow_str(&mut cur)?,
+                    ),
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.principal = Some(
+                    super::super::__buffa::view::oneof::grant_spec::Principal::Group(
+                        ::buffa::types::borrow_str(&mut cur)?,
+                    ),
+                );
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::GrantSpec, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::GrantSpec, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::GrantSpec {
+            plane: self.plane,
+            delete: self.delete,
+            principal: self
+                .principal
+                .as_ref()
+                .map(|v| match v {
+                    super::super::__buffa::view::oneof::grant_spec::Principal::User(
+                        v,
+                    ) => {
+                        super::super::__buffa::oneof::grant_spec::Principal::User(
+                            v.to_string(),
+                        )
+                    }
+                    super::super::__buffa::view::oneof::grant_spec::Principal::Group(
+                        v,
+                    ) => {
+                        super::super::__buffa::oneof::grant_spec::Principal::Group(
+                            v.to_string(),
+                        )
+                    }
+                }),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for GrantSpecView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if let ::core::option::Option::Some(ref v) = self.principal {
+            match v {
+                super::super::__buffa::view::oneof::grant_spec::Principal::User(x) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+                super::super::__buffa::view::oneof::grant_spec::Principal::Group(x) => {
+                    size += 1u64 + ::buffa::types::string_encoded_len(x) as u64;
+                }
+            }
+        }
+        {
+            let val = self.plane.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let ::core::option::Option::Some(ref v) = self.principal {
+            match v {
+                super::super::__buffa::view::oneof::grant_spec::Principal::User(x) => {
+                    ::buffa::types::put_string_field(1u32, x, buf);
+                }
+                super::super::__buffa::view::oneof::grant_spec::Principal::Group(x) => {
+                    ::buffa::types::put_string_field(2u32, x, buf);
+                }
+            }
+        }
+        {
+            let val = self.plane.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(4u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for GrantSpecView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.plane) {
+            __map.serialize_entry("plane", &self.plane)?;
+        }
+        if self.delete {
+            __map.serialize_entry("delete", &self.delete)?;
+        }
+        if let ::core::option::Option::Some(ref __ov) = self.principal {
+            match __ov {
+                super::super::__buffa::view::oneof::grant_spec::Principal::User(v) => {
+                    __map.serialize_entry("user", v)?;
+                }
+                super::super::__buffa::view::oneof::grant_spec::Principal::Group(v) => {
+                    __map.serialize_entry("group", v)?;
+                }
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for GrantSpecView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "GrantSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.GrantSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.GrantSpec";
+}
+::buffa::impl_default_view_instance!(GrantSpecView);
+::buffa::impl_view_reborrow!(GrantSpecView);
+/** Self-contained, `'static` owned view of a `GrantSpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GrantSpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GrantSpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct GrantSpecOwnedView(::buffa::OwnedView<GrantSpecView<'static>>);
+impl GrantSpecOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GrantSpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GrantSpecOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::GrantSpec,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            GrantSpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`GrantSpecView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &GrantSpecView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::GrantSpec {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 3: `plane`
+    #[must_use]
+    pub fn plane(&self) -> ::buffa::EnumValue<super::super::GrantPlane> {
+        self.0.reborrow().plane
+    }
+    /// Field 4: `delete`
+    #[must_use]
+    pub fn delete(&self) -> bool {
+        self.0.reborrow().delete
+    }
+    /// Oneof `principal`.
+    #[must_use]
+    pub fn principal(
+        &self,
+    ) -> ::core::option::Option<
+        &super::super::__buffa::view::oneof::grant_spec::Principal<'_>,
+    > {
+        self.0.reborrow().principal.as_ref()
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<GrantSpecView<'static>>>
+for GrantSpecOwnedView {
+    fn from(inner: ::buffa::OwnedView<GrantSpecView<'static>>) -> Self {
+        GrantSpecOwnedView(inner)
+    }
+}
+impl ::core::convert::From<GrantSpecOwnedView>
+for ::buffa::OwnedView<GrantSpecView<'static>> {
+    fn from(wrapper: GrantSpecOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<GrantSpecView<'static>>>
+for GrantSpecOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<GrantSpecView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::GrantSpec {
+    type View<'a> = GrantSpecView<'a>;
+    type ViewHandle = GrantSpecOwnedView;
+}
+impl ::serde::Serialize for GrantSpecOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

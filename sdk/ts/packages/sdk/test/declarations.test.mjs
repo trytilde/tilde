@@ -176,12 +176,13 @@ test("with TILDE_DISCOVERY_SPECS the reader adds the @trytilde/iac specs the ent
   await writeFile(
     join(dir, "index.mjs"),
     `import { definePrompt } from ${JSON.stringify(sdk)};
-import { defineAgent, defineProject, github, gateway } from ${JSON.stringify(iac)};
+import { defineAgent, defineProject, defineTeam, github, gateway, user } from ${JSON.stringify(iac)};
 export const respond = definePrompt("respond", { template: "Hi" });
 export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gateway(),
   tools: [github.ref("acme").tools("github_get_issue")] });
 // The same agent again, inside its project, is kept once.
 export const project = defineProject({ team: "faro", agents: [triage] });
+export const people = defineTeam({ team: "faro", users: [user({ email: "ada@faro.test", login: true })] });
 export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Other" }) : undefined;
 `,
   );
@@ -198,6 +199,10 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   assert.match(specs.stderr, /agent {3}triage {2}index\.mjs#project/);
   const found = JSON.parse(specs.stdout);
   assert.equal(found.team, "faro");
+  assert.deepEqual(
+    found.users.map((u) => [u.email, u.login]),
+    [["ada@faro.test", true]],
+  );
   assert.deepEqual(
     found.declarations.prompts.map((p) => p.name),
     ["respond"],

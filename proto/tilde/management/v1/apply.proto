@@ -30,6 +30,9 @@ message ApplyRequest {
   optional string branch = 6;
   optional string commit_message = 7;
   optional string commit_author = 8;
+  // People of the apply's team (`defineTeam`); agent specs may declare more. See UserSpec.
+  repeated UserSpec users = 9;
+  repeated GroupSpec groups = 10;
 }
 
 // A connection by slug (`provider/name`, for example `github/acme`), optionally of one type.
@@ -52,6 +55,11 @@ message AgentSpec {
   repeated RoutineSpec routines = 11;
   // Registers this deployment unless the agent already has one with its external id.
   optional DeploymentSpec deployment = 12;
+  // People declared beside the agent (monorepos), merged with the request's by natural key.
+  repeated UserSpec users = 13;
+  repeated GroupSpec groups = 14;
+  // Who may see or own the agent.
+  repeated GrantSpec access = 15;
 }
 message InferenceAliasSpec { string alias = 1; ConnectionRef connection = 2; bool delete = 3; }
 // The agent's tools from one connection: exactly `tools` (a kept source's other tools are dropped).
@@ -108,8 +116,24 @@ enum RequiredActionCode {
   REQUIRED_ACTION_CODE_CONNECTION_NOT_READY = 3; REQUIRED_ACTION_CODE_CONNECTION_WRONG_TYPE = 4;
   REQUIRED_ACTION_CODE_CAPABILITY_MISSING = 5; REQUIRED_ACTION_CODE_TOOL_NOT_OFFERED = 6;
   REQUIRED_ACTION_CODE_SIGNAL_NOT_OFFERED = 7; REQUIRED_ACTION_CODE_PERMISSION_DENIED = 8;
-  REQUIRED_ACTION_CODE_TEAM_MISSING = 9; REQUIRED_ACTION_CODE_SECRET_MISSING = 10;
+  REQUIRED_ACTION_CODE_TEAM_MISSING = 9; REQUIRED_ACTION_CODE_SECRET_MISSING = 10; REQUIRED_ACTION_CODE_SPEC_CONFLICT = 11;
 }
+// People and access are Tilde Cloud's: servers without them refuse a spec declaring any.
+// A user is found by email and upserted: a changed name is an update (an organization
+// administrator's). In a team's apply a declared user is a member of the team: `team.role` sets
+// their role (absent: member when joining, else unchanged) and `team.delete` removes them from
+// the team. `login` invites them to sign in when invitation email is configured; accepting
+// links the sign-in to this user. A group is found by name within the apply's team and created
+// if missing. `delete` disables a user or deletes a group.
+message UserSpec { string email = 1; string name = 2; bool login = 3; bool delete = 4; TeamMembershipSpec team = 5; }
+message TeamMembershipSpec { MemberRole role = 1; bool delete = 2; }
+enum MemberRole { MEMBER_ROLE_UNSPECIFIED = 0; MEMBER_ROLE_MEMBER = 1; MEMBER_ROLE_ADMIN = 2; }
+message GroupSpec { string name = 1; repeated MemberSpec members = 2; bool delete = 3; }
+message MemberSpec { string email = 1; bool delete = 2; }
+// A grant on the agent: visibility (see it) or ownership (change it) to a user or group.
+message GrantSpec { oneof principal { string user = 1; string group = 2; } GrantPlane plane = 3; bool delete = 4; }
+enum GrantPlane { GRANT_PLANE_UNSPECIFIED = 0; GRANT_PLANE_VISIBILITY = 1; GRANT_PLANE_OWNERSHIP = 2; }
+
 message ApplyResponse {
   ApplyOutcome outcome = 1;
   repeated Change changes = 2;

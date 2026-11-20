@@ -9,7 +9,7 @@
  * uploading skill files and registering the deployment, once, for every language.
  *
  * With `TILDE_DISCOVERY_SPECS=1` (set by `tilde deploy`) it prints
- * `{ "declarations": …, "agents": [AgentSpec…], "team": … }` instead, adding the
+ * `{ "declarations": …, "agents": [AgentSpec…], "team": …, "users": […], "groups": […] }` instead, adding the
  * `@trytilde/iac` specs the entry exports; readers that predate specs ignore the variable.
  *
  * The entry is normally built JavaScript (`dist/index.js`); a `.ts` entry relies on Node's own
@@ -135,7 +135,7 @@ async function read(argv: string[]) {
   const specs = process.env.TILDE_DISCOVERY_SPECS === "1";
   if (
     !values["allow-empty"] &&
-    !(specs && found.agents.length) &&
+    !(specs && (found.agents.length || found.users.length || found.groups.length)) &&
     !found.prompts.length &&
     !found.skills.length &&
     !found.tools.length
@@ -154,7 +154,13 @@ async function read(argv: string[]) {
       );
     }
   });
-  return JSON.stringify({ declarations: JSON.parse(declarations), agents, team: found.team });
+  return JSON.stringify({
+    declarations: JSON.parse(declarations),
+    agents,
+    team: found.team,
+    users: found.users,
+    groups: found.groups,
+  });
 }
 
 async function main() {

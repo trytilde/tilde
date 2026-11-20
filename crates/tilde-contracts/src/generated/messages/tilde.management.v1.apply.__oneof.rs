@@ -99,3 +99,31 @@ pub mod routine_trigger_spec {
         }
     }
 }
+pub mod grant_spec {
+    #[allow(unused_imports)]
+    use super::*;
+    #[derive(Clone, PartialEq, Debug)]
+    pub enum Principal {
+        User(::buffa::alloc::string::String),
+        Group(::buffa::alloc::string::String),
+    }
+    impl ::buffa::Oneof for Principal {}
+    impl serde::Serialize for Principal {
+        fn serialize<S: serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            use serde::ser::SerializeMap;
+            let mut map = s.serialize_map(Some(1))?;
+            match self {
+                Self::User(v) => {
+                    map.serialize_entry("user", v)?;
+                }
+                Self::Group(v) => {
+                    map.serialize_entry("group", v)?;
+                }
+            }
+            map.end()
+        }
+    }
+}
