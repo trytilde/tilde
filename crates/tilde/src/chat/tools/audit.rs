@@ -211,9 +211,10 @@ impl Drop for Execution {
             tool.status = "aborted".into();
             tool.error = "Tool execution interrupted".into();
             if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-                runtime.spawn(async move {
+                let report = async move {
                     let _ = chat.report_tool_call(&scope, tool).await;
-                });
+                };
+                runtime.spawn(report);
             }
         }
     }

@@ -1,0 +1,3 @@
+kind: Added
+body: "Tilde runs in a schema of its own beside another application's tables: with `options=-c search_path=<schema>,public` on `DATABASE_URL`, migrations create the schema when it is missing. `DATABASE_DIRECT_URL` optionally names the server behind a transaction-pooling PgBouncer `DATABASE_URL`, used only for migrations and the one LISTEN session per process."
+time: 2026-11-21T17:06:00+00:00

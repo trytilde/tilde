@@ -4,6 +4,7 @@ import { createColumnHelper, FlexRender, tableFeatures, useTable } from "@tansta
 import { PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { HealthBadge, HealthHistory, responseTime } from "@/components/agent-health";
+import { harnessLabel } from "@/components/local-agent";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -61,7 +62,13 @@ export function DataTable({
               {row.original.paused && (
                 <span className="rounded bg-muted px-2 py-0.5 text-xs">Paused</span>
               )}
-              <HealthBadge metrics={row.original.metrics} />
+              {row.original.local ? (
+                <span className="rounded bg-muted px-2 py-0.5 text-xs">
+                  {harnessLabel(row.original.local.harness)}
+                </span>
+              ) : (
+                <HealthBadge metrics={row.original.metrics} />
+              )}
             </div>
           ),
         }),

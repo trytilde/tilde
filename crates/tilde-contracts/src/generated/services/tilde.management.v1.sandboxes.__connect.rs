@@ -82,6 +82,30 @@ pub type OwnedDeleteSandboxEnvVarResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<SetBlueprintEgressRequestView<'static>>`.
+pub type OwnedSetBlueprintEgressRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<SetBlueprintEgressResponseView<'static>>`.
+pub type OwnedSetBlueprintEgressResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteBlueprintEgressRequestView<'static>>`.
+pub type OwnedDeleteBlueprintEgressRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteBlueprintEgressResponseView<'static>>`.
+pub type OwnedDeleteBlueprintEgressResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ListSandboxesRequestView<'static>>`.
 pub type OwnedListSandboxesRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::ListSandboxesRequestView<'static>,
@@ -434,6 +458,90 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetBlueprintEgressResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::SetBlueprintEgressResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::DeleteBlueprintEgressResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::DeleteBlueprintEgressResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ListSandboxesResponse>
 for crate::proto::tilde::management::v1::__buffa::view::ListSandboxesResponseView<'_> {
     fn encode(
@@ -675,6 +783,18 @@ pub const SANDBOX_BLUEPRINT_SERVICE_SET_SANDBOX_ENV_VAR_SPEC: ::connectrpc::Spec
 /// Static [`Spec`](::connectrpc::Spec) for the `DeleteSandboxEnvVar` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const SANDBOX_BLUEPRINT_SERVICE_DELETE_SANDBOX_ENV_VAR_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.management.v1.SandboxBlueprintService/DeleteSandboxEnvVar",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SetBlueprintEgress` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SANDBOX_BLUEPRINT_SERVICE_SET_BLUEPRINT_EGRESS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.SandboxBlueprintService/SetBlueprintEgress",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteBlueprintEgress` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const SANDBOX_BLUEPRINT_SERVICE_DELETE_BLUEPRINT_EGRESS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.SandboxBlueprintService/DeleteBlueprintEgress",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -923,6 +1043,56 @@ pub trait SandboxBlueprintService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::DeleteSandboxEnvVarResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Adds or replaces the blueprint's egress grant `slug`. Sandboxes reach the connection's
+    /// upstream through the gateway with its credential, which never enters them, limited by the
+    /// provider's rules and narrowed by `config_json` (validated against the provider's egress config
+    /// schema; defaults filled in). Needs view on the connection. Running sandboxes pick changes up
+    /// on their next request and their wiring on their process's next connect.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_blueprint_egress<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::SetBlueprintEgressResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the DeleteBlueprintEgress RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_blueprint_egress<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::DeleteBlueprintEgressResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1276,6 +1446,64 @@ impl<S: SandboxBlueprintService> SandboxBlueprintServiceExt for S {
                 },
             )
             .with_spec(SANDBOX_BLUEPRINT_SERVICE_DELETE_SANDBOX_ENV_VAR_SPEC)
+            .route_view(
+                SANDBOX_BLUEPRINT_SERVICE_SERVICE_NAME,
+                "SetBlueprintEgress",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_blueprint_egress(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::SetBlueprintEgressResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SANDBOX_BLUEPRINT_SERVICE_SET_BLUEPRINT_EGRESS_SPEC)
+            .route_view(
+                SANDBOX_BLUEPRINT_SERVICE_SERVICE_NAME,
+                "DeleteBlueprintEgress",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_blueprint_egress(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::DeleteBlueprintEgressResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SANDBOX_BLUEPRINT_SERVICE_DELETE_BLUEPRINT_EGRESS_SPEC)
             .route_view_idempotent(
                 SANDBOX_BLUEPRINT_SERVICE_SERVICE_NAME,
                 "ListSandboxes",
@@ -1528,6 +1756,20 @@ for SandboxBlueprintServiceServer<T> {
                         .with_spec(SANDBOX_BLUEPRINT_SERVICE_DELETE_SANDBOX_ENV_VAR_SPEC),
                 )
             }
+            "SetBlueprintEgress" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(SANDBOX_BLUEPRINT_SERVICE_SET_BLUEPRINT_EGRESS_SPEC),
+                )
+            }
+            "DeleteBlueprintEgress" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            SANDBOX_BLUEPRINT_SERVICE_DELETE_BLUEPRINT_EGRESS_SPEC,
+                        ),
+                )
+            }
             "ListSandboxes" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -1725,6 +1967,50 @@ for SandboxBlueprintServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::DeleteSandboxEnvVarResponse,
+                        >(format)
+                })
+            }
+            "SetBlueprintEgress" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_blueprint_egress(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::SetBlueprintEgressResponse,
+                        >(format)
+                })
+            }
+            "DeleteBlueprintEgress" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_blueprint_egress(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::DeleteBlueprintEgressResponse,
                         >(format)
                 })
             }
@@ -2278,6 +2564,96 @@ where
                 &self.transport,
                 &self.config,
                 SANDBOX_BLUEPRINT_SERVICE_DELETE_SANDBOX_ENV_VAR_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetBlueprintEgress RPC. Sends a request to /tilde.management.v1.SandboxBlueprintService/SetBlueprintEgress.
+    pub async fn set_blueprint_egress(
+        &self,
+        request: crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_blueprint_egress_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetBlueprintEgress RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_blueprint_egress_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::SetBlueprintEgressRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::SetBlueprintEgressResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SANDBOX_BLUEPRINT_SERVICE_SET_BLUEPRINT_EGRESS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteBlueprintEgress RPC. Sends a request to /tilde.management.v1.SandboxBlueprintService/DeleteBlueprintEgress.
+    pub async fn delete_blueprint_egress(
+        &self,
+        request: crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_blueprint_egress_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteBlueprintEgress RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_blueprint_egress_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::DeleteBlueprintEgressRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::DeleteBlueprintEgressResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SANDBOX_BLUEPRINT_SERVICE_DELETE_BLUEPRINT_EGRESS_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

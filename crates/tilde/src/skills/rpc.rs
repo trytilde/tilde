@@ -165,7 +165,7 @@ impl ManagementSkillService for Management {
     async fn list_skill_sources<'a>(
         &'a self,
         _ctx: RequestContext,
-        _: ServiceRequest<'_, management::ListSkillSourcesRequest>,
+        _request: ServiceRequest<'_, management::ListSkillSourcesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListSkillSourcesResponse> + Send + use<'a>> {
         let listed = self.0.sources().await?;
         let ids: Vec<Uuid> = listed.iter().map(|s| s.id).collect();

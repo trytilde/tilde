@@ -16,6 +16,7 @@ impl Channels {
             values: self.connections.resolve(connection).await?,
             http: self.connections.http.clone(),
             endpoints: self.connections.endpoints.clone(),
+            oidc: Some(self.connections.oidc.clone()),
         };
         download(&row.provider_id, &a, reference, url).await
     }

@@ -359,7 +359,7 @@ export function BankSynthesis({
                       ) : (
                         <Link
                           key={m.id}
-                          to="/memory/$bankId/memories"
+                          to="/registry/memory/$bankId/memories"
                           params={{ bankId: bank.id }}
                           search={{ memory: m.id }}
                           className="underline"
@@ -401,7 +401,7 @@ export function SourceLink({
     const wiki = "wikiName" in s && s.wikiName ? `${s.wikiName}: ` : "";
     return (
       <Link
-        to="/wikis/$wikiId/pages"
+        to="/registry/wikis/$wikiId/pages"
         params={{ wikiId: s.wikiId }}
         search={{ page: s.path }}
         className="underline"
@@ -415,7 +415,7 @@ export function SourceLink({
   if (s.agentId && s.threadId)
     return (
       <Link
-        to="/agent/$agentId/sessions"
+        to="/registry/agent/$agentId/sessions"
         params={{ agentId: s.agentId }}
         search={{ session: s.threadId }}
         className="underline"

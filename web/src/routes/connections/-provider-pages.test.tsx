@@ -60,7 +60,7 @@ async function open(provider: string) {
   const App = pages.app!;
   render(<App />);
   fireEvent.change(await screen.findByLabelText("GitHub account name"), {
-    target: { value: "faroai" },
+    target: { value: "acmeai" },
   });
 }
 
@@ -84,25 +84,25 @@ afterEach(cleanup);
 it("continues a new GitHub App to the manifest post", async () => {
   await open("github");
   fireEvent.click(screen.getByRole("button", { name: "Create an app" }));
-  fireEvent.change(await screen.findByLabelText("App name"), { target: { value: "faroai" } });
+  fireEvent.change(await screen.findByLabelText("App name"), { target: { value: "acmeai" } });
   fireEvent.change(screen.getByLabelText(/App owner/), { target: { value: "organization" } });
   const organization = await screen.findByRole("textbox", { name: "Organization" });
-  fireEvent.change(organization, { target: { value: "faro engineering" } });
+  fireEvent.change(organization, { target: { value: "acme engineering" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   // An invalid value is reported in the page, not left to a browser bubble.
   expect((await screen.findByRole("alert")).textContent).toContain("Organization");
   expect(calls.filter((call) => call.method === "executeProviderAction")).toHaveLength(1);
 
-  fireEvent.change(organization, { target: { value: "faro-engineering" } });
+  fireEvent.change(organization, { target: { value: "acme-engineering" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   const post = await screen.findByRole("button", { name: "Create app with provider" });
   expect(post.closest("form")?.action).toBe(
-    "https://github.com/organizations/faro-engineering/settings/apps/new",
+    "https://github.com/organizations/acme-engineering/settings/apps/new",
   );
   expect(calls.at(-1)).toEqual({
     method: "executeProviderAction",
     action: "continue",
-    fields: { app_name: "faroai", owner_type: "organization", account: "faro-engineering" },
+    fields: { app_name: "acmeai", owner_type: "organization", account: "acme-engineering" },
   });
 });
 

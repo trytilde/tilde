@@ -352,6 +352,66 @@ pub type OwnedWatchThreadResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<ListConnectableProvidersRequestView<'static>>`.
+pub type OwnedListConnectableProvidersRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListConnectableProvidersResponseView<'static>>`.
+pub type OwnedListConnectableProvidersResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<StartConnectionRequestView<'static>>`.
+pub type OwnedStartConnectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<StartConnectionResponseView<'static>>`.
+pub type OwnedStartConnectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListConnectionsRequestView<'static>>`.
+pub type OwnedListConnectionsRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListConnectionsResponseView<'static>>`.
+pub type OwnedListConnectionsResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReconnectConnectionRequestView<'static>>`.
+pub type OwnedReconnectConnectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ReconnectConnectionResponseView<'static>>`.
+pub type OwnedReconnectConnectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteConnectionRequestView<'static>>`.
+pub type OwnedDeleteConnectionRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<DeleteConnectionResponseView<'static>>`.
+pub type OwnedDeleteConnectionResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::tilde::provider::tilde::v1::SearchMessagesResponse,
 >
@@ -1574,6 +1634,216 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersResponse,
+>
+for crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::StartConnectionResponse,
+>
+for crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::StartConnectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ListConnectionsResponse,
+>
+for crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ListConnectionsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ReconnectConnectionResponse,
+>
+for crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::ReconnectConnectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::DeleteConnectionResponse,
+>
+for crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::provider::tilde::v1::DeleteConnectionResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const CHAT_SERVICE_SERVICE_NAME: &str = "tilde.provider.tilde.v1.ChatService";
 /// Static [`Spec`](::connectrpc::Spec) for the `SearchMessages` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -1754,6 +2024,36 @@ pub const CHAT_SERVICE_DOWNLOAD_ATTACHMENT_SPEC: ::connectrpc::Spec = ::connectr
 pub const CHAT_SERVICE_WATCH_THREAD_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.provider.tilde.v1.ChatService/WatchThread",
         ::connectrpc::StreamType::ServerStream,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListConnectableProviders` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_LIST_CONNECTABLE_PROVIDERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.provider.tilde.v1.ChatService/ListConnectableProviders",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `StartConnection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_START_CONNECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.provider.tilde.v1.ChatService/StartConnection",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ListConnections` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_LIST_CONNECTIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.provider.tilde.v1.ChatService/ListConnections",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `ReconnectConnection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_RECONNECT_CONNECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.provider.tilde.v1.ChatService/ReconnectConnection",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `DeleteConnection` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_DELETE_CONNECTION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.provider.tilde.v1.ChatService/DeleteConnection",
+        ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Server trait for ChatService.
@@ -2495,6 +2795,122 @@ pub trait ChatService: Send + Sync + 'static {
                     crate::proto::tilde::provider::tilde::v1::WatchThreadResponse,
                 > + Send + use<Self>,
             >,
+        >,
+    > + Send;
+    /// The caller's own connections: accounts the identity connects for the agent's personal tools
+    /// (`tools.personal`), owned by its chat user. Setup happens on Tilde's setup page.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_connectable_providers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the StartConnection RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn start_connection<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::provider::tilde::v1::StartConnectionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ListConnections RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_connections<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::provider::tilde::v1::ListConnectionsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Handle the ReconnectConnection RPC.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn reconnect_connection<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::provider::tilde::v1::ReconnectConnectionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Disconnects it and erases its credentials; its tools are gone from the next invocation.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_connection<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::provider::tilde::v1::DeleteConnectionResponse,
+            > + Send + use<'a, Self>,
         >,
     > + Send;
 }
@@ -3398,6 +3814,151 @@ impl<S: ChatService> ChatServiceExt for S {
                 }),
             )
             .with_spec(CHAT_SERVICE_WATCH_THREAD_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "ListConnectableProviders",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_connectable_providers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_LIST_CONNECTABLE_PROVIDERS_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "StartConnection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.start_connection(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::provider::tilde::v1::StartConnectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_START_CONNECTION_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "ListConnections",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_connections(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::provider::tilde::v1::ListConnectionsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_LIST_CONNECTIONS_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "ReconnectConnection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.reconnect_connection(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::provider::tilde::v1::ReconnectConnectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_RECONNECT_CONNECTION_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "DeleteConnection",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_connection(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::provider::tilde::v1::DeleteConnectionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_DELETE_CONNECTION_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3630,6 +4191,36 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::server_streaming()
                         .with_spec(CHAT_SERVICE_WATCH_THREAD_SPEC),
+                )
+            }
+            "ListConnectableProviders" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_LIST_CONNECTABLE_PROVIDERS_SPEC),
+                )
+            }
+            "StartConnection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_START_CONNECTION_SPEC),
+                )
+            }
+            "ListConnections" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_LIST_CONNECTIONS_SPEC),
+                )
+            }
+            "ReconnectConnection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_RECONNECT_CONNECTION_SPEC),
+                )
+            }
+            "DeleteConnection" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_DELETE_CONNECTION_SPEC),
                 )
             }
             _ => None,
@@ -4283,6 +4874,116 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::provider::tilde::v1::DownloadAttachmentResponse,
+                        >(format)
+                })
+            }
+            "ListConnectableProviders" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_connectable_providers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersResponse,
+                        >(format)
+                })
+            }
+            "StartConnection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.start_connection(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::provider::tilde::v1::StartConnectionResponse,
+                        >(format)
+                })
+            }
+            "ListConnections" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_connections(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::provider::tilde::v1::ListConnectionsResponse,
+                        >(format)
+                })
+            }
+            "ReconnectConnection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.reconnect_connection(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::provider::tilde::v1::ReconnectConnectionResponse,
+                        >(format)
+                })
+            }
+            "DeleteConnection" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_connection(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::provider::tilde::v1::DeleteConnectionResponse,
                         >(format)
                 })
             }
@@ -5781,6 +6482,231 @@ where
                 &self.transport,
                 &self.config,
                 CHAT_SERVICE_WATCH_THREAD_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListConnectableProviders RPC. Sends a request to /tilde.provider.tilde.v1.ChatService/ListConnectableProviders.
+    pub async fn list_connectable_providers(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_connectable_providers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListConnectableProviders RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_connectable_providers_with_options(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ListConnectableProvidersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectableProvidersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_LIST_CONNECTABLE_PROVIDERS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the StartConnection RPC. Sends a request to /tilde.provider.tilde.v1.ChatService/StartConnection.
+    pub async fn start_connection(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.start_connection_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the StartConnection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn start_connection_with_options(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::StartConnectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::StartConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_START_CONNECTION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListConnections RPC. Sends a request to /tilde.provider.tilde.v1.ChatService/ListConnections.
+    pub async fn list_connections(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_connections_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListConnections RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_connections_with_options(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ListConnectionsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ListConnectionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_LIST_CONNECTIONS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ReconnectConnection RPC. Sends a request to /tilde.provider.tilde.v1.ChatService/ReconnectConnection.
+    pub async fn reconnect_connection(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.reconnect_connection_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ReconnectConnection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn reconnect_connection_with_options(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::ReconnectConnectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::ReconnectConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_RECONNECT_CONNECTION_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteConnection RPC. Sends a request to /tilde.provider.tilde.v1.ChatService/DeleteConnection.
+    pub async fn delete_connection(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_connection_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteConnection RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_connection_with_options(
+        &self,
+        request: crate::proto::tilde::provider::tilde::v1::DeleteConnectionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::provider::tilde::v1::__buffa::view::DeleteConnectionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_DELETE_CONNECTION_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

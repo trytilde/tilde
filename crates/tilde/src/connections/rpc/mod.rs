@@ -20,7 +20,29 @@ pub(super) fn driver_number(driver: m::Driver) -> i32 {
     }
 }
 pub(super) fn provider_wire(provider: m::Provider) -> types::Provider {
+    let egress = matches!(provider.kind, m::ProviderKind::BuiltIn)
+        .then(|| crate::connections::egress::hook(&provider.id))
+        .flatten()
+        .map(|hook| {
+            let egress = hook.definition();
+            types::EgressDescriptor {
+                protocols: egress
+                    .protocols
+                    .iter()
+                    .map(|p| types::EgressProtocolSummary {
+                        protocol: p.name().into(),
+                        upstream: p.upstream().into(),
+                        ..Default::default()
+                    })
+                    .collect(),
+                config_schema_json: egress.config_schema.to_string(),
+                config_version: egress.config_version,
+                setup_queries: egress.setup_queries.iter().map(|q| q.to_string()).collect(),
+                ..Default::default()
+            }
+        });
     types::Provider {
+        egress: egress.into(),
         account_name_label: provider.account_name_label,
         icon_url: provider.icon_url,
         instructions: provider.instructions,
@@ -444,6 +466,7 @@ pub(super) fn capability_wire(cap: m::Capability) -> types::Capability {
         m::Capability::Skills => types::Capability::Skills,
         m::Capability::Tool => types::Capability::Tool,
         m::Capability::Signal => types::Capability::Signal,
+        m::Capability::Egress => types::Capability::Egress,
     }
 }
 pub(super) fn capability_model(
@@ -459,6 +482,8 @@ pub(super) fn capability_model(
         Ok(m::Capability::Tool)
     } else if cap == types::Capability::Signal {
         Ok(m::Capability::Signal)
+    } else if cap == types::Capability::Egress {
+        Ok(m::Capability::Egress)
     } else {
         Err(m::invalid("Unknown capability"))
     }

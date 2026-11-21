@@ -4,6 +4,7 @@
 pub struct RunParams {
     pub p1: uuid::Uuid,
     pub p2: Option<uuid::Uuid>,
+    pub p3: uuid::Uuid,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
@@ -112,7 +113,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT c.id,c.name,c.provider_id,c.type_id,p.tool_host_id,t.mcp_credential IS NOT NULL AS mcp FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) JOIN connection_providers p ON p.provider_id=c.provider_id JOIN chat_users o ON o.id=c.owner_user_id WHERE t.tool_capable AND c.status='ready' AND (o.id=$1 OR (o.root_identity_id IS NOT NULL AND o.root_identity_id=$2)) ORDER BY c.provider_id,c.name,c.id",
+        "SELECT c.id,c.name,c.provider_id,c.type_id,p.tool_host_id,t.mcp_credential IS NOT NULL AS mcp FROM connections c JOIN connection_types t ON(t.provider_id=c.provider_id AND t.type_id=c.type_id) JOIN connection_providers p ON p.provider_id=c.provider_id JOIN chat_users o ON o.id=c.owner_user_id WHERE t.tool_capable AND c.status='ready' AND (o.id=$1 OR (o.root_identity_id IS NOT NULL AND o.root_identity_id=$2) ) AND (c.all_permitted_agents OR EXISTS( SELECT 1 FROM personal_connection_agents d WHERE d.connection_id=c.id AND d.agent_id=$3)) ORDER BY c.provider_id,c.name,c.id",
         None,
     )
 }
@@ -129,10 +130,11 @@ impl RunStmt {
         client: &'c C,
         p1: &'a uuid::Uuid,
         p2: &'a Option<uuid::Uuid>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+        p3: &'a uuid::Uuid,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
         RecordQuery {
             client,
-            params: [p1, p2],
+            params: [p1, p2, p3],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -151,14 +153,14 @@ impl RunStmt {
     }
 }
 impl<'c, 'a, 's, C: GenericClient>
-    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 2>, C>
+    crate::client::async_::Params<'c, 'a, 's, RunParams, RecordQuery<'c, 'a, 's, C, Record, 3>, C>
     for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
         params: &'a RunParams,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
-        self.bind(client, &params.p1, &params.p2)
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+        self.bind(client, &params.p1, &params.p2, &params.p3)
     }
 }

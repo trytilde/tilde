@@ -18,10 +18,11 @@ Tilde's goal is to be the ubiqutous harness for AI agents. We want to focus on a
 - Run Rust tests with `cargo nextest run` (through `scripts/with-postgres.sh` when they need a database), not `cargo test`. `.config/nextest.toml` holds the profiles.
 - Focus on writing tests that test orchestration across boundaries, not unit tests within a single boundary unless there's sufficient complexity. good test = repository -> local postgres, domain interface A -> domain interface B -> domain interface A -> domain interface C.
 - Keep a file CONTEXT.md up to date with definitions of domain models and how they interact
+- Every feature that adds or changes a platform resource or setting (e.g. agents, connections, sandbox blueprints, routines, secrets, users) must check whether the deployment SDK needs support: the declarative spec in `@trytilde/iac` (TypeScript first, Python after) and the server's `Apply` (preflight, plan, upsert by key, explicit `delete: true`). Ship that support in the same change, or say in the PR why it isn't needed. Connections and secrets are referenced by the spec, never created by it; preflight lists each missing one with a setup link.
 - Never assume backwards compatability, always ask first. if not eneded, assume no consumers. drop fields from interfaces and contracts or sql tables
 - keep docs folder clean, only add docs to the folder when asked. if required to share conext to subagents, then delete them after. document in code in the relevant files.
 
-- Licensing: the repository is AGPL-3.0-only; `sdk/` (except `sdk/ts/packages/cli`, `sdk/py/packages/tilde-cli` and MIT `agent-avatar`), `proto/` and `crates/tilde-contracts` are Apache-2.0 so applications can embed them. New SDK packages get the Apache `LICENSE` and `"license": "Apache-2.0"`; anything ported from Tilde Cloud keeps these licences.
+- Licensing (open-source Tilde): that repository is AGPL-3.0-only; `sdk/` (except `sdk/ts/packages/cli`, `sdk/py/packages/tilde-cli` and MIT `agent-avatar`), `proto/` and `crates/tilde-contracts` are Apache-2.0 so applications can embed them. New SDK packages get the Apache `LICENSE` and `"license": "Apache-2.0"`; anything ported from Tilde Cloud keeps these licences.
 
 # Don'ts
 

@@ -156,6 +156,12 @@ pub async fn thread(
         }
         "CreateThread" | "CreateUser" | "ListThreads" | "GetIdentity" | "ListAgents"
         | "ListSessions" => return Ok(None),
+        // The identity's own connections: no thread, served where its chat user lives.
+        "ListConnectableProviders"
+        | "StartConnection"
+        | "ListConnections"
+        | "ReconnectConnection"
+        | "DeleteConnection" => return Ok(None),
         _ => return Err(ChatError::Invalid("Unknown ingress method".into())),
     };
     Ok(Some(thread))

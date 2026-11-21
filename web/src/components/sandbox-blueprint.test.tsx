@@ -91,7 +91,7 @@ it("saves only what changed and warns that a new reuse mode terminates sandboxes
     true,
   );
   expect((await screen.findByRole("link", { name: "Ada" })).getAttribute("href")).toBe(
-    "/agent/agent-1/capabilities",
+    "/registry/agent/agent-1/capabilities",
   );
 });
 

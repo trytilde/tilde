@@ -114,29 +114,29 @@ test("refs and routines refuse what the server would", () => {
 
 test("people: a team's users and groups, and an agent's own with its grants", () => {
   const team = defineTeam({
-    team: "faro",
+    team: "acme",
     users: [
-      user({ email: "ada@faro.test", name: "Ada", login: { role: "admin" } }),
-      user({ email: "old@faro.test", delete: true }),
+      user({ email: "ada@acme.test", name: "Ada", login: { role: "admin" } }),
+      user({ email: "old@acme.test", delete: true }),
     ],
     groups: [
-      group({ name: "eng", members: ["ada@faro.test", { email: "old@faro.test", delete: true }] }),
+      group({ name: "eng", members: ["ada@acme.test", { email: "old@acme.test", delete: true }] }),
     ],
   });
   assert.equal(team[SPEC], "team");
-  assert.equal(team.team, "faro");
+  assert.equal(team.team, "acme");
   const [ada, old] = team.users.map((u) => fromJson(UserSpecSchema, u));
   assert.equal(ada.team.role, 2, "login: { role } sets the team role");
   assert.deepEqual(
     [ada.email, ada.name, ada.login, old.delete],
-    ["ada@faro.test", "Ada", true, true],
+    ["ada@acme.test", "Ada", true, true],
   );
   const eng = fromJson(GroupSpecSchema, team.groups[0]);
   assert.deepEqual(
     eng.members.map((m) => [m.email, m.delete]),
     [
-      ["ada@faro.test", false],
-      ["old@faro.test", true],
+      ["ada@acme.test", false],
+      ["old@acme.test", true],
     ],
   );
   const agent = fromJson(
@@ -145,16 +145,16 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
       key: "triage",
       name: "Triage",
       users: [
-        user({ email: "bob@faro.test", name: "Bob", login: true }),
-        user({ email: "eve@faro.test", team: { delete: true } }),
+        user({ email: "bob@acme.test", name: "Bob", login: true }),
+        user({ email: "eve@acme.test", team: { delete: true } }),
       ],
       access: [
         grant(group("eng"), "ownership"),
-        grant(user("ada@faro.test"), "visibility", { delete: true }),
+        grant(user("ada@acme.test"), "visibility", { delete: true }),
       ],
     }).json,
   );
-  assert.equal(agent.users[0].email, "bob@faro.test");
+  assert.equal(agent.users[0].email, "bob@acme.test");
   assert.equal(agent.users[0].login, true);
   assert.equal(agent.users[0].team, undefined, "login: true sends no role, keeping a member's");
   assert.equal(agent.users[1].team.delete, true);
@@ -162,7 +162,7 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
     agent.access.map((g) => [g.principal.case, g.principal.value, g.plane, g.delete]),
     [
       ["group", "eng", 2, false],
-      ["user", "ada@faro.test", 1, true],
+      ["user", "ada@acme.test", 1, true],
     ],
   );
   assert.throws(() => user("not-an-email"), /not an email/);
@@ -170,8 +170,8 @@ test("people: a team's users and groups, and an agent's own with its grants", ()
 
 test("a project carries its team and agents", () => {
   const a = defineAgent({ key: "a", name: "A" });
-  const project = defineProject({ team: "faro", agents: [a] });
+  const project = defineProject({ team: "acme", agents: [a] });
   assert.equal(project[SPEC], "project");
-  assert.equal(project.team, "faro");
+  assert.equal(project.team, "acme");
   assert.equal(project.agents[0], a);
 });

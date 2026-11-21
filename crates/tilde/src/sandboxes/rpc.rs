@@ -57,6 +57,9 @@ impl Drop for Frame {
             if let Some(token) = &mut registered.session_token {
                 token.zeroize();
             }
+            if let Some(token) = &mut registered.egress_token {
+                token.zeroize();
+            }
             for var in &mut registered.env {
                 var.value.zeroize();
             }
@@ -132,6 +135,7 @@ impl Runtime {
                         call_id: call,
                         agent: session.agent_id,
                         thread: session.thread_id,
+                        run: None,
                         sandbox: Some(session.id),
                     },
                     input,
@@ -173,26 +177,38 @@ impl SandboxService for Runtime {
         let presented = digest(bearer(&ctx)?);
         let session = crate::connections::model::random_secret();
         let session_hash = digest(session.expose_secret());
+        // Issued with the session; shells keep it in their environment for the sandbox's life.
+        let egress = crate::connections::model::random_secret();
         let client = pool.get().await.map_err(Error::from)?;
-        let (sandbox, blueprint, session_hash, issued) =
-            match db::sandbox_enroll_opt(&client, &presented, &session_hash)
-                .await
-                .map_err(Error::from)?
-            {
-                Some(row) => (row.id, row.blueprint_id, session_hash, Some(session)),
-                None => {
-                    let row = db::sandbox_authenticate_opt(&client, &presented)
-                        .await
-                        .map_err(Error::from)?
-                        .ok_or_else(|| ConnectError::unauthenticated("Invalid sandbox token"))?;
-                    db::sandbox_connected_execute(&client, row.id)
-                        .await
-                        .map_err(Error::from)?;
-                    (row.id, row.blueprint_id, presented, None)
-                }
-            };
+        let (sandbox, blueprint, session_hash, issued) = match db::sandbox_enroll_opt(
+            &client,
+            &presented,
+            &session_hash,
+            &digest(egress.expose_secret()),
+        )
+        .await
+        .map_err(Error::from)?
+        {
+            Some(row) => (
+                row.id,
+                row.blueprint_id,
+                session_hash,
+                Some((session, egress)),
+            ),
+            None => {
+                let row = db::sandbox_authenticate_opt(&client, &presented)
+                    .await
+                    .map_err(Error::from)?
+                    .ok_or_else(|| ConnectError::unauthenticated("Invalid sandbox token"))?;
+                db::sandbox_connected_execute(&client, row.id)
+                    .await
+                    .map_err(Error::from)?;
+                (row.id, row.blueprint_id, presented, None)
+            }
+        };
         drop(client);
         let env = sandboxes.env(blueprint).await?;
+        let wiring = sandboxes.egress_wiring(blueprint).await?;
         let mut changes = sandboxes
             .calls
             .subscribe(&pool, NOTIFY_CHANNEL)
@@ -201,7 +217,30 @@ impl SandboxService for Runtime {
         changes.borrow_and_update();
         let registered = wire::SandboxRegistered {
             sandbox_id: sandbox.to_string(),
-            session_token: issued.map(|t| t.expose_secret().to_owned()),
+            session_token: issued
+                .as_ref()
+                .map(|(session, _)| session.expose_secret().to_owned()),
+            egress_token: issued
+                .as_ref()
+                .map(|(_, egress)| egress.expose_secret().to_owned()),
+            egress_env: wiring
+                .env
+                .into_iter()
+                .map(|(name, value)| wire::EnvVar {
+                    name,
+                    value,
+                    ..Default::default()
+                })
+                .collect(),
+            git: wiring
+                .git
+                .into_iter()
+                .map(|(url, instead_of)| wire::GitRewrite {
+                    url,
+                    instead_of,
+                    ..Default::default()
+                })
+                .collect(),
             env: env
                 .into_iter()
                 .map(|(name, value)| wire::EnvVar {
@@ -398,7 +437,9 @@ fn span(
 fn id(value: &str) -> Result<Uuid, Error> {
     Uuid::parse_str(value).map_err(|_| Error::Invalid("Invalid UUID".into()))
 }
-fn reuse_text(reuse: buffa::EnumValue<management::SandboxReuse>) -> Result<&'static str, Error> {
+pub(super) fn reuse_text(
+    reuse: buffa::EnumValue<management::SandboxReuse>,
+) -> Result<&'static str, Error> {
     use management::SandboxReuse as R;
     match reuse.as_known() {
         Some(R::Unspecified | R::Thread) => Ok("thread"),
@@ -435,6 +476,18 @@ fn blueprint_wire(b: super::Blueprint) -> management::SandboxBlueprint {
         reuse: reuse_wire(&b.reuse).into(),
         env_names: b.env_names,
         agent_ids: b.agent_ids.iter().map(Uuid::to_string).collect(),
+        egress: b
+            .egress
+            .into_iter()
+            .map(|g| management::BlueprintEgress {
+                slug: g.slug,
+                connection_id: g.connection_id.to_string(),
+                config_json: g.config.to_string(),
+                config_version: g.config_version,
+                enabled: g.enabled,
+                ..Default::default()
+            })
+            .collect(),
         timings: management::SandboxTimings {
             sleep_after_seconds: b.timings.sleep_after,
             terminate_after_seconds: b.timings.terminate_after,
@@ -602,6 +655,43 @@ impl SandboxBlueprintService for Management {
         let r = request.to_owned_message();
         let blueprint = self.0.delete_env(id(&r.blueprint_id)?, &r.name).await?;
         Response::ok(management::DeleteSandboxEnvVarResponse {
+            blueprint: blueprint_wire(blueprint).into(),
+            ..Default::default()
+        })
+    }
+    async fn set_blueprint_egress<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, management::SetBlueprintEgressRequest>,
+    ) -> ServiceResult<impl Encodable<management::SetBlueprintEgressResponse> + Send + use<'a>>
+    {
+        let r = request.to_owned_message();
+        let config: Value = serde_json::from_str(&r.config_json)
+            .map_err(|_| Error::Invalid("config_json is not JSON".into()))?;
+        let blueprint = self
+            .0
+            .set_egress(
+                id(&r.blueprint_id)?,
+                &r.slug,
+                id(&r.connection_id)?,
+                &config,
+                r.enabled,
+            )
+            .await?;
+        Response::ok(management::SetBlueprintEgressResponse {
+            blueprint: blueprint_wire(blueprint).into(),
+            ..Default::default()
+        })
+    }
+    async fn delete_blueprint_egress<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, management::DeleteBlueprintEgressRequest>,
+    ) -> ServiceResult<impl Encodable<management::DeleteBlueprintEgressResponse> + Send + use<'a>>
+    {
+        let r = request.to_owned_message();
+        let blueprint = self.0.delete_egress(id(&r.blueprint_id)?, &r.slug).await?;
+        Response::ok(management::DeleteBlueprintEgressResponse {
             blueprint: blueprint_wire(blueprint).into(),
             ..Default::default()
         })

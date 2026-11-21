@@ -23,7 +23,9 @@
     "@tanstack/react-router": "^1.170.35",
     "@tanstack/react-table": "^9.2.4",
     "@tanstack/react-virtual": "^3.14.13",
+    "@tiptap/extension-list": "3.31.3",
     "@tiptap/extension-placeholder": "^3.31.3",
+    "@tiptap/extension-table": "3.31.3",
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
@@ -58,6 +60,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.1",
     "jsdom": "^30.0.1",
+    "playwright": "1.64.0",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "vitest": "^5.0.0"

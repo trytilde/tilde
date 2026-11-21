@@ -3,22 +3,30 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub name: String,
-    pub encrypted_value: Vec<u8>,
+    pub encrypted_value: Option<Vec<u8>>,
+    pub secret_id: Option<uuid::Uuid>,
+    pub secret_value: Option<Vec<u8>>,
 }
 pub struct RecordBorrowed<'a> {
     pub name: &'a str,
-    pub encrypted_value: &'a [u8],
+    pub encrypted_value: Option<&'a [u8]>,
+    pub secret_id: Option<uuid::Uuid>,
+    pub secret_value: Option<&'a [u8]>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
         RecordBorrowed {
             name,
             encrypted_value,
+            secret_id,
+            secret_value,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
             name: name.into(),
-            encrypted_value: encrypted_value.into(),
+            encrypted_value: encrypted_value.map(|v| v.into()),
+            secret_id,
+            secret_value: secret_value.map(|v| v.into()),
         }
     }
 }
@@ -91,7 +99,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT name,encrypted_value FROM sandbox_blueprint_env WHERE blueprint_id=$1 ORDER BY name",
+        "SELECT e.name,e.encrypted_value,e.secret_id,s.encrypted_value AS secret_value FROM sandbox_blueprint_env e LEFT JOIN secrets s ON s.id=e.secret_id WHERE e.blueprint_id=$1 ORDER BY e.name",
         None,
     )
 }
@@ -118,6 +126,8 @@ impl RunStmt {
                     Ok(RecordBorrowed {
                         name: row.try_get(0)?,
                         encrypted_value: row.try_get(1)?,
+                        secret_id: row.try_get(2)?,
+                        secret_value: row.try_get(3)?,
                     })
                 },
             mapper: |it| Record::from(it),

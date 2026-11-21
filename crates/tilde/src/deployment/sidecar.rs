@@ -43,6 +43,8 @@ pub struct Options {
     pub idle_after: Duration,
     /// Approximate bytes of cached conversation state per agent before early eviction.
     pub cache_bytes: usize,
+    /// Provider endpoint overrides for isolated tests; production sidecars use none.
+    pub endpoints: crate::connections::catalog::Endpoints,
 }
 impl Options {
     pub fn from_env() -> Result<Self> {
@@ -73,6 +75,7 @@ impl Options {
             tokens,
             runtime_listen: socket("ENGINE_SIDECAR_RUNTIME_LISTEN", "127.0.0.1:8081")?,
             listen: socket("ENGINE_SIDECAR_LISTEN", "0.0.0.0:8082")?,
+            endpoints: Default::default(),
             public_url: std::env::var("ENGINE_SIDECAR_PUBLIC_URL")
                 .ok()
                 .filter(|s| !s.is_empty()),
@@ -219,6 +222,7 @@ pub async fn start(options: Options) -> Result<Sidecar> {
                 callback_url: format!("http://127.0.0.1:{runtime_port}{prefix}"),
                 idle_after: options.idle_after,
                 cache_bytes: options.cache_bytes,
+                endpoints: options.endpoints.clone(),
             },
         ));
         runtime.configure(configuration);

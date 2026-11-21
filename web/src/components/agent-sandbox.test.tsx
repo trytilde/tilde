@@ -67,7 +67,7 @@ it("gives an agent without a sandbox one at once", async () => {
   );
   screen.getByText(/Shared by all agents: Every agent using this blueprint shares one sandbox\./);
   expect(screen.getByRole("link", { name: "Open Shared" }).getAttribute("href")).toBe(
-    "/sandboxes/bp-2/settings",
+    "/registry/sandboxes/bp-2/settings",
   );
 });
 

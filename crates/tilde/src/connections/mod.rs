@@ -9,6 +9,8 @@ pub mod catalog;
 pub mod categories;
 pub mod db;
 pub mod dynamic_client;
+pub mod egress;
+pub mod mints;
 pub mod model;
 pub mod oauth;
 pub mod rpc;

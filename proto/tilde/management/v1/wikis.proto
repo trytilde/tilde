@@ -52,11 +52,17 @@ message Wiki {
   google.protobuf.Timestamp created_at = 7;
 }
 message WikiLink { string agent_id = 1; WikiAccess access = 2; }
-message ListWikisRequest { optional string search = 1; }
+message ListWikisRequest {
+  optional string search = 1;
+}
 message ListWikisResponse { repeated Wiki wikis = 1; }
 message GetWikiRequest { string id = 1; }
 message GetWikiResponse { Wiki wiki = 1; }
-message CreateWikiRequest { string name = 1; string description = 2; optional string agent_id = 3; }
+message CreateWikiRequest {
+  string name = 1;
+  string description = 2;
+  optional string agent_id = 3;
+}
 message CreateWikiResponse { Wiki wiki = 1; }
 message UpdateWikiRequest { string id = 1; optional string name = 2; optional string description = 3; }
 message UpdateWikiResponse { Wiki wiki = 1; }

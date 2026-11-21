@@ -161,11 +161,12 @@ impl IdentityVerificationService for Public {
     ) -> ServiceResult<
         impl connectrpc::Encodable<setup::GetIdentityVerificationResponse> + Send + use<'a>,
     > {
-        let verification = self
+        let verification_id = id(request.id)?;
+        let call = self
             .0
             .service
-            .verification(id(request.id)?, request.identity_verification_token)
-            .await?;
+            .verification(verification_id, request.identity_verification_token);
+        let verification = call.await?;
         Response::ok(setup::GetIdentityVerificationResponse {
             verification: verification.into(),
             ..Default::default()
@@ -178,11 +179,12 @@ impl IdentityVerificationService for Public {
     ) -> ServiceResult<
         impl connectrpc::Encodable<setup::ApproveIdentityVerificationResponse> + Send + use<'a>,
     > {
-        let verification = self
+        let verification_id = id(request.id)?;
+        let call = self
             .0
             .service
-            .approve(id(request.id)?, request.identity_verification_token)
-            .await?;
+            .approve(verification_id, request.identity_verification_token);
+        let verification = call.await?;
         Response::ok(setup::ApproveIdentityVerificationResponse {
             verification: verification.into(),
             ..Default::default()

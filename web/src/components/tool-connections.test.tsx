@@ -86,7 +86,7 @@ function renderPage() {
   const root = createRootRoute({ component: () => <Outlet /> });
   const catalog = createRoute({
     getParentRoute: () => root,
-    path: "/tools/catalog",
+    path: "/registry/tools/catalog",
     component: ToolsPage,
   });
   const panel = createRoute({
@@ -96,12 +96,12 @@ function renderPage() {
   });
   const detail = createRoute({
     getParentRoute: () => root,
-    path: "/tools/$toolId",
+    path: "/registry/tools/$toolId",
     component: () => <p>Detail</p>,
   });
   const router = createRouter({
     routeTree: root.addChildren([catalog.addChildren([panel]), detail]),
-    history: createMemoryHistory({ initialEntries: ["/tools/catalog"] }),
+    history: createMemoryHistory({ initialEntries: ["/registry/tools/catalog"] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -189,7 +189,7 @@ it("opens a provider's panel at its own path with its supported auth and every t
   const router = renderPage();
   fireEvent.click(await screen.findByRole("button", { name: /^Tavily/ }));
   const panel = await screen.findByRole("dialog", { name: "Tavily" });
-  expect(router.state.location.pathname).toBe("/tools/catalog/tavily");
+  expect(router.state.location.pathname).toBe("/registry/tools/catalog/tavily");
   // Accounts are managed from Connections, not the catalog.
   expect(within(panel).queryByRole("region", { name: "Accounts" })).toBeNull();
   expect(within(panel).getByText("Supported auth")).toBeTruthy();
@@ -210,7 +210,7 @@ it("opens a provider's panel at its own path with its supported auth and every t
     expect.anything(),
   );
   fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/tools/catalog"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry/tools/catalog"));
 });
 
 async function openSetup(provider: string) {

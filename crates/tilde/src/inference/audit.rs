@@ -534,7 +534,8 @@ pub struct Audit {
 impl Audit {
     pub fn start(sink: Sink) -> Self {
         let (sender, receiver) = mpsc::channel(4096);
-        tokio::spawn(run(sink, receiver));
+        let worker = run(sink, receiver);
+        tokio::spawn(worker);
         Self { sender }
     }
     pub(crate) fn record(&self, raw: Raw) {

@@ -18,16 +18,22 @@ pub fn definition() -> Provider {
                 id: "github_app".into(),
                 name: "GitHub App".into(),
                 credential_source: CredentialSource::Custom,
-                capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
+                capabilities: vec![
+                    Capability::Channel,
+                    Capability::Tool,
+                    Capability::Signal,
+                    Capability::Egress,
+                ],
             },
             ConnectionType {
                 mcp: None,
                 id: "pat".into(),
                 name: "Personal access token".into(),
                 credential_source: CredentialSource::Static {
-                    schema: serde_json::json!({"type":"object","properties":{"token":{"type":"string","title":"Personal access token","description":"A fine-grained or classic token from GitHub Developer settings, e.g. github_pat_...","minLength":1,"writeOnly":true}},"required":["token"],"additionalProperties":false}),
+                    schema: serde_json::json!({"type":"object","properties":{"token":{"type":"string","title":"Personal access token","description":"A fine-grained or classic token from GitHub Developer settings, e.g. github_pat_...","minLength":1,"writeOnly":true},"webhook_secret":{"type":"string","title":"Webhook secret","description":"Optional. To receive repository events as signals, add a repository or organization webhook with this connection's webhook URL (content type application/json) and paste its secret here.","writeOnly":true}},"required":["token"],"additionalProperties":false}),
                 },
-                capabilities: vec![Capability::Tool],
+                // Repository or organization webhooks signed with the connection's secret.
+                capabilities: vec![Capability::Tool, Capability::Signal, Capability::Egress],
             },
             ConnectionType {
                 mcp: None,
@@ -38,7 +44,7 @@ pub fn definition() -> Provider {
                     configuration: github_oauth().into(),
                     additional_schema: None,
                 },
-                capabilities: vec![Capability::Tool],
+                capabilities: vec![Capability::Tool, Capability::Egress],
             },
         ],
     }
@@ -427,4 +433,87 @@ fn app_assertion(values: &Values) -> Result<SecretString, Error> {
     .map_err(|_| invalid("Unable to sign provider assertion"))
 }
 
+pub mod egress;
 mod manifest;
+
+/// An installation token limited to `scope`: its resources are `owner/repo` names of the
+/// installation's account and its permissions GitHub App permissions (`contents` = `write`).
+/// GitHub refuses permissions the app was not granted and repositories it cannot reach.
+pub(crate) async fn installation_token(
+    access: &crate::chat::providers::Access,
+    scope: &crate::connections::mints::MintScope,
+) -> crate::chat::tools::ToolResult<crate::connections::mints::Minted> {
+    let values = &access.values;
+    let installation = value(values, "installation_id")?;
+    installation
+        .parse::<u64>()
+        .map_err(|_| invalid("Invalid GitHub installation ID"))?;
+    let api = access.endpoints.get("github_api", "https://api.github.com");
+    let jwt = app_assertion(values)?;
+    let mut repositories = Vec::with_capacity(scope.resources.len());
+    if !scope.resources.is_empty() {
+        let info = access
+            .http
+            .json(
+                access
+                    .http
+                    .client
+                    .get(url(api, &["app", "installations", installation])?)
+                    .bearer_auth(jwt.expose_secret())
+                    .header("accept", "application/vnd.github+json"),
+            )
+            .await?;
+        let account = info.text("/account/login")?;
+        for resource in &scope.resources {
+            // Names in the token request belong to the installation's account; another owner's
+            // repository of the same name must not be confused with it.
+            match resource.split_once('/') {
+                Some((owner, name)) if owner.eq_ignore_ascii_case(account) => {
+                    repositories.push(name.to_owned())
+                }
+                _ => {
+                    return Err(connectrpc::ConnectError::permission_denied(format!(
+                        "{resource} is not a repository of the installation's account {account}"
+                    )));
+                }
+            }
+        }
+    }
+    let mut body = serde_json::Map::new();
+    if !repositories.is_empty() {
+        body.insert("repositories".into(), repositories.into());
+    }
+    if !scope.permissions.is_empty() {
+        body.insert(
+            "permissions".into(),
+            scope
+                .permissions
+                .iter()
+                .map(|(name, level)| (name.clone(), serde_json::Value::from(level.as_str())))
+                .collect::<serde_json::Map<_, _>>()
+                .into(),
+        );
+    }
+    let token = access
+        .http
+        .json(
+            access
+                .http
+                .client
+                .post(url(
+                    api,
+                    &["app", "installations", installation, "access_tokens"],
+                )?)
+                .bearer_auth(jwt.expose_secret())
+                .header("accept", "application/vnd.github+json")
+                .json(&body),
+        )
+        .await?;
+    let expires_at = DateTime::parse_from_rfc3339(token.text("/expires_at")?)
+        .map_err(|_| invalid("Invalid GitHub token expiry"))?
+        .with_timezone(&Utc);
+    Ok(crate::connections::mints::Minted::bearer(
+        token.text("/token")?,
+        Some(expires_at),
+    ))
+}

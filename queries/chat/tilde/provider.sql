@@ -5,6 +5,7 @@
 --: ReadState()
 --: Session()
 --: Queue()
+--: UserConnection()
 
 --! attest_identity (user_id)
 UPDATE chat_users SET attested_at=NOW() WHERE id=:user_id AND attested_at IS NULL;
@@ -51,3 +52,9 @@ SELECT activity_sequence FROM chat_threads WHERE id=:thread;
 SELECT id FROM chat_messages WHERE thread_id=:thread AND text ILIKE '%' || :query || '%' AND (:after::UUID IS NULL OR id>:after) ORDER BY id LIMIT :limit;
 --! cancel_message (thread, id)
 UPDATE chat_messages m SET status='aborted' WHERE m.thread_id=:thread AND m.id=:id AND EXISTS(SELECT 1 FROM chat_participants p WHERE p.id=m.participant_id AND p.user_id IS NOT NULL);
+--! user_connections (user_id) : UserConnection
+-- The connections a chat user owns (personal tool federation), disconnected ones left out.
+SELECT c.id,c.provider_id,c.name,c.status FROM connections c
+WHERE c.owner_user_id=:user_id AND c.status<>'disconnected' ORDER BY c.created_at,c.id;
+--! agent_capabilities (agent)
+SELECT capabilities FROM agents WHERE id=:agent;

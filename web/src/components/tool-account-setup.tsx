@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ExternalLinkIcon, KeyRoundIcon, ShieldCheckIcon, UserRoundIcon } from "lucide-react";
 import {
+  Capability,
   ClientAuthentication,
   OAuthClient,
   OAuthGrant,
@@ -19,7 +20,6 @@ import {
   dialogTitle,
   message,
   setupTitle,
-  toolMethods,
 } from "./tool-catalog";
 import type { Brokering as FrameSetup } from "./connection-setup-dialog";
 import { Button } from "@/components/ui/button";
@@ -95,9 +95,11 @@ export function credentialFields(type: ConnectionType): CredentialField[] | unde
     };
   } else return undefined;
   const required = new Set(schema.required ?? []);
-  // Schemas arrive with their keys sorted; required fields lead so the essential ones come first.
+  // Required fields lead so the essential ones come first, then by key: schemas keep the order
+  // they were stored in (Postgres jsonb orders keys by length), which reads as arbitrary.
   const entries = Object.entries(schema.properties ?? {}).sort(
-    ([left], [right]) => Number(required.has(right)) - Number(required.has(left)),
+    ([left], [right]) =>
+      Number(required.has(right)) - Number(required.has(left)) || left.localeCompare(right),
   );
   return entries.map(([key, property]) => ({
     key,
@@ -140,6 +142,7 @@ const helper = "text-[11px] leading-4 text-foreground/40";
  */
 export function AccountSetupDialog({
   provider,
+  capability = Capability.TOOL,
   initialTypeId,
   existing,
   iconId,
@@ -149,6 +152,8 @@ export function AccountSetupDialog({
   onClose,
 }: {
   provider: Provider;
+  /** The capability the methods offered must have: tools unless set (inference, say). */
+  capability?: Capability;
   /** The auth method chosen before the dialog opened. */
   initialTypeId?: string;
   /** An account to reconnect rather than a new one. */
@@ -160,7 +165,13 @@ export function AccountSetupDialog({
   onCustom: (setup: FrameSetup, connectionId: string) => void;
   onClose: () => void;
 }) {
-  const methods = toolMethods(provider);
+  // An account being reconnected (or a chosen method) keeps its own method, whatever it is for.
+  const methods = provider.connectionTypes.filter(
+    (type) =>
+      type.capabilities.includes(capability) ||
+      type.id === existing?.typeId ||
+      type.id === initialTypeId,
+  );
   const form = useForm<Values>({
     defaultValues: {
       typeId:

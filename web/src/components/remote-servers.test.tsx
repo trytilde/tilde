@@ -29,17 +29,17 @@ function renderPage() {
   const root = createRootRoute({ component: () => <Outlet /> });
   const page = createRoute({
     getParentRoute: () => root,
-    path: "/tools/remote-servers",
+    path: "/registry/tools/remote-servers",
     component: RemoteServersPage,
   });
   const detail = createRoute({
     getParentRoute: () => root,
-    path: "/tools/$toolId",
+    path: "/registry/tools/$toolId",
     component: () => <p>Detail</p>,
   });
   const router = createRouter({
     routeTree: root.addChildren([page, detail]),
-    history: createMemoryHistory({ initialEntries: ["/tools/remote-servers"] }),
+    history: createMemoryHistory({ initialEntries: ["/registry/tools/remote-servers"] }),
   });
   return render(<RouterProvider router={router} />);
 }
@@ -214,7 +214,7 @@ it("opens a server as a catalog entry: its provider, or itself", async () => {
   let dialog = await screen.findByRole("dialog", { name: "Acme CRM" });
   expect(within(dialog).getByRole("button", { name: "Add account" })).toBeTruthy();
   expect(within(dialog).getByRole("link", { name: "Manage server" }).getAttribute("href")).toBe(
-    "/tools/h1?kind=host",
+    "/registry/tools/h1?kind=host",
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -225,6 +225,6 @@ it("opens a server as a catalog entry: its provider, or itself", async () => {
   expect(within(dialog).queryByRole("button", { name: /Add (new )?account/ })).toBeNull();
   expect(await within(dialog).findByText("restart")).toBeTruthy();
   expect(within(dialog).getByRole("link", { name: "Manage server" }).getAttribute("href")).toBe(
-    "/tools/h2?kind=host",
+    "/registry/tools/h2?kind=host",
   );
 });

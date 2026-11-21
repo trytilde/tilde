@@ -17,9 +17,8 @@ struct Public {
     chat: Chat,
 }
 pub fn router(deployments: Deployments, chat: Chat) -> axum::Router {
-    axum::Router::new()
-        .route("/agents/{agent}/{*path}", axum::routing::any(receive))
-        .with_state(Public { deployments, chat })
+    let router = axum::Router::new().route("/agents/{agent}/{*path}", axum::routing::any(receive));
+    router.with_state(Public { deployments, chat })
 }
 async fn receive(
     State(state): State<Public>,
@@ -37,6 +36,9 @@ async fn process(
     path: String,
     request: Request,
 ) -> Result<Response, Error> {
+    if crate::local::serves(&path) {
+        return crate::local::serve(&state.deployments, &state.chat, agent, &path, request).await;
+    }
     if !path.starts_with("tilde.provider.tilde.v1.ChatService/") {
         return Ok(http::StatusCode::NOT_FOUND.into_response());
     }

@@ -5,7 +5,7 @@ import "google/protobuf/timestamp.proto";
 // Skills: the agent receives the skills linked to the connection. Every connection offers it.
 // Tool: the connection serves tools; granted by adding it to an agent as a tool source.
 // Signal: the connection's webhooks emit typed events that routines can trigger on.
-enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; CAPABILITY_SKILLS = 3; CAPABILITY_TOOL = 4; CAPABILITY_SIGNAL = 5; }
+enum Capability { CAPABILITY_UNSPECIFIED = 0; CAPABILITY_CHANNEL = 1; CAPABILITY_INFERENCE = 2; CAPABILITY_SKILLS = 3; CAPABILITY_TOOL = 4; CAPABILITY_SIGNAL = 5; CAPABILITY_EGRESS = 6; }
 
 enum ClientAuthentication { CLIENT_AUTHENTICATION_UNSPECIFIED = 0; CLIENT_AUTHENTICATION_BODY = 1; CLIENT_AUTHENTICATION_BASIC = 2; CLIENT_AUTHENTICATION_NONE = 3; }
 
@@ -38,6 +38,10 @@ message OAuthConfiguration {
 enum OAuthClient {
   O_AUTH_CLIENT_UNSPECIFIED = 0;
   O_AUTH_CLIENT_FORM = 1;
+
+  // 2: taken by Tilde Cloud; never reuse.
+  reserved 2;
+
   O_AUTH_CLIENT_DYNAMIC = 3;
 }
 
@@ -80,7 +84,24 @@ message Provider {
  string id = 1; string name = 3; repeated ConnectionType connection_types = 5; repeated string categories = 10;
  reserved 2,4,6;
  oneof kind { BuiltInProvider built_in = 7; ConfiguredProvider configured = 8; RemoteProvider remote = 9; }
+
+ // 14: taken by Tilde Cloud; never reuse.
+ reserved 14;
+
+ // What sandboxes may reach through the gateway with its egress-capable connections.
+ optional EgressDescriptor egress = 15;
 }
+
+// A provider's egress: its protocols, and the schema of a grant's config. A property with
+// `x-tilde-options: "<query>"` takes its choices from that setup query (RunSetupQuery).
+message EgressDescriptor {
+  repeated EgressProtocolSummary protocols = 1;
+  string config_schema_json = 2;
+  uint32 config_version = 3;
+  repeated string setup_queries = 4;
+}
+// `protocol` is http or git; `upstream` the fixed origin requests go to.
+message EgressProtocolSummary { string protocol = 1; string upstream = 2; }
 
 message BuiltInProvider {}
 

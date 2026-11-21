@@ -16,6 +16,9 @@ pub enum Capability {
     Tool,
     /// Webhook events routines trigger on; a routine naming the connection is its use.
     Signal,
+    /// Sandboxes reach the provider's upstream through the gateway with the connection's
+    /// credential (`connections::egress`); a sandbox blueprint's egress grant is its use.
+    Egress,
 }
 impl Capability {
     pub fn as_str(self) -> &'static str {
@@ -25,6 +28,7 @@ impl Capability {
             Self::Skills => "skills",
             Self::Tool => "tool",
             Self::Signal => "signal",
+            Self::Egress => "egress",
         }
     }
 }
@@ -414,6 +418,8 @@ impl Connection {
             Capability::Skills => true,
             Capability::Tool => self.tool_capable,
             Capability::Signal => self.signal_capable,
+            // Granted by sandbox blueprints (checked against the catalog), never assigned.
+            Capability::Egress => false,
         }
     }
 }
@@ -619,11 +625,16 @@ impl ConnectionType {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        // A type is at most one of channel or inference; it may also ship tools and signals.
+        // A type is at most one of channel or inference; it may also ship tools, signals and egress.
         let exclusive = self
             .capabilities
             .iter()
-            .filter(|c| !matches!(c, Capability::Tool | Capability::Signal))
+            .filter(|c| {
+                !matches!(
+                    c,
+                    Capability::Tool | Capability::Signal | Capability::Egress
+                )
+            })
             .count();
         let repeated = (1..self.capabilities.len())
             .any(|i| self.capabilities[..i].contains(&self.capabilities[i]));

@@ -47,6 +47,7 @@ pub mod mcp_health_history;
 pub mod mcp_health_lock;
 pub mod mcp_health_sample;
 pub mod mcp_servers;
+pub mod personal_call;
 pub mod personal_connections;
 pub mod personal_owner_set;
 pub mod provider_mcp_tools;

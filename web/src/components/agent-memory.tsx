@@ -147,7 +147,7 @@ export function AgentMemory({
         </div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           The agent recalls from its memory banks and, where it may write, remembers what it learns.{" "}
-          <Link to="/memory" className="text-foreground underline">
+          <Link to="/registry/memory" className="text-foreground underline">
             All memory banks
           </Link>
         </p>
@@ -156,7 +156,11 @@ export function AgentMemory({
         <Label htmlFor="agent-own-bank">Its own bank</Label>
         {own ? (
           <span className="text-sm">
-            <Link to="/memory/$bankId/memories" params={{ bankId: own.id }} className="underline">
+            <Link
+              to="/registry/memory/$bankId/memories"
+              params={{ bankId: own.id }}
+              className="underline"
+            >
               {own.name}
             </Link>{" "}
             <span className="text-muted-foreground">
@@ -244,14 +248,18 @@ export function AgentMemory({
         links={links}
         locked={locked}
         open={(bank) => (
-          <Link to="/memory/$bankId/memories" params={{ bankId: bank.id }} className="underline">
+          <Link
+            to="/registry/memory/$bankId/memories"
+            params={{ bankId: bank.id }}
+            className="underline"
+          >
             {bank.name}
           </Link>
         )}
         empty={
           <>
             No shared banks yet.{" "}
-            <Link to="/memory" className="text-foreground underline">
+            <Link to="/registry/memory" className="text-foreground underline">
               Create one
             </Link>
             .

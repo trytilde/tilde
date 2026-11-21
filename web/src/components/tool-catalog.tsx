@@ -478,7 +478,7 @@ export function ToolProviderDialogs({
   }, []);
   function connected(connectionId: string) {
     void navigate({
-      to: "/tools/$toolId",
+      to: "/registry/tools/$toolId",
       params: { toolId: connectionId },
       search: { kind: "connection" },
     });
@@ -518,7 +518,7 @@ export function ToolProviderDialogs({
               </SheetDescription>
               {entry.hostId ? (
                 <Link
-                  to="/tools/$toolId"
+                  to="/registry/tools/$toolId"
                   params={{ toolId: entry.hostId }}
                   search={{ kind: "host" }}
                   className="w-fit text-xs font-medium text-foreground/60 hover:text-foreground hover:underline"

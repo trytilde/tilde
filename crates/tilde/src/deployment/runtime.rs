@@ -46,6 +46,8 @@ pub struct Runtime {
     pub callback_url: String,
     pub(crate) gateway: gateway::Client,
     pub(crate) state: Arc<Memory>,
+    /// Provider endpoint overrides for isolated tests, as the gateway's connections have.
+    pub(crate) endpoints: crate::connections::catalog::Endpoints,
 }
 /// Decrypted provider configuration never leaves plaintext credentials behind.
 pub struct SensitiveConfiguration(control::GetConfigurationResponse);
@@ -100,6 +102,7 @@ pub struct RuntimeOptions {
     pub idle_after: std::time::Duration,
     /// Approximate bytes of cached conversation state before idle threads are evicted early.
     pub cache_bytes: usize,
+    pub endpoints: crate::connections::catalog::Endpoints,
 }
 impl Runtime {
     pub fn new(gateway: gateway::Client, options: RuntimeOptions) -> Self {
@@ -109,6 +112,7 @@ impl Runtime {
             instance_id: options.instance_id,
             signing_key: options.signing_key,
             callback_url: options.callback_url,
+            endpoints: options.endpoints,
             gateway,
             state: Arc::new(Memory {
                 configuration: RwLock::new(None),

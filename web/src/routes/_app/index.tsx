@@ -1,26 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AgentRegistry, parseRegistrySearch } from "@/components/agent-registry";
+import { createFileRoute, redirect, type AnyRedirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/")({
-  validateSearch: parseRegistrySearch,
-  component: RegistryPage,
+  beforeLoad: () => {
+    let home: AnyRedirect = redirect({ to: "/registry", replace: true });
+    throw home;
+  },
 });
-
-function RegistryPage() {
-  const navigate = Route.useNavigate();
-  const search = Route.useSearch();
-  return (
-    <AgentRegistry
-      search={search}
-      onSearch={(patch) => {
-        void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
-      }}
-      onOpen={(agent) => {
-        void navigate({ to: "/agent/$agentId/capabilities", params: { agentId: agent.id } });
-      }}
-      onCreate={() => {
-        void navigate({ to: "/agent/new" });
-      }}
-    />
-  );
-}

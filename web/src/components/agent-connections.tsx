@@ -400,7 +400,7 @@ export function AgentConnections({
             }
           />
         )}
-        {!assigned.length && !loading && (
+        {!assigned.length && !loading && !error && (
           <div className="flex min-h-48 w-full items-center justify-center rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
             {text.unassigned}
           </div>

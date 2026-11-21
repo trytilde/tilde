@@ -51,7 +51,7 @@ export function GitSourceDialog({
       });
       form.reset();
       onOpenChange(false);
-      if (source) await navigate({ to: "/skills" });
+      if (source) await navigate({ to: "/registry/skills" });
     } catch (e) {
       setError(message(e, "Unable to add the repository."));
     }
@@ -175,7 +175,7 @@ export function EditorSkillDialog({
         files: [{ path: ENTRYPOINT, content: skillTemplate(name) }],
       });
       onOpenChange(false);
-      if (skill) await navigate({ to: "/skills/$skillId", params: { skillId: skill.id } });
+      if (skill) await navigate({ to: "/registry/skills/$skillId", params: { skillId: skill.id } });
     } catch (e) {
       setError(message(e, "Unable to create the skill."));
     }

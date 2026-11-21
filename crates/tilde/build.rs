@@ -5,8 +5,12 @@ use std::{env, fs, path::Path};
 /// `_tilde_migrations` history table that existing databases already carry.
 fn main() {
     println!("cargo:rerun-if-changed=../../migrations");
-    println!("cargo:rerun-if-changed=../../web/dist");
-    println!("cargo:rerun-if-changed=../../web/provider-dist");
+    // Only embedded builds read the web bundles; watching them otherwise reruns this script
+    // (and rebuilds tilde) on every build, because a missing path always counts as changed.
+    if env::var_os("CARGO_FEATURE_EMBEDDED_WEB").is_some() {
+        println!("cargo:rerun-if-changed=../../web/dist");
+        println!("cargo:rerun-if-changed=../../web/provider-dist");
+    }
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
     let mut files: Vec<_> = fs::read_dir(&dir)
         .expect("migrations directory")

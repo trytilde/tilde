@@ -1,5 +1,8 @@
 # @trytilde/embed-server
 
+**Tilde Cloud only.** Embed keys, spaces and the embed service are features of Tilde Cloud;
+open-source Tilde does not serve them.
+
 The server half of embedding Tilde in your application: one handler that opens spaces,
 proxies agent chats and starts connection setup for **your** signed-in users. Pair it with
 `@trytilde/embed` in the browser.

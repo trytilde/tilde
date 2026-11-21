@@ -6,7 +6,8 @@ export function ProviderIcon({ iconUrl }: { iconUrl?: string }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   return iconUrl && iconUrl !== failedUrl ? (
     <img
-      src={iconUrl}
+      // Bundled icons are root-relative; the app may be served below a base path.
+      src={/^\/(?!\/)/.test(iconUrl) ? `${import.meta.env.BASE_URL}${iconUrl.slice(1)}` : iconUrl}
       alt=""
       aria-hidden="true"
       width={20}

@@ -2,11 +2,12 @@
 //! chat application service with external channels and invocation-scoped runtime APIs.
 //! Its credentials and access policy live on the agent's `tilde/application` connection.
 mod adapter;
+mod connections;
 pub(crate) mod credentials;
 pub(crate) mod db;
 mod management;
 pub mod rpc;
-pub(crate) mod sessions;
+mod sessions;
 pub use adapter::Tilde;
 pub(crate) use management::router as management_router;
-pub(crate) use sessions::QueueChange;
+pub(crate) use sessions::{QueueChange, queued_input};

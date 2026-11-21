@@ -59,19 +59,13 @@ async fn handle_callback(service: Connections, query: Callback) -> axum::respons
     let Ok(setup) = Uuid::parse_str(setup) else {
         return (http::StatusCode::BAD_REQUEST, "Invalid callback state").into_response();
     };
-    let mut response = match service
-        .callback(
-            setup,
-            state,
-            &query
-                .parameters
-                .iter()
-                .map(|(key, value)| (key.clone(), SecretString::from(value.as_str())))
-                .collect(),
-            query.error.is_some(),
-        )
-        .await
-    {
+    let parameters = query
+        .parameters
+        .iter()
+        .map(|(key, value)| (key.clone(), SecretString::from(value.as_str())))
+        .collect();
+    let call = service.callback(setup, state, &parameters, query.error.is_some());
+    let mut response = match call.await {
         Ok(url) => axum::response::Redirect::to(&url).into_response(),
         Err(_) => (
             http::StatusCode::BAD_REQUEST,
@@ -89,19 +83,33 @@ async fn handle_callback(service: Connections, query: Callback) -> axum::respons
     );
     response
 }
+impl Rpc {
+    /// Run one setup call; the setup names its organization (ADR-0005).
+    async fn in_setup<T>(
+        &self,
+        setup: Uuid,
+        call: impl std::future::Future<Output = Result<T, Error>>,
+    ) -> Result<T, Error> {
+        let _ = setup; // Open-source Tilde has a single organization.
+        call.await
+    }
+}
 impl ConnectionSetupService for Rpc {
     async fn set_connection_name<'a>(
         &'a self,
         _: RequestContext,
         request: ServiceRequest<'_, setup_pb::SetConnectionNameRequest>,
     ) -> ServiceResult<impl Encodable<setup_pb::SetConnectionNameResponse> + Send + use<'a>> {
+        let setup = id(request.setup_id)?;
         let view = self
-            .0
-            .set_connection_name(
-                id(request.setup_id)?,
-                request.connection_setup_token,
-                id(request.action_id)?,
-                request.name,
+            .in_setup(
+                setup,
+                self.0.set_connection_name(
+                    setup,
+                    request.connection_setup_token,
+                    id(request.action_id)?,
+                    request.name,
+                ),
             )
             .await?;
         Response::ok(setup_pb::SetConnectionNameResponse {
@@ -117,18 +125,20 @@ impl ConnectionSetupService for Rpc {
     ) -> ServiceResult<impl Encodable<setup_pb::SaveDraftResponse> + Send + use<'a>> {
         let body = request.to_owned_message();
         let values = input_values(body.draft)?;
-        Response::ok(setup_pb::SaveDraftResponse {
-            state: broker_wire(
-                self.0
-                    .save_draft(
-                        id(&body.setup_id)?,
-                        &body.connection_setup_token,
-                        id(&body.action_id)?,
-                        values,
-                    )
-                    .await?,
+        let setup = id(&body.setup_id)?;
+        let view = self
+            .in_setup(
+                setup,
+                self.0.save_draft(
+                    setup,
+                    &body.connection_setup_token,
+                    id(&body.action_id)?,
+                    values,
+                ),
             )
-            .into(),
+            .await?;
+        Response::ok(setup_pb::SaveDraftResponse {
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }
@@ -139,18 +149,20 @@ impl ConnectionSetupService for Rpc {
     ) -> ServiceResult<impl Encodable<setup_pb::StartOAuthResponse> + Send + use<'a>> {
         let body = request.to_owned_message();
         let values = input_values(body.fields)?;
-        Response::ok(setup_pb::StartOAuthResponse {
-            state: broker_wire(
-                self.0
-                    .start_oauth(
-                        id(&body.setup_id)?,
-                        &body.connection_setup_token,
-                        id(&body.action_id)?,
-                        values,
-                    )
-                    .await?,
+        let setup = id(&body.setup_id)?;
+        let view = self
+            .in_setup(
+                setup,
+                self.0.start_oauth(
+                    setup,
+                    &body.connection_setup_token,
+                    id(&body.action_id)?,
+                    values,
+                ),
             )
-            .into(),
+            .await?;
+        Response::ok(setup_pb::StartOAuthResponse {
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }
@@ -161,18 +173,20 @@ impl ConnectionSetupService for Rpc {
     ) -> ServiceResult<impl Encodable<setup_pb::SaveCredentialsResponse> + Send + use<'a>> {
         let body = request.to_owned_message();
         let values = input_values(body.fields)?;
-        Response::ok(setup_pb::SaveCredentialsResponse {
-            state: broker_wire(
-                self.0
-                    .save_credentials(
-                        id(&body.setup_id)?,
-                        &body.connection_setup_token,
-                        id(&body.action_id)?,
-                        values,
-                    )
-                    .await?,
+        let setup = id(&body.setup_id)?;
+        let view = self
+            .in_setup(
+                setup,
+                self.0.save_credentials(
+                    setup,
+                    &body.connection_setup_token,
+                    id(&body.action_id)?,
+                    values,
+                ),
             )
-            .into(),
+            .await?;
+        Response::ok(setup_pb::SaveCredentialsResponse {
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }
@@ -181,13 +195,12 @@ impl ConnectionSetupService for Rpc {
         _: RequestContext,
         request: ServiceRequest<'_, setup_pb::GetSetupRequest>,
     ) -> ServiceResult<impl Encodable<setup_pb::GetSetupResponse> + Send + use<'a>> {
+        let setup = id(request.setup_id)?;
+        let view = self
+            .in_setup(setup, self.0.view(setup, request.connection_setup_token))
+            .await?;
         Response::ok(setup_pb::GetSetupResponse {
-            state: broker_wire(
-                self.0
-                    .view(id(request.setup_id)?, request.connection_setup_token)
-                    .await?,
-            )
-            .into(),
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }
@@ -207,19 +220,21 @@ impl ConnectionSetupService for Rpc {
                 return Err(m::invalid("Duplicate input field").into());
             }
         }
-        Response::ok(setup_pb::ExecuteProviderActionResponse {
-            state: broker_wire(
-                self.0
-                    .provider_action(
-                        id(&body.setup_id)?,
-                        &body.connection_setup_token,
-                        id(&body.action_id)?,
-                        &body.action,
-                        values,
-                    )
-                    .await?,
+        let setup = id(&body.setup_id)?;
+        let view = self
+            .in_setup(
+                setup,
+                self.0.provider_action(
+                    setup,
+                    &body.connection_setup_token,
+                    id(&body.action_id)?,
+                    &body.action,
+                    values,
+                ),
             )
-            .into(),
+            .await?;
+        Response::ok(setup_pb::ExecuteProviderActionResponse {
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }
@@ -228,13 +243,12 @@ impl ConnectionSetupService for Rpc {
         _: RequestContext,
         request: ServiceRequest<'_, setup_pb::CancelSetupRequest>,
     ) -> ServiceResult<impl Encodable<setup_pb::CancelSetupResponse> + Send + use<'a>> {
+        let setup = id(request.setup_id)?;
+        let view = self
+            .in_setup(setup, self.0.cancel(setup, request.connection_setup_token))
+            .await?;
         Response::ok(setup_pb::CancelSetupResponse {
-            state: broker_wire(
-                self.0
-                    .cancel(id(request.setup_id)?, request.connection_setup_token)
-                    .await?,
-            )
-            .into(),
+            state: broker_wire(view).into(),
             ..Default::default()
         })
     }

@@ -76,7 +76,7 @@ export async function loadToolConnections(query: ConnectionQuery = {}, signal?: 
 /**
  * The tool catalog (dispatch's "configure a tool" page): providers grouped by their first
  * category. The server filters them by category and search. Dispatch's All/Personal/Bots scope
- * toggle is omitted: management users have no personal accounts. Providers published by remote
+ * toggle is omitted: people manage their personal accounts on `/account/connections`. Providers published by remote
  * servers and MCP servers added by URL are opened from the Remote servers page instead.
  */
 export function ToolsPage() {
@@ -168,7 +168,7 @@ export function ToolsPage() {
                       key={entry.id}
                       onOpen={() =>
                         void navigate({
-                          to: "/tools/catalog/$providerId",
+                          to: "/registry/tools/catalog/$providerId",
                           params: { providerId: entry.id },
                         })
                       }
@@ -190,7 +190,7 @@ export function ToolsPage() {
           entry={open}
           key={open.id}
           refresh={() => refresh()}
-          onClose={() => void navigate({ to: "/tools/catalog" })}
+          onClose={() => void navigate({ to: "/registry/tools/catalog" })}
         />
       ) : null}
     </section>

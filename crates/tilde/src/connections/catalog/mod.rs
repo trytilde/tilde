@@ -5,7 +5,9 @@ use crate::error::Error;
 use std::collections::BTreeMap;
 
 pub mod agentmail;
+pub mod aws;
 pub mod github;
+pub mod google_chat;
 pub mod inference;
 pub mod linq;
 pub mod slack;
@@ -17,6 +19,7 @@ pub fn builtins() -> Vec<Provider> {
     let mut providers: Vec<Provider> = vec![
         github::definition(),
         slack::definition(),
+        google_chat::definition(),
         agentmail::definition(),
         linq::definition(),
         whatsapp::definition(),
@@ -35,6 +38,7 @@ pub fn builtins() -> Vec<Provider> {
         crate::tools::providers::google::search_console::definition(),
         crate::tools::providers::google::analytics::definition(),
         crate::tools::providers::sentry::definition(),
+        crate::tools::providers::linear::definition(),
         crate::tools::providers::posthog::definition(),
         crate::tools::providers::firecrawl::definition(),
         crate::tools::providers::stripe::definition(),
@@ -68,6 +72,15 @@ pub async fn register(
     }) {
         return Err(invalid(
             "The signal capability needs a signal source for the connection type",
+        ));
+    }
+    // Egress protocols are built-in catalog code.
+    if provider.connection_types.iter().any(|typ| {
+        typ.capabilities.contains(&Capability::Egress)
+            && crate::connections::egress::hook(&provider.id).is_none()
+    }) {
+        return Err(invalid(
+            "The egress capability needs egress protocols for the provider",
         ));
     }
     if !builtin
@@ -169,6 +182,7 @@ pub async fn register(
                 .unwrap_or(""),
             typ.oauth().map(|o| o.client).unwrap_or_default().as_str(),
             typ.capabilities.contains(&Capability::Signal),
+            typ.capabilities.contains(&Capability::Egress),
         )
         .await?;
         for field in &oauth.result_fields {
@@ -279,6 +293,7 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
                 (row.inference_capable, Capability::Inference),
                 (row.tool_capable, Capability::Tool),
                 (row.signal_capable, Capability::Signal),
+                (row.egress_capable, Capability::Egress),
             ]
             .into_iter()
             .filter_map(|(capable, cap)| capable.then_some(cap))
@@ -391,7 +406,7 @@ pub async fn list(
 #[derive(Clone, Default)]
 pub struct Endpoints(pub BTreeMap<String, String>);
 impl Endpoints {
-    pub(super) fn get<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
+    pub(crate) fn get<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
         self.0.get(key).map(String::as_str).unwrap_or(default)
     }
 }
@@ -415,6 +430,8 @@ pub(crate) fn runtime(id: &str, type_id: &str) -> &'static dyn runtime::Runtime 
     match (id, type_id) {
         ("github", "github_app") => &github::Github,
         ("slack", "slack_app") => &slack::Slack,
+        ("google_chat", "app") => &google_chat::GoogleChat,
+        ("aws", "oidc") => &aws::AwsOidc,
         ("agentmail", "inbox") => &agentmail::Agentmail,
         ("linq", "account") => &linq::Linq,
         ("whatsapp", "meta") => &whatsapp::Whatsapp,

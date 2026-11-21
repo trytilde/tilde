@@ -383,9 +383,17 @@ async fn dynamic_channel_catalog_tracks_ready_assignment_without_exporting_crede
         .collect();
     assert_eq!(
         configured_channels,
-        ["slack", "github", "agentmail", "linq", "whatsapp", "telnyx"]
-            .into_iter()
-            .collect(),
+        [
+            "slack",
+            "github",
+            "agentmail",
+            "linq",
+            "whatsapp",
+            "telnyx",
+            "google_chat"
+        ]
+        .into_iter()
+        .collect(),
         "A configured chat provider needs outbound, callback and live-account coverage in this suite"
     );
     let chat = Chat::new(db.pool.clone(), crypto, "http://127.0.0.1".into())

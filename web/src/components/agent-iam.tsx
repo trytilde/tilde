@@ -445,7 +445,7 @@ export function AgentIam({ agentId, active = true }: { agentId: string; active?:
                   })}
           </TableBody>
         </Table>
-        {!loading && routes.length === 0 && (
+        {!loading && !error && routes.length === 0 && (
           <p className="p-5 text-sm text-muted-foreground">Add a chat provider to manage access.</p>
         )}
       </div>

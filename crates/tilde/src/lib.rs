@@ -4,6 +4,7 @@
 pub use tilde_contracts::{proto, services};
 
 pub mod agent;
+pub mod apply;
 pub mod config;
 pub mod connections;
 pub mod database;
@@ -11,6 +12,7 @@ pub mod deployment;
 pub mod encryption;
 pub mod error;
 pub mod network;
+pub mod oidc;
 pub mod pricing;
 
 pub mod chat;
@@ -18,10 +20,12 @@ pub mod chat;
 pub mod iam;
 pub mod inference;
 pub mod knowledge;
+pub mod local;
 pub mod memory;
 pub mod prompts;
 pub mod routines;
 pub mod sandboxes;
+pub mod secrets;
 pub mod signals;
 pub mod skills;
 pub mod tools;

@@ -15,6 +15,7 @@
 //! ponytail: this is a hand-rolled reverse proxy on hyper via axum and reqwest. If proxy
 //! overhead ever shows in p99 traces, the filter steps below map one to one onto pingora's
 //! `ProxyHttp` phases.
+pub(crate) mod apply;
 pub mod audit;
 pub mod budgets;
 pub mod db;

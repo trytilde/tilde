@@ -1,5 +1,5 @@
 //! Management surface for an agent's routines.
-use super::{Routine, RoutineInput, Routines, Trigger};
+use super::{Filter, Routine, RoutineInput, Routines, Trigger};
 use crate::error::Error;
 use crate::proto::tilde::management::v1 as management;
 use crate::services::tilde::management::v1::RoutineService;
@@ -33,6 +33,14 @@ fn trigger_model(trigger: Option<&management::RoutineTrigger>) -> Result<Trigger
         Some(Kind::Signal(signal)) => Ok(Trigger::Signal {
             connection_id: id(&signal.connection_id)?,
             signal_type: signal.signal_type.clone(),
+            filters: signal
+                .filters
+                .iter()
+                .map(|f| Filter {
+                    path: f.key.clone(),
+                    values: f.values.clone(),
+                })
+                .collect(),
         }),
         None => Err(Error::Invalid(
             "A routine needs a cron or a signal trigger".into(),
@@ -56,9 +64,18 @@ fn routine_wire(r: Routine) -> management::Routine {
                 Trigger::Signal {
                     connection_id,
                     signal_type,
+                    filters,
                 } => Kind::Signal(Box::new(management::SignalTrigger {
                     connection_id: connection_id.to_string(),
                     signal_type,
+                    filters: filters
+                        .into_iter()
+                        .map(|f| management::SignalFilter {
+                            key: f.path,
+                            values: f.values,
+                            ..Default::default()
+                        })
+                        .collect(),
                     ..Default::default()
                 })),
             }),
@@ -80,8 +97,8 @@ impl RoutineService for Rpc {
         _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListRoutinesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListRoutinesResponse> + Send + use<'a>> {
-        let request = request.to_owned_message();
-        let routines = self.0.list(id(&request.agent_id)?).await?;
+        let agent = id(&request.to_owned_message().agent_id)?;
+        let routines = self.0.list(agent).await?;
         Response::ok(management::ListRoutinesResponse {
             routines: routines.into_iter().map(routine_wire).collect(),
             ..Default::default()
@@ -94,10 +111,11 @@ impl RoutineService for Rpc {
     ) -> ServiceResult<impl Encodable<management::CreateRoutineResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
         let trigger = trigger_model(request.trigger.as_option())?;
+        let agent = id(&request.agent_id)?;
         let routine = self
             .0
             .create(
-                id(&request.agent_id)?,
+                agent,
                 RoutineInput {
                     name: request.name,
                     prompt: request.prompt,
@@ -119,10 +137,11 @@ impl RoutineService for Rpc {
     ) -> ServiceResult<impl Encodable<management::UpdateRoutineResponse> + Send + use<'a>> {
         let request = request.to_owned_message();
         let trigger = trigger_model(request.trigger.as_option())?;
+        let routine = id(&request.id)?;
         let routine = self
             .0
             .update(
-                id(&request.id)?,
+                routine,
                 RoutineInput {
                     name: request.name,
                     prompt: request.prompt,
@@ -142,7 +161,8 @@ impl RoutineService for Rpc {
         _ctx: RequestContext,
         request: ServiceRequest<'_, management::DeleteRoutineRequest>,
     ) -> ServiceResult<impl Encodable<management::DeleteRoutineResponse> + Send + use<'a>> {
-        self.0.delete(id(&request.to_owned_message().id)?).await?;
+        let routine = id(&request.to_owned_message().id)?;
+        self.0.delete(routine).await?;
         Response::ok(management::DeleteRoutineResponse::default())
     }
     async fn list_signal_types<'a>(
@@ -150,10 +170,8 @@ impl RoutineService for Rpc {
         _ctx: RequestContext,
         request: ServiceRequest<'_, management::ListSignalTypesRequest>,
     ) -> ServiceResult<impl Encodable<management::ListSignalTypesResponse> + Send + use<'a>> {
-        let source = self
-            .0
-            .signal_source(id(&request.to_owned_message().connection_id)?)
-            .await?;
+        let connection = id(&request.to_owned_message().connection_id)?;
+        let source = self.0.signal_source(connection).await?;
         Response::ok(management::ListSignalTypesResponse {
             signal_types: source
                 .types()

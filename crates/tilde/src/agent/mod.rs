@@ -1,6 +1,7 @@
 //! Agent registration. An agent is policy (capabilities, concurrency, connections); how it
 //! runs belongs to its deployments. Tilde never calls an agent: hosts dial in with a
 //! deployment token, so a registration carries no endpoint and no wake-signing key.
+pub(crate) mod apply;
 pub mod db;
 use crate::database::Pool;
 use crate::proto::tilde::types::v1 as types;
@@ -96,39 +97,45 @@ impl Agents {
     /// The agent row and its Tilde chat connection commit together: a failure leaves no agent
     /// without its built-in channel.
     pub async fn create(&self, input: CreateAgent) -> Result<Agent, Error> {
+        self.create_as(input, None).await
+    }
+    /// Register a local agent: one that runs in `harness` on a person's machine
+    /// (`crate::local`). The harness is fixed with the registration.
+    pub async fn create_local(
+        &self,
+        input: CreateAgent,
+        harness: crate::local::Harness,
+    ) -> Result<Agent, Error> {
+        self.create_as(input, Some(harness)).await
+    }
+    async fn create_as(
+        &self,
+        input: CreateAgent,
+        harness: Option<crate::local::Harness>,
+    ) -> Result<Agent, Error> {
         input.capabilities.validate()?;
         let name = validate_name(&input.name)?;
         let description = validate_description(&input.description)?;
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
-        let inserted = crate::agent::db::create_opt(
-            &tx,
-            input.id,
-            &(name),
-            input.concurrency_policy.as_str(),
-            &(serde_json::to_value(&input.capabilities)
-                .map_err(|_| Error::Invalid("Invalid capabilities".into()))?),
-            &description,
-        )
-        .await?;
-        if let Some(agent) = inserted {
-            crate::connections::catalog::tilde::create(
-                &tx,
-                &self.encryption,
-                agent.id,
-                &agent.name,
-            )
-            .await?;
+        if let Some(agent) = self.insert(&tx, &input, &name, &description).await? {
+            if let Some(harness) = harness {
+                crate::local::db::register_execute(&tx, agent.id, harness).await?;
+            }
             tx.commit().await?;
             drop(tx_client);
             return Ok(agent);
         }
         drop(tx);
         drop(tx_client);
-        let current = crate::agent::db::get_for_create_opt(&self.pool.get().await?, input.id)
+        let client = self.pool.get().await?;
+        let current = crate::agent::db::get_for_create_opt(&client, input.id)
             .await?
             .ok_or(Error::NotFound)?;
-        if current.name != name
+        let registered = crate::local::db::harness_opt(&client, input.id).await?;
+        drop(client);
+        if registered != harness
+            || current.name != name
             || current.description != description
             || current.capabilities.0 != input.capabilities
             || current.concurrency_policy != input.concurrency_policy.as_str()
@@ -147,6 +154,40 @@ impl Agents {
             created_at: current.created_at,
             updated_at: current.updated_at,
         })
+    }
+
+    /// Inserts the agent with its Tilde chat connection inside `tx`; `None` when the ID is taken.
+    pub(crate) async fn insert(
+        &self,
+        tx: &crate::database::Transaction<'_>,
+        input: &CreateAgent,
+        name: &str,
+        description: &str,
+    ) -> Result<Option<Agent>, Error> {
+        let Some(agent) = crate::agent::db::create_opt(
+            tx,
+            input.id,
+            name,
+            input.concurrency_policy.as_str(),
+            &(serde_json::to_value(&input.capabilities)
+                .map_err(|_| Error::Invalid("Invalid capabilities".into()))?),
+            description,
+        )
+        .await?
+        else {
+            return Ok(None);
+        };
+        crate::connections::catalog::tilde::create(tx, &self.encryption, agent.id, &agent.name)
+            .await?;
+        Ok(Some(agent))
+    }
+
+    /// The harness of each local agent among `ids`; managed agents are absent.
+    pub async fn harnesses(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<std::collections::HashMap<Uuid, crate::local::Harness>, Error> {
+        Ok(crate::local::db::harnesses_all(&self.pool.get().await?, ids).await?)
     }
 
     /// Return public registration metadata.
@@ -299,7 +340,7 @@ pub(crate) fn validate_name(name: &str) -> Result<String, Error> {
     }
     Ok(name.into())
 }
-fn validate_description(description: &str) -> Result<String, Error> {
+pub(crate) fn validate_description(description: &str) -> Result<String, Error> {
     let description = description.trim();
     if description.chars().count() > 500 {
         return Err(Error::Invalid(

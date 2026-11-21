@@ -71,7 +71,7 @@ const threads = [
 ];
 const messages: Record<string, Message[]> = {
   sev2: [
-    message("sev2", "m1", "agent", 60 * 26, "Sentry opened **FARO-API-1F3** and paged on-call."),
+    message("sev2", "m1", "agent", 60 * 26, "Sentry opened **ACME-API-1F3** and paged on-call."),
     message("sev2", "m2", "maya", 60 * 26 - 1, "Is it the deploy from this morning?"),
     message(
       "sev2",

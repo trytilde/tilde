@@ -2,6 +2,8 @@
 pub const CATEGORY_EMAIL: &str = "email";
 pub const CATEGORY_MEMORY: &str = "memory";
 pub const CATEGORY_PAYMENTS: &str = "payments";
+pub const CATEGORY_FINANCE: &str = "finance";
+pub const CATEGORY_ACCOUNTING: &str = "accounting";
 pub const CATEGORY_CALENDAR: &str = "calendar";
 pub const CATEGORY_FILE_STORAGE: &str = "file_storage";
 pub const CATEGORY_DOCUMENTS: &str = "documents";

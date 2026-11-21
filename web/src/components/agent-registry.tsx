@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  LaptopIcon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { AgentHealthStatus, type Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import { agents } from "@/client";
 import { useCursorPage, type FetchPage } from "@/hooks/use-cursor-page";
@@ -7,6 +14,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/data-table";
+import { NewLocalAgentDialog } from "@/components/local-agent";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -95,6 +103,7 @@ export function AgentRegistry({
     return () => window.clearInterval(timer);
   }, [page.refresh, page.loading]);
   const [deleting, setDeleting] = useState<Agent | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [notice, setNotice] = useState("");
@@ -241,6 +250,10 @@ export function AgentRegistry({
       </div>
       <section className="flex flex-1 flex-col gap-4 px-4 py-6 lg:px-6">
         <div className="flex items-center justify-end gap-4">
+          <Button variant="outline" onClick={() => setConnecting(true)}>
+            <LaptopIcon />
+            Connect local agent
+          </Button>
           <Button onClick={onCreate}>
             <PlusIcon />
             Create agent
@@ -268,6 +281,7 @@ export function AgentRegistry({
           </p>
         )}
 
+        <NewLocalAgentDialog open={connecting} onOpenChange={setConnecting} onCreated={onOpen} />
         <DataTable
           data={page.items}
           loading={page.loading}

@@ -157,15 +157,27 @@ impl Adapter for Github {
                 ),
                 _ => return Err(ConnectError::not_found("Unknown GitHub tool")),
             };
+            let minted = crate::connections::mints::mint(
+                a,
+                "github",
+                "github_app",
+                &Default::default(),
+                "chat",
+            )
+            .await?;
+            let mut request =
+                a.http
+                    .client
+                    .post(a.url("github_api", "https://api.github.com", &segments)?);
+            for (name, value) in minted.headers() {
+                request = request.header(name, secrecy::ExposeSecret::expose_secret(value));
+            }
             let response = a
                 .json(
-                    a.post(
-                        a.url("github_api", "https://api.github.com", &segments)?,
-                        "access_token",
-                    )?
-                    .header("Accept", "application/vnd.github+json")
-                    .header("X-GitHub-Api-Version", "2022-11-28")
-                    .json(&body),
+                    request
+                        .header("Accept", "application/vnd.github+json")
+                        .header("X-GitHub-Api-Version", "2022-11-28")
+                        .json(&body),
                 )
                 .await?;
             let external = response

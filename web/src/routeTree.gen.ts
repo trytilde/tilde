@@ -11,50 +11,53 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppSkillsRouteImport } from './routes/_app/skills'
-import { Route as AppAgentAgentIdRouteRouteImport } from './routes/_app/agent/$agentId/route'
-import { Route as AppAgentNewRouteImport } from './routes/_app/agent/new'
-import { Route as AppMemoryIndexRouteImport } from './routes/_app/memory/index'
-import { Route as AppMemoryBankIdRouteRouteImport } from './routes/_app/memory/$bankId/route'
-import { Route as AppSandboxesIndexRouteImport } from './routes/_app/sandboxes/index'
-import { Route as AppSandboxesBlueprintIdRouteRouteImport } from './routes/_app/sandboxes/$blueprintId/route'
-import { Route as AppSkillsSkillIdRouteImport } from './routes/_app/skills_.$skillId'
-import { Route as AppSkillsCatalogRouteImport } from './routes/_app/skills_.catalog'
-import { Route as AppToolsIndexRouteImport } from './routes/_app/tools/index'
-import { Route as AppToolsToolIdRouteImport } from './routes/_app/tools/$toolId'
-import { Route as AppToolsCatalogRouteImport } from './routes/_app/tools/catalog'
-import { Route as AppToolsConnectionsRouteImport } from './routes/_app/tools/connections'
-import { Route as AppToolsRemoteServersRouteImport } from './routes/_app/tools/remote-servers'
-import { Route as AppWikisIndexRouteImport } from './routes/_app/wikis/index'
-import { Route as AppWikisWikiIdRouteRouteImport } from './routes/_app/wikis/$wikiId/route'
+import { Route as AppConnectionsSecretsRouteImport } from './routes/_app/connections/secrets'
+import { Route as AppRegistryIndexRouteImport } from './routes/_app/registry/index'
+import { Route as AppRegistrySkillsRouteImport } from './routes/_app/registry/skills'
 import { Route as ConnectionsBrokerSetupIdRouteImport } from './routes/connections/broker/$setupId'
-import { Route as AppAgentAgentIdIndexRouteImport } from './routes/_app/agent/$agentId/index'
-import { Route as AppAgentAgentIdCapabilitiesRouteImport } from './routes/_app/agent/$agentId/capabilities'
-import { Route as AppAgentAgentIdChatProvidersRouteImport } from './routes/_app/agent/$agentId/chat-providers'
-import { Route as AppAgentAgentIdDeploymentRouteImport } from './routes/_app/agent/$agentId/deployment'
-import { Route as AppAgentAgentIdIamRouteImport } from './routes/_app/agent/$agentId/iam'
-import { Route as AppAgentAgentIdInferenceRouteImport } from './routes/_app/agent/$agentId/inference'
-import { Route as AppAgentAgentIdLogsRouteImport } from './routes/_app/agent/$agentId/logs'
-import { Route as AppAgentAgentIdPromptsRouteImport } from './routes/_app/agent/$agentId/prompts'
-import { Route as AppAgentAgentIdRoutinesRouteImport } from './routes/_app/agent/$agentId/routines'
-import { Route as AppAgentAgentIdSessionsRouteImport } from './routes/_app/agent/$agentId/sessions'
-import { Route as AppAgentAgentIdSkillsRouteImport } from './routes/_app/agent/$agentId/skills'
-import { Route as AppAgentAgentIdToolsRouteImport } from './routes/_app/agent/$agentId/tools'
-import { Route as AppAgentAgentIdTracingRouteImport } from './routes/_app/agent/$agentId/tracing'
-import { Route as AppMemoryBankIdIndexRouteImport } from './routes/_app/memory/$bankId/index'
-import { Route as AppMemoryBankIdMemoriesRouteImport } from './routes/_app/memory/$bankId/memories'
-import { Route as AppMemoryBankIdSettingsRouteImport } from './routes/_app/memory/$bankId/settings'
-import { Route as AppSandboxesBlueprintIdIndexRouteImport } from './routes/_app/sandboxes/$blueprintId/index'
-import { Route as AppSandboxesBlueprintIdEnvironmentRouteImport } from './routes/_app/sandboxes/$blueprintId/environment'
-import { Route as AppSandboxesBlueprintIdSandboxesRouteImport } from './routes/_app/sandboxes/$blueprintId/sandboxes'
-import { Route as AppSandboxesBlueprintIdSettingsRouteImport } from './routes/_app/sandboxes/$blueprintId/settings'
-import { Route as AppSandboxesBlueprintIdToolsRouteImport } from './routes/_app/sandboxes/$blueprintId/tools'
-import { Route as AppSkillsCatalogGroupIdRouteImport } from './routes/_app/skills_.catalog.$groupId'
-import { Route as AppSkillsSourcesSourceIdRouteImport } from './routes/_app/skills_.sources.$sourceId'
-import { Route as AppToolsCatalogProviderIdRouteImport } from './routes/_app/tools/catalog.$providerId'
-import { Route as AppWikisWikiIdIndexRouteImport } from './routes/_app/wikis/$wikiId/index'
-import { Route as AppWikisWikiIdPagesRouteImport } from './routes/_app/wikis/$wikiId/pages'
-import { Route as AppWikisWikiIdSettingsRouteImport } from './routes/_app/wikis/$wikiId/settings'
+import { Route as AppRegistryAgentAgentIdRouteRouteImport } from './routes/_app/registry/agent/$agentId/route'
+import { Route as AppRegistryAgentNewRouteImport } from './routes/_app/registry/agent/new'
+import { Route as AppRegistryMemoryIndexRouteImport } from './routes/_app/registry/memory/index'
+import { Route as AppRegistryMemoryBankIdRouteRouteImport } from './routes/_app/registry/memory/$bankId/route'
+import { Route as AppRegistrySandboxesIndexRouteImport } from './routes/_app/registry/sandboxes/index'
+import { Route as AppRegistrySandboxesBlueprintIdRouteRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/route'
+import { Route as AppRegistrySkillsSkillIdRouteImport } from './routes/_app/registry/skills_.$skillId'
+import { Route as AppRegistrySkillsCatalogRouteImport } from './routes/_app/registry/skills_.catalog'
+import { Route as AppRegistryToolsIndexRouteImport } from './routes/_app/registry/tools/index'
+import { Route as AppRegistryToolsToolIdRouteImport } from './routes/_app/registry/tools/$toolId'
+import { Route as AppRegistryToolsCatalogRouteImport } from './routes/_app/registry/tools/catalog'
+import { Route as AppRegistryToolsConnectionsRouteImport } from './routes/_app/registry/tools/connections'
+import { Route as AppRegistryToolsRemoteServersRouteImport } from './routes/_app/registry/tools/remote-servers'
+import { Route as AppRegistryWikisIndexRouteImport } from './routes/_app/registry/wikis/index'
+import { Route as AppRegistryWikisWikiIdRouteRouteImport } from './routes/_app/registry/wikis/$wikiId/route'
+import { Route as AppRegistryAgentAgentIdIndexRouteImport } from './routes/_app/registry/agent/$agentId/index'
+import { Route as AppRegistryAgentAgentIdCapabilitiesRouteImport } from './routes/_app/registry/agent/$agentId/capabilities'
+import { Route as AppRegistryAgentAgentIdChatProvidersRouteImport } from './routes/_app/registry/agent/$agentId/chat-providers'
+import { Route as AppRegistryAgentAgentIdDeploymentRouteImport } from './routes/_app/registry/agent/$agentId/deployment'
+import { Route as AppRegistryAgentAgentIdIamRouteImport } from './routes/_app/registry/agent/$agentId/iam'
+import { Route as AppRegistryAgentAgentIdInferenceRouteImport } from './routes/_app/registry/agent/$agentId/inference'
+import { Route as AppRegistryAgentAgentIdLogsRouteImport } from './routes/_app/registry/agent/$agentId/logs'
+import { Route as AppRegistryAgentAgentIdPromptsRouteImport } from './routes/_app/registry/agent/$agentId/prompts'
+import { Route as AppRegistryAgentAgentIdRoutinesRouteImport } from './routes/_app/registry/agent/$agentId/routines'
+import { Route as AppRegistryAgentAgentIdSessionsRouteImport } from './routes/_app/registry/agent/$agentId/sessions'
+import { Route as AppRegistryAgentAgentIdSkillsRouteImport } from './routes/_app/registry/agent/$agentId/skills'
+import { Route as AppRegistryAgentAgentIdToolsRouteImport } from './routes/_app/registry/agent/$agentId/tools'
+import { Route as AppRegistryAgentAgentIdTracingRouteImport } from './routes/_app/registry/agent/$agentId/tracing'
+import { Route as AppRegistryMemoryBankIdIndexRouteImport } from './routes/_app/registry/memory/$bankId/index'
+import { Route as AppRegistryMemoryBankIdMemoriesRouteImport } from './routes/_app/registry/memory/$bankId/memories'
+import { Route as AppRegistryMemoryBankIdSettingsRouteImport } from './routes/_app/registry/memory/$bankId/settings'
+import { Route as AppRegistrySandboxesBlueprintIdIndexRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/index'
+import { Route as AppRegistrySandboxesBlueprintIdEgressRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/egress'
+import { Route as AppRegistrySandboxesBlueprintIdEnvironmentRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/environment'
+import { Route as AppRegistrySandboxesBlueprintIdSandboxesRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/sandboxes'
+import { Route as AppRegistrySandboxesBlueprintIdSettingsRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/settings'
+import { Route as AppRegistrySandboxesBlueprintIdToolsRouteImport } from './routes/_app/registry/sandboxes/$blueprintId/tools'
+import { Route as AppRegistrySkillsCatalogGroupIdRouteImport } from './routes/_app/registry/skills_.catalog.$groupId'
+import { Route as AppRegistrySkillsSourcesSourceIdRouteImport } from './routes/_app/registry/skills_.sources.$sourceId'
+import { Route as AppRegistryToolsCatalogProviderIdRouteImport } from './routes/_app/registry/tools/catalog.$providerId'
+import { Route as AppRegistryWikisWikiIdIndexRouteImport } from './routes/_app/registry/wikis/$wikiId/index'
+import { Route as AppRegistryWikisWikiIdPagesRouteImport } from './routes/_app/registry/wikis/$wikiId/pages'
+import { Route as AppRegistryWikisWikiIdSettingsRouteImport } from './routes/_app/registry/wikis/$wikiId/settings'
 
 const AppRouteRoute = AppRouteRouteImport.update({
   id: '/_app',
@@ -65,85 +68,19 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSkillsRoute = AppSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
+const AppConnectionsSecretsRoute = AppConnectionsSecretsRouteImport.update({
+  id: '/connections/secrets',
+  path: '/connections/secrets',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAgentAgentIdRouteRoute = AppAgentAgentIdRouteRouteImport.update({
-  id: '/agent/$agentId',
-  path: '/agent/$agentId',
+const AppRegistryIndexRoute = AppRegistryIndexRouteImport.update({
+  id: '/registry/',
+  path: '/registry/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppAgentNewRoute = AppAgentNewRouteImport.update({
-  id: '/agent/new',
-  path: '/agent/new',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppMemoryIndexRoute = AppMemoryIndexRouteImport.update({
-  id: '/memory/',
-  path: '/memory/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppMemoryBankIdRouteRoute = AppMemoryBankIdRouteRouteImport.update({
-  id: '/memory/$bankId',
-  path: '/memory/$bankId',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSandboxesIndexRoute = AppSandboxesIndexRouteImport.update({
-  id: '/sandboxes/',
-  path: '/sandboxes/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSandboxesBlueprintIdRouteRoute =
-  AppSandboxesBlueprintIdRouteRouteImport.update({
-    id: '/sandboxes/$blueprintId',
-    path: '/sandboxes/$blueprintId',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppSkillsSkillIdRoute = AppSkillsSkillIdRouteImport.update({
-  id: '/skills_/$skillId',
-  path: '/skills/$skillId',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppSkillsCatalogRoute = AppSkillsCatalogRouteImport.update({
-  id: '/skills_/catalog',
-  path: '/skills/catalog',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppToolsIndexRoute = AppToolsIndexRouteImport.update({
-  id: '/tools/',
-  path: '/tools/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppToolsToolIdRoute = AppToolsToolIdRouteImport.update({
-  id: '/tools/$toolId',
-  path: '/tools/$toolId',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppToolsCatalogRoute = AppToolsCatalogRouteImport.update({
-  id: '/tools/catalog',
-  path: '/tools/catalog',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppToolsConnectionsRoute = AppToolsConnectionsRouteImport.update({
-  id: '/tools/connections',
-  path: '/tools/connections',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppToolsRemoteServersRoute = AppToolsRemoteServersRouteImport.update({
-  id: '/tools/remote-servers',
-  path: '/tools/remote-servers',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppWikisIndexRoute = AppWikisIndexRouteImport.update({
-  id: '/wikis/',
-  path: '/wikis/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppWikisWikiIdRouteRoute = AppWikisWikiIdRouteRouteImport.update({
-  id: '/wikis/$wikiId',
-  path: '/wikis/$wikiId',
+const AppRegistrySkillsRoute = AppRegistrySkillsRouteImport.update({
+  id: '/registry/skills',
+  path: '/registry/skills',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const ConnectionsBrokerSetupIdRoute =
@@ -152,431 +89,555 @@ const ConnectionsBrokerSetupIdRoute =
     path: '/connections/broker/$setupId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AppAgentAgentIdIndexRoute = AppAgentAgentIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdCapabilitiesRoute =
-  AppAgentAgentIdCapabilitiesRouteImport.update({
-    id: '/capabilities',
-    path: '/capabilities',
-    getParentRoute: () => AppAgentAgentIdRouteRoute,
-  } as any)
-const AppAgentAgentIdChatProvidersRoute =
-  AppAgentAgentIdChatProvidersRouteImport.update({
-    id: '/chat-providers',
-    path: '/chat-providers',
-    getParentRoute: () => AppAgentAgentIdRouteRoute,
-  } as any)
-const AppAgentAgentIdDeploymentRoute =
-  AppAgentAgentIdDeploymentRouteImport.update({
-    id: '/deployment',
-    path: '/deployment',
-    getParentRoute: () => AppAgentAgentIdRouteRoute,
-  } as any)
-const AppAgentAgentIdIamRoute = AppAgentAgentIdIamRouteImport.update({
-  id: '/iam',
-  path: '/iam',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdInferenceRoute =
-  AppAgentAgentIdInferenceRouteImport.update({
-    id: '/inference',
-    path: '/inference',
-    getParentRoute: () => AppAgentAgentIdRouteRoute,
-  } as any)
-const AppAgentAgentIdLogsRoute = AppAgentAgentIdLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdPromptsRoute = AppAgentAgentIdPromptsRouteImport.update({
-  id: '/prompts',
-  path: '/prompts',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdRoutinesRoute = AppAgentAgentIdRoutinesRouteImport.update({
-  id: '/routines',
-  path: '/routines',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdSessionsRoute = AppAgentAgentIdSessionsRouteImport.update({
-  id: '/sessions',
-  path: '/sessions',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdSkillsRoute = AppAgentAgentIdSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdToolsRoute = AppAgentAgentIdToolsRouteImport.update({
-  id: '/tools',
-  path: '/tools',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppAgentAgentIdTracingRoute = AppAgentAgentIdTracingRouteImport.update({
-  id: '/tracing',
-  path: '/tracing',
-  getParentRoute: () => AppAgentAgentIdRouteRoute,
-} as any)
-const AppMemoryBankIdIndexRoute = AppMemoryBankIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppMemoryBankIdRouteRoute,
-} as any)
-const AppMemoryBankIdMemoriesRoute = AppMemoryBankIdMemoriesRouteImport.update({
-  id: '/memories',
-  path: '/memories',
-  getParentRoute: () => AppMemoryBankIdRouteRoute,
-} as any)
-const AppMemoryBankIdSettingsRoute = AppMemoryBankIdSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppMemoryBankIdRouteRoute,
-} as any)
-const AppSandboxesBlueprintIdIndexRoute =
-  AppSandboxesBlueprintIdIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
-  } as any)
-const AppSandboxesBlueprintIdEnvironmentRoute =
-  AppSandboxesBlueprintIdEnvironmentRouteImport.update({
-    id: '/environment',
-    path: '/environment',
-    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
-  } as any)
-const AppSandboxesBlueprintIdSandboxesRoute =
-  AppSandboxesBlueprintIdSandboxesRouteImport.update({
-    id: '/sandboxes',
-    path: '/sandboxes',
-    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
-  } as any)
-const AppSandboxesBlueprintIdSettingsRoute =
-  AppSandboxesBlueprintIdSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
-  } as any)
-const AppSandboxesBlueprintIdToolsRoute =
-  AppSandboxesBlueprintIdToolsRouteImport.update({
-    id: '/tools',
-    path: '/tools',
-    getParentRoute: () => AppSandboxesBlueprintIdRouteRoute,
-  } as any)
-const AppSkillsCatalogGroupIdRoute = AppSkillsCatalogGroupIdRouteImport.update({
-  id: '/$groupId',
-  path: '/$groupId',
-  getParentRoute: () => AppSkillsCatalogRoute,
-} as any)
-const AppSkillsSourcesSourceIdRoute =
-  AppSkillsSourcesSourceIdRouteImport.update({
-    id: '/skills_/sources/$sourceId',
-    path: '/skills/sources/$sourceId',
+const AppRegistryAgentAgentIdRouteRoute =
+  AppRegistryAgentAgentIdRouteRouteImport.update({
+    id: '/registry/agent/$agentId',
+    path: '/registry/agent/$agentId',
     getParentRoute: () => AppRouteRoute,
   } as any)
-const AppToolsCatalogProviderIdRoute =
-  AppToolsCatalogProviderIdRouteImport.update({
+const AppRegistryAgentNewRoute = AppRegistryAgentNewRouteImport.update({
+  id: '/registry/agent/new',
+  path: '/registry/agent/new',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryMemoryIndexRoute = AppRegistryMemoryIndexRouteImport.update({
+  id: '/registry/memory/',
+  path: '/registry/memory/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryMemoryBankIdRouteRoute =
+  AppRegistryMemoryBankIdRouteRouteImport.update({
+    id: '/registry/memory/$bankId',
+    path: '/registry/memory/$bankId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistrySandboxesIndexRoute =
+  AppRegistrySandboxesIndexRouteImport.update({
+    id: '/registry/sandboxes/',
+    path: '/registry/sandboxes/',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdRouteRoute =
+  AppRegistrySandboxesBlueprintIdRouteRouteImport.update({
+    id: '/registry/sandboxes/$blueprintId',
+    path: '/registry/sandboxes/$blueprintId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistrySkillsSkillIdRoute =
+  AppRegistrySkillsSkillIdRouteImport.update({
+    id: '/registry/skills_/$skillId',
+    path: '/registry/skills/$skillId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistrySkillsCatalogRoute =
+  AppRegistrySkillsCatalogRouteImport.update({
+    id: '/registry/skills_/catalog',
+    path: '/registry/skills/catalog',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistryToolsIndexRoute = AppRegistryToolsIndexRouteImport.update({
+  id: '/registry/tools/',
+  path: '/registry/tools/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryToolsToolIdRoute = AppRegistryToolsToolIdRouteImport.update({
+  id: '/registry/tools/$toolId',
+  path: '/registry/tools/$toolId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryToolsCatalogRoute = AppRegistryToolsCatalogRouteImport.update({
+  id: '/registry/tools/catalog',
+  path: '/registry/tools/catalog',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryToolsConnectionsRoute =
+  AppRegistryToolsConnectionsRouteImport.update({
+    id: '/registry/tools/connections',
+    path: '/registry/tools/connections',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistryToolsRemoteServersRoute =
+  AppRegistryToolsRemoteServersRouteImport.update({
+    id: '/registry/tools/remote-servers',
+    path: '/registry/tools/remote-servers',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistryWikisIndexRoute = AppRegistryWikisIndexRouteImport.update({
+  id: '/registry/wikis/',
+  path: '/registry/wikis/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppRegistryWikisWikiIdRouteRoute =
+  AppRegistryWikisWikiIdRouteRouteImport.update({
+    id: '/registry/wikis/$wikiId',
+    path: '/registry/wikis/$wikiId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdIndexRoute =
+  AppRegistryAgentAgentIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdCapabilitiesRoute =
+  AppRegistryAgentAgentIdCapabilitiesRouteImport.update({
+    id: '/capabilities',
+    path: '/capabilities',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdChatProvidersRoute =
+  AppRegistryAgentAgentIdChatProvidersRouteImport.update({
+    id: '/chat-providers',
+    path: '/chat-providers',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdDeploymentRoute =
+  AppRegistryAgentAgentIdDeploymentRouteImport.update({
+    id: '/deployment',
+    path: '/deployment',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdIamRoute =
+  AppRegistryAgentAgentIdIamRouteImport.update({
+    id: '/iam',
+    path: '/iam',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdInferenceRoute =
+  AppRegistryAgentAgentIdInferenceRouteImport.update({
+    id: '/inference',
+    path: '/inference',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdLogsRoute =
+  AppRegistryAgentAgentIdLogsRouteImport.update({
+    id: '/logs',
+    path: '/logs',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdPromptsRoute =
+  AppRegistryAgentAgentIdPromptsRouteImport.update({
+    id: '/prompts',
+    path: '/prompts',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdRoutinesRoute =
+  AppRegistryAgentAgentIdRoutinesRouteImport.update({
+    id: '/routines',
+    path: '/routines',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdSessionsRoute =
+  AppRegistryAgentAgentIdSessionsRouteImport.update({
+    id: '/sessions',
+    path: '/sessions',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdSkillsRoute =
+  AppRegistryAgentAgentIdSkillsRouteImport.update({
+    id: '/skills',
+    path: '/skills',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdToolsRoute =
+  AppRegistryAgentAgentIdToolsRouteImport.update({
+    id: '/tools',
+    path: '/tools',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryAgentAgentIdTracingRoute =
+  AppRegistryAgentAgentIdTracingRouteImport.update({
+    id: '/tracing',
+    path: '/tracing',
+    getParentRoute: () => AppRegistryAgentAgentIdRouteRoute,
+  } as any)
+const AppRegistryMemoryBankIdIndexRoute =
+  AppRegistryMemoryBankIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppRegistryMemoryBankIdRouteRoute,
+  } as any)
+const AppRegistryMemoryBankIdMemoriesRoute =
+  AppRegistryMemoryBankIdMemoriesRouteImport.update({
+    id: '/memories',
+    path: '/memories',
+    getParentRoute: () => AppRegistryMemoryBankIdRouteRoute,
+  } as any)
+const AppRegistryMemoryBankIdSettingsRoute =
+  AppRegistryMemoryBankIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppRegistryMemoryBankIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdIndexRoute =
+  AppRegistrySandboxesBlueprintIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdEgressRoute =
+  AppRegistrySandboxesBlueprintIdEgressRouteImport.update({
+    id: '/egress',
+    path: '/egress',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdEnvironmentRoute =
+  AppRegistrySandboxesBlueprintIdEnvironmentRouteImport.update({
+    id: '/environment',
+    path: '/environment',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdSandboxesRoute =
+  AppRegistrySandboxesBlueprintIdSandboxesRouteImport.update({
+    id: '/sandboxes',
+    path: '/sandboxes',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdSettingsRoute =
+  AppRegistrySandboxesBlueprintIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySandboxesBlueprintIdToolsRoute =
+  AppRegistrySandboxesBlueprintIdToolsRouteImport.update({
+    id: '/tools',
+    path: '/tools',
+    getParentRoute: () => AppRegistrySandboxesBlueprintIdRouteRoute,
+  } as any)
+const AppRegistrySkillsCatalogGroupIdRoute =
+  AppRegistrySkillsCatalogGroupIdRouteImport.update({
+    id: '/$groupId',
+    path: '/$groupId',
+    getParentRoute: () => AppRegistrySkillsCatalogRoute,
+  } as any)
+const AppRegistrySkillsSourcesSourceIdRoute =
+  AppRegistrySkillsSourcesSourceIdRouteImport.update({
+    id: '/registry/skills_/sources/$sourceId',
+    path: '/registry/skills/sources/$sourceId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
+const AppRegistryToolsCatalogProviderIdRoute =
+  AppRegistryToolsCatalogProviderIdRouteImport.update({
     id: '/$providerId',
     path: '/$providerId',
-    getParentRoute: () => AppToolsCatalogRoute,
+    getParentRoute: () => AppRegistryToolsCatalogRoute,
   } as any)
-const AppWikisWikiIdIndexRoute = AppWikisWikiIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppWikisWikiIdRouteRoute,
-} as any)
-const AppWikisWikiIdPagesRoute = AppWikisWikiIdPagesRouteImport.update({
-  id: '/pages',
-  path: '/pages',
-  getParentRoute: () => AppWikisWikiIdRouteRoute,
-} as any)
-const AppWikisWikiIdSettingsRoute = AppWikisWikiIdSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppWikisWikiIdRouteRoute,
-} as any)
+const AppRegistryWikisWikiIdIndexRoute =
+  AppRegistryWikisWikiIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AppRegistryWikisWikiIdRouteRoute,
+  } as any)
+const AppRegistryWikisWikiIdPagesRoute =
+  AppRegistryWikisWikiIdPagesRouteImport.update({
+    id: '/pages',
+    path: '/pages',
+    getParentRoute: () => AppRegistryWikisWikiIdRouteRoute,
+  } as any)
+const AppRegistryWikisWikiIdSettingsRoute =
+  AppRegistryWikisWikiIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppRegistryWikisWikiIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/skills': typeof AppSkillsRoute
-  '/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
-  '/memory/$bankId': typeof AppMemoryBankIdRouteRouteWithChildren
-  '/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdRouteRouteWithChildren
-  '/wikis/$wikiId': typeof AppWikisWikiIdRouteRouteWithChildren
-  '/agent/new': typeof AppAgentNewRoute
-  '/skills/$skillId': typeof AppSkillsSkillIdRoute
-  '/skills/catalog': typeof AppSkillsCatalogRouteWithChildren
-  '/tools/$toolId': typeof AppToolsToolIdRoute
-  '/tools/catalog': typeof AppToolsCatalogRouteWithChildren
-  '/tools/connections': typeof AppToolsConnectionsRoute
-  '/tools/remote-servers': typeof AppToolsRemoteServersRoute
+  '/connections/secrets': typeof AppConnectionsSecretsRoute
+  '/registry/skills': typeof AppRegistrySkillsRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
-  '/memory/': typeof AppMemoryIndexRoute
-  '/sandboxes/': typeof AppSandboxesIndexRoute
-  '/tools/': typeof AppToolsIndexRoute
-  '/wikis/': typeof AppWikisIndexRoute
-  '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
-  '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
-  '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
-  '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
-  '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
-  '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
-  '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
-  '/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
-  '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
-  '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
-  '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
-  '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
-  '/memory/$bankId/memories': typeof AppMemoryBankIdMemoriesRoute
-  '/memory/$bankId/settings': typeof AppMemoryBankIdSettingsRoute
-  '/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
-  '/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
-  '/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
-  '/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
-  '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
-  '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
-  '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
-  '/wikis/$wikiId/pages': typeof AppWikisWikiIdPagesRoute
-  '/wikis/$wikiId/settings': typeof AppWikisWikiIdSettingsRoute
-  '/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
-  '/memory/$bankId/': typeof AppMemoryBankIdIndexRoute
-  '/sandboxes/$blueprintId/': typeof AppSandboxesBlueprintIdIndexRoute
-  '/wikis/$wikiId/': typeof AppWikisWikiIdIndexRoute
+  '/registry/': typeof AppRegistryIndexRoute
+  '/registry/agent/$agentId': typeof AppRegistryAgentAgentIdRouteRouteWithChildren
+  '/registry/memory/$bankId': typeof AppRegistryMemoryBankIdRouteRouteWithChildren
+  '/registry/sandboxes/$blueprintId': typeof AppRegistrySandboxesBlueprintIdRouteRouteWithChildren
+  '/registry/wikis/$wikiId': typeof AppRegistryWikisWikiIdRouteRouteWithChildren
+  '/registry/agent/new': typeof AppRegistryAgentNewRoute
+  '/registry/skills/$skillId': typeof AppRegistrySkillsSkillIdRoute
+  '/registry/skills/catalog': typeof AppRegistrySkillsCatalogRouteWithChildren
+  '/registry/tools/$toolId': typeof AppRegistryToolsToolIdRoute
+  '/registry/tools/catalog': typeof AppRegistryToolsCatalogRouteWithChildren
+  '/registry/tools/connections': typeof AppRegistryToolsConnectionsRoute
+  '/registry/tools/remote-servers': typeof AppRegistryToolsRemoteServersRoute
+  '/registry/memory/': typeof AppRegistryMemoryIndexRoute
+  '/registry/sandboxes/': typeof AppRegistrySandboxesIndexRoute
+  '/registry/tools/': typeof AppRegistryToolsIndexRoute
+  '/registry/wikis/': typeof AppRegistryWikisIndexRoute
+  '/registry/agent/$agentId/capabilities': typeof AppRegistryAgentAgentIdCapabilitiesRoute
+  '/registry/agent/$agentId/chat-providers': typeof AppRegistryAgentAgentIdChatProvidersRoute
+  '/registry/agent/$agentId/deployment': typeof AppRegistryAgentAgentIdDeploymentRoute
+  '/registry/agent/$agentId/iam': typeof AppRegistryAgentAgentIdIamRoute
+  '/registry/agent/$agentId/inference': typeof AppRegistryAgentAgentIdInferenceRoute
+  '/registry/agent/$agentId/logs': typeof AppRegistryAgentAgentIdLogsRoute
+  '/registry/agent/$agentId/prompts': typeof AppRegistryAgentAgentIdPromptsRoute
+  '/registry/agent/$agentId/routines': typeof AppRegistryAgentAgentIdRoutinesRoute
+  '/registry/agent/$agentId/sessions': typeof AppRegistryAgentAgentIdSessionsRoute
+  '/registry/agent/$agentId/skills': typeof AppRegistryAgentAgentIdSkillsRoute
+  '/registry/agent/$agentId/tools': typeof AppRegistryAgentAgentIdToolsRoute
+  '/registry/agent/$agentId/tracing': typeof AppRegistryAgentAgentIdTracingRoute
+  '/registry/memory/$bankId/memories': typeof AppRegistryMemoryBankIdMemoriesRoute
+  '/registry/memory/$bankId/settings': typeof AppRegistryMemoryBankIdSettingsRoute
+  '/registry/sandboxes/$blueprintId/egress': typeof AppRegistrySandboxesBlueprintIdEgressRoute
+  '/registry/sandboxes/$blueprintId/environment': typeof AppRegistrySandboxesBlueprintIdEnvironmentRoute
+  '/registry/sandboxes/$blueprintId/sandboxes': typeof AppRegistrySandboxesBlueprintIdSandboxesRoute
+  '/registry/sandboxes/$blueprintId/settings': typeof AppRegistrySandboxesBlueprintIdSettingsRoute
+  '/registry/sandboxes/$blueprintId/tools': typeof AppRegistrySandboxesBlueprintIdToolsRoute
+  '/registry/skills/catalog/$groupId': typeof AppRegistrySkillsCatalogGroupIdRoute
+  '/registry/skills/sources/$sourceId': typeof AppRegistrySkillsSourcesSourceIdRoute
+  '/registry/tools/catalog/$providerId': typeof AppRegistryToolsCatalogProviderIdRoute
+  '/registry/wikis/$wikiId/pages': typeof AppRegistryWikisWikiIdPagesRoute
+  '/registry/wikis/$wikiId/settings': typeof AppRegistryWikisWikiIdSettingsRoute
+  '/registry/agent/$agentId/': typeof AppRegistryAgentAgentIdIndexRoute
+  '/registry/memory/$bankId/': typeof AppRegistryMemoryBankIdIndexRoute
+  '/registry/sandboxes/$blueprintId/': typeof AppRegistrySandboxesBlueprintIdIndexRoute
+  '/registry/wikis/$wikiId/': typeof AppRegistryWikisWikiIdIndexRoute
 }
 export interface FileRoutesByTo {
-  '/skills': typeof AppSkillsRoute
   '/': typeof AppIndexRoute
-  '/agent/new': typeof AppAgentNewRoute
-  '/skills/$skillId': typeof AppSkillsSkillIdRoute
-  '/skills/catalog': typeof AppSkillsCatalogRouteWithChildren
-  '/tools/$toolId': typeof AppToolsToolIdRoute
-  '/tools/catalog': typeof AppToolsCatalogRouteWithChildren
-  '/tools/connections': typeof AppToolsConnectionsRoute
-  '/tools/remote-servers': typeof AppToolsRemoteServersRoute
+  '/connections/secrets': typeof AppConnectionsSecretsRoute
+  '/registry/skills': typeof AppRegistrySkillsRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
-  '/memory': typeof AppMemoryIndexRoute
-  '/sandboxes': typeof AppSandboxesIndexRoute
-  '/tools': typeof AppToolsIndexRoute
-  '/wikis': typeof AppWikisIndexRoute
-  '/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
-  '/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
-  '/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
-  '/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
-  '/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
-  '/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
-  '/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
-  '/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
-  '/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
-  '/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
-  '/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
-  '/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
-  '/memory/$bankId/memories': typeof AppMemoryBankIdMemoriesRoute
-  '/memory/$bankId/settings': typeof AppMemoryBankIdSettingsRoute
-  '/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
-  '/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
-  '/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
-  '/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
-  '/skills/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
-  '/skills/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
-  '/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
-  '/wikis/$wikiId/pages': typeof AppWikisWikiIdPagesRoute
-  '/wikis/$wikiId/settings': typeof AppWikisWikiIdSettingsRoute
-  '/agent/$agentId': typeof AppAgentAgentIdIndexRoute
-  '/memory/$bankId': typeof AppMemoryBankIdIndexRoute
-  '/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdIndexRoute
-  '/wikis/$wikiId': typeof AppWikisWikiIdIndexRoute
+  '/registry': typeof AppRegistryIndexRoute
+  '/registry/agent/new': typeof AppRegistryAgentNewRoute
+  '/registry/skills/$skillId': typeof AppRegistrySkillsSkillIdRoute
+  '/registry/skills/catalog': typeof AppRegistrySkillsCatalogRouteWithChildren
+  '/registry/tools/$toolId': typeof AppRegistryToolsToolIdRoute
+  '/registry/tools/catalog': typeof AppRegistryToolsCatalogRouteWithChildren
+  '/registry/tools/connections': typeof AppRegistryToolsConnectionsRoute
+  '/registry/tools/remote-servers': typeof AppRegistryToolsRemoteServersRoute
+  '/registry/memory': typeof AppRegistryMemoryIndexRoute
+  '/registry/sandboxes': typeof AppRegistrySandboxesIndexRoute
+  '/registry/tools': typeof AppRegistryToolsIndexRoute
+  '/registry/wikis': typeof AppRegistryWikisIndexRoute
+  '/registry/agent/$agentId/capabilities': typeof AppRegistryAgentAgentIdCapabilitiesRoute
+  '/registry/agent/$agentId/chat-providers': typeof AppRegistryAgentAgentIdChatProvidersRoute
+  '/registry/agent/$agentId/deployment': typeof AppRegistryAgentAgentIdDeploymentRoute
+  '/registry/agent/$agentId/iam': typeof AppRegistryAgentAgentIdIamRoute
+  '/registry/agent/$agentId/inference': typeof AppRegistryAgentAgentIdInferenceRoute
+  '/registry/agent/$agentId/logs': typeof AppRegistryAgentAgentIdLogsRoute
+  '/registry/agent/$agentId/prompts': typeof AppRegistryAgentAgentIdPromptsRoute
+  '/registry/agent/$agentId/routines': typeof AppRegistryAgentAgentIdRoutinesRoute
+  '/registry/agent/$agentId/sessions': typeof AppRegistryAgentAgentIdSessionsRoute
+  '/registry/agent/$agentId/skills': typeof AppRegistryAgentAgentIdSkillsRoute
+  '/registry/agent/$agentId/tools': typeof AppRegistryAgentAgentIdToolsRoute
+  '/registry/agent/$agentId/tracing': typeof AppRegistryAgentAgentIdTracingRoute
+  '/registry/memory/$bankId/memories': typeof AppRegistryMemoryBankIdMemoriesRoute
+  '/registry/memory/$bankId/settings': typeof AppRegistryMemoryBankIdSettingsRoute
+  '/registry/sandboxes/$blueprintId/egress': typeof AppRegistrySandboxesBlueprintIdEgressRoute
+  '/registry/sandboxes/$blueprintId/environment': typeof AppRegistrySandboxesBlueprintIdEnvironmentRoute
+  '/registry/sandboxes/$blueprintId/sandboxes': typeof AppRegistrySandboxesBlueprintIdSandboxesRoute
+  '/registry/sandboxes/$blueprintId/settings': typeof AppRegistrySandboxesBlueprintIdSettingsRoute
+  '/registry/sandboxes/$blueprintId/tools': typeof AppRegistrySandboxesBlueprintIdToolsRoute
+  '/registry/skills/catalog/$groupId': typeof AppRegistrySkillsCatalogGroupIdRoute
+  '/registry/skills/sources/$sourceId': typeof AppRegistrySkillsSourcesSourceIdRoute
+  '/registry/tools/catalog/$providerId': typeof AppRegistryToolsCatalogProviderIdRoute
+  '/registry/wikis/$wikiId/pages': typeof AppRegistryWikisWikiIdPagesRoute
+  '/registry/wikis/$wikiId/settings': typeof AppRegistryWikisWikiIdSettingsRoute
+  '/registry/agent/$agentId': typeof AppRegistryAgentAgentIdIndexRoute
+  '/registry/memory/$bankId': typeof AppRegistryMemoryBankIdIndexRoute
+  '/registry/sandboxes/$blueprintId': typeof AppRegistrySandboxesBlueprintIdIndexRoute
+  '/registry/wikis/$wikiId': typeof AppRegistryWikisWikiIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteRouteWithChildren
-  '/_app/skills': typeof AppSkillsRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/agent/$agentId': typeof AppAgentAgentIdRouteRouteWithChildren
-  '/_app/memory/$bankId': typeof AppMemoryBankIdRouteRouteWithChildren
-  '/_app/sandboxes/$blueprintId': typeof AppSandboxesBlueprintIdRouteRouteWithChildren
-  '/_app/wikis/$wikiId': typeof AppWikisWikiIdRouteRouteWithChildren
-  '/_app/agent/new': typeof AppAgentNewRoute
-  '/_app/skills_/$skillId': typeof AppSkillsSkillIdRoute
-  '/_app/skills_/catalog': typeof AppSkillsCatalogRouteWithChildren
-  '/_app/tools/$toolId': typeof AppToolsToolIdRoute
-  '/_app/tools/catalog': typeof AppToolsCatalogRouteWithChildren
-  '/_app/tools/connections': typeof AppToolsConnectionsRoute
-  '/_app/tools/remote-servers': typeof AppToolsRemoteServersRoute
+  '/_app/connections/secrets': typeof AppConnectionsSecretsRoute
+  '/_app/registry/skills': typeof AppRegistrySkillsRoute
   '/connections/broker/$setupId': typeof ConnectionsBrokerSetupIdRoute
-  '/_app/memory/': typeof AppMemoryIndexRoute
-  '/_app/sandboxes/': typeof AppSandboxesIndexRoute
-  '/_app/tools/': typeof AppToolsIndexRoute
-  '/_app/wikis/': typeof AppWikisIndexRoute
-  '/_app/agent/$agentId/capabilities': typeof AppAgentAgentIdCapabilitiesRoute
-  '/_app/agent/$agentId/chat-providers': typeof AppAgentAgentIdChatProvidersRoute
-  '/_app/agent/$agentId/deployment': typeof AppAgentAgentIdDeploymentRoute
-  '/_app/agent/$agentId/iam': typeof AppAgentAgentIdIamRoute
-  '/_app/agent/$agentId/inference': typeof AppAgentAgentIdInferenceRoute
-  '/_app/agent/$agentId/logs': typeof AppAgentAgentIdLogsRoute
-  '/_app/agent/$agentId/prompts': typeof AppAgentAgentIdPromptsRoute
-  '/_app/agent/$agentId/routines': typeof AppAgentAgentIdRoutinesRoute
-  '/_app/agent/$agentId/sessions': typeof AppAgentAgentIdSessionsRoute
-  '/_app/agent/$agentId/skills': typeof AppAgentAgentIdSkillsRoute
-  '/_app/agent/$agentId/tools': typeof AppAgentAgentIdToolsRoute
-  '/_app/agent/$agentId/tracing': typeof AppAgentAgentIdTracingRoute
-  '/_app/memory/$bankId/memories': typeof AppMemoryBankIdMemoriesRoute
-  '/_app/memory/$bankId/settings': typeof AppMemoryBankIdSettingsRoute
-  '/_app/sandboxes/$blueprintId/environment': typeof AppSandboxesBlueprintIdEnvironmentRoute
-  '/_app/sandboxes/$blueprintId/sandboxes': typeof AppSandboxesBlueprintIdSandboxesRoute
-  '/_app/sandboxes/$blueprintId/settings': typeof AppSandboxesBlueprintIdSettingsRoute
-  '/_app/sandboxes/$blueprintId/tools': typeof AppSandboxesBlueprintIdToolsRoute
-  '/_app/skills_/catalog/$groupId': typeof AppSkillsCatalogGroupIdRoute
-  '/_app/skills_/sources/$sourceId': typeof AppSkillsSourcesSourceIdRoute
-  '/_app/tools/catalog/$providerId': typeof AppToolsCatalogProviderIdRoute
-  '/_app/wikis/$wikiId/pages': typeof AppWikisWikiIdPagesRoute
-  '/_app/wikis/$wikiId/settings': typeof AppWikisWikiIdSettingsRoute
-  '/_app/agent/$agentId/': typeof AppAgentAgentIdIndexRoute
-  '/_app/memory/$bankId/': typeof AppMemoryBankIdIndexRoute
-  '/_app/sandboxes/$blueprintId/': typeof AppSandboxesBlueprintIdIndexRoute
-  '/_app/wikis/$wikiId/': typeof AppWikisWikiIdIndexRoute
+  '/_app/registry/': typeof AppRegistryIndexRoute
+  '/_app/registry/agent/$agentId': typeof AppRegistryAgentAgentIdRouteRouteWithChildren
+  '/_app/registry/memory/$bankId': typeof AppRegistryMemoryBankIdRouteRouteWithChildren
+  '/_app/registry/sandboxes/$blueprintId': typeof AppRegistrySandboxesBlueprintIdRouteRouteWithChildren
+  '/_app/registry/wikis/$wikiId': typeof AppRegistryWikisWikiIdRouteRouteWithChildren
+  '/_app/registry/agent/new': typeof AppRegistryAgentNewRoute
+  '/_app/registry/skills_/$skillId': typeof AppRegistrySkillsSkillIdRoute
+  '/_app/registry/skills_/catalog': typeof AppRegistrySkillsCatalogRouteWithChildren
+  '/_app/registry/tools/$toolId': typeof AppRegistryToolsToolIdRoute
+  '/_app/registry/tools/catalog': typeof AppRegistryToolsCatalogRouteWithChildren
+  '/_app/registry/tools/connections': typeof AppRegistryToolsConnectionsRoute
+  '/_app/registry/tools/remote-servers': typeof AppRegistryToolsRemoteServersRoute
+  '/_app/registry/memory/': typeof AppRegistryMemoryIndexRoute
+  '/_app/registry/sandboxes/': typeof AppRegistrySandboxesIndexRoute
+  '/_app/registry/tools/': typeof AppRegistryToolsIndexRoute
+  '/_app/registry/wikis/': typeof AppRegistryWikisIndexRoute
+  '/_app/registry/agent/$agentId/capabilities': typeof AppRegistryAgentAgentIdCapabilitiesRoute
+  '/_app/registry/agent/$agentId/chat-providers': typeof AppRegistryAgentAgentIdChatProvidersRoute
+  '/_app/registry/agent/$agentId/deployment': typeof AppRegistryAgentAgentIdDeploymentRoute
+  '/_app/registry/agent/$agentId/iam': typeof AppRegistryAgentAgentIdIamRoute
+  '/_app/registry/agent/$agentId/inference': typeof AppRegistryAgentAgentIdInferenceRoute
+  '/_app/registry/agent/$agentId/logs': typeof AppRegistryAgentAgentIdLogsRoute
+  '/_app/registry/agent/$agentId/prompts': typeof AppRegistryAgentAgentIdPromptsRoute
+  '/_app/registry/agent/$agentId/routines': typeof AppRegistryAgentAgentIdRoutinesRoute
+  '/_app/registry/agent/$agentId/sessions': typeof AppRegistryAgentAgentIdSessionsRoute
+  '/_app/registry/agent/$agentId/skills': typeof AppRegistryAgentAgentIdSkillsRoute
+  '/_app/registry/agent/$agentId/tools': typeof AppRegistryAgentAgentIdToolsRoute
+  '/_app/registry/agent/$agentId/tracing': typeof AppRegistryAgentAgentIdTracingRoute
+  '/_app/registry/memory/$bankId/memories': typeof AppRegistryMemoryBankIdMemoriesRoute
+  '/_app/registry/memory/$bankId/settings': typeof AppRegistryMemoryBankIdSettingsRoute
+  '/_app/registry/sandboxes/$blueprintId/egress': typeof AppRegistrySandboxesBlueprintIdEgressRoute
+  '/_app/registry/sandboxes/$blueprintId/environment': typeof AppRegistrySandboxesBlueprintIdEnvironmentRoute
+  '/_app/registry/sandboxes/$blueprintId/sandboxes': typeof AppRegistrySandboxesBlueprintIdSandboxesRoute
+  '/_app/registry/sandboxes/$blueprintId/settings': typeof AppRegistrySandboxesBlueprintIdSettingsRoute
+  '/_app/registry/sandboxes/$blueprintId/tools': typeof AppRegistrySandboxesBlueprintIdToolsRoute
+  '/_app/registry/skills_/catalog/$groupId': typeof AppRegistrySkillsCatalogGroupIdRoute
+  '/_app/registry/skills_/sources/$sourceId': typeof AppRegistrySkillsSourcesSourceIdRoute
+  '/_app/registry/tools/catalog/$providerId': typeof AppRegistryToolsCatalogProviderIdRoute
+  '/_app/registry/wikis/$wikiId/pages': typeof AppRegistryWikisWikiIdPagesRoute
+  '/_app/registry/wikis/$wikiId/settings': typeof AppRegistryWikisWikiIdSettingsRoute
+  '/_app/registry/agent/$agentId/': typeof AppRegistryAgentAgentIdIndexRoute
+  '/_app/registry/memory/$bankId/': typeof AppRegistryMemoryBankIdIndexRoute
+  '/_app/registry/sandboxes/$blueprintId/': typeof AppRegistrySandboxesBlueprintIdIndexRoute
+  '/_app/registry/wikis/$wikiId/': typeof AppRegistryWikisWikiIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/skills'
-    | '/agent/$agentId'
-    | '/memory/$bankId'
-    | '/sandboxes/$blueprintId'
-    | '/wikis/$wikiId'
-    | '/agent/new'
-    | '/skills/$skillId'
-    | '/skills/catalog'
-    | '/tools/$toolId'
-    | '/tools/catalog'
-    | '/tools/connections'
-    | '/tools/remote-servers'
+    | '/connections/secrets'
+    | '/registry/skills'
     | '/connections/broker/$setupId'
-    | '/memory/'
-    | '/sandboxes/'
-    | '/tools/'
-    | '/wikis/'
-    | '/agent/$agentId/capabilities'
-    | '/agent/$agentId/chat-providers'
-    | '/agent/$agentId/deployment'
-    | '/agent/$agentId/iam'
-    | '/agent/$agentId/inference'
-    | '/agent/$agentId/logs'
-    | '/agent/$agentId/prompts'
-    | '/agent/$agentId/routines'
-    | '/agent/$agentId/sessions'
-    | '/agent/$agentId/skills'
-    | '/agent/$agentId/tools'
-    | '/agent/$agentId/tracing'
-    | '/memory/$bankId/memories'
-    | '/memory/$bankId/settings'
-    | '/sandboxes/$blueprintId/environment'
-    | '/sandboxes/$blueprintId/sandboxes'
-    | '/sandboxes/$blueprintId/settings'
-    | '/sandboxes/$blueprintId/tools'
-    | '/skills/catalog/$groupId'
-    | '/skills/sources/$sourceId'
-    | '/tools/catalog/$providerId'
-    | '/wikis/$wikiId/pages'
-    | '/wikis/$wikiId/settings'
-    | '/agent/$agentId/'
-    | '/memory/$bankId/'
-    | '/sandboxes/$blueprintId/'
-    | '/wikis/$wikiId/'
+    | '/registry/'
+    | '/registry/agent/$agentId'
+    | '/registry/memory/$bankId'
+    | '/registry/sandboxes/$blueprintId'
+    | '/registry/wikis/$wikiId'
+    | '/registry/agent/new'
+    | '/registry/skills/$skillId'
+    | '/registry/skills/catalog'
+    | '/registry/tools/$toolId'
+    | '/registry/tools/catalog'
+    | '/registry/tools/connections'
+    | '/registry/tools/remote-servers'
+    | '/registry/memory/'
+    | '/registry/sandboxes/'
+    | '/registry/tools/'
+    | '/registry/wikis/'
+    | '/registry/agent/$agentId/capabilities'
+    | '/registry/agent/$agentId/chat-providers'
+    | '/registry/agent/$agentId/deployment'
+    | '/registry/agent/$agentId/iam'
+    | '/registry/agent/$agentId/inference'
+    | '/registry/agent/$agentId/logs'
+    | '/registry/agent/$agentId/prompts'
+    | '/registry/agent/$agentId/routines'
+    | '/registry/agent/$agentId/sessions'
+    | '/registry/agent/$agentId/skills'
+    | '/registry/agent/$agentId/tools'
+    | '/registry/agent/$agentId/tracing'
+    | '/registry/memory/$bankId/memories'
+    | '/registry/memory/$bankId/settings'
+    | '/registry/sandboxes/$blueprintId/egress'
+    | '/registry/sandboxes/$blueprintId/environment'
+    | '/registry/sandboxes/$blueprintId/sandboxes'
+    | '/registry/sandboxes/$blueprintId/settings'
+    | '/registry/sandboxes/$blueprintId/tools'
+    | '/registry/skills/catalog/$groupId'
+    | '/registry/skills/sources/$sourceId'
+    | '/registry/tools/catalog/$providerId'
+    | '/registry/wikis/$wikiId/pages'
+    | '/registry/wikis/$wikiId/settings'
+    | '/registry/agent/$agentId/'
+    | '/registry/memory/$bankId/'
+    | '/registry/sandboxes/$blueprintId/'
+    | '/registry/wikis/$wikiId/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/skills'
     | '/'
-    | '/agent/new'
-    | '/skills/$skillId'
-    | '/skills/catalog'
-    | '/tools/$toolId'
-    | '/tools/catalog'
-    | '/tools/connections'
-    | '/tools/remote-servers'
+    | '/connections/secrets'
+    | '/registry/skills'
     | '/connections/broker/$setupId'
-    | '/memory'
-    | '/sandboxes'
-    | '/tools'
-    | '/wikis'
-    | '/agent/$agentId/capabilities'
-    | '/agent/$agentId/chat-providers'
-    | '/agent/$agentId/deployment'
-    | '/agent/$agentId/iam'
-    | '/agent/$agentId/inference'
-    | '/agent/$agentId/logs'
-    | '/agent/$agentId/prompts'
-    | '/agent/$agentId/routines'
-    | '/agent/$agentId/sessions'
-    | '/agent/$agentId/skills'
-    | '/agent/$agentId/tools'
-    | '/agent/$agentId/tracing'
-    | '/memory/$bankId/memories'
-    | '/memory/$bankId/settings'
-    | '/sandboxes/$blueprintId/environment'
-    | '/sandboxes/$blueprintId/sandboxes'
-    | '/sandboxes/$blueprintId/settings'
-    | '/sandboxes/$blueprintId/tools'
-    | '/skills/catalog/$groupId'
-    | '/skills/sources/$sourceId'
-    | '/tools/catalog/$providerId'
-    | '/wikis/$wikiId/pages'
-    | '/wikis/$wikiId/settings'
-    | '/agent/$agentId'
-    | '/memory/$bankId'
-    | '/sandboxes/$blueprintId'
-    | '/wikis/$wikiId'
+    | '/registry'
+    | '/registry/agent/new'
+    | '/registry/skills/$skillId'
+    | '/registry/skills/catalog'
+    | '/registry/tools/$toolId'
+    | '/registry/tools/catalog'
+    | '/registry/tools/connections'
+    | '/registry/tools/remote-servers'
+    | '/registry/memory'
+    | '/registry/sandboxes'
+    | '/registry/tools'
+    | '/registry/wikis'
+    | '/registry/agent/$agentId/capabilities'
+    | '/registry/agent/$agentId/chat-providers'
+    | '/registry/agent/$agentId/deployment'
+    | '/registry/agent/$agentId/iam'
+    | '/registry/agent/$agentId/inference'
+    | '/registry/agent/$agentId/logs'
+    | '/registry/agent/$agentId/prompts'
+    | '/registry/agent/$agentId/routines'
+    | '/registry/agent/$agentId/sessions'
+    | '/registry/agent/$agentId/skills'
+    | '/registry/agent/$agentId/tools'
+    | '/registry/agent/$agentId/tracing'
+    | '/registry/memory/$bankId/memories'
+    | '/registry/memory/$bankId/settings'
+    | '/registry/sandboxes/$blueprintId/egress'
+    | '/registry/sandboxes/$blueprintId/environment'
+    | '/registry/sandboxes/$blueprintId/sandboxes'
+    | '/registry/sandboxes/$blueprintId/settings'
+    | '/registry/sandboxes/$blueprintId/tools'
+    | '/registry/skills/catalog/$groupId'
+    | '/registry/skills/sources/$sourceId'
+    | '/registry/tools/catalog/$providerId'
+    | '/registry/wikis/$wikiId/pages'
+    | '/registry/wikis/$wikiId/settings'
+    | '/registry/agent/$agentId'
+    | '/registry/memory/$bankId'
+    | '/registry/sandboxes/$blueprintId'
+    | '/registry/wikis/$wikiId'
   id:
     | '__root__'
     | '/_app'
-    | '/_app/skills'
     | '/_app/'
-    | '/_app/agent/$agentId'
-    | '/_app/memory/$bankId'
-    | '/_app/sandboxes/$blueprintId'
-    | '/_app/wikis/$wikiId'
-    | '/_app/agent/new'
-    | '/_app/skills_/$skillId'
-    | '/_app/skills_/catalog'
-    | '/_app/tools/$toolId'
-    | '/_app/tools/catalog'
-    | '/_app/tools/connections'
-    | '/_app/tools/remote-servers'
+    | '/_app/connections/secrets'
+    | '/_app/registry/skills'
     | '/connections/broker/$setupId'
-    | '/_app/memory/'
-    | '/_app/sandboxes/'
-    | '/_app/tools/'
-    | '/_app/wikis/'
-    | '/_app/agent/$agentId/capabilities'
-    | '/_app/agent/$agentId/chat-providers'
-    | '/_app/agent/$agentId/deployment'
-    | '/_app/agent/$agentId/iam'
-    | '/_app/agent/$agentId/inference'
-    | '/_app/agent/$agentId/logs'
-    | '/_app/agent/$agentId/prompts'
-    | '/_app/agent/$agentId/routines'
-    | '/_app/agent/$agentId/sessions'
-    | '/_app/agent/$agentId/skills'
-    | '/_app/agent/$agentId/tools'
-    | '/_app/agent/$agentId/tracing'
-    | '/_app/memory/$bankId/memories'
-    | '/_app/memory/$bankId/settings'
-    | '/_app/sandboxes/$blueprintId/environment'
-    | '/_app/sandboxes/$blueprintId/sandboxes'
-    | '/_app/sandboxes/$blueprintId/settings'
-    | '/_app/sandboxes/$blueprintId/tools'
-    | '/_app/skills_/catalog/$groupId'
-    | '/_app/skills_/sources/$sourceId'
-    | '/_app/tools/catalog/$providerId'
-    | '/_app/wikis/$wikiId/pages'
-    | '/_app/wikis/$wikiId/settings'
-    | '/_app/agent/$agentId/'
-    | '/_app/memory/$bankId/'
-    | '/_app/sandboxes/$blueprintId/'
-    | '/_app/wikis/$wikiId/'
+    | '/_app/registry/'
+    | '/_app/registry/agent/$agentId'
+    | '/_app/registry/memory/$bankId'
+    | '/_app/registry/sandboxes/$blueprintId'
+    | '/_app/registry/wikis/$wikiId'
+    | '/_app/registry/agent/new'
+    | '/_app/registry/skills_/$skillId'
+    | '/_app/registry/skills_/catalog'
+    | '/_app/registry/tools/$toolId'
+    | '/_app/registry/tools/catalog'
+    | '/_app/registry/tools/connections'
+    | '/_app/registry/tools/remote-servers'
+    | '/_app/registry/memory/'
+    | '/_app/registry/sandboxes/'
+    | '/_app/registry/tools/'
+    | '/_app/registry/wikis/'
+    | '/_app/registry/agent/$agentId/capabilities'
+    | '/_app/registry/agent/$agentId/chat-providers'
+    | '/_app/registry/agent/$agentId/deployment'
+    | '/_app/registry/agent/$agentId/iam'
+    | '/_app/registry/agent/$agentId/inference'
+    | '/_app/registry/agent/$agentId/logs'
+    | '/_app/registry/agent/$agentId/prompts'
+    | '/_app/registry/agent/$agentId/routines'
+    | '/_app/registry/agent/$agentId/sessions'
+    | '/_app/registry/agent/$agentId/skills'
+    | '/_app/registry/agent/$agentId/tools'
+    | '/_app/registry/agent/$agentId/tracing'
+    | '/_app/registry/memory/$bankId/memories'
+    | '/_app/registry/memory/$bankId/settings'
+    | '/_app/registry/sandboxes/$blueprintId/egress'
+    | '/_app/registry/sandboxes/$blueprintId/environment'
+    | '/_app/registry/sandboxes/$blueprintId/sandboxes'
+    | '/_app/registry/sandboxes/$blueprintId/settings'
+    | '/_app/registry/sandboxes/$blueprintId/tools'
+    | '/_app/registry/skills_/catalog/$groupId'
+    | '/_app/registry/skills_/sources/$sourceId'
+    | '/_app/registry/tools/catalog/$providerId'
+    | '/_app/registry/wikis/$wikiId/pages'
+    | '/_app/registry/wikis/$wikiId/settings'
+    | '/_app/registry/agent/$agentId/'
+    | '/_app/registry/memory/$bankId/'
+    | '/_app/registry/sandboxes/$blueprintId/'
+    | '/_app/registry/wikis/$wikiId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -600,116 +661,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/skills': {
-      id: '/_app/skills'
-      path: '/skills'
-      fullPath: '/skills'
-      preLoaderRoute: typeof AppSkillsRouteImport
+    '/_app/connections/secrets': {
+      id: '/_app/connections/secrets'
+      path: '/connections/secrets'
+      fullPath: '/connections/secrets'
+      preLoaderRoute: typeof AppConnectionsSecretsRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/agent/$agentId': {
-      id: '/_app/agent/$agentId'
-      path: '/agent/$agentId'
-      fullPath: '/agent/$agentId'
-      preLoaderRoute: typeof AppAgentAgentIdRouteRouteImport
+    '/_app/registry/': {
+      id: '/_app/registry/'
+      path: '/registry'
+      fullPath: '/registry/'
+      preLoaderRoute: typeof AppRegistryIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/agent/new': {
-      id: '/_app/agent/new'
-      path: '/agent/new'
-      fullPath: '/agent/new'
-      preLoaderRoute: typeof AppAgentNewRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/memory/': {
-      id: '/_app/memory/'
-      path: '/memory'
-      fullPath: '/memory/'
-      preLoaderRoute: typeof AppMemoryIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/memory/$bankId': {
-      id: '/_app/memory/$bankId'
-      path: '/memory/$bankId'
-      fullPath: '/memory/$bankId'
-      preLoaderRoute: typeof AppMemoryBankIdRouteRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/sandboxes/': {
-      id: '/_app/sandboxes/'
-      path: '/sandboxes'
-      fullPath: '/sandboxes/'
-      preLoaderRoute: typeof AppSandboxesIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId': {
-      id: '/_app/sandboxes/$blueprintId'
-      path: '/sandboxes/$blueprintId'
-      fullPath: '/sandboxes/$blueprintId'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdRouteRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/skills_/$skillId': {
-      id: '/_app/skills_/$skillId'
-      path: '/skills/$skillId'
-      fullPath: '/skills/$skillId'
-      preLoaderRoute: typeof AppSkillsSkillIdRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/skills_/catalog': {
-      id: '/_app/skills_/catalog'
-      path: '/skills/catalog'
-      fullPath: '/skills/catalog'
-      preLoaderRoute: typeof AppSkillsCatalogRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/tools/': {
-      id: '/_app/tools/'
-      path: '/tools'
-      fullPath: '/tools/'
-      preLoaderRoute: typeof AppToolsIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/tools/$toolId': {
-      id: '/_app/tools/$toolId'
-      path: '/tools/$toolId'
-      fullPath: '/tools/$toolId'
-      preLoaderRoute: typeof AppToolsToolIdRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/tools/catalog': {
-      id: '/_app/tools/catalog'
-      path: '/tools/catalog'
-      fullPath: '/tools/catalog'
-      preLoaderRoute: typeof AppToolsCatalogRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/tools/connections': {
-      id: '/_app/tools/connections'
-      path: '/tools/connections'
-      fullPath: '/tools/connections'
-      preLoaderRoute: typeof AppToolsConnectionsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/tools/remote-servers': {
-      id: '/_app/tools/remote-servers'
-      path: '/tools/remote-servers'
-      fullPath: '/tools/remote-servers'
-      preLoaderRoute: typeof AppToolsRemoteServersRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/wikis/': {
-      id: '/_app/wikis/'
-      path: '/wikis'
-      fullPath: '/wikis/'
-      preLoaderRoute: typeof AppWikisIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/_app/wikis/$wikiId': {
-      id: '/_app/wikis/$wikiId'
-      path: '/wikis/$wikiId'
-      fullPath: '/wikis/$wikiId'
-      preLoaderRoute: typeof AppWikisWikiIdRouteRouteImport
+    '/_app/registry/skills': {
+      id: '/_app/registry/skills'
+      path: '/registry/skills'
+      fullPath: '/registry/skills'
+      preLoaderRoute: typeof AppRegistrySkillsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/connections/broker/$setupId': {
@@ -719,351 +689,495 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectionsBrokerSetupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/agent/$agentId/': {
-      id: '/_app/agent/$agentId/'
-      path: '/'
-      fullPath: '/agent/$agentId/'
-      preLoaderRoute: typeof AppAgentAgentIdIndexRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/capabilities': {
-      id: '/_app/agent/$agentId/capabilities'
-      path: '/capabilities'
-      fullPath: '/agent/$agentId/capabilities'
-      preLoaderRoute: typeof AppAgentAgentIdCapabilitiesRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/chat-providers': {
-      id: '/_app/agent/$agentId/chat-providers'
-      path: '/chat-providers'
-      fullPath: '/agent/$agentId/chat-providers'
-      preLoaderRoute: typeof AppAgentAgentIdChatProvidersRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/deployment': {
-      id: '/_app/agent/$agentId/deployment'
-      path: '/deployment'
-      fullPath: '/agent/$agentId/deployment'
-      preLoaderRoute: typeof AppAgentAgentIdDeploymentRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/iam': {
-      id: '/_app/agent/$agentId/iam'
-      path: '/iam'
-      fullPath: '/agent/$agentId/iam'
-      preLoaderRoute: typeof AppAgentAgentIdIamRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/inference': {
-      id: '/_app/agent/$agentId/inference'
-      path: '/inference'
-      fullPath: '/agent/$agentId/inference'
-      preLoaderRoute: typeof AppAgentAgentIdInferenceRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/logs': {
-      id: '/_app/agent/$agentId/logs'
-      path: '/logs'
-      fullPath: '/agent/$agentId/logs'
-      preLoaderRoute: typeof AppAgentAgentIdLogsRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/prompts': {
-      id: '/_app/agent/$agentId/prompts'
-      path: '/prompts'
-      fullPath: '/agent/$agentId/prompts'
-      preLoaderRoute: typeof AppAgentAgentIdPromptsRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/routines': {
-      id: '/_app/agent/$agentId/routines'
-      path: '/routines'
-      fullPath: '/agent/$agentId/routines'
-      preLoaderRoute: typeof AppAgentAgentIdRoutinesRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/sessions': {
-      id: '/_app/agent/$agentId/sessions'
-      path: '/sessions'
-      fullPath: '/agent/$agentId/sessions'
-      preLoaderRoute: typeof AppAgentAgentIdSessionsRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/skills': {
-      id: '/_app/agent/$agentId/skills'
-      path: '/skills'
-      fullPath: '/agent/$agentId/skills'
-      preLoaderRoute: typeof AppAgentAgentIdSkillsRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/tools': {
-      id: '/_app/agent/$agentId/tools'
-      path: '/tools'
-      fullPath: '/agent/$agentId/tools'
-      preLoaderRoute: typeof AppAgentAgentIdToolsRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/agent/$agentId/tracing': {
-      id: '/_app/agent/$agentId/tracing'
-      path: '/tracing'
-      fullPath: '/agent/$agentId/tracing'
-      preLoaderRoute: typeof AppAgentAgentIdTracingRouteImport
-      parentRoute: typeof AppAgentAgentIdRouteRoute
-    }
-    '/_app/memory/$bankId/': {
-      id: '/_app/memory/$bankId/'
-      path: '/'
-      fullPath: '/memory/$bankId/'
-      preLoaderRoute: typeof AppMemoryBankIdIndexRouteImport
-      parentRoute: typeof AppMemoryBankIdRouteRoute
-    }
-    '/_app/memory/$bankId/memories': {
-      id: '/_app/memory/$bankId/memories'
-      path: '/memories'
-      fullPath: '/memory/$bankId/memories'
-      preLoaderRoute: typeof AppMemoryBankIdMemoriesRouteImport
-      parentRoute: typeof AppMemoryBankIdRouteRoute
-    }
-    '/_app/memory/$bankId/settings': {
-      id: '/_app/memory/$bankId/settings'
-      path: '/settings'
-      fullPath: '/memory/$bankId/settings'
-      preLoaderRoute: typeof AppMemoryBankIdSettingsRouteImport
-      parentRoute: typeof AppMemoryBankIdRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId/': {
-      id: '/_app/sandboxes/$blueprintId/'
-      path: '/'
-      fullPath: '/sandboxes/$blueprintId/'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdIndexRouteImport
-      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId/environment': {
-      id: '/_app/sandboxes/$blueprintId/environment'
-      path: '/environment'
-      fullPath: '/sandboxes/$blueprintId/environment'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdEnvironmentRouteImport
-      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId/sandboxes': {
-      id: '/_app/sandboxes/$blueprintId/sandboxes'
-      path: '/sandboxes'
-      fullPath: '/sandboxes/$blueprintId/sandboxes'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdSandboxesRouteImport
-      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId/settings': {
-      id: '/_app/sandboxes/$blueprintId/settings'
-      path: '/settings'
-      fullPath: '/sandboxes/$blueprintId/settings'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdSettingsRouteImport
-      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
-    }
-    '/_app/sandboxes/$blueprintId/tools': {
-      id: '/_app/sandboxes/$blueprintId/tools'
-      path: '/tools'
-      fullPath: '/sandboxes/$blueprintId/tools'
-      preLoaderRoute: typeof AppSandboxesBlueprintIdToolsRouteImport
-      parentRoute: typeof AppSandboxesBlueprintIdRouteRoute
-    }
-    '/_app/skills_/catalog/$groupId': {
-      id: '/_app/skills_/catalog/$groupId'
-      path: '/$groupId'
-      fullPath: '/skills/catalog/$groupId'
-      preLoaderRoute: typeof AppSkillsCatalogGroupIdRouteImport
-      parentRoute: typeof AppSkillsCatalogRoute
-    }
-    '/_app/skills_/sources/$sourceId': {
-      id: '/_app/skills_/sources/$sourceId'
-      path: '/skills/sources/$sourceId'
-      fullPath: '/skills/sources/$sourceId'
-      preLoaderRoute: typeof AppSkillsSourcesSourceIdRouteImport
+    '/_app/registry/agent/$agentId': {
+      id: '/_app/registry/agent/$agentId'
+      path: '/registry/agent/$agentId'
+      fullPath: '/registry/agent/$agentId'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/tools/catalog/$providerId': {
-      id: '/_app/tools/catalog/$providerId'
-      path: '/$providerId'
-      fullPath: '/tools/catalog/$providerId'
-      preLoaderRoute: typeof AppToolsCatalogProviderIdRouteImport
-      parentRoute: typeof AppToolsCatalogRoute
+    '/_app/registry/agent/new': {
+      id: '/_app/registry/agent/new'
+      path: '/registry/agent/new'
+      fullPath: '/registry/agent/new'
+      preLoaderRoute: typeof AppRegistryAgentNewRouteImport
+      parentRoute: typeof AppRouteRoute
     }
-    '/_app/wikis/$wikiId/': {
-      id: '/_app/wikis/$wikiId/'
+    '/_app/registry/memory/': {
+      id: '/_app/registry/memory/'
+      path: '/registry/memory'
+      fullPath: '/registry/memory/'
+      preLoaderRoute: typeof AppRegistryMemoryIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/memory/$bankId': {
+      id: '/_app/registry/memory/$bankId'
+      path: '/registry/memory/$bankId'
+      fullPath: '/registry/memory/$bankId'
+      preLoaderRoute: typeof AppRegistryMemoryBankIdRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/sandboxes/': {
+      id: '/_app/registry/sandboxes/'
+      path: '/registry/sandboxes'
+      fullPath: '/registry/sandboxes/'
+      preLoaderRoute: typeof AppRegistrySandboxesIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId': {
+      id: '/_app/registry/sandboxes/$blueprintId'
+      path: '/registry/sandboxes/$blueprintId'
+      fullPath: '/registry/sandboxes/$blueprintId'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/skills_/$skillId': {
+      id: '/_app/registry/skills_/$skillId'
+      path: '/registry/skills/$skillId'
+      fullPath: '/registry/skills/$skillId'
+      preLoaderRoute: typeof AppRegistrySkillsSkillIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/skills_/catalog': {
+      id: '/_app/registry/skills_/catalog'
+      path: '/registry/skills/catalog'
+      fullPath: '/registry/skills/catalog'
+      preLoaderRoute: typeof AppRegistrySkillsCatalogRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/': {
+      id: '/_app/registry/tools/'
+      path: '/registry/tools'
+      fullPath: '/registry/tools/'
+      preLoaderRoute: typeof AppRegistryToolsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/$toolId': {
+      id: '/_app/registry/tools/$toolId'
+      path: '/registry/tools/$toolId'
+      fullPath: '/registry/tools/$toolId'
+      preLoaderRoute: typeof AppRegistryToolsToolIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/catalog': {
+      id: '/_app/registry/tools/catalog'
+      path: '/registry/tools/catalog'
+      fullPath: '/registry/tools/catalog'
+      preLoaderRoute: typeof AppRegistryToolsCatalogRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/connections': {
+      id: '/_app/registry/tools/connections'
+      path: '/registry/tools/connections'
+      fullPath: '/registry/tools/connections'
+      preLoaderRoute: typeof AppRegistryToolsConnectionsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/remote-servers': {
+      id: '/_app/registry/tools/remote-servers'
+      path: '/registry/tools/remote-servers'
+      fullPath: '/registry/tools/remote-servers'
+      preLoaderRoute: typeof AppRegistryToolsRemoteServersRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/wikis/': {
+      id: '/_app/registry/wikis/'
+      path: '/registry/wikis'
+      fullPath: '/registry/wikis/'
+      preLoaderRoute: typeof AppRegistryWikisIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/wikis/$wikiId': {
+      id: '/_app/registry/wikis/$wikiId'
+      path: '/registry/wikis/$wikiId'
+      fullPath: '/registry/wikis/$wikiId'
+      preLoaderRoute: typeof AppRegistryWikisWikiIdRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/agent/$agentId/': {
+      id: '/_app/registry/agent/$agentId/'
       path: '/'
-      fullPath: '/wikis/$wikiId/'
-      preLoaderRoute: typeof AppWikisWikiIdIndexRouteImport
-      parentRoute: typeof AppWikisWikiIdRouteRoute
+      fullPath: '/registry/agent/$agentId/'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdIndexRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
     }
-    '/_app/wikis/$wikiId/pages': {
-      id: '/_app/wikis/$wikiId/pages'
-      path: '/pages'
-      fullPath: '/wikis/$wikiId/pages'
-      preLoaderRoute: typeof AppWikisWikiIdPagesRouteImport
-      parentRoute: typeof AppWikisWikiIdRouteRoute
+    '/_app/registry/agent/$agentId/capabilities': {
+      id: '/_app/registry/agent/$agentId/capabilities'
+      path: '/capabilities'
+      fullPath: '/registry/agent/$agentId/capabilities'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdCapabilitiesRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
     }
-    '/_app/wikis/$wikiId/settings': {
-      id: '/_app/wikis/$wikiId/settings'
+    '/_app/registry/agent/$agentId/chat-providers': {
+      id: '/_app/registry/agent/$agentId/chat-providers'
+      path: '/chat-providers'
+      fullPath: '/registry/agent/$agentId/chat-providers'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdChatProvidersRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/deployment': {
+      id: '/_app/registry/agent/$agentId/deployment'
+      path: '/deployment'
+      fullPath: '/registry/agent/$agentId/deployment'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdDeploymentRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/iam': {
+      id: '/_app/registry/agent/$agentId/iam'
+      path: '/iam'
+      fullPath: '/registry/agent/$agentId/iam'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdIamRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/inference': {
+      id: '/_app/registry/agent/$agentId/inference'
+      path: '/inference'
+      fullPath: '/registry/agent/$agentId/inference'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdInferenceRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/logs': {
+      id: '/_app/registry/agent/$agentId/logs'
+      path: '/logs'
+      fullPath: '/registry/agent/$agentId/logs'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdLogsRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/prompts': {
+      id: '/_app/registry/agent/$agentId/prompts'
+      path: '/prompts'
+      fullPath: '/registry/agent/$agentId/prompts'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdPromptsRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/routines': {
+      id: '/_app/registry/agent/$agentId/routines'
+      path: '/routines'
+      fullPath: '/registry/agent/$agentId/routines'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdRoutinesRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/sessions': {
+      id: '/_app/registry/agent/$agentId/sessions'
+      path: '/sessions'
+      fullPath: '/registry/agent/$agentId/sessions'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdSessionsRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/skills': {
+      id: '/_app/registry/agent/$agentId/skills'
+      path: '/skills'
+      fullPath: '/registry/agent/$agentId/skills'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdSkillsRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/tools': {
+      id: '/_app/registry/agent/$agentId/tools'
+      path: '/tools'
+      fullPath: '/registry/agent/$agentId/tools'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdToolsRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/agent/$agentId/tracing': {
+      id: '/_app/registry/agent/$agentId/tracing'
+      path: '/tracing'
+      fullPath: '/registry/agent/$agentId/tracing'
+      preLoaderRoute: typeof AppRegistryAgentAgentIdTracingRouteImport
+      parentRoute: typeof AppRegistryAgentAgentIdRouteRoute
+    }
+    '/_app/registry/memory/$bankId/': {
+      id: '/_app/registry/memory/$bankId/'
+      path: '/'
+      fullPath: '/registry/memory/$bankId/'
+      preLoaderRoute: typeof AppRegistryMemoryBankIdIndexRouteImport
+      parentRoute: typeof AppRegistryMemoryBankIdRouteRoute
+    }
+    '/_app/registry/memory/$bankId/memories': {
+      id: '/_app/registry/memory/$bankId/memories'
+      path: '/memories'
+      fullPath: '/registry/memory/$bankId/memories'
+      preLoaderRoute: typeof AppRegistryMemoryBankIdMemoriesRouteImport
+      parentRoute: typeof AppRegistryMemoryBankIdRouteRoute
+    }
+    '/_app/registry/memory/$bankId/settings': {
+      id: '/_app/registry/memory/$bankId/settings'
       path: '/settings'
-      fullPath: '/wikis/$wikiId/settings'
-      preLoaderRoute: typeof AppWikisWikiIdSettingsRouteImport
-      parentRoute: typeof AppWikisWikiIdRouteRoute
+      fullPath: '/registry/memory/$bankId/settings'
+      preLoaderRoute: typeof AppRegistryMemoryBankIdSettingsRouteImport
+      parentRoute: typeof AppRegistryMemoryBankIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/': {
+      id: '/_app/registry/sandboxes/$blueprintId/'
+      path: '/'
+      fullPath: '/registry/sandboxes/$blueprintId/'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdIndexRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/egress': {
+      id: '/_app/registry/sandboxes/$blueprintId/egress'
+      path: '/egress'
+      fullPath: '/registry/sandboxes/$blueprintId/egress'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdEgressRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/environment': {
+      id: '/_app/registry/sandboxes/$blueprintId/environment'
+      path: '/environment'
+      fullPath: '/registry/sandboxes/$blueprintId/environment'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdEnvironmentRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/sandboxes': {
+      id: '/_app/registry/sandboxes/$blueprintId/sandboxes'
+      path: '/sandboxes'
+      fullPath: '/registry/sandboxes/$blueprintId/sandboxes'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdSandboxesRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/settings': {
+      id: '/_app/registry/sandboxes/$blueprintId/settings'
+      path: '/settings'
+      fullPath: '/registry/sandboxes/$blueprintId/settings'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdSettingsRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/sandboxes/$blueprintId/tools': {
+      id: '/_app/registry/sandboxes/$blueprintId/tools'
+      path: '/tools'
+      fullPath: '/registry/sandboxes/$blueprintId/tools'
+      preLoaderRoute: typeof AppRegistrySandboxesBlueprintIdToolsRouteImport
+      parentRoute: typeof AppRegistrySandboxesBlueprintIdRouteRoute
+    }
+    '/_app/registry/skills_/catalog/$groupId': {
+      id: '/_app/registry/skills_/catalog/$groupId'
+      path: '/$groupId'
+      fullPath: '/registry/skills/catalog/$groupId'
+      preLoaderRoute: typeof AppRegistrySkillsCatalogGroupIdRouteImport
+      parentRoute: typeof AppRegistrySkillsCatalogRoute
+    }
+    '/_app/registry/skills_/sources/$sourceId': {
+      id: '/_app/registry/skills_/sources/$sourceId'
+      path: '/registry/skills/sources/$sourceId'
+      fullPath: '/registry/skills/sources/$sourceId'
+      preLoaderRoute: typeof AppRegistrySkillsSourcesSourceIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/registry/tools/catalog/$providerId': {
+      id: '/_app/registry/tools/catalog/$providerId'
+      path: '/$providerId'
+      fullPath: '/registry/tools/catalog/$providerId'
+      preLoaderRoute: typeof AppRegistryToolsCatalogProviderIdRouteImport
+      parentRoute: typeof AppRegistryToolsCatalogRoute
+    }
+    '/_app/registry/wikis/$wikiId/': {
+      id: '/_app/registry/wikis/$wikiId/'
+      path: '/'
+      fullPath: '/registry/wikis/$wikiId/'
+      preLoaderRoute: typeof AppRegistryWikisWikiIdIndexRouteImport
+      parentRoute: typeof AppRegistryWikisWikiIdRouteRoute
+    }
+    '/_app/registry/wikis/$wikiId/pages': {
+      id: '/_app/registry/wikis/$wikiId/pages'
+      path: '/pages'
+      fullPath: '/registry/wikis/$wikiId/pages'
+      preLoaderRoute: typeof AppRegistryWikisWikiIdPagesRouteImport
+      parentRoute: typeof AppRegistryWikisWikiIdRouteRoute
+    }
+    '/_app/registry/wikis/$wikiId/settings': {
+      id: '/_app/registry/wikis/$wikiId/settings'
+      path: '/settings'
+      fullPath: '/registry/wikis/$wikiId/settings'
+      preLoaderRoute: typeof AppRegistryWikisWikiIdSettingsRouteImport
+      parentRoute: typeof AppRegistryWikisWikiIdRouteRoute
     }
   }
 }
 
-interface AppAgentAgentIdRouteRouteChildren {
-  AppAgentAgentIdCapabilitiesRoute: typeof AppAgentAgentIdCapabilitiesRoute
-  AppAgentAgentIdChatProvidersRoute: typeof AppAgentAgentIdChatProvidersRoute
-  AppAgentAgentIdDeploymentRoute: typeof AppAgentAgentIdDeploymentRoute
-  AppAgentAgentIdIamRoute: typeof AppAgentAgentIdIamRoute
-  AppAgentAgentIdInferenceRoute: typeof AppAgentAgentIdInferenceRoute
-  AppAgentAgentIdLogsRoute: typeof AppAgentAgentIdLogsRoute
-  AppAgentAgentIdPromptsRoute: typeof AppAgentAgentIdPromptsRoute
-  AppAgentAgentIdRoutinesRoute: typeof AppAgentAgentIdRoutinesRoute
-  AppAgentAgentIdSessionsRoute: typeof AppAgentAgentIdSessionsRoute
-  AppAgentAgentIdSkillsRoute: typeof AppAgentAgentIdSkillsRoute
-  AppAgentAgentIdToolsRoute: typeof AppAgentAgentIdToolsRoute
-  AppAgentAgentIdTracingRoute: typeof AppAgentAgentIdTracingRoute
-  AppAgentAgentIdIndexRoute: typeof AppAgentAgentIdIndexRoute
+interface AppRegistryAgentAgentIdRouteRouteChildren {
+  AppRegistryAgentAgentIdCapabilitiesRoute: typeof AppRegistryAgentAgentIdCapabilitiesRoute
+  AppRegistryAgentAgentIdChatProvidersRoute: typeof AppRegistryAgentAgentIdChatProvidersRoute
+  AppRegistryAgentAgentIdDeploymentRoute: typeof AppRegistryAgentAgentIdDeploymentRoute
+  AppRegistryAgentAgentIdIamRoute: typeof AppRegistryAgentAgentIdIamRoute
+  AppRegistryAgentAgentIdInferenceRoute: typeof AppRegistryAgentAgentIdInferenceRoute
+  AppRegistryAgentAgentIdLogsRoute: typeof AppRegistryAgentAgentIdLogsRoute
+  AppRegistryAgentAgentIdPromptsRoute: typeof AppRegistryAgentAgentIdPromptsRoute
+  AppRegistryAgentAgentIdRoutinesRoute: typeof AppRegistryAgentAgentIdRoutinesRoute
+  AppRegistryAgentAgentIdSessionsRoute: typeof AppRegistryAgentAgentIdSessionsRoute
+  AppRegistryAgentAgentIdSkillsRoute: typeof AppRegistryAgentAgentIdSkillsRoute
+  AppRegistryAgentAgentIdToolsRoute: typeof AppRegistryAgentAgentIdToolsRoute
+  AppRegistryAgentAgentIdTracingRoute: typeof AppRegistryAgentAgentIdTracingRoute
+  AppRegistryAgentAgentIdIndexRoute: typeof AppRegistryAgentAgentIdIndexRoute
 }
 
-const AppAgentAgentIdRouteRouteChildren: AppAgentAgentIdRouteRouteChildren = {
-  AppAgentAgentIdCapabilitiesRoute: AppAgentAgentIdCapabilitiesRoute,
-  AppAgentAgentIdChatProvidersRoute: AppAgentAgentIdChatProvidersRoute,
-  AppAgentAgentIdDeploymentRoute: AppAgentAgentIdDeploymentRoute,
-  AppAgentAgentIdIamRoute: AppAgentAgentIdIamRoute,
-  AppAgentAgentIdInferenceRoute: AppAgentAgentIdInferenceRoute,
-  AppAgentAgentIdLogsRoute: AppAgentAgentIdLogsRoute,
-  AppAgentAgentIdPromptsRoute: AppAgentAgentIdPromptsRoute,
-  AppAgentAgentIdRoutinesRoute: AppAgentAgentIdRoutinesRoute,
-  AppAgentAgentIdSessionsRoute: AppAgentAgentIdSessionsRoute,
-  AppAgentAgentIdSkillsRoute: AppAgentAgentIdSkillsRoute,
-  AppAgentAgentIdToolsRoute: AppAgentAgentIdToolsRoute,
-  AppAgentAgentIdTracingRoute: AppAgentAgentIdTracingRoute,
-  AppAgentAgentIdIndexRoute: AppAgentAgentIdIndexRoute,
-}
-
-const AppAgentAgentIdRouteRouteWithChildren =
-  AppAgentAgentIdRouteRoute._addFileChildren(AppAgentAgentIdRouteRouteChildren)
-
-interface AppMemoryBankIdRouteRouteChildren {
-  AppMemoryBankIdMemoriesRoute: typeof AppMemoryBankIdMemoriesRoute
-  AppMemoryBankIdSettingsRoute: typeof AppMemoryBankIdSettingsRoute
-  AppMemoryBankIdIndexRoute: typeof AppMemoryBankIdIndexRoute
-}
-
-const AppMemoryBankIdRouteRouteChildren: AppMemoryBankIdRouteRouteChildren = {
-  AppMemoryBankIdMemoriesRoute: AppMemoryBankIdMemoriesRoute,
-  AppMemoryBankIdSettingsRoute: AppMemoryBankIdSettingsRoute,
-  AppMemoryBankIdIndexRoute: AppMemoryBankIdIndexRoute,
-}
-
-const AppMemoryBankIdRouteRouteWithChildren =
-  AppMemoryBankIdRouteRoute._addFileChildren(AppMemoryBankIdRouteRouteChildren)
-
-interface AppSandboxesBlueprintIdRouteRouteChildren {
-  AppSandboxesBlueprintIdEnvironmentRoute: typeof AppSandboxesBlueprintIdEnvironmentRoute
-  AppSandboxesBlueprintIdSandboxesRoute: typeof AppSandboxesBlueprintIdSandboxesRoute
-  AppSandboxesBlueprintIdSettingsRoute: typeof AppSandboxesBlueprintIdSettingsRoute
-  AppSandboxesBlueprintIdToolsRoute: typeof AppSandboxesBlueprintIdToolsRoute
-  AppSandboxesBlueprintIdIndexRoute: typeof AppSandboxesBlueprintIdIndexRoute
-}
-
-const AppSandboxesBlueprintIdRouteRouteChildren: AppSandboxesBlueprintIdRouteRouteChildren =
+const AppRegistryAgentAgentIdRouteRouteChildren: AppRegistryAgentAgentIdRouteRouteChildren =
   {
-    AppSandboxesBlueprintIdEnvironmentRoute:
-      AppSandboxesBlueprintIdEnvironmentRoute,
-    AppSandboxesBlueprintIdSandboxesRoute:
-      AppSandboxesBlueprintIdSandboxesRoute,
-    AppSandboxesBlueprintIdSettingsRoute: AppSandboxesBlueprintIdSettingsRoute,
-    AppSandboxesBlueprintIdToolsRoute: AppSandboxesBlueprintIdToolsRoute,
-    AppSandboxesBlueprintIdIndexRoute: AppSandboxesBlueprintIdIndexRoute,
+    AppRegistryAgentAgentIdCapabilitiesRoute:
+      AppRegistryAgentAgentIdCapabilitiesRoute,
+    AppRegistryAgentAgentIdChatProvidersRoute:
+      AppRegistryAgentAgentIdChatProvidersRoute,
+    AppRegistryAgentAgentIdDeploymentRoute:
+      AppRegistryAgentAgentIdDeploymentRoute,
+    AppRegistryAgentAgentIdIamRoute: AppRegistryAgentAgentIdIamRoute,
+    AppRegistryAgentAgentIdInferenceRoute:
+      AppRegistryAgentAgentIdInferenceRoute,
+    AppRegistryAgentAgentIdLogsRoute: AppRegistryAgentAgentIdLogsRoute,
+    AppRegistryAgentAgentIdPromptsRoute: AppRegistryAgentAgentIdPromptsRoute,
+    AppRegistryAgentAgentIdRoutinesRoute: AppRegistryAgentAgentIdRoutinesRoute,
+    AppRegistryAgentAgentIdSessionsRoute: AppRegistryAgentAgentIdSessionsRoute,
+    AppRegistryAgentAgentIdSkillsRoute: AppRegistryAgentAgentIdSkillsRoute,
+    AppRegistryAgentAgentIdToolsRoute: AppRegistryAgentAgentIdToolsRoute,
+    AppRegistryAgentAgentIdTracingRoute: AppRegistryAgentAgentIdTracingRoute,
+    AppRegistryAgentAgentIdIndexRoute: AppRegistryAgentAgentIdIndexRoute,
   }
 
-const AppSandboxesBlueprintIdRouteRouteWithChildren =
-  AppSandboxesBlueprintIdRouteRoute._addFileChildren(
-    AppSandboxesBlueprintIdRouteRouteChildren,
+const AppRegistryAgentAgentIdRouteRouteWithChildren =
+  AppRegistryAgentAgentIdRouteRoute._addFileChildren(
+    AppRegistryAgentAgentIdRouteRouteChildren,
   )
 
-interface AppWikisWikiIdRouteRouteChildren {
-  AppWikisWikiIdPagesRoute: typeof AppWikisWikiIdPagesRoute
-  AppWikisWikiIdSettingsRoute: typeof AppWikisWikiIdSettingsRoute
-  AppWikisWikiIdIndexRoute: typeof AppWikisWikiIdIndexRoute
+interface AppRegistryMemoryBankIdRouteRouteChildren {
+  AppRegistryMemoryBankIdMemoriesRoute: typeof AppRegistryMemoryBankIdMemoriesRoute
+  AppRegistryMemoryBankIdSettingsRoute: typeof AppRegistryMemoryBankIdSettingsRoute
+  AppRegistryMemoryBankIdIndexRoute: typeof AppRegistryMemoryBankIdIndexRoute
 }
 
-const AppWikisWikiIdRouteRouteChildren: AppWikisWikiIdRouteRouteChildren = {
-  AppWikisWikiIdPagesRoute: AppWikisWikiIdPagesRoute,
-  AppWikisWikiIdSettingsRoute: AppWikisWikiIdSettingsRoute,
-  AppWikisWikiIdIndexRoute: AppWikisWikiIdIndexRoute,
+const AppRegistryMemoryBankIdRouteRouteChildren: AppRegistryMemoryBankIdRouteRouteChildren =
+  {
+    AppRegistryMemoryBankIdMemoriesRoute: AppRegistryMemoryBankIdMemoriesRoute,
+    AppRegistryMemoryBankIdSettingsRoute: AppRegistryMemoryBankIdSettingsRoute,
+    AppRegistryMemoryBankIdIndexRoute: AppRegistryMemoryBankIdIndexRoute,
+  }
+
+const AppRegistryMemoryBankIdRouteRouteWithChildren =
+  AppRegistryMemoryBankIdRouteRoute._addFileChildren(
+    AppRegistryMemoryBankIdRouteRouteChildren,
+  )
+
+interface AppRegistrySandboxesBlueprintIdRouteRouteChildren {
+  AppRegistrySandboxesBlueprintIdEgressRoute: typeof AppRegistrySandboxesBlueprintIdEgressRoute
+  AppRegistrySandboxesBlueprintIdEnvironmentRoute: typeof AppRegistrySandboxesBlueprintIdEnvironmentRoute
+  AppRegistrySandboxesBlueprintIdSandboxesRoute: typeof AppRegistrySandboxesBlueprintIdSandboxesRoute
+  AppRegistrySandboxesBlueprintIdSettingsRoute: typeof AppRegistrySandboxesBlueprintIdSettingsRoute
+  AppRegistrySandboxesBlueprintIdToolsRoute: typeof AppRegistrySandboxesBlueprintIdToolsRoute
+  AppRegistrySandboxesBlueprintIdIndexRoute: typeof AppRegistrySandboxesBlueprintIdIndexRoute
 }
 
-const AppWikisWikiIdRouteRouteWithChildren =
-  AppWikisWikiIdRouteRoute._addFileChildren(AppWikisWikiIdRouteRouteChildren)
+const AppRegistrySandboxesBlueprintIdRouteRouteChildren: AppRegistrySandboxesBlueprintIdRouteRouteChildren =
+  {
+    AppRegistrySandboxesBlueprintIdEgressRoute:
+      AppRegistrySandboxesBlueprintIdEgressRoute,
+    AppRegistrySandboxesBlueprintIdEnvironmentRoute:
+      AppRegistrySandboxesBlueprintIdEnvironmentRoute,
+    AppRegistrySandboxesBlueprintIdSandboxesRoute:
+      AppRegistrySandboxesBlueprintIdSandboxesRoute,
+    AppRegistrySandboxesBlueprintIdSettingsRoute:
+      AppRegistrySandboxesBlueprintIdSettingsRoute,
+    AppRegistrySandboxesBlueprintIdToolsRoute:
+      AppRegistrySandboxesBlueprintIdToolsRoute,
+    AppRegistrySandboxesBlueprintIdIndexRoute:
+      AppRegistrySandboxesBlueprintIdIndexRoute,
+  }
 
-interface AppSkillsCatalogRouteChildren {
-  AppSkillsCatalogGroupIdRoute: typeof AppSkillsCatalogGroupIdRoute
+const AppRegistrySandboxesBlueprintIdRouteRouteWithChildren =
+  AppRegistrySandboxesBlueprintIdRouteRoute._addFileChildren(
+    AppRegistrySandboxesBlueprintIdRouteRouteChildren,
+  )
+
+interface AppRegistryWikisWikiIdRouteRouteChildren {
+  AppRegistryWikisWikiIdPagesRoute: typeof AppRegistryWikisWikiIdPagesRoute
+  AppRegistryWikisWikiIdSettingsRoute: typeof AppRegistryWikisWikiIdSettingsRoute
+  AppRegistryWikisWikiIdIndexRoute: typeof AppRegistryWikisWikiIdIndexRoute
 }
 
-const AppSkillsCatalogRouteChildren: AppSkillsCatalogRouteChildren = {
-  AppSkillsCatalogGroupIdRoute: AppSkillsCatalogGroupIdRoute,
+const AppRegistryWikisWikiIdRouteRouteChildren: AppRegistryWikisWikiIdRouteRouteChildren =
+  {
+    AppRegistryWikisWikiIdPagesRoute: AppRegistryWikisWikiIdPagesRoute,
+    AppRegistryWikisWikiIdSettingsRoute: AppRegistryWikisWikiIdSettingsRoute,
+    AppRegistryWikisWikiIdIndexRoute: AppRegistryWikisWikiIdIndexRoute,
+  }
+
+const AppRegistryWikisWikiIdRouteRouteWithChildren =
+  AppRegistryWikisWikiIdRouteRoute._addFileChildren(
+    AppRegistryWikisWikiIdRouteRouteChildren,
+  )
+
+interface AppRegistrySkillsCatalogRouteChildren {
+  AppRegistrySkillsCatalogGroupIdRoute: typeof AppRegistrySkillsCatalogGroupIdRoute
 }
 
-const AppSkillsCatalogRouteWithChildren =
-  AppSkillsCatalogRoute._addFileChildren(AppSkillsCatalogRouteChildren)
+const AppRegistrySkillsCatalogRouteChildren: AppRegistrySkillsCatalogRouteChildren =
+  {
+    AppRegistrySkillsCatalogGroupIdRoute: AppRegistrySkillsCatalogGroupIdRoute,
+  }
 
-interface AppToolsCatalogRouteChildren {
-  AppToolsCatalogProviderIdRoute: typeof AppToolsCatalogProviderIdRoute
+const AppRegistrySkillsCatalogRouteWithChildren =
+  AppRegistrySkillsCatalogRoute._addFileChildren(
+    AppRegistrySkillsCatalogRouteChildren,
+  )
+
+interface AppRegistryToolsCatalogRouteChildren {
+  AppRegistryToolsCatalogProviderIdRoute: typeof AppRegistryToolsCatalogProviderIdRoute
 }
 
-const AppToolsCatalogRouteChildren: AppToolsCatalogRouteChildren = {
-  AppToolsCatalogProviderIdRoute: AppToolsCatalogProviderIdRoute,
-}
+const AppRegistryToolsCatalogRouteChildren: AppRegistryToolsCatalogRouteChildren =
+  {
+    AppRegistryToolsCatalogProviderIdRoute:
+      AppRegistryToolsCatalogProviderIdRoute,
+  }
 
-const AppToolsCatalogRouteWithChildren = AppToolsCatalogRoute._addFileChildren(
-  AppToolsCatalogRouteChildren,
-)
+const AppRegistryToolsCatalogRouteWithChildren =
+  AppRegistryToolsCatalogRoute._addFileChildren(
+    AppRegistryToolsCatalogRouteChildren,
+  )
 
 interface AppRouteRouteChildren {
-  AppSkillsRoute: typeof AppSkillsRoute
   AppIndexRoute: typeof AppIndexRoute
-  AppAgentAgentIdRouteRoute: typeof AppAgentAgentIdRouteRouteWithChildren
-  AppMemoryBankIdRouteRoute: typeof AppMemoryBankIdRouteRouteWithChildren
-  AppSandboxesBlueprintIdRouteRoute: typeof AppSandboxesBlueprintIdRouteRouteWithChildren
-  AppWikisWikiIdRouteRoute: typeof AppWikisWikiIdRouteRouteWithChildren
-  AppAgentNewRoute: typeof AppAgentNewRoute
-  AppSkillsSkillIdRoute: typeof AppSkillsSkillIdRoute
-  AppSkillsCatalogRoute: typeof AppSkillsCatalogRouteWithChildren
-  AppToolsToolIdRoute: typeof AppToolsToolIdRoute
-  AppToolsCatalogRoute: typeof AppToolsCatalogRouteWithChildren
-  AppToolsConnectionsRoute: typeof AppToolsConnectionsRoute
-  AppToolsRemoteServersRoute: typeof AppToolsRemoteServersRoute
-  AppMemoryIndexRoute: typeof AppMemoryIndexRoute
-  AppSandboxesIndexRoute: typeof AppSandboxesIndexRoute
-  AppToolsIndexRoute: typeof AppToolsIndexRoute
-  AppWikisIndexRoute: typeof AppWikisIndexRoute
-  AppSkillsSourcesSourceIdRoute: typeof AppSkillsSourcesSourceIdRoute
+  AppConnectionsSecretsRoute: typeof AppConnectionsSecretsRoute
+  AppRegistrySkillsRoute: typeof AppRegistrySkillsRoute
+  AppRegistryIndexRoute: typeof AppRegistryIndexRoute
+  AppRegistryAgentAgentIdRouteRoute: typeof AppRegistryAgentAgentIdRouteRouteWithChildren
+  AppRegistryMemoryBankIdRouteRoute: typeof AppRegistryMemoryBankIdRouteRouteWithChildren
+  AppRegistrySandboxesBlueprintIdRouteRoute: typeof AppRegistrySandboxesBlueprintIdRouteRouteWithChildren
+  AppRegistryWikisWikiIdRouteRoute: typeof AppRegistryWikisWikiIdRouteRouteWithChildren
+  AppRegistryAgentNewRoute: typeof AppRegistryAgentNewRoute
+  AppRegistrySkillsSkillIdRoute: typeof AppRegistrySkillsSkillIdRoute
+  AppRegistrySkillsCatalogRoute: typeof AppRegistrySkillsCatalogRouteWithChildren
+  AppRegistryToolsToolIdRoute: typeof AppRegistryToolsToolIdRoute
+  AppRegistryToolsCatalogRoute: typeof AppRegistryToolsCatalogRouteWithChildren
+  AppRegistryToolsConnectionsRoute: typeof AppRegistryToolsConnectionsRoute
+  AppRegistryToolsRemoteServersRoute: typeof AppRegistryToolsRemoteServersRoute
+  AppRegistryMemoryIndexRoute: typeof AppRegistryMemoryIndexRoute
+  AppRegistrySandboxesIndexRoute: typeof AppRegistrySandboxesIndexRoute
+  AppRegistryToolsIndexRoute: typeof AppRegistryToolsIndexRoute
+  AppRegistryWikisIndexRoute: typeof AppRegistryWikisIndexRoute
+  AppRegistrySkillsSourcesSourceIdRoute: typeof AppRegistrySkillsSourcesSourceIdRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
-  AppSkillsRoute: AppSkillsRoute,
   AppIndexRoute: AppIndexRoute,
-  AppAgentAgentIdRouteRoute: AppAgentAgentIdRouteRouteWithChildren,
-  AppMemoryBankIdRouteRoute: AppMemoryBankIdRouteRouteWithChildren,
-  AppSandboxesBlueprintIdRouteRoute:
-    AppSandboxesBlueprintIdRouteRouteWithChildren,
-  AppWikisWikiIdRouteRoute: AppWikisWikiIdRouteRouteWithChildren,
-  AppAgentNewRoute: AppAgentNewRoute,
-  AppSkillsSkillIdRoute: AppSkillsSkillIdRoute,
-  AppSkillsCatalogRoute: AppSkillsCatalogRouteWithChildren,
-  AppToolsToolIdRoute: AppToolsToolIdRoute,
-  AppToolsCatalogRoute: AppToolsCatalogRouteWithChildren,
-  AppToolsConnectionsRoute: AppToolsConnectionsRoute,
-  AppToolsRemoteServersRoute: AppToolsRemoteServersRoute,
-  AppMemoryIndexRoute: AppMemoryIndexRoute,
-  AppSandboxesIndexRoute: AppSandboxesIndexRoute,
-  AppToolsIndexRoute: AppToolsIndexRoute,
-  AppWikisIndexRoute: AppWikisIndexRoute,
-  AppSkillsSourcesSourceIdRoute: AppSkillsSourcesSourceIdRoute,
+  AppConnectionsSecretsRoute: AppConnectionsSecretsRoute,
+  AppRegistrySkillsRoute: AppRegistrySkillsRoute,
+  AppRegistryIndexRoute: AppRegistryIndexRoute,
+  AppRegistryAgentAgentIdRouteRoute:
+    AppRegistryAgentAgentIdRouteRouteWithChildren,
+  AppRegistryMemoryBankIdRouteRoute:
+    AppRegistryMemoryBankIdRouteRouteWithChildren,
+  AppRegistrySandboxesBlueprintIdRouteRoute:
+    AppRegistrySandboxesBlueprintIdRouteRouteWithChildren,
+  AppRegistryWikisWikiIdRouteRoute:
+    AppRegistryWikisWikiIdRouteRouteWithChildren,
+  AppRegistryAgentNewRoute: AppRegistryAgentNewRoute,
+  AppRegistrySkillsSkillIdRoute: AppRegistrySkillsSkillIdRoute,
+  AppRegistrySkillsCatalogRoute: AppRegistrySkillsCatalogRouteWithChildren,
+  AppRegistryToolsToolIdRoute: AppRegistryToolsToolIdRoute,
+  AppRegistryToolsCatalogRoute: AppRegistryToolsCatalogRouteWithChildren,
+  AppRegistryToolsConnectionsRoute: AppRegistryToolsConnectionsRoute,
+  AppRegistryToolsRemoteServersRoute: AppRegistryToolsRemoteServersRoute,
+  AppRegistryMemoryIndexRoute: AppRegistryMemoryIndexRoute,
+  AppRegistrySandboxesIndexRoute: AppRegistrySandboxesIndexRoute,
+  AppRegistryToolsIndexRoute: AppRegistryToolsIndexRoute,
+  AppRegistryWikisIndexRoute: AppRegistryWikisIndexRoute,
+  AppRegistrySkillsSourcesSourceIdRoute: AppRegistrySkillsSourcesSourceIdRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(

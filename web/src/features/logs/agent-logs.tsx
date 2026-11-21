@@ -50,7 +50,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
     if (!preserveActivity && ("range" in patch || "from" in patch || "to" in patch))
       setActivityWindow(null);
     void navigate({
-      to: "/agent/$agentId/logs",
+      to: "/registry/agent/$agentId/logs",
       params: { agentId },
       search: (previous) => ({ ...previous, ...patch }),
       replace: true,
@@ -430,7 +430,7 @@ export function AgentLogs({ agentId }: { agentId: string }) {
                 {selected.traceId && (
                   <Link
                     className="underline"
-                    to="/agent/$agentId/tracing"
+                    to="/registry/agent/$agentId/tracing"
                     params={{ agentId }}
                     search={{ trace: selected.traceId }}
                   >

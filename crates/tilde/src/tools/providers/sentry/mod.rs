@@ -6,8 +6,9 @@
 //! mapped onto REST operations, Composio's DSN ingestion, and a generated
 //! `sentry_<snake_case(operationId)>` tool for every other non-deprecated operation.
 //!
-//! The bearer token only goes to Sentry: a caller's `regionUrl` must be an HTTPS sentry.io origin.
-//! The `sentry_api` endpoint override (tests) replaces whichever region was chosen.
+//! The bearer token only goes to Sentry: a caller's `regionUrl` must be an HTTPS sentry.io origin,
+//! and a self-hosted connection's `base_url` replaces it. The `sentry_api` endpoint override
+//! (tests) replaces whichever was chosen.
 mod official;
 mod openapi;
 
@@ -70,9 +71,9 @@ pub fn definition() -> model::Provider {
                 id: "token".into(),
                 name: "Sentry auth token".into(),
                 credential_source: model::CredentialSource::Static {
-                    schema: json!({"type":"object","properties":{"auth_token":{"type":"string","title":"Auth token","description":"An organization or personal auth token, e.g. sntrys_...","minLength":1,"writeOnly":true},"client_secret":{"type":"string","title":"Integration client secret","description":"Optional. To receive issue events as signals, create an internal integration with this connection's webhook URL, subscribe it to issue events and paste its client secret here.","writeOnly":true}},"required":["auth_token"],"additionalProperties":false}),
+                    schema: json!({"type":"object","properties":{"auth_token":{"type":"string","title":"Auth token","description":"An organization or personal auth token, e.g. sntrys_...","minLength":1,"writeOnly":true},"client_secret":{"type":"string","title":"Integration client secret","description":"Optional. To receive signals, create an internal integration with this connection's webhook URL, subscribe it to Issue events, turn on Alert Rule Action so alert rules can notify it, and paste its client secret here.","writeOnly":true},"base_url":{"type":"string","title":"Self-hosted Sentry URL","description":"Only for self-hosted Sentry: its URL, e.g. https://sentry.example.com. Tool calls go here instead of sentry.io.","format":"uri","pattern":"^https://[^/?#@]+/?$","maxLength":2048}},"required":["auth_token"],"additionalProperties":false}),
                 },
-                // Issue webhooks of an internal integration, signed with its client secret.
+                // Issue and alert webhooks of an internal integration, signed with its client secret.
                 capabilities: vec![model::Capability::Tool, model::Capability::Signal],
             },
             model::ConnectionType {
@@ -336,7 +337,11 @@ struct Client<'a> {
 }
 impl Client<'_> {
     fn base(&self, region: Option<&str>) -> ToolResult<String> {
-        let region = normalize_region_url(region)?;
+        let self_hosted = model::optional(&self.access.values, "base_url");
+        let region = match self_hosted {
+            Some(base) => base.trim_end_matches('/').to_owned(),
+            None => normalize_region_url(region)?,
+        };
         Ok(match self.access.endpoints.0.get("sentry_api") {
             Some(base) => base.trim_end_matches('/').to_owned(),
             None => region,

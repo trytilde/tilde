@@ -318,6 +318,7 @@ impl Fixture {
             public_url: None,
             idle_after: Duration::from_secs(600),
             cache_bytes: 256 * 1024 * 1024,
+            endpoints: Default::default(),
         };
         let first = sidecar::start(options(&gateway_url)).await.unwrap();
         let second = sidecar::start(options(&gateway_url)).await.unwrap();

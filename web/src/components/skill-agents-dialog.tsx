@@ -89,7 +89,11 @@ export function SkillAgentsDialog({
           {shown.map(({ agent, via: how }) => (
             <li key={agent.id}>
               <Link
-                to={tab === "tools" ? "/agent/$agentId/tools" : "/agent/$agentId/skills"}
+                to={
+                  tab === "tools"
+                    ? "/registry/agent/$agentId/tools"
+                    : "/registry/agent/$agentId/skills"
+                }
                 params={{ agentId: agent.id }}
                 className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50"
               >

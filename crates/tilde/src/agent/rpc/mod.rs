@@ -10,6 +10,7 @@ pub(super) fn wire(
     agent: crate::agent::Agent,
     metrics: Option<types::AgentMetrics>,
     avatar_url: Option<String>,
+    harness: Option<crate::local::Harness>,
 ) -> types::Agent {
     let timestamp =
         |date: chrono::DateTime<chrono::Utc>| buffa_types::google::protobuf::Timestamp {
@@ -28,6 +29,7 @@ pub(super) fn wire(
         description: agent.description,
         created_at: timestamp(agent.created_at).into(),
         updated_at: timestamp(agent.updated_at).into(),
+        local: harness.map(crate::local::Harness::wire).into(),
         ..Default::default()
     };
     if let Some(metrics) = metrics {
@@ -42,5 +44,6 @@ pub(crate) async fn project(
 ) -> Result<types::Agent, Error> {
     let metrics = agents.metrics(&[agent.id]).await?.remove(&agent.id);
     let avatar_url = agents.avatar_url(&agent).await?;
-    Ok(wire(agent, metrics, avatar_url))
+    let harness = agents.harnesses(&[agent.id]).await?.remove(&agent.id);
+    Ok(wire(agent, metrics, avatar_url, harness))
 }

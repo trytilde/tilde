@@ -171,7 +171,7 @@ pub async fn set(
     .await?;
     // Settle immediately so a tightened limit takes effect before the next tick, and return
     // the settled row rather than the freshly written one.
-    super::db::budgets_settle_all(&pool.get().await?).await?;
+    settle(pool).await?;
     list(pool, Some(scope), Some(scope_id))
         .await?
         .into_iter()
@@ -185,8 +185,13 @@ pub async fn delete(pool: &Pool, id: Uuid) -> Result<(), Error> {
     Ok(())
 }
 /// Re-sum every budget; exhaustion flips notify configuration readers through the trigger.
+/// A transaction of its own: the settled rows stream back, and a streamed statement outside
+/// one does not wait for its commit (`database::Client::query_raw`).
 pub async fn settle(pool: &Pool) -> Result<(), Error> {
-    super::db::budgets_settle_all(&pool.get().await?).await?;
+    let mut client = pool.get().await?;
+    let tx = client.transaction().await?;
+    super::db::budgets_settle_all(&tx).await?;
+    tx.commit().await?;
     Ok(())
 }
 pub async fn worker(pool: Pool, mut shutdown: tokio::sync::watch::Receiver<bool>) {

@@ -12,6 +12,7 @@ include!("tilde.management.v1.inference.__connect.rs");
 include!("tilde.management.v1.logs.__connect.rs");
 include!("tilde.management.v1.memory.__connect.rs");
 include!("tilde.management.v1.prompts.__connect.rs");
+include!("tilde.management.v1.secrets.__connect.rs");
 include!("tilde.management.v1.skills.__connect.rs");
 include!("tilde.management.v1.tilde_chat.__connect.rs");
 include!("tilde.management.v1.tracing.__connect.rs");

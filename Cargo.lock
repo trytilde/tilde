@@ -3346,6 +3346,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha1_smol"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3677,6 +3688,7 @@ dependencies = [
  "aes-gcm",
  "async-stream",
  "async-trait",
+ "aws-lc-rs",
  "axum",
  "base64",
  "buffa",
@@ -3708,6 +3720,7 @@ dependencies = [
  "prost",
  "rand 0.8.8",
  "reqwest",
+ "ring",
  "rotel",
  "rust-embed",
  "rustls",
@@ -3715,6 +3728,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sha1",
  "sha2 0.10.9",
  "subtle",
  "thiserror",
@@ -3724,12 +3738,14 @@ dependencies = [
  "tokio-postgres",
  "tokio-postgres-rustls",
  "tokio-util",
+ "toml",
  "tower",
  "tracing",
  "tracing-subscriber",
  "url",
  "uuid",
  "webpki-roots 0.26.11",
+ "x509-cert",
  "zeroize",
 ]
 

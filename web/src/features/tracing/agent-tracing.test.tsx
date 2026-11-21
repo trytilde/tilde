@@ -760,7 +760,12 @@ it("opens sessions as read-only chat with reasoning and tool results, and drills
   rpc.getSession.mockResolvedValue(page([captured]));
   rpc.getTrace.mockResolvedValue(page([captured]));
   mount("/sessions?inspectSession=session-1");
-  const conversation = await screen.findByRole("region", { name: "Session conversation" });
+  // The session sheet and its transcript load on first open, which can take over a second.
+  const conversation = await screen.findByRole(
+    "region",
+    { name: "Session conversation" },
+    { timeout: 5000 },
+  );
   await within(conversation).findByText("The temperature is 20 degrees.");
   expect(within(conversation).getByText("Look up the weather")).toBeTruthy();
   expect(within(conversation).getByRole("button", { name: /Thinking/ })).toBeTruthy();

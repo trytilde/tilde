@@ -13,7 +13,18 @@ service ConnectionsService {
   rpc UnassignCapability(UnassignCapabilityRequest) returns (UnassignCapabilityResponse);
   rpc Reconnect(ReconnectRequest) returns (ReconnectResponse);
   rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+  // Runs one of the provider's egress setup queries (`Provider.egress.setup_queries`, e.g.
+  // `github.list_repositories`) with the connection, for choices in a grant's config form. Needs
+  // edit on the connection, or edit on `blueprint_id` and view on the connection.
+  rpc RunSetupQuery(RunSetupQueryRequest) returns (RunSetupQueryResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
 }
+// `input_json`: a JSON object (`{"repository":"owner/name"}` for `github.list_branches`).
+message RunSetupQueryRequest {
+  string connection_id = 1; string query = 2; string input_json = 3;
+  optional string blueprint_id = 4;
+}
+// `output_json`: `{"options":[{"value":…,"label":…}]}`.
+message RunSetupQueryResponse { string output_json = 1; }
 
 // Every filter applies before pagination. `search` matches the name, id or instructions
 // case-insensitively; `capability` keeps providers with a method offering it.
@@ -39,7 +50,13 @@ message RegisterProviderRequest { tilde.types.v1.Provider provider = 1; reserved
 
 message RegisterProviderResponse { tilde.types.v1.Provider provider = 1; }
 
-message StartConnectionRequest { string id = 1; string name = 2; string provider_id = 3; string type_id = 4; repeated tilde.types.v1.CapabilityAssignment assignments = 5; }
+message StartConnectionRequest {
+  string id = 1;
+  string name = 2;
+  string provider_id = 3;
+  string type_id = 4;
+  repeated tilde.types.v1.CapabilityAssignment assignments = 5;
+}
 
 message StartConnectionResponse { tilde.types.v1.Connection connection = 1; string brokering_url = 2 [debug_redact = true]; }
 
@@ -52,7 +69,8 @@ message ListConnectionsRequest { uint32 page_size = 1; string page_token = 2; op
   // Applied before pagination. `search` matches the name, account label or provider name case-insensitively.
   optional string search = 5; optional string provider_id = 6; optional string status = 7;
   // Only connections of providers from this source.
-  optional ProviderSource source = 8; }
+  optional ProviderSource source = 8;
+}
 
 message ListConnectionsResponse { repeated tilde.types.v1.Connection connections = 1; string next_page_token = 2; }
 

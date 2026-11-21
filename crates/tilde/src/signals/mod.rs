@@ -5,10 +5,12 @@
 //! and `summary`).
 //!
 //! Chat adapters authenticate the webhooks of channel providers. Providers without a chat
-//! adapter (Sentry, Firecrawl) are authenticated by [`verify`].
+//! adapter (Sentry, Firecrawl, Linear, AWS) are authenticated by [`verify`].
 mod agentmail;
+mod aws;
 mod firecrawl;
 mod github;
+mod linear;
 mod linq;
 mod sentry;
 mod slack;
@@ -70,24 +72,35 @@ pub const COMMON: &[Variable] = &[
 
 pub fn source(provider: &str, typ: &str) -> Option<&'static dyn Source> {
     match (provider, typ) {
-        ("github", "github_app") => Some(&github::Github),
+        ("github", "github_app" | "pat") => Some(&github::Github),
         ("slack", "slack_app") => Some(&slack::Slack),
         ("agentmail", "inbox") => Some(&agentmail::Agentmail),
         ("linq", "account") => Some(&linq::Linq),
         ("whatsapp", "meta") | ("telnyx", "whatsapp") => Some(&whatsapp::Whatsapp),
         ("sentry", "token") => Some(&sentry::Sentry),
+        ("linear", "api_key" | "oauth") => Some(&linear::Linear),
+        ("aws", "iam" | "oidc") => Some(&aws::Aws),
         ("firecrawl", "api") => Some(&firecrawl::Firecrawl),
         _ => None,
     }
 }
 
 /// Authenticates a delivery for a signal-only provider, one no chat adapter verifies.
-pub fn verify(provider: &str, access: &Access, headers: &HeaderMap, body: &[u8]) -> ToolResult<()> {
+pub async fn verify(
+    provider: &str,
+    access: &Access,
+    headers: &HeaderMap,
+    body: &[u8],
+) -> ToolResult<()> {
     use crate::chat::providers::ingress::{header, hmac_verify};
     let (name, key, prefix) = match provider {
         // A Sentry integration signs the exact body with its client secret.
         "sentry" => ("sentry-hook-signature", "client_secret", ""),
         "firecrawl" => ("x-firecrawl-signature", "webhook_secret", "sha256="),
+        "linear" => ("linear-signature", "webhook_secret", ""),
+        // A repository or organization webhook of a personal access token connection.
+        "github" => ("x-hub-signature-256", "webhook_secret", "sha256="),
+        "aws" => return aws::verify(access, body).await,
         _ => return Err(ConnectError::not_found("Unknown webhook provider")),
     };
     let signature = header(headers, name)?
@@ -98,7 +111,19 @@ pub fn verify(provider: &str, access: &Access, headers: &HeaderMap, body: &[u8])
     let secret = access
         .secret(key)
         .map_err(|_| ConnectError::unauthenticated("Signals are not configured"))?;
-    hmac_verify(secret.as_bytes(), body, &signature)
+    hmac_verify(secret.as_bytes(), body, &signature)?;
+    if provider == "linear" {
+        // Linear signs `webhookTimestamp` (milliseconds) with the body; a replay older than a
+        // minute is refused, as Linear recommends.
+        let sent = serde_json::from_slice::<Value>(body)
+            .ok()
+            .and_then(|p| p["webhookTimestamp"].as_i64())
+            .ok_or_else(|| ConnectError::unauthenticated("Missing webhook timestamp"))?;
+        if chrono::Utc::now().timestamp_millis().abs_diff(sent) > 60_000 {
+            return Err(ConnectError::unauthenticated("Expired webhook"));
+        }
+    }
+    Ok(())
 }
 
 /// The values a template may name: the signal's data with the common fields beside it.
@@ -142,12 +167,45 @@ pub fn render(template: &str, context: &Value) -> String {
 fn str_at<'a>(value: &'a Value, pointer: &str) -> Option<&'a str> {
     value.pointer(pointer).and_then(Value::as_str)
 }
-/// A stable delivery ID for payloads that carry none, so redeliveries still dedupe.
+/// A stable delivery ID for payloads that carry none, so redeliveries still dedupe. Hashed over
+/// sorted keys: serde_json keeps the sender's key order (`preserve_order`), and a redelivery may
+/// order them differently. Sorted is also what IDs stored before that feature were hashed over.
 fn hashed(prefix: &str, value: &Value) -> String {
     use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(value.to_string());
+    fn sorted(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut entries: Vec<_> = map.iter().collect();
+                entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+                Value::Object(
+                    entries
+                        .into_iter()
+                        .map(|(k, v)| (k.clone(), sorted(v)))
+                        .collect(),
+                )
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+            other => other.clone(),
+        }
+    }
+    let digest = Sha256::digest(sorted(value).to_string());
     format!("{prefix}-{}", hex::encode(&digest[..16]))
 }
 fn readable(event: &str) -> String {
     event.replace(['.', '_'], " ")
+}
+
+#[cfg(test)]
+mod tests {
+    // The delivery IDs routines dedupe on must not depend on the sender's key order, and must
+    // equal the IDs earlier builds stored (sorted keys) for the same payload.
+    #[test]
+    fn hashed_ids_ignore_key_order() {
+        let payload: serde_json::Value =
+            serde_json::from_str(r#"{"b":{"d":3,"c":[{"f":5,"e":4}]},"a":1}"#).unwrap();
+        assert_eq!(
+            super::hashed("slack", &payload),
+            "slack-f73ae1844c205f85f4d6e59e4742560c"
+        );
+    }
 }

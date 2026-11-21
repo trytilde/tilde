@@ -205,6 +205,36 @@ pub struct Sequence {
 pub struct MessageId {
     pub id: uuid::Uuid,
 }
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserConnection {
+    pub id: uuid::Uuid,
+    pub provider_id: String,
+    pub name: String,
+    pub status: String,
+}
+pub struct UserConnectionBorrowed<'a> {
+    pub id: uuid::Uuid,
+    pub provider_id: &'a str,
+    pub name: &'a str,
+    pub status: &'a str,
+}
+impl<'a> From<UserConnectionBorrowed<'a>> for UserConnection {
+    fn from(
+        UserConnectionBorrowed {
+            id,
+            provider_id,
+            name,
+            status,
+        }: UserConnectionBorrowed<'a>,
+    ) -> Self {
+        Self {
+            id,
+            provider_id: provider_id.into(),
+            name: name.into(),
+            status: status.into(),
+        }
+    }
+}
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct SessionQuery<'c, 'a, 's, C: GenericClient, T, const N: usize> {
@@ -605,6 +635,144 @@ where
 {
     pub fn map<R>(self, mapper: fn(MessageId) -> R) -> MessageIdQuery<'c, 'a, 's, C, R, N> {
         MessageIdQuery {
+            client: self.client,
+            params: self.params,
+            query: self.query,
+            cached: self.cached,
+            extractor: self.extractor,
+            mapper,
+        }
+    }
+    pub async fn one(self) -> Result<T, tokio_postgres::Error> {
+        let row =
+            crate::client::async_::one(self.client, self.query, &self.params, self.cached).await?;
+        Ok((self.mapper)((self.extractor)(&row)?))
+    }
+    pub async fn all(self) -> Result<Vec<T>, tokio_postgres::Error> {
+        self.iter().await?.try_collect().await
+    }
+    pub async fn opt(self) -> Result<Option<T>, tokio_postgres::Error> {
+        let opt_row =
+            crate::client::async_::opt(self.client, self.query, &self.params, self.cached).await?;
+        Ok(opt_row
+            .map(|row| {
+                let extracted = (self.extractor)(&row)?;
+                Ok((self.mapper)(extracted))
+            })
+            .transpose()?)
+    }
+    pub async fn iter(
+        self,
+    ) -> Result<
+        impl futures::Stream<Item = Result<T, tokio_postgres::Error>> + 'c,
+        tokio_postgres::Error,
+    > {
+        let stream = crate::client::async_::raw(
+            self.client,
+            self.query,
+            crate::slice_iter(&self.params),
+            self.cached,
+        )
+        .await?;
+        let mapped = stream
+            .map(move |res| {
+                res.and_then(|row| {
+                    let extracted = (self.extractor)(&row)?;
+                    Ok((self.mapper)(extracted))
+                })
+            })
+            .into_stream();
+        Ok(mapped)
+    }
+}
+pub struct UserConnectionQuery<'c, 'a, 's, C: GenericClient, T, const N: usize> {
+    client: &'c C,
+    params: [&'a (dyn postgres_types::ToSql + Sync); N],
+    query: &'static str,
+    cached: Option<&'s tokio_postgres::Statement>,
+    extractor: fn(&tokio_postgres::Row) -> Result<UserConnectionBorrowed, tokio_postgres::Error>,
+    mapper: fn(UserConnectionBorrowed) -> T,
+}
+impl<'c, 'a, 's, C, T: 'c, const N: usize> UserConnectionQuery<'c, 'a, 's, C, T, N>
+where
+    C: GenericClient,
+{
+    pub fn map<R>(
+        self,
+        mapper: fn(UserConnectionBorrowed) -> R,
+    ) -> UserConnectionQuery<'c, 'a, 's, C, R, N> {
+        UserConnectionQuery {
+            client: self.client,
+            params: self.params,
+            query: self.query,
+            cached: self.cached,
+            extractor: self.extractor,
+            mapper,
+        }
+    }
+    pub async fn one(self) -> Result<T, tokio_postgres::Error> {
+        let row =
+            crate::client::async_::one(self.client, self.query, &self.params, self.cached).await?;
+        Ok((self.mapper)((self.extractor)(&row)?))
+    }
+    pub async fn all(self) -> Result<Vec<T>, tokio_postgres::Error> {
+        self.iter().await?.try_collect().await
+    }
+    pub async fn opt(self) -> Result<Option<T>, tokio_postgres::Error> {
+        let opt_row =
+            crate::client::async_::opt(self.client, self.query, &self.params, self.cached).await?;
+        Ok(opt_row
+            .map(|row| {
+                let extracted = (self.extractor)(&row)?;
+                Ok((self.mapper)(extracted))
+            })
+            .transpose()?)
+    }
+    pub async fn iter(
+        self,
+    ) -> Result<
+        impl futures::Stream<Item = Result<T, tokio_postgres::Error>> + 'c,
+        tokio_postgres::Error,
+    > {
+        let stream = crate::client::async_::raw(
+            self.client,
+            self.query,
+            crate::slice_iter(&self.params),
+            self.cached,
+        )
+        .await?;
+        let mapped = stream
+            .map(move |res| {
+                res.and_then(|row| {
+                    let extracted = (self.extractor)(&row)?;
+                    Ok((self.mapper)(extracted))
+                })
+            })
+            .into_stream();
+        Ok(mapped)
+    }
+}
+pub struct SerdejsonValueQuery<'c, 'a, 's, C: GenericClient, T, const N: usize> {
+    client: &'c C,
+    params: [&'a (dyn postgres_types::ToSql + Sync); N],
+    query: &'static str,
+    cached: Option<&'s tokio_postgres::Statement>,
+    extractor:
+        fn(
+            &tokio_postgres::Row,
+        )
+            -> Result<postgres_types::Json<&serde_json::value::RawValue>, tokio_postgres::Error>,
+    mapper: fn(postgres_types::Json<&serde_json::value::RawValue>) -> T,
+}
+impl<'c, 'a, 's, C, T: 'c, const N: usize> SerdejsonValueQuery<'c, 'a, 's, C, T, N>
+where
+    C: GenericClient,
+{
+    pub fn map<R>(
+        self,
+        mapper: fn(postgres_types::Json<&serde_json::value::RawValue>) -> R,
+    ) -> SerdejsonValueQuery<'c, 'a, 's, C, R, N> {
+        SerdejsonValueQuery {
             client: self.client,
             params: self.params,
             query: self.query,
@@ -1434,5 +1602,71 @@ impl<'a, C: GenericClient + Send + Sync>
         Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
     > {
         Box::pin(self.bind(client, &params.thread, &params.id))
+    }
+}
+pub struct UserConnectionsStmt(&'static str, Option<tokio_postgres::Statement>);
+pub fn user_connections() -> UserConnectionsStmt {
+    UserConnectionsStmt(
+        "SELECT c.id,c.provider_id,c.name,c.status FROM connections c WHERE c.owner_user_id=$1 AND c.status<>'disconnected' ORDER BY c.created_at,c.id",
+        None,
+    )
+}
+impl UserConnectionsStmt {
+    pub async fn prepare<'a, C: GenericClient>(
+        mut self,
+        client: &'a C,
+    ) -> Result<Self, tokio_postgres::Error> {
+        self.1 = Some(client.prepare(self.0).await?);
+        Ok(self)
+    }
+    pub fn bind<'c, 'a, 's, C: GenericClient>(
+        &'s self,
+        client: &'c C,
+        user_id: &'a uuid::Uuid,
+    ) -> UserConnectionQuery<'c, 'a, 's, C, UserConnection, 1> {
+        UserConnectionQuery {
+            client,
+            params: [user_id],
+            query: self.0,
+            cached: self.1.as_ref(),
+            extractor: |
+                row: &tokio_postgres::Row,
+            | -> Result<UserConnectionBorrowed, tokio_postgres::Error> {
+                Ok(UserConnectionBorrowed {
+                    id: row.try_get(0)?,
+                    provider_id: row.try_get(1)?,
+                    name: row.try_get(2)?,
+                    status: row.try_get(3)?,
+                })
+            },
+            mapper: |it| UserConnection::from(it),
+        }
+    }
+}
+pub struct AgentCapabilitiesStmt(&'static str, Option<tokio_postgres::Statement>);
+pub fn agent_capabilities() -> AgentCapabilitiesStmt {
+    AgentCapabilitiesStmt("SELECT capabilities FROM agents WHERE id=$1", None)
+}
+impl AgentCapabilitiesStmt {
+    pub async fn prepare<'a, C: GenericClient>(
+        mut self,
+        client: &'a C,
+    ) -> Result<Self, tokio_postgres::Error> {
+        self.1 = Some(client.prepare(self.0).await?);
+        Ok(self)
+    }
+    pub fn bind<'c, 'a, 's, C: GenericClient>(
+        &'s self,
+        client: &'c C,
+        agent: &'a uuid::Uuid,
+    ) -> SerdejsonValueQuery<'c, 'a, 's, C, serde_json::Value, 1> {
+        SerdejsonValueQuery {
+            client,
+            params: [agent],
+            query: self.0,
+            cached: self.1.as_ref(),
+            extractor: |row| Ok(row.try_get(0)?),
+            mapper: |it| serde_json::from_str(it.0.get()).unwrap(),
+        }
     }
 }

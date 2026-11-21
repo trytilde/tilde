@@ -300,3 +300,13 @@ pub async fn exhausted_all(db: &impl GenericClient) -> DbResult<Vec<ExhaustedRow
         .all()
         .await?)
 }
+pub use tilde_queries::queries::inference::agent_aliases::Record as AgentAliasRow;
+pub async fn agent_aliases_all(
+    db: &impl GenericClient,
+    agent: uuid::Uuid,
+) -> DbResult<Vec<AgentAliasRow>> {
+    Ok(tilde_queries::queries::inference::agent_aliases::run()
+        .bind(db, &agent)
+        .all()
+        .await?)
+}

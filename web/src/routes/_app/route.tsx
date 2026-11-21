@@ -10,9 +10,9 @@ export const Route = createFileRoute("/_app")({ component: AppLayout });
 function AppLayout() {
   const fullHeight = useRouterState({
     select: (state) =>
-      /^\/agent\/[^/]+\/(?:tracing|logs|deployment)$/.test(state.location.pathname) ||
+      /^\/registry\/agent\/[^/]+\/(?:tracing|logs|deployment)$/.test(state.location.pathname) ||
       // A skill page lays out its own full-height file tree and scrolling content.
-      /^\/skills\/(?!catalog$)[^/]+$/.test(state.location.pathname),
+      /^\/registry\/skills\/(?!catalog$)[^/]+$/.test(state.location.pathname),
   });
   return (
     <DashboardBreadcrumbProvider>
@@ -25,9 +25,10 @@ function AppLayout() {
             }
           >
             <SiteHeader />
-            <main className="flex min-h-0 flex-1 flex-col">
+            {/* SidebarInset is the page's <main>; this only lays out the content below the header. */}
+            <div className="flex min-h-0 flex-1 flex-col">
               <Outlet />
-            </main>
+            </div>
           </SidebarInset>
         </SidebarProvider>
       </TooltipProvider>

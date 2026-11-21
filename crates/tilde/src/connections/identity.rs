@@ -42,18 +42,20 @@ impl Connections {
     /// Populate identities for channels configured before this model existed, using stored
     /// provider credentials rather than editable labels. No external calls or messages are sent.
     pub async fn restore_agent_identities(&self) -> Result<(), Error> {
-        for row in
-            crate::chat::access::db::agent_identities_missing_all(&self.pool.get().await?).await?
-        {
-            self.assign(
-                row.connection_id,
-                &Assignment {
-                    capability: Capability::Channel,
-                    agent_id: row.agent_id,
-                    alias: None,
-                },
+        let rows = async {
+            Ok::<_, Error>(
+                crate::chat::access::db::agent_identities_missing_all(&self.pool.get().await?)
+                    .await?,
             )
-            .await?;
+        };
+        for row in rows.await? {
+            let assignment = Assignment {
+                capability: Capability::Channel,
+                agent_id: row.agent_id,
+                alias: None,
+            };
+            let assign = self.assign(row.connection_id, &assignment);
+            assign.await?;
         }
         Ok(())
     }

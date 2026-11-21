@@ -292,3 +292,37 @@ pub async fn health_sample_execute(
         .bind(db, &at)
         .await?)
 }
+pub use tilde_queries::queries::agent::apply_get::Record as ApplyRow;
+pub async fn apply_get_opt(
+    db: &impl GenericClient,
+    key: &str,
+    id: Option<uuid::Uuid>,
+) -> DbResult<Option<ApplyRow>> {
+    Ok(tilde_queries::queries::agent::apply_get::run()
+        .bind(db, &key, &id)
+        .opt()
+        .await?)
+}
+pub async fn apply_update_execute(
+    db: &impl GenericClient,
+    key: &str,
+    name: &str,
+    description: &str,
+    concurrency_policy: &str,
+    tool_mode: &str,
+    capabilities: &serde_json::Value,
+    id: uuid::Uuid,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::agent::apply_update::run()
+        .bind(
+            db,
+            &key,
+            &name,
+            &description,
+            &concurrency_policy,
+            &tool_mode,
+            capabilities,
+            &id,
+        )
+        .await?)
+}

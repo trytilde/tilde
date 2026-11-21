@@ -41,24 +41,14 @@ impl Chat {
     }
 }
 impl Deployments {
-    pub(crate) async fn authenticate_tilde(
+    /// The agent's Tilde connection, when `api_key` is its application key.
+    pub(crate) async fn application_key(
         &self,
+        db: &impl crate::database::GenericClient,
         agent: Uuid,
         api_key: &str,
-        identity: &str,
-    ) -> Result<(SecretString, IngressClaims), Error> {
-        let identity = crate::chat::access::identity::Identity {
-            identity_type: crate::proto::tilde::types::v1::IdentityType::Username,
-            value: identity.to_owned(),
-        };
-        identity.validate().map_err(|_| Error::Denied)?;
-        let mut client = self.pool.get().await?;
-        let tx = client.transaction().await?;
-        // Serialize identity creation and key rotation with the same agent lock.
-        crate::deployment::db::lock_opt(&tx, agent)
-            .await?
-            .ok_or(Error::Denied)?;
-        let connection = crate::connections::db::tilde_connection_opt(&tx, agent)
+    ) -> Result<Uuid, Error> {
+        let connection = crate::connections::db::tilde_connection_opt(db, agent)
             .await?
             .ok_or(Error::Denied)?
             .id;
@@ -77,7 +67,26 @@ impl Deployments {
         ) {
             return Err(Error::Denied);
         }
-        drop(expected);
+        Ok(connection)
+    }
+    pub(crate) async fn authenticate_tilde(
+        &self,
+        agent: Uuid,
+        api_key: &str,
+        identity: &str,
+    ) -> Result<(SecretString, IngressClaims), Error> {
+        let identity = crate::chat::access::identity::Identity {
+            identity_type: crate::proto::tilde::types::v1::IdentityType::Username,
+            value: identity.to_owned(),
+        };
+        identity.validate().map_err(|_| Error::Denied)?;
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        // Serialize identity creation and key rotation with the same agent lock.
+        crate::deployment::db::lock_opt(&tx, agent)
+            .await?
+            .ok_or(Error::Denied)?;
+        let connection = self.application_key(&tx, agent, api_key).await?;
         // The application vouches for the identity, so it counts as attested. Unknown identities
         // are recorded even when refused so an editor can allow them; the shared policy then
         // decides: disabled admits nobody, private only allowed identities, public everyone.

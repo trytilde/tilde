@@ -97,6 +97,7 @@ try {
   server = await start();
   assert.equal((await fetch(server.url + "/healthz")).status, 200);
   assert.equal((await fetch(server.url + "/readyz")).status, 200);
+  let app = "";
   const html = await fetch(server.url + "/");
   assert.equal(html.status, 200);
   assert.match(html.headers.get("content-type"), /text\/html/);
@@ -107,11 +108,13 @@ try {
   assert.equal(asset.status, 200);
   assert.match(asset.headers.get("cache-control"), /immutable/);
   assert.equal(
-    (await fetch(server.url + "/agents/example", { headers: { accept: "text/html" } })).status,
+    (await fetch(server.url + app + "/agents/example", { headers: { accept: "text/html" } }))
+      .status,
     200,
   );
   assert.equal(
-    (await fetch(server.url + "/assets/missing.js", { headers: { accept: "text/html" } })).status,
+    (await fetch(server.url + app + "/assets/missing.js", { headers: { accept: "text/html" } }))
+      .status,
     404,
   );
   assert.equal(

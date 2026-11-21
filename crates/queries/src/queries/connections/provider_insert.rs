@@ -32,7 +32,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label,tool_host_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label,tool_host_id=excluded.tool_host_id",
+        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label,tool_host_id ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 ) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label,tool_host_id=excluded.tool_host_id",
         None,
     )
 }

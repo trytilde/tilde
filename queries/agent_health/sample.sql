@@ -19,6 +19,8 @@ WITH availability AS (
  COALESCE(s.routing='weighted' AND EXISTS (SELECT 1 FROM availability d WHERE d.agent_id=a.id AND d.traffic_weight>0 AND d.ready)
  AND EXISTS (SELECT 1 FROM availability d WHERE d.agent_id=a.id AND d.traffic_weight>0 AND NOT d.ready),FALSE) AS degraded
  FROM agents a LEFT JOIN agent_deployment_settings s ON s.agent_id=a.id WHERE a.deleted_at IS NULL
+ -- A local agent runs in its harness: no deployment is expected to serve it.
+ AND NOT EXISTS (SELECT 1 FROM local_agents l WHERE l.agent_id=a.id)
 )
 INSERT INTO agent_health(agent_id,checked_at,healthy,degraded,latency_ms,error_code)
 SELECT id,:p1,healthy,degraded,0,CASE WHEN healthy THEN NULL ELSE 'not_ready' END FROM samples;

@@ -13,7 +13,18 @@ import {
 } from "./ui/dialog";
 
 /** The one action on an agent's system-managed Tilde connection: reveal or rotate its key. */
-export function TildeChatKey({ agentId, disabled }: { agentId: string; disabled?: boolean }) {
+export function TildeChatKey({
+  agentId,
+  disabled,
+  title = "Tilde chat API key",
+  description = "Embed chat in your application using the Tilde provider. Keep this key on your server; your proxy authenticates users and supplies their identity.",
+}: {
+  agentId: string;
+  disabled?: boolean;
+  /** A local agent's harness uses the same key, and describes it in its own words. */
+  title?: string;
+  description?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -69,11 +80,8 @@ export function TildeChatKey({ agentId, disabled }: { agentId: string; disabled?
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Tilde chat API key</DialogTitle>
-            <DialogDescription>
-              Embed chat in your application using the Tilde provider. Keep this key on your server;
-              your proxy authenticates users and supplies their identity.
-            </DialogDescription>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           {error && (
             <p role="alert" className="text-sm text-destructive">
@@ -81,7 +89,7 @@ export function TildeChatKey({ agentId, disabled }: { agentId: string; disabled?
             </p>
           )}
           <Input
-            aria-label="Tilde chat API key"
+            aria-label={title}
             type="password"
             readOnly
             value={key}

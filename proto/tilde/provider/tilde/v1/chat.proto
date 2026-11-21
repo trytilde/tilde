@@ -36,6 +36,14 @@ service ChatService {
   rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
   rpc WatchThread(WatchThreadRequest) returns (stream WatchThreadResponse);
+  // The caller's own connections: accounts the identity connects for the agent's personal tools
+  // (`tools.personal`), owned by its chat user. Setup happens on Tilde's setup page.
+  rpc ListConnectableProviders(ListConnectableProvidersRequest) returns (ListConnectableProvidersResponse);
+  rpc StartConnection(StartConnectionRequest) returns (StartConnectionResponse);
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsResponse);
+  rpc ReconnectConnection(ReconnectConnectionRequest) returns (ReconnectConnectionResponse);
+  // Disconnects it and erases its credentials; its tools are gone from the next invocation.
+  rpc DeleteConnection(DeleteConnectionRequest) returns (DeleteConnectionResponse);
 }
 
 message CreateUserRequest { string name = 1; }
@@ -144,3 +152,30 @@ message SteerQueuedMessageResponse {}
 
 message SearchMessagesRequest { string thread_id = 1; string query = 2; string page_token = 3; uint32 page_size = 4; }
 message SearchMessagesResponse { repeated .tilde.types.v1.Message messages = 1; string next_page_token = 2; }
+
+message ConnectableProvider { string id = 1; string name = 2; string icon_url = 3; }
+message ListConnectableProvidersRequest {}
+message ListConnectableProvidersResponse { repeated ConnectableProvider providers = 1; }
+message StartConnectionRequest { string provider = 1; }
+// A setup page only the identity's user should open; it expires.
+message ConnectionSetup {
+  string connection_id = 1;
+  string setup_url = 2;
+  // Unix seconds.
+  int64 expires_at = 3;
+}
+message StartConnectionResponse { ConnectionSetup setup = 1; }
+message UserConnection {
+  string id = 1;
+  string provider_id = 2;
+  // The account name collected during setup.
+  string name = 3;
+  // requires_action (setup unfinished), ready or failed.
+  string status = 4;
+}
+message ListConnectionsRequest {}
+message ListConnectionsResponse { repeated UserConnection connections = 1; }
+message ReconnectConnectionRequest { string connection_id = 1; }
+message ReconnectConnectionResponse { ConnectionSetup setup = 1; }
+message DeleteConnectionRequest { string connection_id = 1; }
+message DeleteConnectionResponse {}

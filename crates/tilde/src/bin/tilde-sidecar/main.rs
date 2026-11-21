@@ -11,6 +11,9 @@ struct Args {
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Several rustls crypto providers are compiled into the workspace, so there is no implicit
+    // default; dependencies that call `ClientConfig::builder()` need this one.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     tracing_subscriber::fmt()
         .with_ansi(false)
         .with_env_filter(

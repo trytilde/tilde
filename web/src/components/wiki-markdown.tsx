@@ -50,7 +50,11 @@ export function WikiMarkdown({
                 {children}
               </a>
             ) : (
-              <Link to="/wikis/$wikiId/pages" params={{ wikiId }} search={{ page: pagePath(href) }}>
+              <Link
+                to="/registry/wikis/$wikiId/pages"
+                params={{ wikiId }}
+                search={{ page: pagePath(href) }}
+              >
                 {children}
               </Link>
             ),
@@ -68,4 +72,20 @@ export function WikiMarkdown({
       </ReactMarkdown>
     </article>
   );
+}
+
+/** A page's ATX headings (`#` to `###`) in order, outside code fences, as plain text. */
+export function headingsOf(content: string) {
+  const headings: { level: number; text: string }[] = [];
+  let fence = false;
+  for (const line of content.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+    const found = !fence && /^(#{1,3})\s+(.+?)\s*#*\s*$/.exec(line);
+    if (found)
+      headings.push({
+        level: found[1].length,
+        text: found[2].replace(/[*_`~]|\[([^\]]*)\]\([^)]*\)/g, "$1"),
+      });
+  }
+  return headings;
 }

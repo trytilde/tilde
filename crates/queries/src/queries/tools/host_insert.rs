@@ -18,7 +18,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO tool_hosts(id,name,execution_type,function_arn,token_hash) VALUES($1,$2,$3,$4,$5) ON CONFLICT(name) DO NOTHING",
+        "INSERT INTO tool_hosts(id,name,execution_type,function_arn,token_hash) VALUES($1,$2,$3,$4,$5) ON CONFLICT ON CONSTRAINT tool_hosts_name_key DO NOTHING",
         None,
     )
 }

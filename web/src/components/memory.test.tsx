@@ -22,6 +22,26 @@ import { MemoryBankPage } from "./memory-bank";
 vi.mock("@/components/agent-iam", () => ({ AgentIam: () => null }));
 vi.mock("@/components/agent-sandbox", () => ({ AgentSandbox: () => null }));
 vi.mock("./agent-connections", () => ({ AgentConnections: () => null }));
+// Tiptap needs a real layout engine; a textarea stands in for the markdown editor.
+vi.mock("./markdown-editor", async (original) => ({
+  ...(await original<typeof import("./markdown-editor")>()),
+  MarkdownEditor: ({
+    value,
+    onChange,
+    readOnly,
+    label,
+  }: {
+    value: string;
+    onChange?: (value: string) => void;
+    readOnly?: boolean;
+    label?: string;
+  }) =>
+    readOnly ? (
+      <div data-testid="markdown">{value}</div>
+    ) : (
+      <textarea aria-label={label} value={value} onChange={(e) => onChange?.(e.target.value)} />
+    ),
+}));
 const rpc = vi.hoisted(() => ({
   agents: { createAgent: vi.fn(), updateAgent: vi.fn(), listAgents: vi.fn() },
   deployments: { getDeployment: vi.fn(), setDeployment: vi.fn() },
@@ -121,7 +141,9 @@ it("adds a person's fact at the chosen path and shows how a search found each me
   fireEvent.click(await screen.findByRole("button", { name: /deploys/ }));
   fireEvent.click(screen.getByRole("button", { name: "Add fact" }));
   const dialog = within(await screen.findByRole("form", { name: "Memory" }));
-  expect((dialog.getByRole("textbox", { name: "Path" }) as HTMLInputElement).value).toBe("deploys");
+  expect((dialog.getByRole("combobox", { name: "Folder" }) as HTMLInputElement).value).toBe(
+    "deploys",
+  );
   fireEvent.change(dialog.getByRole("textbox", { name: "Title" }), {
     target: { value: fact.title },
   });
@@ -139,6 +161,6 @@ it("adds a person's fact at the chosen path and shows how a search found each me
   fireEvent.change(screen.getByRole("searchbox", { name: "Search memories" }), {
     target: { value: "who checks weekend releases" },
   });
-  const list = within(await screen.findByRole("list", { name: "Memory list" }));
-  await list.findByText("Meaning");
+  const list = within(await screen.findByRole("table", { name: "Memory list" }));
+  await list.findByText("meaning");
 });

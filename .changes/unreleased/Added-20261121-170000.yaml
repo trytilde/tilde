@@ -1,0 +1,3 @@
+kind: Added
+body: "Chat and signal providers: Google Chat as a chat provider; Linear connections with tools and issue/comment signals; Sentry regression and alert signals; CloudWatch alarm signals through SNS on AWS connections; and filters on signal routines."
+time: 2026-11-21T17:00:00+00:00

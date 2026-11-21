@@ -1,32 +1,32 @@
-import { ProviderSource } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import {
+  Capability,
+  type Connection,
+  type Provider,
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
   EllipsisIcon,
   ExternalLinkIcon,
+  KeyRoundIcon,
   LayoutGridIcon,
+  PlusIcon,
   UnplugIcon,
   ZapIcon,
 } from "lucide-react";
-import type { Connection } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { connections, toolHosts, tools } from "@/client";
 import { FilterSearchInput } from "@/features/observability/filter-search-input";
 import { quote, tokens, unquote } from "@/features/observability/query";
 import { AddServers } from "./add-servers";
 import { AgentStack, useAgentRegistry } from "./agent-stack";
+import { NewConnectionDialog, SANDBOX_PROVIDERS } from "./new-connection-dialog";
 import { ProviderIcon } from "./provider-icon";
 import { Pill } from "./skill-common";
 import { SkillAgentsDialog } from "./skill-agents-dialog";
-import {
-  isMcpServer,
-  loadToolConnections,
-  loadToolProviders,
-  message,
-  statusLabel,
-} from "./tool-connections";
-import { Button } from "./ui/button";
+import { isMcpServer, message, statusLabel } from "./tool-connections";
+import { Button, buttonVariants } from "./ui/button";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -47,15 +47,66 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
 
 const COLUMNS = 4;
+/**
+ * What a connection is for, as the page's top tabs split them: sandbox providers, then
+ * inference (and embedding) providers, then tools and chat, then anything else found (data
+ * sources for ontologies, say).
+ */
+const TYPES = {
+  tools: "Tools & chat",
+  inference: "Inference & embedding",
+  sandboxes: "Sandboxes",
+  other: "Other",
+} as const;
+type Type = keyof typeof TYPES;
+/** What the tabs with an add button of their own add: its label, dialog title and capability. */
+const ADDS: Partial<Record<Type, { label: string; title: string; capability: Capability }>> = {
+  inference: {
+    label: "Add inference connection",
+    title: "New inference connection",
+    capability: Capability.INFERENCE,
+  },
+  sandboxes: {
+    label: "Add sandbox connection",
+    title: "New sandbox connection",
+    capability: Capability.TOOL,
+  },
+};
+function typeOf(connection: Connection): Type {
+  if ((SANDBOX_PROVIDERS as readonly string[]).includes(connection.providerId)) return "sandboxes";
+  if (connection.capabilities.includes(Capability.INFERENCE)) return "inference";
+  if (
+    connection.capabilities.includes(Capability.TOOL) ||
+    connection.capabilities.includes(Capability.CHANNEL)
+  )
+    return "tools";
+  return "other";
+}
+async function loadProviders(signal?: AbortSignal) {
+  const providers: Provider[] = [];
+  let pageToken = "";
+  do {
+    const page = await connections.listProviders({ pageSize: 100, pageToken }, { signal });
+    providers.push(...page.providers);
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return providers;
+}
+async function loadConnections(query: { search?: string }, signal?: AbortSignal) {
+  const all: Connection[] = [];
+  let pageToken = "";
+  do {
+    const page = await connections.listConnections(
+      { ...query, pageSize: 100, pageToken },
+      { signal },
+    );
+    all.push(...page.connections);
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return all;
+}
 type Kind = "catalog" | "mcp" | "host";
 const KINDS = { all: "All", catalog: "Catalog", mcp: "MCP", host: "Tilde tool server" } as const;
-/** The server-side filter each type tab asks for. */
-const SOURCES = {
-  all: undefined,
-  catalog: ProviderSource.CATALOG,
-  mcp: ProviderSource.MCP_SERVER,
-  host: ProviderSource.TOOL_HOST,
-} as const;
 /** A provider's connections: a catalog provider, an MCP server, or a remote server's provider. */
 type Group = {
   id: string;
@@ -76,9 +127,10 @@ function parseQuery(query: string) {
 }
 
 /**
- * The tool connections in use, grouped by the provider they connect to, as the Skills page
- * groups skills. Each row carries the agents using it; new connections come
- * from the Tilde Catalog or a remote server.
+ * Every connection, split by what it is for (tools and chat, inference, sandboxes, anything
+ * else) and grouped by the provider it connects to, as the Skills page groups skills. Each row
+ * carries the agents using it. New connections come from the Tilde Catalog or a remote server,
+ * or for inference and sandboxes straight from their tab, with no agent needed first.
  */
 export function ConnectionsPage() {
   const navigate = useNavigate();
@@ -88,6 +140,9 @@ export function ConnectionsPage() {
   const [users, setUsers] = useState<Map<string, string[]>>(() => new Map());
   const registry = useAgentRegistry();
   const [words, setWords] = useState<string[]>([]);
+  const [type, setType] = useState<Type>("tools");
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<keyof typeof KINDS>("all");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [viewing, setViewing] = useState<{ title: string; ids: string[] }>();
@@ -97,18 +152,21 @@ export function ConnectionsPage() {
   const search = words.join(" ");
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
-      const [catalog, list, hosts] = await Promise.all([
-        loadToolProviders({}, signal),
-        loadToolConnections({ search: search || undefined, source: SOURCES[kind] }, signal),
+      const [catalog, listed, hosts] = await Promise.all([
+        loadProviders(signal),
+        loadConnections({ search: search || undefined }, signal),
         toolHosts.listToolHosts({ withProvider: true }, { signal }),
       ]);
       if (signal?.aborted) return;
-      const providers = new Map(catalog.providers.map((p) => [p.id, p]));
+      // Every agent's own Tilde chat connection is managed on the agent, not here.
+      const all = listed.filter((connection) => connection.providerId !== "tilde");
+      setProviders(catalog);
+      const providers = new Map(catalog.map((p) => [p.id, p]));
       const servers = new Map(
         hosts.toolHosts.flatMap((h) => (h.providerId ? [[h.providerId, h]] : [])),
       );
       const byProvider = new Map<string, Group>();
-      for (const connection of list) {
+      for (const connection of all) {
         let group = byProvider.get(connection.providerId);
         if (!group) {
           const provider = providers.get(connection.providerId);
@@ -133,22 +191,27 @@ export function ConnectionsPage() {
             connections: group.connections.sort((a, b) => a.name.localeCompare(b.name)),
           })),
       );
-      // ListToolSources takes one connection at a time, so this asks once per listed connection.
+      // Agents assigned the connection (chat, inference) and, for a tool connection, those using
+      // it as a tool source; ListToolSources takes one connection at a time.
       const used = await Promise.all(
-        list.map((connection) =>
-          tools.listToolSources({ connectionId: connection.id }, { signal }).then(
-            ({ sources }): [string, string[]] => [
-              connection.id,
-              // Blueprint-owned sources have no agent; this column lists agents.
-              [...new Set(sources.filter((s) => s.agentId).map((s) => s.agentId))],
-            ],
-            (): [string, string[]] => [connection.id, []],
-          ),
-        ),
+        all.map(async (connection): Promise<[string, string[]]> => {
+          const assigned = connection.associatedAgents.map((a) => a.id);
+          if (!connection.capabilities.includes(Capability.TOOL))
+            return [connection.id, [...new Set(assigned)]];
+          const sources = await tools
+            .listToolSources({ connectionId: connection.id }, { signal })
+            .then(
+              ({ sources }) => sources,
+              () => [],
+            );
+          // Blueprint-owned sources have no agent; this column lists agents.
+          const tooled = sources.filter((s) => s.agentId).map((s) => s.agentId);
+          return [connection.id, [...new Set([...assigned, ...tooled])]];
+        }),
       );
       if (!signal?.aborted) setUsers(new Map(used));
     },
-    [search, kind],
+    [search],
   );
   useEffect(() => {
     const abort = new AbortController();
@@ -162,8 +225,35 @@ export function ConnectionsPage() {
     return () => abort.abort();
   }, [refresh]);
   const reload = () => void refresh().catch((e) => setError(message(e)));
-  const shown = groups;
-  const filtered = kind !== "all" || words.length > 0;
+  // Tabs only filter what is loaded: counts ignore the source tab, which narrows tools alone.
+  const { shown, counts } = useMemo(() => {
+    const counts = Object.fromEntries(Object.keys(TYPES).map((t) => [t, 0])) as Record<
+      Type,
+      number
+    >;
+    for (const group of groups)
+      for (const connection of group.connections) counts[typeOf(connection)] += 1;
+    const shown = groups
+      .filter((group) => type !== "tools" || kind === "all" || group.kind === kind)
+      .map((group) => ({
+        ...group,
+        connections: group.connections.filter((c) => typeOf(c) === type),
+      }))
+      .filter((group) => group.connections.length > 0);
+    return { shown, counts };
+  }, [groups, type, kind]);
+  const filtered = (type === "tools" && kind !== "all") || words.length > 0;
+  const shownTypes = (Object.keys(TYPES) as Type[]).filter((t) => t !== "other" || counts.other);
+  // Inference and sandbox providers are added from their tab; tools come from the catalog.
+  let addable =
+    type === "inference"
+      ? providers.filter((p) =>
+          p.connectionTypes.some((t) => t.capabilities.includes(Capability.INFERENCE)),
+        )
+      : type === "sandboxes"
+        ? SANDBOX_PROVIDERS.flatMap((id) => providers.filter((p) => p.id === id))
+        : [];
+  const add = ADDS[type];
   function toggle(id: string) {
     setCollapsed((current) => {
       const next = new Set(current);
@@ -181,23 +271,57 @@ export function ConnectionsPage() {
           aria-label="Connection filter bar"
         >
           <Tabs
-            value={kind}
-            onValueChange={(value) => setKind(value as keyof typeof KINDS)}
+            value={type}
+            onValueChange={(value) => setType(value as Type)}
             className="shrink-0 gap-0"
           >
-            <TabsList aria-label="Connection types" className="h-[26px] gap-0.5 rounded-md p-0.5">
-              {Object.entries(KINDS).map(([id, label]) => (
+            <TabsList
+              aria-label="What connections are for"
+              className="h-[26px] gap-0.5 rounded-md p-0.5"
+            >
+              {shownTypes.map((id) => (
                 <TabsTrigger
                   key={id}
                   value={id}
                   className="h-[22px] rounded px-2 text-xs font-normal data-active:font-bold"
                 >
-                  {label}
+                  {TYPES[id]}
+                  <span className="ml-1 tabular-nums text-muted-foreground">{counts[id]}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
+          {type === "tools" && <span aria-hidden="true" className="mx-1 h-5 shrink-0 border-l" />}
+          {type === "tools" && (
+            <Tabs
+              value={kind}
+              onValueChange={(value) => setKind(value as keyof typeof KINDS)}
+              className="shrink-0 gap-0"
+            >
+              <TabsList aria-label="Connection types" className="h-[26px] gap-0.5 rounded-md p-0.5">
+                {Object.entries(KINDS).map(([id, label]) => (
+                  <TabsTrigger
+                    key={id}
+                    value={id}
+                    className="h-[22px] rounded px-2 text-xs font-normal data-active:font-bold"
+                  >
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
           <span aria-hidden="true" className="mx-1 h-5 shrink-0 border-l" />
+          <Link
+            to="/connections/secrets"
+            className={buttonVariants({
+              variant: "ghost",
+              size: "sm",
+              className: "order-last ml-auto",
+            })}
+          >
+            <KeyRoundIcon /> Secrets
+          </Link>
           <FilterSearchInput
             label="Search connections"
             canonical={words.map(quote).join(" ")}
@@ -210,12 +334,21 @@ export function ConnectionsPage() {
       </div>
       <div className="flex flex-col gap-6 p-4 lg:p-6">
         <div className="flex flex-wrap gap-3">
-          <Pill
-            icon={<LayoutGridIcon />}
-            label="Tilde Catalog"
-            onClick={() => void navigate({ to: "/tools/catalog" })}
-          />
-          <AddServers existing onChanged={reload} />
+          {type === "tools" ? (
+            <>
+              <Pill
+                icon={<LayoutGridIcon />}
+                label="Tilde Catalog"
+                onClick={() => void navigate({ to: "/registry/tools/catalog" })}
+              />
+              <AddServers existing onChanged={reload} />
+            </>
+          ) : (
+            add &&
+            addable.length > 0 && (
+              <Pill icon={<PlusIcon />} label={add.label} onClick={() => setAdding(true)} />
+            )
+          )}
         </div>
         {error && (
           <p role="alert" className="text-sm text-destructive">
@@ -263,7 +396,7 @@ export function ConnectionsPage() {
                             )}
                             {group.hostId ? (
                               <Link
-                                to="/tools/$toolId"
+                                to="/registry/tools/$toolId"
                                 params={{ toolId: group.hostId }}
                                 search={{ kind: "host" }}
                                 className="truncate text-sm font-semibold hover:underline"
@@ -291,7 +424,7 @@ export function ConnectionsPage() {
                               className="cursor-pointer"
                               onClick={() =>
                                 void navigate({
-                                  to: "/tools/$toolId",
+                                  to: "/registry/tools/$toolId",
                                   params: { toolId: connection.id },
                                   search: { kind: "connection" },
                                 })
@@ -299,7 +432,7 @@ export function ConnectionsPage() {
                             >
                               <TableCell className="pl-14">
                                 <Link
-                                  to="/tools/$toolId"
+                                  to="/registry/tools/$toolId"
                                   params={{ toolId: connection.id }}
                                   search={{ kind: "connection" }}
                                   className="font-medium hover:underline"
@@ -352,13 +485,23 @@ export function ConnectionsPage() {
                         ? "Unable to load connections."
                         : filtered
                           ? "No connections match your search."
-                          : empty}
+                          : type === "tools"
+                            ? empty
+                            : `No ${TYPES[type].toLowerCase()} connections yet.`}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
+        <NewConnectionDialog
+          open={adding}
+          title={add?.title ?? ""}
+          providers={addable}
+          capability={add?.capability ?? Capability.TOOL}
+          onClose={() => setAdding(false)}
+          onConnected={reload}
+        />
         <SkillAgentsDialog
           open={!!viewing}
           onOpenChange={(open) => !open && setViewing(undefined)}
@@ -414,7 +557,7 @@ function ConnectionActions({
           <DropdownMenuItem
             onClick={() =>
               void navigate({
-                to: "/tools/$toolId",
+                to: "/registry/tools/$toolId",
                 params: { toolId: connection.id },
                 search: { kind: "connection" },
               })

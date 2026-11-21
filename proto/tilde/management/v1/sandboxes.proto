@@ -20,6 +20,13 @@ service SandboxBlueprintService {
   // Values are write-only. A sandbox receives the current environment whenever its process connects.
   rpc SetSandboxEnvVar(SetSandboxEnvVarRequest) returns (SetSandboxEnvVarResponse);
   rpc DeleteSandboxEnvVar(DeleteSandboxEnvVarRequest) returns (DeleteSandboxEnvVarResponse);
+  // Adds or replaces the blueprint's egress grant `slug`. Sandboxes reach the connection's
+  // upstream through the gateway with its credential, which never enters them, limited by the
+  // provider's rules and narrowed by `config_json` (validated against the provider's egress config
+  // schema; defaults filled in). Needs view on the connection. Running sandboxes pick changes up
+  // on their next request and their wiring on their process's next connect.
+  rpc SetBlueprintEgress(SetBlueprintEgressRequest) returns (SetBlueprintEgressResponse);
+  rpc DeleteBlueprintEgress(DeleteBlueprintEgressRequest) returns (DeleteBlueprintEgressResponse);
   rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
   // Terminates the VM at its provider; the next invocation that needs it launches a new one.
   rpc TerminateSandbox(TerminateSandboxRequest) returns (TerminateSandboxResponse);
@@ -52,6 +59,18 @@ message SandboxBlueprint {
   // Agents whose sandbox setting uses it.
   repeated string agent_ids = 7;
   SandboxTimings timings = 8;
+  repeated BlueprintEgress egress = 9;
+}
+// A blueprint's grant to reach a connection's upstream through the gateway at
+// `/sandboxes/egress/{slug}/…`. Off until enabled.
+message BlueprintEgress {
+  // Lowercase letters, digits and underscores, starting with a letter, at most 32.
+  string slug = 1;
+  string connection_id = 2;
+  // The grant's config: a JSON object of the provider's egress config schema.
+  string config_json = 3;
+  uint32 config_version = 4;
+  bool enabled = 5;
 }
 // When its sandboxes sleep and are terminated, and how long a launch or wake waits for the
 // sandbox's tilde process to connect (failing the invocation after it). A Modal sandbox's sleep
@@ -66,7 +85,9 @@ message SandboxTimings {
   uint32 connect_timeout_seconds = 3;
 }
 // `search` matches the name case-insensitively.
-message ListSandboxBlueprintsRequest { optional string search = 1; }
+message ListSandboxBlueprintsRequest {
+  optional string search = 1;
+}
 message ListSandboxBlueprintsResponse { repeated SandboxBlueprint blueprints = 1; }
 message GetSandboxBlueprintRequest { string id = 1; }
 message GetSandboxBlueprintResponse { SandboxBlueprint blueprint = 1; }
@@ -90,6 +111,12 @@ message SetSandboxEnvVarRequest { string blueprint_id = 1; string name = 2; stri
 message SetSandboxEnvVarResponse { SandboxBlueprint blueprint = 1; }
 message DeleteSandboxEnvVarRequest { string blueprint_id = 1; string name = 2; }
 message DeleteSandboxEnvVarResponse { SandboxBlueprint blueprint = 1; }
+message SetBlueprintEgressRequest {
+  string blueprint_id = 1; string slug = 2; string connection_id = 3; string config_json = 4; bool enabled = 5;
+}
+message SetBlueprintEgressResponse { SandboxBlueprint blueprint = 1; }
+message DeleteBlueprintEgressRequest { string blueprint_id = 1; string slug = 2; }
+message DeleteBlueprintEgressResponse { SandboxBlueprint blueprint = 1; }
 enum SandboxStatus {
   SANDBOX_STATUS_UNSPECIFIED = 0; SANDBOX_STATUS_STARTING = 1; SANDBOX_STATUS_RUNNING = 2;
   SANDBOX_STATUS_SLEEPING = 3; SANDBOX_STATUS_FAILED = 4;

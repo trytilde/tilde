@@ -40,6 +40,8 @@ pub struct Connections {
     pub(crate) public_event_ingress_url: String,
     pub(crate) http: Http,
     pub(crate) endpoints: Endpoints,
+    /// The registry's OIDC issuer; connections federating with a web identity mint from it.
+    pub(crate) oidc: crate::oidc::Issuer,
     /// Decrypted credentials of recently used connections. Every credential, status or
     /// assignment change notifies `tilde_sidecar_configuration`, which empties it; the TTL
     /// bounds staleness if that listener is down. `SecretString` values zeroize on eviction.
@@ -90,7 +92,13 @@ impl Connections {
                 return Err(invalid("Public URL cannot contain a query"));
             }
         }
+        let oidc = crate::oidc::Issuer::new(
+            pool.clone(),
+            crypto.clone(),
+            format!("{}/oidc", public_event_ingress_url.trim_end_matches('/')),
+        );
         Ok(Self {
+            oidc,
             pool,
             crypto,
             public_url: public_url.trim_end_matches('/').into(),
@@ -113,6 +121,7 @@ impl Connections {
             .write()
             .unwrap_or_else(|e| e.into_inner())
             .clear();
+        super::mints::forget();
     }
     fn cached_credentials(&self, id: Uuid) -> Option<Values> {
         let cache = self.credentials.read().unwrap_or_else(|e| e.into_inner());
@@ -144,7 +153,8 @@ impl Connections {
     }
     /// Reconcile the built-in provider catalog.
     pub async fn seed(&self) -> Result<(), Error> {
-        catalog::seed(&self.pool).await
+        let seed = catalog::seed(&self.pool);
+        seed.await
     }
     pub async fn register_provider(
         &self,
@@ -346,8 +356,13 @@ impl Connections {
             });
         }
         let setup = self.create_setup(&tx, id).await?;
-        // App connections reauthorize their existing user-owned app rather than creating another.
-        if row.status == "ready" {
+        // App connections reauthorize their existing user-owned app rather than creating another,
+        // also once they need action again (an account link the provider wants re-confirmed).
+        let stored = row.status == "requires_action"
+            && !crate::connections::db::values_get_all(&tx, id)
+                .await?
+                .is_empty();
+        if row.status == "ready" || stored {
             let step = catalog::runtime(&row.provider_id, &row.type_id).resume_step();
             if let Some(step) = step {
                 crate::connections::db::setup_copy_values_execute(&tx, setup.id, id).await?;
@@ -543,6 +558,7 @@ impl Connections {
                 .instructions(&typ)
                 .iter()
                 .map(|step| (*step).to_owned())
+                .chain(runtime.connection_instructions(self, connection.id, &typ))
                 .collect(),
             provider_name: provider.name.clone(),
             account_name_label: provider
@@ -803,7 +819,8 @@ impl Connections {
         }
         crate::connections::db::values_delete_execute(&tx, setup.connection_id).await?;
         for row in crate::connections::db::setup_values_get_all(&tx, setup.id).await? {
-            if row.field_key == "_pkce" {
+            // `_`-prefixed values are the setup's own working state (PKCE verifier, a provider's link token).
+            if row.field_key.starts_with('_') {
                 continue;
             }
             crate::connections::db::values_put_execute(
@@ -879,6 +896,10 @@ impl Connections {
     }
     /// Recover expired or interrupted attempts without blindly repeating external app creation.
     pub async fn recover(&self) -> Result<(), Error> {
+        let run = self.recover_setups();
+        run.await
+    }
+    async fn recover_setups(&self) -> Result<(), Error> {
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
         let rows = crate::connections::db::setup_recover_all(&tx).await?;
@@ -924,7 +945,17 @@ impl Connections {
             values: self.resolve(id).await?,
             http: self.http.clone(),
             endpoints: self.endpoints.clone(),
+            oidc: Some(self.oidc.clone()),
         })
+    }
+    /// Uses the registry's issuer (`crate::oidc`) instead of the default one at
+    /// `{ingress}/oidc`; connections are one of its consumers.
+    pub fn with_oidc_issuer(mut self, issuer: crate::oidc::Issuer) -> Self {
+        self.oidc = issuer;
+        self
+    }
+    pub fn oidc(&self) -> &crate::oidc::Issuer {
+        &self.oidc
     }
     pub async fn resolve(&self, id: Uuid) -> Result<Values, Error> {
         if let Some(values) = self.cached_credentials(id) {
@@ -1107,21 +1138,31 @@ impl Connections {
     }
     /// Give agents created before Tilde was a catalog provider their connection.
     pub async fn backfill_tilde(&self) -> Result<(), Error> {
-        for row in crate::connections::db::tilde_missing_all(&self.pool.get().await?).await? {
-            let mut tx_client = self.pool.get().await?;
-            let tx = tx_client.transaction().await?;
-            let Some(agent) = crate::iam::db::agent_lock_opt(&tx, row.id).await? else {
-                continue;
-            };
-            if crate::connections::db::tilde_connection_opt(&tx, agent.id)
-                .await?
-                .is_none()
-            {
-                catalog::tilde::create(&tx, &self.crypto, agent.id, &agent.name).await?;
-            }
-            tx.commit().await?;
-            drop(tx_client);
+        let rows = async {
+            Ok::<_, Error>(
+                crate::connections::db::tilde_missing_all(&self.pool.get().await?).await?,
+            )
+        };
+        for row in rows.await? {
+            let backfill = self.backfill_agent(row.id);
+            backfill.await?;
         }
+        Ok(())
+    }
+    async fn backfill_agent(&self, agent: Uuid) -> Result<(), Error> {
+        let mut tx_client = self.pool.get().await?;
+        let tx = tx_client.transaction().await?;
+        let Some(agent) = crate::iam::db::agent_lock_opt(&tx, agent).await? else {
+            return Ok(());
+        };
+        if crate::connections::db::tilde_connection_opt(&tx, agent.id)
+            .await?
+            .is_none()
+        {
+            catalog::tilde::create(&tx, &self.crypto, agent.id, &agent.name).await?;
+        }
+        tx.commit().await?;
+        drop(tx_client);
         Ok(())
     }
 }
@@ -1143,7 +1184,7 @@ impl Connections {
         drop(tx_client);
         Ok(row)
     }
-    async fn assign_in_transaction(
+    pub(crate) async fn assign_in_transaction(
         tx: &crate::database::Transaction<'_>,
         row: &Connection,
         assignment: &Assignment,
@@ -1165,6 +1206,7 @@ impl Connections {
                 Capability::Skills => "Every connection supports skills",
                 Capability::Tool => "This connection type does not serve tools",
                 Capability::Signal => "This connection type does not emit signals",
+                Capability::Egress => "Egress is granted by a sandbox blueprint",
             }));
         }
         if crate::connections::db::agent_exists_opt(tx, assignment.agent_id)
@@ -1220,5 +1262,21 @@ impl Connections {
         tx.commit().await?;
         drop(tx_client);
         Ok(row)
+    }
+}
+impl Connections {
+    /// One of the connection's provider's egress setup queries, run with its credential.
+    pub async fn setup_query(
+        &self,
+        id: Uuid,
+        query: &str,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, Error> {
+        let connection = self.get(id).await?;
+        let hook = super::egress::hook(&connection.provider_id)
+            .filter(|hook| hook.definition().setup_queries.contains(&query))
+            .ok_or_else(|| invalid("The connection's provider has no such setup query"))?;
+        hook.setup_query(&self.access(id).await?, query, input)
+            .await
     }
 }

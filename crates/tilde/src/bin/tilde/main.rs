@@ -55,6 +55,9 @@ enum Command {
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Several rustls crypto providers are compiled into the workspace, so there is no implicit
+    // default; dependencies that call `ClientConfig::builder()` need this one.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let args = Args::parse();
     if matches!(args.command, Some(Command::GenerateKey)) {
         let mut key = Zeroizing::new([0u8; 32]);
@@ -97,7 +100,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_ansi(false)
         .with_env_filter(config.log_filter.clone())
         .init();
-    let pool = database::connect(config.database_url.0.expose_secret()).await?;
+    let pool = database::connect(
+        config.database_url.0.expose_secret(),
+        config.database_direct_url(),
+    )
+    .await?;
     let encryption = Arc::new(
         tokio::time::timeout(
             std::time::Duration::from_secs(30),
@@ -112,7 +119,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Telemetry intake and delivery have their own connections, so a full or slow telemetry
     // queue can never take the ones management requests and agent heartbeats need.
-    let telemetry_pool = database::pool(config.database_url.0.expose_secret(), 6)?;
+    let telemetry_pool = database::pool(
+        config.database_url.0.expose_secret(),
+        config.database_direct_url(),
+        2,
+    )?;
     let logs =
         tilde::telemetry::logs::Runtime::start(telemetry_pool.clone(), &config, buckets.logs)?;
     let metrics = tilde::telemetry::metrics::Runtime::start(
@@ -170,12 +181,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         origins.push(url::Url::parse(value)?.origin().ascii_serialization());
     }
     let boundary = network::Boundary::new(address, config.allow_network, origins)?;
+    let default_issuer = format!("{}/oidc", ingress_url.trim_end_matches('/'));
     let connections = tilde::connections::service::Connections::new(
         pool.clone(),
         encryption.clone(),
         connection_setup_url,
         ingress_url,
     )?;
+    // One issuer and key set for the registry; connections are one consumer of it.
+    let oidc = tilde::oidc::Issuer::new(
+        pool.clone(),
+        encryption.clone(),
+        config.token_issuer_url().unwrap_or(default_issuer),
+    );
+    let connections = connections.with_oidc_issuer(oidc.clone());
     connections.seed().await?;
     connections.backfill_tilde().await?;
     connections.recover().await?;
@@ -190,7 +209,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     let sweep_cancel = tokio_util::sync::CancellationToken::new();
-    let sweeper = tokio::spawn(tilde::telemetry::spool::sweep_worker(
+    let sweeper = worker(tilde::telemetry::spool::sweep_worker(
         telemetry_pool.clone(),
         sweep_cancel.clone(),
     ));
@@ -204,10 +223,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_metrics(metrics.delivery.clone())
     .with_telemetry(trace_delivery.queue.clone());
     let health = tilde::agent::health::AgentHealth::new(pool.clone());
-    health.cleanup().await?;
+    let cleanup = health.cleanup();
+    cleanup.await?;
     let inference = tilde::inference::gateway::Loader::new(pool.clone(), connections.clone());
     inference.load().await?;
-    tilde::inference::prices::reconcile(&pool).await?;
+    let prices = tilde::inference::prices::reconcile(&pool);
+    prices.await?;
     let skills = tilde::skills::Skills::new(pool.clone())
         .with_store(buckets.skills.clone())
         .with_github(tilde::skills::github::GitHub::new(
@@ -218,7 +239,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .as_ref()
                 .map(|t| secrecy::SecretString::from(t.0.expose_secret().to_owned())),
         )?);
-    skills.reconcile().await?;
+    let reconcile = skills.reconcile();
+    reconcile.await?;
     let deployments = deployments.with_skills(skills.clone());
     let chat = tilde::chat::Chat::new(pool.clone(), encryption.clone(), runtime_url)
         .with_connections(connections.clone())
@@ -240,41 +262,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     opentelemetry::global::set_tracer_provider(telemetry.provider.clone());
     let (chat_shutdown, chat_shutdown_rx) = tokio::sync::watch::channel(false);
-    let mut relay_worker = tokio::spawn(deployments.clone().relay_worker(chat_shutdown_rx.clone()));
-    let mut recovery_worker = tokio::spawn(
+    let mut relay_worker = worker(deployments.clone().relay_worker(chat_shutdown_rx.clone()));
+    let mut recovery_worker = worker(
         deployments
             .clone()
             .recovery_worker(chat_shutdown_rx.clone()),
     );
-    let mut connection_worker = tokio::spawn(connections.clone().worker(chat_shutdown_rx.clone()));
-    let _inference_worker = tokio::spawn(inference.worker(chat_shutdown_rx.clone()));
-    let _skills_worker = tokio::spawn(skills.worker(chat_shutdown_rx.clone()));
-    let _budget_worker = tokio::spawn(tilde::inference::budgets::worker(
+    let mut connection_worker = worker(connections.clone().worker(chat_shutdown_rx.clone()));
+    let _inference_worker = worker(inference.worker(chat_shutdown_rx.clone()));
+    let _skills_worker = worker(skills.worker(chat_shutdown_rx.clone()));
+    let _budget_worker = worker(tilde::inference::budgets::worker(
         pool.clone(),
         chat_shutdown_rx.clone(),
     ));
-    let _price_worker = tokio::spawn(tilde::inference::prices::worker(
+    let _price_worker = worker(tilde::inference::prices::worker(
         pool.clone(),
         config.inference_prices_url.clone(),
         chat_shutdown_rx.clone(),
     ));
-    let mut health_worker = tokio::spawn(health.run(chat_shutdown_rx.clone()));
-    let _routine_worker = tokio::spawn(
+    let mut health_worker = worker(health.run(chat_shutdown_rx.clone()));
+    let _routine_worker = worker(
         tilde::routines::Routines::new(pool.clone(), chat.clone()).worker(chat_shutdown_rx.clone()),
     );
     let _mcp_health_worker = chat
         .tools
         .clone()
-        .map(|tools| tokio::spawn(tools.run_mcp_health(chat_shutdown_rx.clone())));
+        .map(|tools| worker(tools.run_mcp_health(chat_shutdown_rx.clone())));
     let _sandbox_worker = chat
         .tools
         .clone()
-        .map(|tools| tokio::spawn(tools.sandboxes.run(chat_shutdown_rx.clone())));
+        .map(|tools| worker(tools.sandboxes.run(chat_shutdown_rx.clone())));
     let _memory_worker = chat
         .tools
         .clone()
-        .map(|tools| tokio::spawn(tools.memory.run(chat_shutdown_rx.clone())));
-    let chat_worker = tokio::spawn(chat.clone().worker(chat_shutdown_rx));
+        .map(|tools| worker(tools.memory.run(chat_shutdown_rx.clone())));
+    let chat_worker = worker(chat.clone().worker(chat_shutdown_rx));
     let readiness_pool = pool.clone();
     let mut router = Router::new()
         .route("/healthz", get(|| async { "ok" }))
@@ -295,14 +317,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
         );
     if serve.runtime {
+        let uploads = logs
+            .router(&telemetry.tracing)
+            .merge(metrics.router(&telemetry.tracing));
         router = router.merge(
             tilde::iam::listeners::agent_runtime_router(
                 agents.clone(),
                 chat.clone(),
                 &telemetry.tracing,
             )
-            .merge(logs.router(&telemetry.tracing))
-            .merge(metrics.router(&telemetry.tracing)),
+            .merge(uploads),
         );
     }
     if serve.ingress {
@@ -315,7 +339,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     if serve.sidecar {
-        router = router.merge(tilde::deployment::rpc::sidecar_router(deployments.clone()));
+        let sidecars = tilde::deployment::rpc::sidecar_router(deployments.clone());
+        router = router.merge(sidecars);
     }
     if serve.management {
         let trace_router = tilde::telemetry::tracing::viewer::router(trace_reader)
@@ -398,6 +423,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pool.close().await;
     result?;
     Ok(())
+}
+
+/// Background workers claim across organizations and enter each item's organization.
+fn worker<F>(task: F) -> tokio::task::JoinHandle<F::Output>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    tokio::spawn(task)
 }
 
 async fn shutdown() {

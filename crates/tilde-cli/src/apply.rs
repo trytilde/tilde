@@ -345,7 +345,7 @@ mod tests {
         let mut other_team = args("http://x".into());
         other_team.team = Some("other".into());
         let declared = Declarations {
-            team: Some("faro".into()),
+            team: Some("acme".into()),
             ..declarations(json!([]))
         };
         let error = super::request(&other_team, &declared).unwrap_err();

@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def configure(env):
     env = dict(env)
+    # Set by an outer dev-env.py: nested dev tasks keep its decision (its URL is not external).
+    if env.get('TILDE_LOCAL_CLICKHOUSE') in ('0', '1'):
+        return env
     env['TILDE_LOCAL_CLICKHOUSE'] = '0'
     if env.get('ENGINE_CLICKHOUSE_URL', '').strip():
         return env

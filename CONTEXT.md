@@ -118,7 +118,8 @@ update atomically, and builtin definitions reconcile at startup. In-use methods 
 be deleted through registration. Remote authorization has its own opaque encryption
 identity; the migration retains existing ciphertext bindings without versioned providers.
 
-Capabilities are `channel`, `inference`, `tool` and `signal`. A connection type declares which it offers;
+
+Capabilities are `channel`, `inference`, `tool`, `signal` and `egress` (granted by sandbox blueprints). A connection type declares which it offers;
 an assignment grants one capability of one connection to one agent. Chat keeps a single
 owner per connection; an inference connection may be assigned to any number of agents.
 Every connection has a slug, `provider_id/name` (for example `linq/daniel@trytilde.ai`
@@ -131,6 +132,57 @@ Inference providers label the name "API key name", "Project name" or "Resource n
 account identity. An inference assignment may carry an alias, unique per agent and never a
 provider id; the agent can call `ctx.inference("fast")` instead of the slug, and the route
 resolves the alias from the same in-memory map (gateway loader or sidecar configuration).
+
+Mints (`connections::mints`) turn a connection's stored credential into what a consumer (`tool`,
+`chat`, later `egress`) sends upstream. A connection type mints `Stored` (the credential as it is:
+an OAuth access token the connection keeps refreshed, else a `token` or `api_key`; the scope cannot
+narrow it) or `Custom` (provider code). Custom mints: a GitHub App installation token limited to a
+`MintScope` of `owner/repo` resources of the installation's account and App permissions (an
+unscoped GitHub consumer gets the installation token the connection keeps), and AWS STS sessions in
+the scope's account. Network mints are cached in memory by connection, a fingerprint of its stored
+values and the scope digest until five minutes before expiry, single-flight per key, emptied with
+the credential cache on every `tilde_sidecar_configuration` notification, and traced as
+`credential.mint` spans. Which strategy a type uses is built-in catalog code (`mints::strategy`).
+
+The Connections page lists every connection, split by what it is for into top tabs: Tools &
+chat (tool or channel capability), Inference & embedding, Sandboxes (E2B and Modal), and Other
+when any remain (ingestion sources, say), classified from each connection's provider and
+capabilities. Tools & chat keeps the All/Catalog/MCP/Tilde tool server source tabs. Inference
+and sandbox connections are added from their tab, with no agent first (`NewConnectionDialog`:
+choose a provider, then its methods of that capability); tools come from the Tilde Catalog or
+a remote server. Each row lists the agents assigned the connection or using it as a tool
+source.
+
+
+### OIDC issuer
+
+The registry has one OpenID Connect issuer and one signing key set (`crate::oidc`), independent
+of any provider; components mint tokens from it for a relying party by subject and audience. Its
+consumer is workload federation from connections (subject `connection:<id>`).
+The issuer URL is `ENGINE_TOKEN_ISSUER_URL`, by default the event ingress origin plus `/oidc`;
+the ingress serves `/oidc/.well-known/openid-configuration` and `/oidc/jwks`, so a custom issuer
+must route to those paths over HTTPS. Tokens are RS256 JWTs valid for five minutes with `iss` the
+issuer, `aud` the relying party (`sts.amazonaws.com` for AWS) and `sub` chosen by the consumer
+(`connection:<connection id>` for connections). Signing keys are 2048-bit RSA (aws-lc-rs), generated on first use, sealed by the encryption
+crate (`oidc_signing_keys`, binding `oidc_signing_key`/kid/`private_key`); the newest signs, a key
+older than 30 days is replaced at the next signing (`Issuer::rotate` forces it), and superseded
+keys stay in the JWKS until they are 37 days old.
+
+For an `aws`/`oidc` connection the operator, once per account: adds an IAM OpenID Connect
+provider with the issuer URL and audience `sts.amazonaws.com` (AWS trusts the issuer's public CA;
+the console's Get thumbprint fills a thumbprint if asked), then gives the connection's role this
+trust policy (the setup page shows it with the real issuer and connection ID):
+
+```json
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+ "Principal":{"Federated":"arn:aws:iam::<ACCOUNT_ID>:oidc-provider/<issuer host and path>"},
+ "Action":"sts:AssumeRoleWithWebIdentity",
+ "Condition":{"StringEquals":{"<issuer host and path>:aud":"sts.amazonaws.com",
+  "<issuer host and path>:sub":"connection:<connection id>"}}}]}
+```
+
+Roles in other accounts (`assume_role_arns`) trust the connection's role (or IAM user) as an AWS
+principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
 
 ## Tools
 
@@ -152,7 +204,16 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   parsed by a shared module (`sandbox_patch`) Modal also uses; Modal, which manages sandboxes
   over its gRPC API and works inside one through its task command router; AWS, which offers a
   fixed snapshot of the official AWS MCP Server's tools and calls it over MCP with every
-  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`.
+  request SigV4-signed and the connection's default region in `_meta.AWS_REGION`. An AWS connection
+  is IAM access keys (`iam`) or a role federated with Tilde's OIDC issuer (`oidc`, no keys:
+  `AssumeRoleWithWebIdentity` into `role_arn`). Either may list roles in other accounts
+  (`assume_role_arns`, optional `external_id`): every AWS tool takes an optional `account_id`, and
+  a call naming a listed role's account runs with `sts:AssumeRole` credentials (session
+  `tilde-<connection id>`), cached until five minutes before they expire; an unlisted account is
+  refused, and `aws_list_accounts` names the reachable ones. Several AWS connections (one per
+  account) are simply several tool sources (`aws_prod.*`, `aws_staging.*`); Linear
+  (personal API key or OAuth app) over its GraphQL API: `get_issue`, `search_issues`,
+  `create_comment` and `update_issue_state` (by state name or ID within the issue's team).
 - Tool host: a customer-hosted tool backend. Like an agent host it is never dialed. A
   connected host opens `tilde.tool_host.v1.ToolHostService.Watch` with its token, publishes its
   tools and answers calls through `Respond`; a Lambda host is its function ARN, invoked
@@ -183,8 +244,8 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   prefix, or `api_key` as a query parameter. The curated servers carried over from trytilde/api
   (Notion, Linear, HubSpot, Vercel, Neon, Salesforce, documentation servers and others) are
   built-in providers in `tools/mcp_catalog.rs`, one connection type per way to reach the server;
-  a server of a service Tilde already integrates (Slack, AgentMail, Stripe) joins that provider
-  as `mcp_*` types. Any other server is added by URL as a registered (configured) provider of its
+  a server of a service Tilde already integrates (Slack, AgentMail, Stripe, Linear) joins that
+  provider as `mcp_*` types. Any other server is added by URL as a registered (configured) provider of its
   own: the MCP server is the adapter that lets a registered type declare the tool capability, so
   it is registered like any provider. It is listed on the Remote servers page beside
   tool hosts, not in the catalog, with the same 12-hour health history: every five minutes one
@@ -294,6 +355,21 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
   invocations acting for that user, or for another identity under the same root. The user of an
   invocation is the run's source identity, else the thread's only active human; an unverified,
   unattested channel identity is a claim and unlocks nothing.
+  An application's user does the same without a conversation: the native provider's
+  `ListConnectableProviders`, `StartConnection`, `ListConnections`, `ReconnectConnection` and
+  `DeleteConnection` (agent ingress, the agent's chat key or an embed key naming it, and
+  `x-tilde-identity`) start the same hosted setup for a provider the agent's `tools.personal`
+  grants, owned by that identity's chat user, and list, reconnect or disconnect only that user's
+  connections. The setup page announces completion to its opener or parent window
+  (`tilde.connection.complete` with the connection id), which `@trytilde/embed`'s
+  `mountConnectionSetup` listens for.
+- Delegation: the owner chooses which agents may use a personal connection: every agent whose
+  `tools.personal` covers the provider (`connections.all_permitted_agents`, the default for new
+  connections and for every connection made before owners could choose) or only the agents
+  listed in `personal_connection_agents`. An agent uses it only when both allow; the catalog and
+  every call check both, so a change applies from the agent's next invocation (a call is refused
+  at once). Each personal tool call records the connection it ran on
+  (`chat_tool_calls.personal_connection_id`), whose owner is fixed at setup.
 
 The invocation catalog lists the agent's tools on sources whose connection is ready or whose
 host can take a call; invoke rechecks the same catalog, validates input against
@@ -309,10 +385,29 @@ tool's span (`tilde.tool.background`) ends with its ticket, and a `background {n
 covers the provider's work until the outcome is delivered. A tool's output is at most 1 MiB
 (`tools::MAX_OUTPUT`, shared by REST providers, tool host answers and the audit record); a
 larger one fails the call with a terminal "output larger than 1 MiB" record, and a background
-call delivers that failure. Agent tools, tool hosts, built-in and personal tools
-are gateway-only. Sidecar-hosted agents still see channel tools alone: serving them there
-needs a provider-level relay to the gateway (credentials stay central) that executes without
-auditing, because the replica holding the thread owns its tool-call records and activity order.
+call delivers that failure.
+
+A sidecar-hosted agent gets its tool sources too, offered as `{source slug}.{tool name}` exactly
+as on the gateway and filtered by the same `tools_invoke` ceiling; the replica's tool registry
+audits every call, because the replica holding the thread owns its tool-call records and activity
+order. Where a call runs depends on the source (`tools::Callee::on_sidecar`):
+- Managed provider tools on a connection (GitHub, Tavily, ...) and tools of MCP-served
+  connections run on the sidecar. The replicated configuration carries them as `SidecarTool`s
+  (the catalog definition with the agent's wording and tool mode, the provider's tool name and,
+  for MCP, the server URL and credential placement), built by `Tools::sidecar_tools` from the
+  same rows as the gateway's catalog, and carries their connections' decrypted credentials as
+  `ConnectionConfiguration`s with the TOOL capability (a connection already replicated as a
+  channel or for inference is not repeated). Changes to tool sources, picks, MCP discoveries,
+  tool mode, connections and credentials notify `tilde_sidecar_configuration`, so a rotation or
+  removed tool reaches the replica with the next configuration frame, not the next invocation.
+- Tool hosts (credential-less hosts and instances of a host's provider; hosts dial the gateway),
+  sandbox tools and AWS OIDC (it signs with the gateway's OIDC issuer) stay on the gateway.
+  The replica lists and calls them through the relayed
+  `tilde.runtime.v1.GatewayToolService` (`tools::relay`), as it does memory and wikis; the
+  gateway rechecks the token, lease, ceiling and its own catalog, and runs the call without a
+  second audit record. A gateway the replica cannot reach hides those tools from that listing.
+
+Built-in (`tools.*` gateway extras) and personal tools remain gateway-only.
 
 Both SDKs expose `ctx.toolSource(slug)` / `ctx.tool_source(slug)`, tool `summary`/`annotations`/
 `outputSchema`/`background` and bundled tools; TypeScript also has `ManagementClient.tools`/`toolHosts`, and `@trytilde/sdk/tool-host` with
@@ -342,14 +437,24 @@ bundled tools out) and its bundled tools.
   source; registration refuses a mismatch. GitHub App (issues, pull requests, comments, reviews, CI check runs), Slack,
   AgentMail, Linq, WhatsApp (Meta and Telnyx) connections reuse their chat webhook and its
   verification; Sentry auth-token connections (signed with an internal integration's client
-  secret) and Firecrawl connections (signed with the account's webhook secret) have no chat
-  adapter and are verified by `signals::verify`. Their secrets are optional setup fields; without
-  one, deliveries are refused. Signal-capable setups show the connection's webhook URL. Bot
+  secret), Firecrawl connections (signed with the account's webhook secret), Linear connections
+  (`Linear-Signature`, an HMAC of the body with the webhook's signing secret, and a
+  `webhookTimestamp` at most a minute old) and AWS connections (CloudWatch alarms through an SNS
+  HTTPS subscription) have no chat adapter and are verified by `signals::verify`. Their secrets
+  (for AWS, the accepted topic ARNs) are optional setup fields; without one, deliveries are
+  refused. SNS messages are checked against the certificate at `SigningCertURL`, fetched only
+  from `https://sns.<topic region>.amazonaws.com`, with the RSA signature over SNS's canonical
+  string (SHA-1 for SignatureVersion 1, SHA-256 for 2); a valid signature proves SNS, not the
+  customer, so only listed topics are accepted, and their subscription confirmation is answered
+  by visiting its SubscribeURL on the same origin. The exact signal names are listed under
+  "Signal catalog" below. Signal-capable setups show the connection's webhook URL. Bot
   senders on GitHub and Slack emit nothing, so a routine cannot trigger itself.
 - Routine: one agent, a name, a prompt, a thread title, an enabled flag (on at creation, toggled
   from the table) and exactly one trigger:
   a five-field cron schedule evaluated in UTC, or one signal type of one signal-capable
-  connection. Prompt and title are `{{ key }}` templates: a signal's context is its data plus
+  connection, narrowed by up to 20 filters (`routine_filters`): each names a context path and
+  the values it may hold, and all must match (for a list value, any element may; scalars compare
+  as their text, a missing path never matches). Prompt and title are `{{ key }}` templates: a signal's context is its data plus
   `provider_delivery_id`, `signal_type` and `summary`; a cron routine's is `scheduled_at`. A
   missing key renders empty; an empty title uses the routine's name. A deleted (soft-deleted)
   agent's routines no longer fire.
@@ -371,6 +476,39 @@ bundled tools out) and its bundled tools.
   setup then opens the routine on it), and "Scheduled routine". The routine dialog has the
   form on the left and the template variables on the right; template fields show variables as
   inline badges (`components/template-input.tsx`).
+
+### Signal catalog
+
+Exact signal types per provider/connection type, as `ListSignalTypes` returns them. Routine
+templates and filters name paths of a signal's context: its data below plus
+`provider_delivery_id`, `signal_type` and `summary`.
+
+- Linear (`linear`, types `api_key` and `oauth`; webhook secret field `webhook_secret`):
+  `linear.issue.created`, `linear.issue.updated`, `linear.issue.removed`,
+  `linear.comment.created`, `linear.comment.updated`, `linear.comment.removed`. Data:
+  `action`, `url`, `organization_id`, `actor {id,name,email}`, `issue {id, identifier, title,
+  description, url, priority, priority_label, state {name,type}, team {key,name}, labels [names],
+  assignee {id,name,email}}`, `comment {id, body, url, user}` (comment events, else null) and
+  `changed` (updatedFrom keys). Changes by apps or integrations emit nothing.
+- Sentry (`sentry`, type `token`; field `client_secret`): `sentry.issue.created`,
+  `sentry.issue.assigned`, `sentry.issue.resolved`, `sentry.issue.unresolved`,
+  `sentry.issue.archived` (also Sentry's older `ignored`), `sentry.issue.regressed` (an
+  unresolve whose `data.issue.substatus` is `regressed`, emitted beside it),
+  `sentry.alert.triggered` (issue alert rules, resource `event_alert`) and
+  `sentry.metric_alert.critical|warning|resolved`. Data is Sentry's payload as sent
+  (`data.issue.*`, `data.event.*`, `data.triggered_rule`, `data.metric_alert`,
+  `data.description_title`, `data.web_url`).
+- AWS (`aws`, types `iam` and `oidc`; field `sns_topic_arns`, comma-separated, any number of
+  accounts and regions in one connection): `aws.cloudwatch.alarm.triggered`
+  (new state ALARM), `aws.cloudwatch.alarm.resolved` (OK) and
+  `aws.cloudwatch.alarm.insufficient_data`. Data: `topic_arn`, `message_id` and `alarm {name,
+  description, state, previous_state, reason, changed_at, arn, account_id, region, namespace,
+  metric_name, statistic, comparison, threshold, period, evaluation_periods, dimensions {Name:
+  Value}, ecs_service, ecs_cluster, load_balancer, target_group}`; the last four lift the
+  ServiceName, ClusterName, LoadBalancer and TargetGroup dimensions (metric-math alarms report
+  their first metric).
+- Also: `github.*` (GitHub App), `slack.app_mention` and `slack.message.posted`, AgentMail, Linq,
+  WhatsApp and Firecrawl types in `signals/`.
 
 ## Sandboxes
 
@@ -420,14 +558,44 @@ bundled tools out) and its bundled tools.
   images kept for 31 days, past the longest terminate-after. The sweeper also renews a running
   E2B VM's TTL before E2B would pause it, and puts a Modal VM to sleep before its 24-hour
   lifetime ends; it never sleeps a sandbox with operations in flight, which keep it in use.
-- Sandbox egress wiring (the process side): the registration that issues the session also issues
-  an egress token, kept in memory the same way, for the gateway's egress route. Each registration's
-  `egress_env` joins the blueprint's environment with `{token}` replaced (variables naming the
-  token are skipped while the process has none), and its `git` rewrites replace a marked block in
-  `/etc/gitconfig` (`url.<url>.insteadOf`, and for the gateway origin an empty helper followed by
-  `!tilde sandbox credential`); no rewrites removes the block. `tilde sandbox credential get`
-  answers git from the loopback API (`/v1/egress/credential`) only for the gateway's protocol and
-  host, as `x-access-token` and the egress token.
+- Egress grant: a blueprint's permission for its sandboxes to reach a connection's upstream
+  through the gateway with the connection's credential, which never enters the VM
+  (`sandbox_blueprint_egress`, managed with SetBlueprintEgress/DeleteBlueprintEgress; off until
+  enabled). Its slug (`^[a-z][a-z0-9_]{0,31}$`) names it in the route; a blueprint grants a
+  connection once. The connection must be ready, installation-owned and of a type with the
+  `egress` capability, which a provider offers when it declares egress (`connections::egress`,
+  built-in catalog code: GitHub first). A provider's egress is its protocols (HTTP with
+  deny-by-default `METHOD /path` allow and deny rules, deny winning; git smart-HTTP with its
+  services and whether pushes may delete refs, rewrite them or touch the default branch), its
+  fixed upstreams, and the JSON Schema of a grant's config. A grant's config is validated against
+  that schema and stored with its defaults (`config_version` records the schema it was saved
+  under); it can only narrow the rules. The provider's `EgressHook` checks each request against
+  the rules and the config and names the narrowest credential to mint (`MintScope`). Setup queries
+  (RunSetupQuery, e.g. `github.list_repositories`) fill config choices marked
+  `x-tilde-options`. GitHub grants narrow to repositories, push branches (globs, default
+  `factory/*`; empty: no push) and pull request writes; App connections mint tokens limited to
+  them, personal access and OAuth tokens rely on the gateway's checks alone.
+- Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
+  (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
+  enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process
+  gets a new one) authenticates as Bearer, `token` or a Basic password (git). The token's
+  sandbox's blueprint's enabled grant `slug` names the connection (still ready,
+  installation-owned and egress-capable); a grant saved under an older config version is
+  refused. Git smart-HTTP paths (`<owner>/<repo>.git/info/refs|git-upload-pack|git-receive-pack`)
+  are git, anything else HTTP. A push is read whole first (at most 100 MiB): its pkt-line ref
+  updates, whether its pack proves each update a fast-forward (commits walked from new to old
+  through the pack, offset deltas resolved; anything unprovable is not), and the default branch
+  from upstream's upload-pack advertisement (unknown refuses the push). The hook decides; the
+  client's credentials, cookies and hop-by-hop headers are dropped, the scoped credential minted
+  (git sends it as Basic `x-access-token`), and the request streams to the provider's fixed
+  upstream. Redirects are not followed: a same-host `Location` is rewritten to the route. 20
+  requests a second per sandbox (burst 200). Each request is a `sandbox.egress {slug}` span on the
+  sandbox's latest invocation (slug, protocol, method and path or git service and repository,
+  decision and reason, status, ref updates as events). Registration carries `egress_token` (with
+  the session only), `egress_env` (`TILDE_EGRESS_<SLUG>_URL` and the provider's HTTP templates,
+  `{token}` filled in by the process) and `git` rewrites of each git upstream to the route;
+  `tilde sandbox connect` writes them to the shell environment and `/etc/gitconfig` with
+  `tilde sandbox credential` as the gateway's only credential helper.
 
 ## Memory
 
@@ -581,14 +749,20 @@ injects nothing.
 The memory pages: **Memory** in the sidebar lists banks (owner agent or shared, scope, current
 memory count, memories waiting for an embedding, linked agents) with New bank and, for
 administrators, Embedding settings (an inference connection, a model from `ListEmbeddingModels` or
-typed, and dimensions; saving runs the probe). A bank page has two tabs. Memories: the bank's path
-tree (`ListMemoryPaths`, counts summed up the tree), the memories under the chosen path newest
-first a page at a time (`ListMemories` without a query pages by the last memory's id), or ranked by
-a search with how each was found; filters by kind, origin and, in a per-person bank, person
-(`ListMemoryPeople`: each identity with memories there, named after one of its users). A memory's
-panel shows its validity, origin, writer, the conversation it came from, what it replaced or what
-replaced it (`superseded_by`) and its revisions; people add facts and edit or delete any memory
-(editing an agent's memory is "Take over and edit": it becomes the person's); a synthesized
+typed, and dimensions; saving runs the probe). A bank page has two tabs. Memories, master-detail:
+search, kind, origin and (per-person banks) person filters and Add fact sit in the header's tab row;
+a collapsible folder tree from the bank's paths (`ListMemoryPaths`, counts summed up the tree;
+paths are the only grouping memories have), a dense table of the memories under the chosen folder
+newest first a page at a time (`ListMemories` without a query pages by the last memory's id), or
+ranked by a search with how each was found, and the chosen memory's panel; filters by kind, origin
+and, in a per-person bank, person (`ListMemoryPeople`: each identity with memories there, named
+after one of its users). A memory's panel renders its content as Markdown and shows its validity,
+origin, writer, the conversation it came from, what it replaced or what replaced it
+(`superseded_by`, by title), other memories in its folder, and its revisions; people add facts and
+edit any memory in that panel with the rich Markdown editor (`markdown-editor.tsx`: tiptap with a
+toolbar, a selection bubble menu, slash commands, task lists, tables, links, a raw Markdown view
+and ⌘S/Ctrl+S to save) and delete any memory (editing an agent's memory is "Take over and edit": it
+becomes the person's); a synthesized
 memory's panel lists its evidence, linking to the conversation (`/agent/$agentId/sessions`) or
 the wiki page, and `?memory=` opens a memory's panel. Settings: name,
 description, linked agents and their access (carried on the bank's `links`), Synthesis
@@ -761,13 +935,16 @@ knowledge is kept up to date (ADR-0014).
   sidecar-hosted agents reach them through the relayed `KnowledgeService`.
 
 People manage wikis through `WikiService` (`wikis::rpc`). The **Wikis** sidebar page lists them;
-a wiki's page has its page tree (the open page is in the URL, `?page=<path>`), the page rendered
+a wiki's page has search (words, exact text or regex) and New page in the header's tab row, its
+collapsible page tree (the open page is in the URL, `?page=<path>`), beside the open page its
+outline and the pages linking to it (grep for Markdown links naming its path), the page rendered
 from Markdown (`react-markdown` with GitHub's extensions, raw HTML not rendered; `wiki-markdown.tsx`:
 a link without a scheme names a page by its path from the wiki root (`/runbooks/deploys`; a
 leading `./` and a trailing `.md` are ignored) and opens it here, absolute links open outside the
 app, and
-images from other origins show as links and are never fetched), a raw Markdown editor (Monaco)
-that saves at the revision it opened, asks before discarding unsaved changes (any navigation
+images from other origins show as links and are never fetched), editing and creating pages in
+place with the rich Markdown editor (the memory panel's; its raw Markdown view covers anything the
+rich view does not show) that saves at the revision it opened, asks before discarding unsaved changes (any navigation
 through the router's blocker, Cancel, leaving the browser page) and, when someone saved first,
 shows their changes and overwrites them with the draft at the latest revision or discards it; a
 `?page=` naming no page offers editors to create it, move and delete, a history linking each agent
@@ -919,18 +1096,25 @@ when the page is hidden, and respects reduced motion. A CSS background remains w
 
 TanStack Router owns browser navigation through file routes in `web/src/routes`.
 The Vite plugin generates `web/src/routeTree.gen.ts`; `_app` is the pathless
-authenticated layout, and public brokering lives outside it. Agent routes live in
-`_app/agent/`, with the shared editor and its tabs grouped in `$agentId/`.
-Standalone Connections and Chat pages are not exposed. Agent rows open `/agent/{id}/capabilities`;
-`/agent/{id}/chat-providers` and `/agent/{id}/iam` are sibling tab routes under a shared
+authenticated layout, and public brokering lives outside it. The registry's pages (agents,
+skills, tools, sandboxes, memory and wikis) live below `/registry` (`_app/registry/`); the root
+route redirects their earlier paths (`/agent/...`, `/skills...` and so on) there, keeping search
+and hash. Agent routes live in
+`_app/registry/agent/`, with the shared editor and its tabs grouped in `$agentId/`.
+Standalone Connections and Chat pages are not exposed in the registry. Agent rows open
+`/registry/agent/{id}/capabilities`;
+`/registry/agent/{id}/chat-providers` and `/registry/agent/{id}/iam` are sibling tab routes under a shared
 agent editor. Agent details are fetched by ID, so direct URLs and refreshes do not depend on previously loading the registry. The
 shared editor preserves local state across tab navigation and browser Back/Forward. The dashboard header
 shows Agent Registry / agent-name breadcrumbs, updated from loaded and saved route data.
 Pages can contribute a DashboardNavigation slot beside the breadcrumbs; agent tabs use a
 React portal so their panel context and keyboard behavior remain intact.
-`/memory` lists memory banks and `/memory/{id}/memories` and `/memory/{id}/settings` are a bank's
-tabs, like a sandbox blueprint's; `/wikis` and `/wikis/{id}/pages` and `/wikis/{id}/settings` do
-the same for wikis. `/agent/new` creates an agent; the registry remains `/`. Connection brokering has a
+`/registry/memory` lists memory banks and `/registry/memory/{id}/memories` and
+`/registry/memory/{id}/settings` are a bank's tabs, like a sandbox blueprint's; `/registry/wikis`
+and its `{id}/pages` and `{id}/settings` do the same for wikis. `/registry/agent/new` creates an
+agent; the registry is `/registry`, which `/` redirects to.
+The sidebar collapses to icons (item names become tooltips).
+Connection brokering has a
 separate public route outside the authenticated app layout. Connection setup and
 identity verification host modules live under `web/src/routes/connections/` with
 `-` prefixes to exclude them from route generation. Shared connection UI loading
@@ -1114,7 +1298,18 @@ examples run with the workspace interpreter directly so stopping the launcher ne
 them. Python packages share the Changie release version; contracts are generated
 by `sdk/py/scripts/generate.py` and not committed.
 
+`serve({ run })` (Python `serve(run=...)`) hosts an agent wherever its entry module runs, so one
+entry serves every deploy target: inside AWS Lambda (`AWS_LAMBDA_FUNCTION_NAME`) it returns the
+Lambda handler (`export const handler = serve({ run })`); with a deployment token (option or
+`TILDE_DEPLOYMENT_TOKEN`) it starts the dial-in host (`connectAgent`) and closes it on SIGINT or
+SIGTERM, letting active invocations report before exiting; otherwise (declaration discovery,
+tests, a plain import) it does nothing and the returned handler throws if called. Python's blocks
+until a signal, so it refuses to run inside an event loop (`connect_agent` is for that).
+
 ## Generated contracts
+
+Open-source Tilde only; Tilde Cloud compiles the generated trees into the engine crate
+(`crates/tilde/src/generated`) and has no CLI crate.
 
 `crates/tilde-contracts` holds the Rust Protobuf messages (`proto`) and ConnectRPC service
 definitions (`services`) generated from `proto/` by `buf.gen.yaml`; `task generate` rewrites both
@@ -1131,6 +1326,8 @@ for that reason rather than a `From`. Pulling the crate in costs about a minute 
 on a cold build, which is why the CLI depends on it rather than the engine.
 
 ## The tilde CLI
+
+Open-source Tilde only (`crates/tilde-cli`); Tilde Cloud's users install the same released CLI.
 
 `crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy`, `doctor` and `local`
 (connecting a harness on this machine to its local agent; see Local agents). The engine
@@ -1189,6 +1386,15 @@ dependency, because package managers install peers at the project root where `np
 resolves, while a transitive dependency's bin is not linked there. `sdk/py/packages/tilde-cli`
 is a development stand-in that runs the binary built by cargo so `uv` can resolve
 `trytilde-cli` inside this repository; `task sdk:py:pack` skips it.
+
+Sandbox egress wiring (the process side, `tilde sandbox`): the registration that issues the
+session also issues an egress token, kept in memory the same way, for the gateway's egress route.
+Each registration's `egress_env` joins the blueprint's environment with `{token}` replaced
+(variables naming the token are skipped while the process has none), and its `git` rewrites
+replace a marked block in `/etc/gitconfig` (`url.<url>.insteadOf`, and for the gateway origin an
+empty helper followed by `!tilde sandbox credential`); no rewrites removes the block.
+`tilde sandbox credential get` answers git from the loopback API (`/v1/egress/credential`) only
+for the gateway's protocol and host, as `x-access-token` and the egress token.
 
 ## Tracing
 
@@ -1358,7 +1564,7 @@ JavaScript remains for substantive generation checks and integration tests.
 
 Dev dotenv files supply bind addresses, public URLs, Vite upstreams, browser
 origins and S3 endpoints. `TS_ADDR=<IPv4> task dev` relocates local
-service binds and URL hosts in `scripts/dev.py` before starting Task's services;
+service binds and URL hosts in `scripts/dev-env.py` before starting Task's services;
 custom external URLs and database settings remain independent.
 Without TS_ADDR, dotenv values pass through directly. `.env.example` lists local
 defaults. Dev ngrok always overrides the ingress public URL.
@@ -1382,7 +1588,7 @@ An assignment may be pending credential setup. Tools appear only while the conne
 is ready and assigned; invocation IAM grants still filter the catalog.
 
 Chat adapters live under `chat/providers` for Slack, GitHub, AgentMail, Linq, Meta
-WhatsApp and Telnyx WhatsApp. They own dynamic tool definitions and provider wire
+WhatsApp, Telnyx WhatsApp and Google Chat. They own dynamic tool definitions and provider wire
 formats. Tool names include the connection ID to distinguish multiple accounts. Meta
 read/typing actions are not advertised for Telnyx, and email has no reaction tool.
 Connection credentials resolve through the existing encrypted store and refresh path.
@@ -1445,7 +1651,23 @@ connections together. Neither read needs an additional invocation-state query.
 Development falls back to public `.env.example` defaults; private `.env` and
 `.env.local` override them. Tests use `.env.test` and start local storage when
 using its default endpoint.
-All six chat adapters have isolated outbound/inbound fixture coverage.
+The six original chat adapters have isolated outbound/inbound fixture coverage; Google Chat is
+covered end to end (signed request, agent host wake, reply to a fake Chat API).
+
+A Google Chat app (`google_chat`/`app`) is a Chat API app with an HTTP endpoint (not a
+Workspace add-on) whose endpoint is the connection's webhook URL. Its credentials are the
+JWT-bearer grant of the project's service account (`issuer` = client_email, `private_key`,
+scope `chat.bot`), minting Chat API tokens on refresh, and the Cloud `project_number`: Google
+signs each request with a JWT from `chat@system.gserviceaccount.com` whose audience is that
+number ("Authentication Audience: Project Number"), verified against Chat's published
+certificates. Google delivers space messages only when they @mention the app (or run its slash
+commands) and every DM; the agent sees `argumentText`, the message without the mention. A DM is
+one external thread (`spaces/AAA`), a space thread another (`spaces/AAA/threads/BBB`), which is
+also the `conversation` its `sendMessage` tool replies to; `updateMessage` edits a sent
+message (there is no automatic streaming edit, as with Slack). Senders are their Google email,
+which Google vouches for, so the adapter attests identities: private access allows an added
+email at once. The webhook answers `{}` (no synchronous reply). Attachments are not yet
+ingested.
 
 
 ## RPC audience boundaries
@@ -1534,16 +1756,12 @@ projection; hydration restores their order and resume publishes their new invoca
 `@trytilde/chat-proxy` owns server credentials, trusted identity resolution, configured agent
 selection, and streaming Connect forwarding. It allows only the provider contract and never
 forwards browser cookies or credentials upstream. `@trytilde/chat-next` adapts Web requests
-and async catch-all route params. `@trytilde/chat-ui` exports Chat and ListSessions with
-Dispatch's (openbot's) chat look: the pane, header, grouped bubbles, day separators, find bar,
-prompt dock, composer and queue, and the sidebar rows with `@trytilde/agent-avatar` avatars.
-Native history, search, read state, attachments, live replay and queue controls drive them;
-Reply and Copy are hover actions on each message. In a session with more than one other
-participant, a group's first bubble names its sender. The browser receives no provider key. Components
+and async catch-all route params. `@trytilde/chat-ui` exports Chat and ListSessions, reusing
+Dispatch's composer and markdown presentation with native history, search, read state,
+attachments, live replay and queue controls. The browser receives no provider key. Components
 sharing a proxy and UI identity invalidate each other's lists; unmount aborts streams and
 revokes attachment object URLs. These packages build through `task build:chat`, including
-SDK pack/publish workflows, and are exercised by `task test:chat-ui`. `task preview:chat-ui`
-serves them against in-browser fixtures (light, dark, phone width) for visual comparison.
+SDK pack/publish workflows, and are exercised by `task test:chat-ui`.
 
 ## PostgreSQL notifications
 
@@ -1552,7 +1770,23 @@ with transaction-commit NOTIFY wakeups from `chat_activity`. Readers subscribe
 before loading history and drain all cursor pages before waiting. Notifications
 contain no event data. Reconnect invalidates subscribers so they catch up from
 persisted state without periodic subscription polling. Listener connections are
-separate from the query pool and close with the service/pool.
+separate from the query pool and close with the service/pool. They connect to
+`DATABASE_DIRECT_URL` (the server itself): `DATABASE_URL` may be a
+transaction-pooling PgBouncer, which gives no session to LISTEN on.
+
+## Connection pooling
+
+`DATABASE_URL` is the query pool's address and may be a transaction-pooling PgBouncer;
+`DATABASE_DIRECT_URL` is the server itself and defaults to `DATABASE_URL`. Only work that
+needs a session uses it: LISTEN (one connection per listening service) and migrations (one, at
+startup). Nothing on a pooled connection may rely on session state: settings are `SET LOCAL`
+and advisory locks are transaction locks. Prepared statements are fine (PgBouncer's
+`max_prepared_statements` re-prepares them on each server session). A PgBouncer that rejects a
+`search_path` in the startup `options` needs a deployment that keeps Tilde in a schema of its
+own to set it on the login role (`ALTER ROLE <login> SET search_path = <schema>, public`),
+never in a pooled URL.
+The query pool has 4 connections behind a pooler (`DATABASE_DIRECT_URL` set) and 16 on the
+server itself.
 
 Pending message routing and invocation dispatch wake on committed message/work
 changes and on freed local execution capacity. Queued API events are dispatched
@@ -1573,6 +1807,81 @@ on `tilde_chat_activity` and on any local message write to the thread; short TTL
 staleness and the invocation's end evicts its entries. Credentials live only in
 `Connections`, as `SecretString` values that zeroize on eviction. Sidecars already hold
 their threads and configuration in memory and need none of this.
+
+## Secrets
+
+A secret (`crate::secrets`, `SecretService`) is a named value a person sets in the app
+(Connections → Secrets, `/connections/secrets`) and specs reference by name. Names follow
+environment-variable rules; each secret has an optional description. The value is sealed by
+the encryption crate (binding `secret`/id/`value`) when set and never returned: management lists
+names, descriptions, timestamps and the blueprints using each. A sandbox blueprint's environment
+variable holds its own sealed value or references a secret (`sandbox_blueprint_env.secret_id`);
+a connecting sandbox process gets the secret's current value, so rotating it reaches new sandbox
+connections without a deploy. A referenced secret cannot be deleted. An apply's blueprint env
+takes `secret.ref("NAME")`; a missing one is a required action linking to
+`/connections/secrets?add=NAME`, which opens a new row with the name filled in and the value
+focused.
+
+## Declarative apply
+
+An agent's registry configuration can be written in code (`@trytilde/iac` in open-source Tilde's
+SDK) and applied by `tilde deploy` through `ApplyService.Apply`, in every edition. A request
+carries agent specs: the agent's own fields, inference aliases, tool sources, a sandbox blueprint
+(environment and egress grants), routines and the deployment the customer already deployed (a
+Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::apply` runs it:
+
+- Preflight reads only and lists every required action before anything is written, each with a
+  link into the app: a missing connection (a pre-filled create link: provider, name, type), one
+  that is not ready, of the wrong type or lacking a capability for its use, a tool or signal the
+  connection does not offer (with the nearest name as a suggestion), an invalid spec, and
+  missing permissions.
+- Then one transaction for every agent of the request, in dependency order: blueprints, then per
+  agent its fields, aliases, tool sources, sandbox link, routines and deployment. A dry run runs
+  the same writes and rolls back, so the plan is what an apply does.
+- Upsert by key, whoever created the resource: an agent by `key` (`agents.key`, unique among live
+  agents; a spec's fixed `id` takes over an existing agent without a key), a blueprint by name, a
+  routine by name within its agent (`routines_agent_name`), a tool source by connection, an
+  inference alias by alias, an egress grant by slug, a deployment by external ID.
+- Nothing is removed for being absent from a spec; an entry with `delete: true` removes it (a
+  blueprint environment variable too: variables a spec does not name, such as secrets set in the
+  app, stay). A tool source's tools become exactly the spec's (`*` is every tool the connection
+  offers). Absent capabilities, concurrency policy and tool mode keep the agent's own. A routine
+  without `enabled` is created disabled and its enabled state is then left to people.
+- Preflight also blocks an alias that would displace another alias on the same connection, a
+  fixed ID that names an agent with a different key, and (cloud) capabilities beyond the caller's
+  own reach, as CreateAgent and UpdateAgent do.
+- Connections are only ever referenced by slug, never created by an apply.
+- Specs are written with `@trytilde/iac` (`sdk/ts/packages/iac`): `defineAgent`, `defineProject`
+  (agents applied together, and their team), `connection.ref("provider/name")`, `blueprint`,
+  `egress`, `routine`, and deploy targets (`lambda(arn)`, `gateway()`, `sidecar()`). Values are
+  plain data marked with `Symbol.for("tilde.iac")` and carry their `AgentSpec` protobuf JSON.
+  Built-in catalog providers are typed (`github.ref("acme")`): `src/catalog.ts`, generated by
+  `task iac:catalog` from a disposable server's catalog, holds one string-literal union of tool
+  names (and one of connection types) per provider. `.tools(...)` takes only those names and `"*"`
+  (`ALL`, every offered tool), so a typo does not compile; `.untypedTools(...)` takes any string,
+  and both chain in any order. MCP-served tools take plain strings, which preflight checks.
+  `connection.ref(slug)` is typed through the `Connections` interface of `@trytilde/iac` (empty
+  in the package), which a project fills by module augmentation: `tilde iac types` lists the
+  organization's ready connections (MCP servers and tool hosts' instances included) with their
+  tools and writes a `.d.ts` (`declare module "@trytilde/iac"`) mapping each slug to its
+  connection type and tool names.
+  Connections that share a slug merge: one type keeps
+  the union of their tools, different types (or unknown tools) leave that part plain strings. A
+  generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
+  plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
+- `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
+  reader that knows specs prints `{declarations, agents, team}` (validating each agent against
+  `AgentSpec`), older readers ignore the variable. With agents, the CLI sends one `Apply`: the
+  one agent declaring `deploy` gets the entry's declarations (skill files inline) and an external
+  ID (`--external-id`, the GitHub run, else a digest of what is deployed, so an unchanged rerun
+  registers nothing); `--team`/`TILDE_TEAM` overrides the project's team; `--dry-run` asks for
+  the plan. It prints the plan or every required action with its link (relative links joined to
+  the server URL) on stderr, a newly registered dial-in deployment's token on stdout, or with
+  `--json` the response. Exit codes: 0 applied or planned, 1 error, 2 blocked. Without agents it
+  registers the deployment as before.
+- The response lists one `Change` per resource (create, update with before and after per field,
+  unchanged, remove; environment values sealed) and, for a registered dial-in deployment, its
+  token once.
 
 ## Deployments, instances and the run protocol
 
@@ -1729,7 +2038,10 @@ releases the leases of idle threads, ends its invocations on threads mid-invocat
 locally (the agent process's open command stream turns into a stop, as it does when a
 replica is fenced or loses a lease), and sends a final not-ready heartbeat; the gateway
 treats a not-ready instance as gone and recovery restarts that work at once instead of
-after the liveness window.
+after the liveness window. Recovery wakes on registrations and on changes of an instance's
+connection or readiness, never on a heartbeat that only refreshes `last_seen_at` (a NOTIFY
+serialises its commit behind every notifying commit on the server); dead holders are found
+on recovery's interval. Heartbeats commit without waiting for their WAL flush.
 
 Lease validity is the holder's liveness: the instance heartbeat, sent every three
 seconds independently of the event queue, implicitly renews every lease the replica
@@ -1914,7 +2226,7 @@ and restores confirmed values on failure. A right-aligned toolbar button opens m
 token rotation require destructive confirmations; issued tokens appear once in a dialog.
 Log levels display warnings in bold yellow and errors/fatal levels in bold red.
 
-The sidebar logo row has a right-aligned light/dark toggle. The app retains the shared paper/espresso palettes, with a black main content card
+The light/dark toggle is in the account menu (open source: the sidebar footer). The app retains the shared paper/espresso palettes, with a black main content card
 and neutral charcoal tabs, table headers, inputs, hover states and portaled menus/dialogs
 in dark mode. It defaults to the system theme on initial load and persists
 an explicit choice in `tilde.theme`. The HTML shell applies that choice before first
@@ -2020,9 +2332,13 @@ them. There is no separate session ClickHouse table, projection worker, or sessi
 The cleanup migration removes the earlier experimental PostgreSQL projection objects;
 the experimental ClickHouse table is removed with its one-time cleanup SQL.
 
+
+
+
+
 ## Liveness through proxies
 
-A deployment is often reached through a load balancer (Tilde Cloud's is an AWS ALB) that closes a connection after 60 s without bytes
+Tilde Cloud is reached through a load balancer that closes a connection after 60 s without bytes
 in either direction, and speaks HTTP/1.1 to Tilde, so HTTP/2 PINGs never cross it. Work that can
 sit silent longer streams its own bytes (`rpc::with_keepalive`, a frame per heartbeat interval,
 10 s): `InvokeToolStream` (chat and sandbox), the sidecar's `RelayStream`, `WatchThread` (an empty
@@ -2030,4 +2346,4 @@ frame repeating the cursor) and the other server streams' pings. A non-streamed 
 still silent after 20 s is answered `200` at once with JSON whitespace every heartbeat until the
 provider's body follows. Management RPCs that wait on outside work give up after 45 s
 (`rpc::INLINE_LIMIT`) with their own error, or let it finish in the background (skill source
-syncs).
+syncs, BuildVersion's repository fetch).

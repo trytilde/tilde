@@ -20,6 +20,16 @@ pub(crate) trait Runtime: Send + Sync {
     fn instructions(&self, _typ: &ConnectionType) -> &'static [&'static str] {
         &[]
     }
+    /// Steps that name this connection or the deployment (URLs, identifiers), after
+    /// [`Runtime::instructions`].
+    fn connection_instructions(
+        &self,
+        _service: &Connections,
+        _connection: uuid::Uuid,
+        _typ: &ConnectionType,
+    ) -> Vec<String> {
+        vec![]
+    }
     /// Credential supplied from the saved account name during the fields step.
     /// Keep it in the canonical schema for validation; the broker omits it from the form.
     fn account_name_field(&self, _typ: &ConnectionType) -> Option<&'static str> {

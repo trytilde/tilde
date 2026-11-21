@@ -1,5 +1,6 @@
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
+import { readableErrors } from "@/lib/connect-errors";
 import { AgentAccessService } from "@trytilde/contracts/tilde/management/v1/access_pb.js";
 import { AgentService } from "@trytilde/contracts/tilde/management/v1/agents_pb.js";
 import { ConnectionsService } from "@trytilde/contracts/tilde/management/v1/connections_pb.js";
@@ -11,6 +12,7 @@ import { WikiService } from "@trytilde/contracts/tilde/management/v1/wikis_pb.js
 import { PromptService } from "@trytilde/contracts/tilde/management/v1/prompts_pb.js";
 import { RoutineService } from "@trytilde/contracts/tilde/management/v1/routines_pb.js";
 import { SandboxBlueprintService } from "@trytilde/contracts/tilde/management/v1/sandboxes_pb.js";
+import { SecretService } from "@trytilde/contracts/tilde/management/v1/secrets_pb.js";
 import { SkillService } from "@trytilde/contracts/tilde/management/v1/skills_pb.js";
 import { TildeChatProviderService } from "@trytilde/contracts/tilde/management/v1/tilde_chat_pb.js";
 import {
@@ -22,6 +24,7 @@ import { ConnectionSetupService } from "@trytilde/contracts/tilde/setup/v1/conne
 
 const transport = createConnectTransport({
   baseUrl: window.location.origin,
+  interceptors: [readableErrors],
 });
 
 export const agents = createClient(AgentService, transport);
@@ -38,6 +41,7 @@ export const skills = createClient(SkillService, transport);
 export const tools = createClient(ToolService, transport);
 export const toolHosts = createClient(ToolHostRegistryService, transport);
 export const sandboxes = createClient(SandboxBlueprintService, transport);
+export const secrets = createClient(SecretService, transport);
 export const memory = createClient(MemoryService, transport);
 export const wikis = createClient(WikiService, transport);
 // Setup calls authenticate with each setup's own token.

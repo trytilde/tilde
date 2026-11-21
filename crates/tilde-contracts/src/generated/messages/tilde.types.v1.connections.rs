@@ -13,6 +13,7 @@ pub enum Capability {
     CAPABILITY_SKILLS = 3i32,
     CAPABILITY_TOOL = 4i32,
     CAPABILITY_SIGNAL = 5i32,
+    CAPABILITY_EGRESS = 6i32,
 }
 impl Capability {
     ///Idiomatic alias for [`Self::CAPABILITY_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -33,6 +34,9 @@ impl Capability {
     ///Idiomatic alias for [`Self::CAPABILITY_SIGNAL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Signal: Self = Self::CAPABILITY_SIGNAL;
+    ///Idiomatic alias for [`Self::CAPABILITY_EGRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Egress: Self = Self::CAPABILITY_EGRESS;
 }
 impl ::core::default::Default for Capability {
     fn default() -> Self {
@@ -134,6 +138,7 @@ impl ::buffa::Enumeration for Capability {
             3i32 => ::core::option::Option::Some(Self::CAPABILITY_SKILLS),
             4i32 => ::core::option::Option::Some(Self::CAPABILITY_TOOL),
             5i32 => ::core::option::Option::Some(Self::CAPABILITY_SIGNAL),
+            6i32 => ::core::option::Option::Some(Self::CAPABILITY_EGRESS),
             _ => ::core::option::Option::None,
         }
     }
@@ -148,6 +153,7 @@ impl ::buffa::Enumeration for Capability {
             Self::CAPABILITY_SKILLS => "CAPABILITY_SKILLS",
             Self::CAPABILITY_TOOL => "CAPABILITY_TOOL",
             Self::CAPABILITY_SIGNAL => "CAPABILITY_SIGNAL",
+            Self::CAPABILITY_EGRESS => "CAPABILITY_EGRESS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -164,6 +170,7 @@ impl ::buffa::Enumeration for Capability {
             "CAPABILITY_SKILLS" => ::core::option::Option::Some(Self::CAPABILITY_SKILLS),
             "CAPABILITY_TOOL" => ::core::option::Option::Some(Self::CAPABILITY_TOOL),
             "CAPABILITY_SIGNAL" => ::core::option::Option::Some(Self::CAPABILITY_SIGNAL),
+            "CAPABILITY_EGRESS" => ::core::option::Option::Some(Self::CAPABILITY_EGRESS),
             _ => ::core::option::Option::None,
         }
     }
@@ -175,6 +182,7 @@ impl ::buffa::Enumeration for Capability {
             Self::CAPABILITY_SKILLS,
             Self::CAPABILITY_TOOL,
             Self::CAPABILITY_SIGNAL,
+            Self::CAPABILITY_EGRESS,
         ]
     }
 }
@@ -2985,6 +2993,17 @@ pub struct Provider {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub categories: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// What sandboxes may reach through the gateway with its egress-capable connections.
+    ///
+    /// Field 15: `egress`
+    #[serde(
+        rename = "egress",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub egress: ::buffa::MessageField<
+        EgressDescriptor,
+        ::buffa::Inline<EgressDescriptor>,
+    >,
     #[serde(flatten)]
     pub kind: ::core::option::Option<__buffa::oneof::provider::Kind>,
     #[serde(skip)]
@@ -3001,6 +3020,7 @@ impl ::core::fmt::Debug for Provider {
             .field("name", &self.name)
             .field("connection_types", &self.connection_types)
             .field("categories", &self.categories)
+            .field("egress", &self.egress)
             .field("kind", &self.kind)
             .finish()
     }
@@ -3118,6 +3138,14 @@ impl ::buffa::Message for Provider {
         if let Some(ref v) = self.account_name_label {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if self.egress.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.egress.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3181,6 +3209,14 @@ impl ::buffa::Message for Provider {
         }
         if let Some(ref v) = self.account_name_label {
             ::buffa::types::put_string_field(13u32, v, buf);
+        }
+        if self.egress.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.egress.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3328,6 +3364,17 @@ impl ::buffa::Message for Provider {
                     buf,
                 )?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.egress.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3344,6 +3391,7 @@ impl ::buffa::Message for Provider {
         self.icon_url = ::core::option::Option::None;
         self.instructions = ::core::option::Option::None;
         self.account_name_label = ::core::option::Option::None;
+        self.egress = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3389,6 +3437,12 @@ impl<'de> serde::Deserialize<'de> for Provider {
                 > = None;
                 let mut __f_categories: ::core::option::Option<
                     ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+                > = None;
+                let mut __f_egress: ::core::option::Option<
+                    ::buffa::MessageField<
+                        EgressDescriptor,
+                        ::buffa::Inline<EgressDescriptor>,
+                    >,
                 > = None;
                 let mut __oneof_kind: ::core::option::Option<
                     __buffa::oneof::provider::Kind,
@@ -3493,6 +3547,17 @@ impl<'de> serde::Deserialize<'de> for Provider {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "egress" => {
+                            __f_egress = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            EgressDescriptor,
+                                            ::buffa::Inline<EgressDescriptor>,
+                                        >,
+                                    >()?,
+                            );
+                        }
                         "builtIn" | "built_in" => {
                             let v: ::core::option::Option<BuiltInProvider> = map
                                 .next_value_seed(
@@ -3592,6 +3657,9 @@ impl<'de> serde::Deserialize<'de> for Provider {
                 if let ::core::option::Option::Some(v) = __f_categories {
                     __r.categories = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_egress {
+                    __r.egress = v;
+                }
                 __r.kind = __oneof_kind;
                 Ok(__r)
             }
@@ -3627,6 +3695,375 @@ pub mod provider {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::provider::Kind as KindView;
 }
+/// A provider's egress: its protocols, and the schema of a grant's config. A property with
+/// `x-tilde-options: "<query>"` takes its choices from that setup query (RunSetupQuery).
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct EgressDescriptor {
+    /// Field 1: `protocols`
+    #[serde(
+        rename = "protocols",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub protocols: ::buffa::alloc::vec::Vec<EgressProtocolSummary>,
+    /// Field 2: `config_schema_json`
+    #[serde(
+        rename = "configSchemaJson",
+        alias = "config_schema_json",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub config_schema_json: ::buffa::alloc::string::String,
+    /// Field 3: `config_version`
+    #[serde(
+        rename = "configVersion",
+        alias = "config_version",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub config_version: u32,
+    /// Field 4: `setup_queries`
+    #[serde(
+        rename = "setupQueries",
+        alias = "setup_queries",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub setup_queries: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for EgressDescriptor {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("EgressDescriptor")
+            .field("protocols", &self.protocols)
+            .field("config_schema_json", &self.config_schema_json)
+            .field("config_version", &self.config_version)
+            .field("setup_queries", &self.setup_queries)
+            .finish()
+    }
+}
+impl EgressDescriptor {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressDescriptor";
+}
+::buffa::impl_default_instance!(EgressDescriptor);
+impl ::buffa::MessageName for EgressDescriptor {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "EgressDescriptor";
+    const FULL_NAME: &'static str = "tilde.types.v1.EgressDescriptor";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressDescriptor";
+}
+impl ::buffa::Message for EgressDescriptor {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.protocols {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.config_schema_json.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.config_schema_json)
+                        as u64;
+        }
+        if self.config_version != 0u32 {
+            size
+                += 1u64 + ::buffa::types::uint32_encoded_len(self.config_version) as u64;
+        }
+        for v in &self.setup_queries {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.protocols {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if !self.config_schema_json.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.config_schema_json, buf);
+        }
+        if self.config_version != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.config_version, buf);
+        }
+        for v in &self.setup_queries {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.protocols.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.config_schema_json, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.config_version = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.setup_queries.push(__elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.protocols.clear();
+        self.config_schema_json.clear();
+        self.config_version = 0u32;
+        self.setup_queries.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for EgressDescriptor {
+    const PROTO_FQN: &'static str = "tilde.types.v1.EgressDescriptor";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for EgressDescriptor {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __EGRESS_DESCRIPTOR_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.EgressDescriptor",
+    to_json: ::buffa::type_registry::any_to_json::<EgressDescriptor>,
+    from_json: ::buffa::type_registry::any_from_json::<EgressDescriptor>,
+    is_wkt: false,
+};
+/// `protocol` is http or git; `upstream` the fixed origin requests go to.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct EgressProtocolSummary {
+    /// Field 1: `protocol`
+    #[serde(
+        rename = "protocol",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub protocol: ::buffa::alloc::string::String,
+    /// Field 2: `upstream`
+    #[serde(
+        rename = "upstream",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub upstream: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for EgressProtocolSummary {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("EgressProtocolSummary")
+            .field("protocol", &self.protocol)
+            .field("upstream", &self.upstream)
+            .finish()
+    }
+}
+impl EgressProtocolSummary {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressProtocolSummary";
+}
+::buffa::impl_default_instance!(EgressProtocolSummary);
+impl ::buffa::MessageName for EgressProtocolSummary {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "EgressProtocolSummary";
+    const FULL_NAME: &'static str = "tilde.types.v1.EgressProtocolSummary";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressProtocolSummary";
+}
+impl ::buffa::Message for EgressProtocolSummary {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.protocol.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.protocol) as u64;
+        }
+        if !self.upstream.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.upstream) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.protocol.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.protocol, buf);
+        }
+        if !self.upstream.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.upstream, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.protocol, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.upstream, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.protocol.clear();
+        self.upstream.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for EgressProtocolSummary {
+    const PROTO_FQN: &'static str = "tilde.types.v1.EgressProtocolSummary";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for EgressProtocolSummary {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __EGRESS_PROTOCOL_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.EgressProtocolSummary",
+    to_json: ::buffa::type_registry::any_to_json::<EgressProtocolSummary>,
+    from_json: ::buffa::type_registry::any_from_json::<EgressProtocolSummary>,
+    is_wkt: false,
+};
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]

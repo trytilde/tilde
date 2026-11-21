@@ -436,7 +436,10 @@ async fn aws_and_modal_tools_reach_their_upstreams_through_an_agent() {
     .await;
 
     let tools = fx.chat.tools.clone().unwrap();
-    assert_eq!(tools.provider_tools(aws_connection).await.unwrap().len(), 9);
+    assert_eq!(
+        tools.provider_tools(aws_connection).await.unwrap().len(),
+        10
+    );
     assert_eq!(
         tools.provider_tools(modal_connection).await.unwrap().len(),
         10

@@ -1,11 +1,19 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Controller, useForm } from "react-hook-form";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { Link, useBlocker, useNavigate, useRouterState } from "@tanstack/react-router";
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { formatDistanceToNow } from "date-fns";
-import { FilePlusIcon, HistoryIcon, PencilIcon } from "lucide-react";
-import { NativeSelect } from "@trytilde/connection-ui";
+import {
+  ChevronRightIcon,
+  FileTextIcon,
+  FolderIcon,
+  FolderInputIcon,
+  HistoryIcon,
+  PencilIcon,
+  PlusIcon,
+} from "lucide-react";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import {
   WikiOperation,
@@ -21,9 +29,11 @@ import { useAgentRegistry } from "./agent-stack";
 import { DashboardNavigation, usePageCrumb } from "./dashboard-breadcrumbs";
 import { LineDiff } from "./line-diff";
 import { TildeLoader } from "./loading-screen";
-import { WikiMarkdown } from "./wiki-markdown";
+import { MarkdownEditor, saveKey } from "./markdown-editor";
+import { headingsOf, WikiMarkdown } from "./wiki-markdown";
 import { LinkedAgentsTable, OwnerLink } from "./linked-agents";
 import { RemoveButton } from "./remove-button";
+import { ToolbarSelect } from "./toolbar-select";
 import { CatalogSearchField } from "./tool-catalog";
 import { message } from "./tool-connections";
 import { Button } from "@/components/ui/button";
@@ -76,6 +86,8 @@ export function WikiPage({
 }) {
   const [wiki, setWiki] = useState<Wiki>();
   const [error, setError] = useState("");
+  // The header row's right side, where the pages tab puts its search and New page.
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const registry = useAgentRegistry();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   usePageCrumb(pathname, wiki?.name);
@@ -110,14 +122,26 @@ export function WikiPage({
       onValueChange={(value) => onTabChange(value as WikiTab)}
     >
       <DashboardNavigation>
-        <TabsList aria-label="Wiki">
-          <TabsTrigger value="pages">Pages</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+        <div className="flex min-w-max items-center gap-3">
+          <TabsList aria-label="Wiki">
+            <TabsTrigger value="pages">Pages</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+          <div
+            ref={setToolbar}
+            className="trace-controls ml-auto flex items-center justify-end gap-1.5 empty:hidden"
+          />
+        </div>
       </DashboardNavigation>
       <TabsContent value="pages" className="flex min-h-0 flex-1 flex-col">
         {tab === "pages" && (
-          <WikiPages wiki={wiki} registry={registry} path={page} onPathChange={onPageChange} />
+          <WikiPages
+            wiki={wiki}
+            registry={registry}
+            toolbar={toolbar}
+            path={page}
+            onPathChange={onPageChange}
+          />
         )}
       </TabsContent>
       <TabsContent
@@ -139,9 +163,10 @@ const OPERATIONS: Record<WikiOperation, string> = {
   [WikiOperation.MOVE]: "Moved",
   [WikiOperation.DELETE]: "Deleted",
 };
+type Row = { key: string; path: string; depth: number; label: string; page?: WikiPageSummary };
 /** Pages in path order, indented under the folders their paths name. */
 function outline(pages: WikiPageSummary[]) {
-  const rows: { key: string; depth: number; label: string; page?: WikiPageSummary }[] = [];
+  const rows: Row[] = [];
   const shown = new Set<string>();
   for (const page of pages) {
     const segments = page.path.split("/");
@@ -149,16 +174,27 @@ function outline(pages: WikiPageSummary[]) {
       const folder = segments.slice(0, i).join("/");
       if (shown.has(folder) || pages.some((p) => p.path === folder)) continue;
       shown.add(folder);
-      rows.push({ key: `folder:${folder}`, depth: i - 1, label: segments[i - 1] });
+      rows.push({ key: `folder:${folder}`, path: folder, depth: i - 1, label: segments[i - 1] });
     }
-    rows.push({ key: page.id, depth: segments.length - 1, label: page.title, page });
+    rows.push({
+      key: page.id,
+      path: page.path,
+      depth: segments.length - 1,
+      label: page.title,
+      page,
+    });
   }
   return rows;
 }
+const ancestors = (path: string) =>
+  path
+    .split("/")
+    .slice(0, -1)
+    .map((_, i, all) => all.slice(0, i + 1).join("/"));
 
 /** A search excerpt, whose matched words the server brackets with U+E000 and U+E001. */
 function Excerpt({ text }: { text: string }) {
-  return text.split(/[\uE000\uE001]/).map((part, index) =>
+  return text.split(/[]/).map((part, index) =>
     index % 2 ? (
       <mark
         key={index}
@@ -171,7 +207,6 @@ function Excerpt({ text }: { text: string }) {
     ),
   );
 }
-const CodeEditor = lazy(() => import("./code-editor"));
 
 type Finding =
   | { kind: "search"; results: WikiSearchResult[] }
@@ -180,14 +215,28 @@ type Finding =
       lines: WikiGrepLine[];
       more: boolean;
     };
+type Mode = "search" | "grep" | "regex";
+const MODES: { value: Mode; label: string }[] = [
+  { value: "search", label: "Words" },
+  { value: "grep", label: "Exact text" },
+  { value: "regex", label: "Regex" },
+];
+
+/**
+ * A wiki's pages: the page tree (or what a search found), the open page as a document with its
+ * outline and the pages linking to it, and editing and creating pages in place with the rich
+ * editor. Search and New page sit in the page header's tab row.
+ */
 function WikiPages({
   wiki,
   registry,
+  toolbar,
   path,
   onPathChange,
 }: {
   wiki: Wiki;
   registry: Map<string, Agent>;
+  toolbar: HTMLDivElement | null;
   path: string | undefined;
   onPathChange: (path?: string) => void;
 }) {
@@ -198,12 +247,13 @@ function WikiPages({
   const [page, setPage] = useState<Page>();
   const [revisions, setRevisions] = useState<WikiPageRevision[]>([]);
   const [editing, setEditing] = useState(false);
-  const [creating, setCreating] = useState(false);
+  // The path a new page starts with, while creating one.
+  const [creating, setCreating] = useState<string>();
   const [moving, setMoving] = useState(false);
   const [history, setHistory] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"search" | "grep" | "regex">("search");
+  const [mode, setMode] = useState<Mode>("search");
   const [finding, setFinding] = useState<Finding>();
   const loadPages = useCallback(
     (signal?: AbortSignal) =>
@@ -224,7 +274,10 @@ function WikiPages({
   }, [loadPages]);
   const selected = path ? pages.find((p) => p.path === path)?.id : pages[0]?.id;
   // An unsaved edit is guarded by the editor's navigation blocker.
-  const select = onPathChange;
+  const select = (next?: string) => {
+    setCreating(undefined);
+    onPathChange(next);
+  };
   const loadPage = useCallback(async (id: string, signal?: AbortSignal) => {
     const found = await client.getWikiPage({ id }, { signal });
     setPage(found.page);
@@ -260,8 +313,6 @@ function WikiPages({
       setError(message(e));
     }
   }
-
-  const rows = useMemo(() => outline(pages), [pages]);
   async function changed(next?: Page) {
     await loadPages();
     if (next) {
@@ -269,17 +320,17 @@ function WikiPages({
       await loadPage(next.id);
     }
   }
-  return (
-    <div className="grid min-h-0 flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col gap-3 border-b p-4 lg:border-r lg:border-b-0">
-        <form
-          className="grid gap-2"
-          aria-label="Find in this wiki"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void find();
-          }}
-        >
+  const tools = (
+    <>
+      <form
+        className="flex items-center gap-1.5"
+        aria-label="Find in this wiki"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void find();
+        }}
+      >
+        <div className="w-56">
           <CatalogSearchField
             label={mode === "search" ? "Search pages" : "Find lines"}
             value={query}
@@ -288,109 +339,53 @@ function WikiPages({
               if (!value.trim()) setFinding(undefined);
             }}
           />
-          <NativeSelect
-            aria-label="How to find"
-            value={mode}
-            onChange={(event) => setMode(event.target.value as typeof mode)}
-          >
-            <option value="search">Search words</option>
-            <option value="grep">Find exact text</option>
-            <option value="regex">Find a regular expression</option>
-          </NativeSelect>
-        </form>
+        </div>
+        <ToolbarSelect label="How to find" value={mode} options={MODES} onChange={setMode} />
+      </form>
+      <Button
+        size="sm"
+        className="h-[26px] gap-1.5 px-2.5 text-[11px]"
+        onClick={() => setCreating(page ? folderOf(page.path) : "")}
+      >
+        <PlusIcon className="size-3.5" />
+        New page
+      </Button>
+    </>
+  );
+  const reading = page && !editing && creating === undefined;
+  return (
+    <div
+      className={`grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[16rem_minmax(0,1fr)] ${reading ? "xl:grid-cols-[16rem_minmax(0,1fr)_15rem]" : ""}`}
+    >
+      {toolbar ? createPortal(tools, toolbar) : null}
+      <aside className="trace-controls flex min-h-0 flex-col overflow-y-auto border-b bg-muted/20 p-2 lg:border-r lg:border-b-0">
         {finding ? (
-          <ul className="grid gap-1 overflow-auto text-sm" aria-label="Found">
-            {finding.kind === "search" ? (
-              finding.results.length ? (
-                finding.results.map((r) => (
-                  <li key={r.page?.id}>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1.5 text-left hover:bg-muted"
-                      onClick={() => r.page && select(r.page.path)}
-                    >
-                      <span className="block font-medium">{r.page?.title}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        <Excerpt text={r.excerpt} />
-                      </span>
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <li className="text-xs text-muted-foreground">No pages match.</li>
-              )
-            ) : finding.lines.length ? (
-              <>
-                {finding.lines.map((l) => (
-                  <li key={`${l.pagePath}:${l.lineNumber}`}>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1 text-left font-mono text-xs hover:bg-muted"
-                      onClick={() => select(l.pagePath)}
-                    >
-                      <span className="text-muted-foreground">
-                        {l.pagePath}:{l.lineNumber}
-                      </span>{" "}
-                      {l.line}
-                      {l.truncated && <span className="text-muted-foreground">…</span>}
-                    </button>
-                  </li>
-                ))}
-                {finding.more && (
-                  <li className="text-xs text-muted-foreground">More lines matched.</li>
-                )}
-              </>
-            ) : (
-              <li className="text-xs text-muted-foreground">No lines match.</li>
-            )}
-          </ul>
+          <Found finding={finding} onSelect={select} onClear={() => setFinding(undefined)} />
         ) : (
-          <nav className="grid gap-0.5 overflow-auto text-sm" aria-label="Pages">
-            {rows.length ? (
-              rows.map((row) =>
-                row.page ? (
-                  <button
-                    key={row.key}
-                    type="button"
-                    aria-current={row.page.id === selected ? "page" : undefined}
-                    className="truncate rounded-md px-2 py-1 text-left hover:bg-muted aria-[current=page]:bg-muted aria-[current=page]:font-medium"
-                    style={{ paddingLeft: `${0.5 + row.depth}rem` }}
-                    onClick={() => select(row.page!.path)}
-                  >
-                    {row.label}
-                  </button>
-                ) : (
-                  <span
-                    key={row.key}
-                    className="px-2 py-1 text-xs text-muted-foreground"
-                    style={{ paddingLeft: `${0.5 + row.depth}rem` }}
-                  >
-                    {row.label}/
-                  </span>
-                ),
-              )
-            ) : (
-              <p className="px-2 text-xs text-muted-foreground">No pages yet.</p>
-            )}
-            {more && (
-              <p className="px-2 text-xs text-muted-foreground">
-                Only the first pages are listed; search to find the rest.
-              </p>
-            )}
-          </nav>
+          <PageTree
+            pages={pages}
+            more={more}
+            selected={selected}
+            open={page?.path}
+            onSelect={select}
+          />
         )}
-        <Button variant="outline" className="gap-2" onClick={() => setCreating(true)}>
-          <FilePlusIcon />
-          New page
-        </Button>
       </aside>
-      <section className="flex min-h-0 flex-col gap-4 overflow-auto p-4 lg:p-6" aria-label="Page">
+      <section className="flex min-h-0 flex-col overflow-auto" aria-label="Page">
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="px-6 pt-4 text-sm text-destructive">
             {error}
           </p>
         )}
-        {page ? (
+        {creating !== undefined ? (
+          <PageCreator
+            wiki={wiki}
+            path={creating}
+            folders={[...new Set(pages.flatMap((p) => ancestors(p.path)))]}
+            onCancel={() => setCreating(undefined)}
+            onCreated={(next) => void changed(next)}
+          />
+        ) : page ? (
           editing ? (
             <PageEditor
               page={page}
@@ -402,34 +397,31 @@ function WikiPages({
             />
           ) : (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">{page.title}</h2>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {page.path} · revision {page.revision} · edited {ago(page.updatedAt)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
+              <div className="sticky top-0 z-10 flex h-10 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
+                <PathCrumbs path={page.path} />
+                <span className="ml-auto hidden shrink-0 text-[11px] text-muted-foreground md:inline">
+                  Revision {page.revision} · edited {ago(page.updatedAt)}
+                  {revisions[0] &&
+                    ` by ${revisions[0].agentId ? (registry.get(revisions[0].agentId)?.name ?? "an agent") : "a person"}`}
+                </span>
+                <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="gap-1.5"
+                    className="h-7 gap-1.5"
                     onClick={() => setHistory(true)}
                   >
                     <HistoryIcon />
                     History
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => setEditing(true)}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Move"
+                    title="Move to another path"
+                    onClick={() => setMoving(true)}
                   >
-                    <PencilIcon />
-                    Edit
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setMoving(true)}>
-                    Move
+                    <FolderInputIcon />
                   </Button>
                   <RemoveButton
                     label={`Delete ${page.title}`}
@@ -446,42 +438,56 @@ function WikiPages({
                         .catch((e) => setError(message(e)))
                     }
                   />
-                </div>
-              </div>
-              <WikiMarkdown content={page.content} label={page.title} wikiId={wiki.id} />
-            </>
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {path && loaded && !selected ? (
-              <>
-                No page at <code className="font-mono">{path}</code>.
-                {editable && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="ml-3"
-                    onClick={() => setCreating(true)}
+                    className="h-7 gap-1.5"
+                    onClick={() => setEditing(true)}
                   >
+                    <PencilIcon />
+                    Edit
+                  </Button>
+                </div>
+              </div>
+              <div className="mx-auto w-full max-w-3xl px-6 py-8">
+                {/* Most pages open with their title as a heading; it is not shown twice. */}
+                {untitled(page.content, page.title) === undefined && (
+                  <h2 className="mb-6 text-2xl font-semibold tracking-tight">{page.title}</h2>
+                )}
+                <WikiMarkdown content={page.content} label={page.title} wikiId={wiki.id} />
+              </div>
+            </>
+          )
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
+            <FileTextIcon className="size-8 opacity-40" />
+            {path && loaded && !selected ? (
+              <>
+                <p>
+                  No page at <code className="font-mono">{path}</code>.
+                </p>
+                {editable && (
+                  <Button variant="outline" size="sm" onClick={() => setCreating(path)}>
                     Create it
                   </Button>
                 )}
               </>
             ) : pages.length ? (
-              "Choose a page."
+              <p>Choose a page.</p>
             ) : (
-              "This wiki has no pages yet."
+              <>
+                <p>This wiki has no pages yet.</p>
+                {editable && loaded && (
+                  <Button variant="outline" size="sm" onClick={() => setCreating("")}>
+                    Write the first page
+                  </Button>
+                )}
+              </>
             )}
-          </p>
+          </div>
         )}
       </section>
-      <CreatePageDialog
-        wiki={wiki}
-        path={selected ? "" : (path ?? "")}
-        open={creating}
-        onClose={() => setCreating(false)}
-        onCreated={(next) => void changed(next)}
-      />
+      {reading && <PageRail wiki={wiki} page={page} onSelect={select} />}
       {page && (
         <MovePageDialog
           page={page}
@@ -506,9 +512,342 @@ function WikiPages({
 }
 
 /**
- * Editing a page's title and raw Markdown at the revision it was opened at. When someone else
- * saved first, it shows what changed since and lets the writer save on top of the latest
- * revision or discard their draft.
+ * A page's Markdown without its leading `# Title` heading, when that heading repeats the title;
+ * undefined otherwise. Reading and editing show the title once.
+ */
+function untitled(content: string, title: string) {
+  const heading = /^\s*#[ \t]+[^\n]*(\n|$)/.exec(content);
+  if (!heading || headingsOf(heading[0].trim())[0]?.text !== title) return undefined;
+  return content.slice(heading[0].length).replace(/^\n+/, "");
+}
+
+/** The folder a page sits in, with a trailing slash, for a sibling's starting path. */
+const folderOf = (path: string) =>
+  path.includes("/") ? `${path.slice(0, path.lastIndexOf("/"))}/` : "";
+
+function PathCrumbs({ path }: { path: string }) {
+  const segments = path.split("/");
+  return (
+    <nav
+      aria-label="Page path"
+      className="flex min-w-0 items-center gap-1 truncate font-mono text-[11px] text-muted-foreground"
+    >
+      {segments.map((segment, i) => (
+        <span key={i} className="flex min-w-0 items-center gap-1">
+          {i > 0 && <ChevronRightIcon aria-hidden className="size-3 shrink-0" />}
+          <span className={i === segments.length - 1 ? "truncate text-foreground" : "truncate"}>
+            {segment}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+/** Pages under collapsible folders. */
+function PageTree({
+  pages,
+  more,
+  selected,
+  open,
+  onSelect,
+}: {
+  pages: WikiPageSummary[];
+  more: boolean;
+  selected?: string;
+  /** The open page's path; its folders stay expanded. */
+  open?: string;
+  onSelect: (path: string) => void;
+}) {
+  const rows = useMemo(() => outline(pages), [pages]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggle = (folder: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(folder)) next.add(folder);
+      return next;
+    });
+  const hasChildren = useMemo(() => new Set(pages.flatMap((p) => ancestors(p.path))), [pages]);
+  const visible = rows.filter(
+    (row) =>
+      !ancestors(row.path).some(
+        (folder) => collapsed.has(folder) && !(open && open.startsWith(`${folder}/`)),
+      ),
+  );
+  return (
+    <nav className="grid gap-px" aria-label="Pages">
+      <p className="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+        Pages
+      </p>
+      {visible.length ? (
+        visible.map((row) => {
+          const expandable = hasChildren.has(row.path);
+          const expanded = expandable && !collapsed.has(row.path);
+          return (
+            <div
+              key={row.key}
+              className="flex h-7 items-center rounded-md pr-2 hover:bg-muted has-aria-[current=page]:bg-muted has-aria-[current=page]:font-semibold"
+              style={{ paddingLeft: `${row.depth * 0.75}rem` }}
+            >
+              {expandable ? (
+                <button
+                  type="button"
+                  aria-label={expanded ? `Collapse ${row.label}` : `Expand ${row.label}`}
+                  aria-expanded={expanded}
+                  className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                  onClick={() => toggle(row.path)}
+                >
+                  <ChevronRightIcon
+                    className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+                  />
+                </button>
+              ) : (
+                <span className="w-5 shrink-0" />
+              )}
+              {row.page ? (
+                <button
+                  type="button"
+                  title={row.path}
+                  aria-current={row.page.id === selected ? "page" : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                  onClick={() => onSelect(row.page!.path)}
+                >
+                  <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{row.label}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-muted-foreground"
+                  onClick={() => toggle(row.path)}
+                >
+                  <FolderIcon className="size-3.5 shrink-0" />
+                  <span className="truncate">{row.label}</span>
+                </button>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <p className="px-2 text-muted-foreground">No pages yet.</p>
+      )}
+      {more && (
+        <p className="px-2 pt-2 text-muted-foreground">
+          Only the first pages are listed; search to find the rest.
+        </p>
+      )}
+    </nav>
+  );
+}
+
+function Found({
+  finding,
+  onSelect,
+  onClear,
+}: {
+  finding: Finding;
+  onSelect: (path: string) => void;
+  onClear: () => void;
+}) {
+  const count = finding.kind === "search" ? finding.results.length : finding.lines.length;
+  return (
+    <div className="grid gap-1">
+      <div className="flex items-center px-2 pt-1 pb-1.5">
+        <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+          {count} {finding.kind === "search" ? "pages" : "lines"} found
+        </p>
+        <button
+          type="button"
+          className="ml-auto text-muted-foreground underline-offset-2 hover:underline"
+          onClick={onClear}
+        >
+          Back to pages
+        </button>
+      </div>
+      <ul className="grid gap-px" aria-label="Found">
+        {finding.kind === "search" ? (
+          finding.results.length ? (
+            finding.results.map((r) => (
+              <li key={r.page?.id}>
+                <button
+                  type="button"
+                  className="w-full rounded-md px-2 py-1.5 text-left hover:bg-muted"
+                  onClick={() => r.page && onSelect(r.page.path)}
+                >
+                  <span className="block font-semibold">{r.page?.title}</span>
+                  <span className="block text-muted-foreground">
+                    <Excerpt text={r.excerpt} />
+                  </span>
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className="px-2 text-muted-foreground">No pages match.</li>
+          )
+        ) : finding.lines.length ? (
+          <>
+            {finding.lines.map((l) => (
+              <li key={`${l.pagePath}:${l.lineNumber}`}>
+                <button
+                  type="button"
+                  className="w-full rounded-md px-2 py-1 text-left hover:bg-muted"
+                  onClick={() => onSelect(l.pagePath)}
+                >
+                  <span className="text-muted-foreground">
+                    {l.pagePath}:{l.lineNumber}
+                  </span>{" "}
+                  {l.line}
+                  {l.truncated && <span className="text-muted-foreground">…</span>}
+                </button>
+              </li>
+            ))}
+            {finding.more && <li className="px-2 text-muted-foreground">More lines matched.</li>}
+          </>
+        ) : (
+          <li className="px-2 text-muted-foreground">No lines match.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Beside an open page: its outline, and the pages whose Markdown links to it (found by grepping
+ * for links that name its path).
+ */
+function PageRail({
+  wiki,
+  page,
+  onSelect,
+}: {
+  wiki: Wiki;
+  page: Page;
+  onSelect: (path: string) => void;
+}) {
+  const headings = useMemo(() => headingsOf(page.content), [page.content]);
+  const [linking, setLinking] = useState<string[]>([]);
+  useEffect(() => {
+    const abort = new AbortController();
+    // A link names the page by its path from the root: `/path`, `./path` or `path`, maybe `.md`.
+    const escaped = page.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const target = new RegExp(`\\]\\((\\.?/)?${escaped}(\\.md)?(#[^)]*)?\\)`);
+    Promise.resolve()
+      .then(() =>
+        client.grepWikiPages(
+          { wikiId: wiki.id, pattern: page.path, regex: false },
+          { signal: abort.signal },
+        ),
+      )
+      .then(({ lines }) =>
+        setLinking([
+          ...new Set(
+            lines
+              .filter((l) => l.pagePath !== page.path && target.test(l.line))
+              .map((l) => l.pagePath),
+          ),
+        ]),
+      )
+      .catch(() => setLinking([]));
+    return () => abort.abort();
+  }, [wiki.id, page.path]);
+  return (
+    <aside
+      aria-label="About this page"
+      className="trace-controls hidden min-h-0 overflow-y-auto border-l p-4 xl:block"
+    >
+      {headings.length > 1 && (
+        <nav aria-label="On this page" className="mb-6">
+          <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            On this page
+          </p>
+          <ul className="grid gap-1">
+            {headings.map((h, index) => (
+              <li key={index} style={{ paddingLeft: `${(h.level - 1) * 0.6}rem` }}>
+                <button
+                  type="button"
+                  className="text-left text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    // The page's headings render in the order the outline lists them.
+                    document
+                      .querySelectorAll("article.wiki-prose :is(h1, h2, h3)")
+                      [index]?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  {h.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+      <p className="mb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+        Linked from
+      </p>
+      {linking.length ? (
+        <ul className="grid gap-1" aria-label="Linked from">
+          {linking.map((p) => (
+            <li key={p}>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-left hover:underline"
+                onClick={() => onSelect(p)}
+              >
+                <FileTextIcon className="size-3 shrink-0 text-muted-foreground" />
+                {p}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground">
+          No pages link here. Link one with <code>[text](/{page.path})</code>.
+        </p>
+      )}
+    </aside>
+  );
+}
+
+/** The bar above a page being written: what it is and its actions. */
+function EditorBar({ title, children }: { title: ReactNode; children: ReactNode }) {
+  return (
+    <div className="sticky top-0 z-20 flex h-10 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
+      <div className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+/** A big borderless title field, as the page will show it. */
+function TitleField({
+  invalid,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { invalid: boolean }) {
+  return (
+    <input
+      aria-label="Title"
+      aria-invalid={invalid}
+      placeholder="Untitled"
+      className="w-full bg-transparent text-2xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+      {...props}
+    />
+  );
+}
+
+/** Asks before leaving with unsaved changes; `leaving` is set once saved or discarded. */
+function useUnsavedGuard(dirty: boolean) {
+  const leaving = useRef(false);
+  useBlocker({
+    shouldBlockFn: () =>
+      !leaving.current && dirty && !window.confirm("Discard your unsaved changes to this page?"),
+    enableBeforeUnload: () => !leaving.current && dirty,
+  });
+  return leaving;
+}
+
+/**
+ * Editing a page's title and Markdown, in the rich editor, at the revision it was opened at.
+ * When someone else saved first, it shows what changed since and lets the writer save on top of
+ * the latest revision or discard their draft.
  */
 function PageEditor({
   page,
@@ -519,21 +858,17 @@ function PageEditor({
   onCancel: () => void;
   onSaved: (page: Page) => void;
 }) {
-  const form = useForm({ defaultValues: { title: page.title, content: page.content } });
+  // A page that opens with its title as a heading edits without it, and saves it back on top
+  // under the (possibly new) title.
+  const body = untitled(page.content, page.title);
+  const form = useForm({ defaultValues: { title: page.title, content: body ?? page.content } });
   const [error, setError] = useState("");
   // The revision the draft saves on top of: the one it opened, or the latest after a conflict.
   const [base, setBase] = useState(page.revision);
   const [latest, setLatest] = useState<Page>();
   const dirty = form.formState.isDirty;
   // Leaving with unsaved changes asks first: other pages, tabs, links, history and the browser.
-  // Set once the draft is saved or deliberately discarded, so the navigation that follows is not
-  // asked about.
-  const leaving = useRef(false);
-  useBlocker({
-    shouldBlockFn: () =>
-      !leaving.current && dirty && !window.confirm("Discard your unsaved changes to this page?"),
-    enableBeforeUnload: () => !leaving.current && dirty,
-  });
+  const leaving = useUnsavedGuard(dirty);
   // Saves at `revision`: the one the draft opened at, or the latest once the writer chose to.
   const save = (revision: number) =>
     form.handleSubmit(async (values) => {
@@ -543,7 +878,8 @@ function PageEditor({
           id: page.id,
           expectedRevision: revision,
           title: values.title.trim(),
-          content: values.content,
+          content:
+            body === undefined ? values.content : `# ${values.title.trim()}\n\n${values.content}`,
         });
         if (next) {
           leaving.current = true;
@@ -555,188 +891,230 @@ function PageEditor({
         setLatest(newer);
       }
     });
+  const submit = () => {
+    if (!latest && !form.formState.isSubmitting) void save(base)();
+  };
   return (
-    <form className="grid gap-4" aria-label="Edit page" onSubmit={save(base)}>
-      {latest && (
-        <section
-          aria-label="Changed since you opened it"
-          className="grid gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 p-3"
-        >
-          <p className="text-sm">
-            Someone saved revision {latest.revision} while you were editing. Their changes since you
-            opened the page:
-          </p>
-          <LineDiff before={page.content} after={latest.content} />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              disabled={form.formState.isSubmitting}
-              onClick={() => {
-                setBase(latest.revision);
-                setLatest(undefined);
-                void save(latest.revision)();
-              }}
-            >
-              Overwrite with mine (revision {latest.revision})
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                leaving.current = true;
-                onSaved(latest);
-              }}
-            >
-              Discard and open latest
-            </Button>
-          </div>
-        </section>
-      )}
-      <div className="space-y-2">
-        <Label htmlFor="page-title">Title</Label>
-        <Input
-          id="page-title"
-          aria-invalid={!!form.formState.errors.title}
-          {...form.register("title", { validate: (value) => !!value.trim() })}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Markdown</Label>
-        <div className="h-[60vh] overflow-hidden rounded-lg border">
-          <Controller
-            control={form.control}
-            name="content"
-            render={({ field }) => (
-              <Suspense fallback={<TildeLoader className="h-full" />}>
-                <CodeEditor
-                  path={`${page.path}.md`}
-                  value={field.value}
-                  readOnly={false}
-                  onChange={field.onChange}
-                />
-              </Suspense>
-            )}
-          />
-        </div>
-      </div>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      <div className="flex justify-end gap-2">
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      aria-label="Edit page"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
+      <EditorBar
+        title={
+          <>
+            Editing <span className="font-mono text-foreground">{page.path}</span> · revision {base}
+          </>
+        }
+      >
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
+          size="sm"
+          className="h-7"
           disabled={form.formState.isSubmitting}
           onClick={() => {
             if (dirty && !window.confirm("Discard your unsaved changes to this page?")) return;
+            leaving.current = true;
             onCancel();
           }}
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={form.formState.isSubmitting || !!latest}>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-7"
+          title={`Save (${saveKey()})`}
+          disabled={form.formState.isSubmitting || !!latest}
+        >
           {form.formState.isSubmitting ? "Saving…" : "Save"}
         </Button>
+      </EditorBar>
+      <div className="mx-auto grid w-full max-w-3xl gap-4 px-6 py-6">
+        {latest && (
+          <section
+            aria-label="Changed since you opened it"
+            className="grid gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 p-3"
+          >
+            <p className="text-sm">
+              Someone saved revision {latest.revision} while you were editing. Their changes since
+              you opened the page:
+            </p>
+            <LineDiff before={page.content} after={latest.content} />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={form.formState.isSubmitting}
+                onClick={() => {
+                  setBase(latest.revision);
+                  setLatest(undefined);
+                  void save(latest.revision)();
+                }}
+              >
+                Overwrite with mine (revision {latest.revision})
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  leaving.current = true;
+                  onSaved(latest);
+                }}
+              >
+                Discard and open latest
+              </Button>
+            </div>
+          </section>
+        )}
+        <TitleField
+          invalid={!!form.formState.errors.title}
+          {...form.register("title", { validate: (value) => !!value.trim() })}
+        />
+        <Controller
+          control={form.control}
+          name="content"
+          render={({ field }) => (
+            <MarkdownEditor
+              label="Page content"
+              value={field.value}
+              onChange={field.onChange}
+              onSave={submit}
+              autoFocus
+              contentClassName="wiki-prose"
+              minHeight="min-h-[55vh]"
+            />
+          )}
+        />
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
     </form>
   );
 }
 
-function CreatePageDialog({
+/** Writing a new page in place: its path, title and Markdown. */
+function PageCreator({
   wiki,
   path,
-  open,
-  onClose,
+  folders,
+  onCancel,
   onCreated,
 }: {
   wiki: Wiki;
-  /** Filled in when creating a page a link or URL named. */
+  /** Filled in when creating a page a link or URL named, or beside the open page. */
   path: string;
-  open: boolean;
-  onClose: () => void;
+  /** Existing folders, offered while typing the path. */
+  folders: string[];
+  onCancel: () => void;
   onCreated: (page: Page) => void;
 }) {
   const form = useForm({ defaultValues: { path, title: "", content: "" } });
   const [error, setError] = useState("");
-  useEffect(() => {
-    if (open) form.reset({ path, title: "", content: "" });
-  }, [open, path, form]);
-  function close() {
-    onClose();
-    form.reset();
+  const leaving = useUnsavedGuard(form.formState.isDirty);
+  const submit = form.handleSubmit(async (values) => {
     setError("");
-  }
+    try {
+      const { page } = await client.createWikiPage({
+        wikiId: wiki.id,
+        path: values.path.trim(),
+        title: values.title.trim(),
+        content: values.content,
+      });
+      if (page) {
+        leaving.current = true;
+        onCreated(page);
+      }
+    } catch (e) {
+      setError(message(e));
+    }
+  });
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>New page</DialogTitle>
-        </DialogHeader>
-        <form
-          className="space-y-4"
-          onSubmit={form.handleSubmit(async (values) => {
-            setError("");
-            try {
-              const { page } = await client.createWikiPage({
-                wikiId: wiki.id,
-                path: values.path.trim(),
-                title: values.title.trim(),
-                content: values.content,
-              });
-              if (page) onCreated(page);
-              close();
-            } catch (e) {
-              setError(message(e));
-            }
-          })}
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      aria-label="New page"
+      onSubmit={(event) => void submit(event)}
+    >
+      <EditorBar title="New page">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7"
+          onClick={() => {
+            if (
+              form.formState.isDirty &&
+              !window.confirm("Discard your unsaved changes to this page?")
+            )
+              return;
+            leaving.current = true;
+            onCancel();
+          }}
         >
-          <div className="space-y-2">
-            <Label htmlFor="new-page-path">Path</Label>
-            <Input
-              id="new-page-path"
-              placeholder="runbooks/deploys"
-              aria-invalid={!!form.formState.errors.path}
-              {...form.register("path", { validate: (value) => !!value.trim() })}
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="h-7"
+          title={`Create (${saveKey()})`}
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? "Creating…" : "Create page"}
+        </Button>
+      </EditorBar>
+      <div className="mx-auto grid w-full max-w-3xl gap-4 px-6 py-6">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="new-page-path" className="shrink-0 text-xs text-muted-foreground">
+            Path
+          </Label>
+          <Input
+            id="new-page-path"
+            list="new-page-folders"
+            autoFocus
+            className="h-7 font-mono text-xs"
+            placeholder="runbooks/deploys"
+            aria-invalid={!!form.formState.errors.path}
+            title="Slash-separated segments of letters, digits, '-', '_' and '.'"
+            {...form.register("path", { validate: (value) => !!value.trim() })}
+          />
+          <datalist id="new-page-folders">
+            {folders.map((f) => (
+              <option key={f} value={`${f}/`} />
+            ))}
+          </datalist>
+        </div>
+        <TitleField
+          invalid={!!form.formState.errors.title}
+          {...form.register("title", { validate: (value) => !!value.trim() })}
+        />
+        <Controller
+          control={form.control}
+          name="content"
+          render={({ field }) => (
+            <MarkdownEditor
+              label="Page content"
+              value={field.value}
+              onChange={field.onChange}
+              onSave={() => void submit()}
+              contentClassName="wiki-prose"
+              minHeight="min-h-[50vh]"
             />
-            <p className="text-xs text-muted-foreground">
-              Slash-separated segments of letters, digits, '-', '_' and '.'.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-page-title">Title</Label>
-            <Input
-              id="new-page-title"
-              aria-invalid={!!form.formState.errors.title}
-              {...form.register("title", { validate: (value) => !!value.trim() })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-page-content">Content</Label>
-            <Textarea
-              id="new-page-content"
-              className="min-h-40 font-mono text-xs"
-              placeholder="Markdown"
-              {...form.register("content")}
-            />
-          </div>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
           )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={close}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Creating…" : "Create page"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        />
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+    </form>
   );
 }
 
@@ -938,7 +1316,7 @@ function HistoryDialog({
                     <TableCell>
                       {r.agentId && r.threadId && (
                         <Link
-                          to="/agent/$agentId/sessions"
+                          to="/registry/agent/$agentId/sessions"
                           params={{ agentId: r.agentId }}
                           search={{ session: r.threadId }}
                           className="underline"
@@ -976,7 +1354,7 @@ function WikiSettings({
     setBusy(true);
     try {
       await client.deleteWiki({ id: wiki.id });
-      void navigate({ to: "/wikis" });
+      void navigate({ to: "/registry/wikis" });
     } catch (e) {
       setError(message(e));
       setDeleting(false);

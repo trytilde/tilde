@@ -55,9 +55,16 @@ message ToolHost {
 }
 // `search` matches the name case-insensitively; `with_provider` keeps only hosts that publish a
 // provider (true) or only those that do not (false).
-message ListToolHostsRequest { optional string search = 1; optional bool with_provider = 2; }
+message ListToolHostsRequest {
+  optional string search = 1;
+  optional bool with_provider = 2;
+}
 message ListToolHostsResponse { repeated ToolHost tool_hosts = 1; }
-message RegisterToolHostRequest { string name = 1; ToolHostType type = 2; optional string function_arn = 3; }
+message RegisterToolHostRequest {
+  string name = 1;
+  ToolHostType type = 2;
+  optional string function_arn = 3;
+}
 // `token` is set once, for connected hosts only; only its digest is stored.
 message RegisterToolHostResponse { ToolHost tool_host = 1; optional string token = 2 [debug_redact = true]; }
 message RotateToolHostTokenRequest { string id = 1; }

@@ -1,0 +1,3 @@
+kind: Added
+body: "Local agents: an agent that runs in a harness on a person's machine (Claude Code, Codex, Claude Desktop, ChatGPT Desktop) is registered with `CreateAgent`'s `harness` (Agent Registry \u2192 Connect local agent). Tilde never runs it; its harness reports sessions through `tilde.local.v1.LocalAgentService` (one thread per session, every event a span) and reads the agent's skills, and `/agents/{agent}/mcp` serves the agent's tools as an MCP server."
+time: 2026-11-21T17:05:00+00:00

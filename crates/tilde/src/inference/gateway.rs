@@ -23,6 +23,10 @@ impl Loader {
     }
     /// Decrypt every ready inference connection and swap the routing map.
     pub async fn load(&self) -> Result<(), Error> {
+        let run = self.reload();
+        run.await
+    }
+    async fn reload(&self) -> Result<(), Error> {
         let rows = super::db::upstreams_all(&self.pool.get().await?).await?;
         let aliases = super::db::aliases_all(&self.pool.get().await?).await?;
         let mut candidates = Vec::with_capacity(rows.len());
@@ -30,8 +34,12 @@ impl Loader {
             let Some(provider) = Provider::parse(&row.provider_id) else {
                 continue;
             };
-            let connection = self.connections.get(row.id).await?;
-            match self.connections.resolve(row.id).await {
+            let open = async {
+                let connection = self.connections.get(row.id).await?;
+                Ok::<_, Error>((connection, self.connections.resolve(row.id).await))
+            };
+            let (connection, values) = open.await?;
+            match values {
                 Ok(values) => candidates.push(Candidate {
                     slug: format!("{}/{}", row.provider_id, row.name),
                     connection: row.id,

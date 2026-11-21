@@ -7,11 +7,13 @@ import {
   Heading2,
   Heading3,
   List,
+  ListChecks,
   ListOrdered,
   type LucideIcon,
   Minus,
   Quote,
   SquareCode,
+  Table2,
   Type,
 } from "lucide-react";
 import { forwardRef, type ReactNode, useEffect, useImperativeHandle, useState } from "react";
@@ -65,6 +67,24 @@ const ITEMS: SlashItem[] = [
     keywords: ["ordered", "numbered"],
     apply: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
+  },
+  {
+    title: "Task list",
+    icon: ListChecks,
+    keywords: ["todo", "task", "checkbox", "check"],
+    apply: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
+  },
+  {
+    title: "Table",
+    icon: Table2,
+    keywords: ["table", "grid", "columns"],
+    apply: ({ editor, range }) =>
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run(),
   },
   {
     title: "Quote",

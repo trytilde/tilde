@@ -11,8 +11,7 @@ import { connections, sandboxes } from "@/client";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ProviderIcon } from "./provider-icon";
 import { AgentStack, useAgentRegistry } from "./agent-stack";
-import { AccountSetupDialog } from "./tool-account-setup";
-import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog";
+import { NewConnectionDialog, SANDBOX_PROVIDERS } from "./new-connection-dialog";
 import { CatalogSearchField } from "./tool-catalog";
 import { loadToolConnections, message } from "./tool-connections";
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,6 @@ import {
 } from "@/components/ui/table";
 
 /** The tool providers whose connections launch sandboxes. */
-const SANDBOX_PROVIDERS = ["e2b", "modal"] as const;
 
 type Reuse = Exclude<SandboxReuse, SandboxReuse.UNSPECIFIED>;
 /** How each reuse mode reads; `warning` names the data that crosses sessions or agents. */
@@ -235,7 +233,7 @@ export function BlueprintFields({
           <p className="text-xs text-muted-foreground">
             No ready E2B or Modal connection. Connect{" "}
             <Link
-              to="/tools/catalog/$providerId"
+              to="/registry/tools/catalog/$providerId"
               params={{ providerId: "e2b" }}
               className="underline"
             >
@@ -243,7 +241,7 @@ export function BlueprintFields({
             </Link>{" "}
             or{" "}
             <Link
-              to="/tools/catalog/$providerId"
+              to="/registry/tools/catalog/$providerId"
               params={{ providerId: "modal" }}
               className="underline"
             >
@@ -453,7 +451,7 @@ export function SandboxesPage() {
                   <TableRow key={blueprint.id}>
                     <TableCell className="h-12 font-medium">
                       <Link
-                        to="/sandboxes/$blueprintId/settings"
+                        to="/registry/sandboxes/$blueprintId/settings"
                         params={{ blueprintId: blueprint.id }}
                         className="hover:underline"
                       >
@@ -473,7 +471,7 @@ export function SandboxesPage() {
                         registry={registry}
                         onOpen={() =>
                           void navigate({
-                            to: "/sandboxes/$blueprintId/settings",
+                            to: "/registry/sandboxes/$blueprintId/settings",
                             params: { blueprintId: blueprint.id },
                           })
                         }
@@ -507,9 +505,10 @@ export function SandboxesPage() {
           setCreating(connectionId);
         }}
       />
-      <NewSandboxConnection
+      <NewConnectionDialog
         open={newConnection}
-        providers={available.providers}
+        title="New sandbox connection"
+        providers={SANDBOX_PROVIDERS.flatMap((id) => available.providers.get(id) ?? [])}
         onClose={() => setNewConnection(false)}
         onConnected={(connectionId) => {
           void refresh().catch((e) => setError(message(e)));
@@ -522,7 +521,7 @@ export function SandboxesPage() {
         onClose={() => setCreating(null)}
         onCreated={(blueprint) =>
           void navigate({
-            to: "/sandboxes/$blueprintId/settings",
+            to: "/registry/sandboxes/$blueprintId/settings",
             params: { blueprintId: blueprint.id },
           })
         }
@@ -603,79 +602,6 @@ function ExistingSandboxConnection({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * A new E2B or Modal connection, set up as the catalog sets one up: the provider is chosen here
- * rather than from the whole catalog. `onConnected` gets the ready connection.
- */
-function NewSandboxConnection({
-  open,
-  providers,
-  onClose,
-  onConnected,
-}: {
-  open: boolean;
-  providers: Map<string, Provider>;
-  onClose: () => void;
-  onConnected: (connectionId: string) => void;
-}) {
-  const [provider, setProvider] = useState<Provider | null>(null);
-  const [frame, setFrame] = useState<{ setup: Brokering; connectionId: string } | null>(null);
-  const offered = SANDBOX_PROVIDERS.flatMap((id) => providers.get(id) ?? []);
-  return (
-    <>
-      <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>New sandbox connection</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-2">
-            {offered.map((candidate) => (
-              <button
-                key={candidate.id}
-                type="button"
-                className="flex items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted/50"
-                onClick={() => {
-                  onClose();
-                  setProvider(candidate);
-                }}
-              >
-                <ProviderIcon iconUrl={candidate.iconUrl} />
-                <span className="text-sm font-medium">{candidate.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-      {provider && (
-        <AccountSetupDialog
-          provider={provider}
-          iconId={provider.id}
-          onStarted={() => {}}
-          onComplete={(connectionId) => {
-            setProvider(null);
-            onConnected(connectionId);
-          }}
-          onCustom={(setup, connectionId) => {
-            setProvider(null);
-            setFrame({ setup, connectionId });
-          }}
-          onClose={() => setProvider(null)}
-        />
-      )}
-      {frame && (
-        <ConnectionSetupDialog
-          setup={frame.setup}
-          error=""
-          onClose={() => {
-            onConnected(frame.connectionId);
-            setFrame(null);
-          }}
-        />
-      )}
-    </>
   );
 }
 

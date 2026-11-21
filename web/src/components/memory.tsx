@@ -97,7 +97,7 @@ export function MemoryPage() {
     return () => abort.abort();
   }, [refresh]);
   const open = (bank: MemoryBank) =>
-    void navigate({ to: "/memory/$bankId/memories", params: { bankId: bank.id } });
+    void navigate({ to: "/registry/memory/$bankId/memories", params: { bankId: bank.id } });
   return (
     <div className="flex flex-col">
       <div
@@ -106,18 +106,27 @@ export function MemoryPage() {
         aria-label="Memory bank filter bar"
       >
         <CatalogSearchField label="Search memory banks" value={query} onChange={setQuery} />
-      </div>
-      <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button variant="outline" className="gap-2" onClick={() => setSettings(true)}>
-            <SlidersHorizontalIcon />
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-[26px] gap-1.5 px-2.5 text-[11px]"
+            onClick={() => setSettings(true)}
+          >
+            <SlidersHorizontalIcon className="size-3.5" />
             Embedding settings
           </Button>
-          <Button className="gap-2" onClick={() => setCreating(true)}>
-            <PlusIcon />
+          <Button
+            size="sm"
+            className="h-[26px] gap-1.5 px-2.5 text-[11px]"
+            onClick={() => setCreating(true)}
+          >
+            <PlusIcon className="size-3.5" />
             New bank
           </Button>
         </div>
+      </div>
+      <div className="flex flex-col gap-4 p-4 lg:p-6">
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -141,7 +150,7 @@ export function MemoryPage() {
                   <TableRow key={bank.id}>
                     <TableCell className="h-12 font-medium">
                       <Link
-                        to="/memory/$bankId/memories"
+                        to="/registry/memory/$bankId/memories"
                         params={{ bankId: bank.id }}
                         className="hover:underline"
                       >

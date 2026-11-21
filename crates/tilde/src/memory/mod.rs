@@ -844,6 +844,9 @@ impl Memory {
     /// rejects a batch, each memory is tried alone so only the one it refuses backs off; when it
     /// is unavailable, the whole batch backs off.
     pub async fn embed_pending(&self) -> Result<usize, Error> {
+        self.embed_due().await
+    }
+    async fn embed_due(&self) -> Result<usize, Error> {
         let client = self.client().await?;
         let Some(settings) = db::settings_get_opt(&client).await? else {
             return Ok(0);

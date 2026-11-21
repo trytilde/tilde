@@ -74,6 +74,8 @@ pub struct ClickhouseExporterConfigBuilder {
     use_json: bool,
     nested_kv_max_depth: usize,
     request_timeout: Duration,
+    // Tilde: a pinned CA (PEM) for a self-hosted server; native roots otherwise.
+    ca_pem: Option<String>,
 }
 
 type SvcType<RespBody> = TowerRetry<
@@ -117,7 +119,13 @@ impl ClickhouseExporterConfigBuilder {
             use_json: false,
             nested_kv_max_depth: 3,
             async_insert: false,
+            ca_pem: None,
         }
+    }
+
+    pub fn with_ca_pem(mut self, ca_pem: String) -> Self {
+        self.ca_pem = Some(ca_pem);
+        self
     }
 
     pub fn with_compression(mut self, compression: impl Into<Compression>) -> Self {
@@ -185,6 +193,7 @@ impl ClickhouseExporterConfigBuilder {
             request_timeout: self.request_timeout,
             nested_kv_max_depth: self.nested_kv_max_depth,
             logs_extended: false,
+            ca_pem: self.ca_pem,
         })
     }
 
@@ -208,6 +217,7 @@ pub struct ClickhouseExporterBuilder {
     nested_kv_max_depth: usize,
     /// Whether the logs table has the extended EventName column.
     logs_extended: bool,
+    ca_pem: Option<String>,
 }
 
 impl ClickhouseExporterBuilder {
@@ -286,8 +296,12 @@ impl ClickhouseExporterBuilder {
         use crate::exporters::http::client::{
             DEFAULT_POOL_IDLE_TIMEOUT, DEFAULT_POOL_MAX_IDLE_PER_HOST,
         };
+        let tls = match &self.ca_pem {
+            Some(pem) => tls::Config::builder().with_ca_pem(pem.clone()).build()?,
+            None => tls::Config::default(),
+        };
         let client = Client::build(
-            tls::Config::default(),
+            tls,
             Protocol::Http,
             Default::default(),
             DEFAULT_POOL_IDLE_TIMEOUT,

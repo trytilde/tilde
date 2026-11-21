@@ -29,6 +29,10 @@ message CreateAgentRequest {
   reserved "endpoint_url", "webhook_signing_key";
   tilde.types.v1.Capabilities capabilities = 6;
   tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 7;
+
+  // 9: taken by Tilde Cloud; never reuse.
+  reserved 9;
+
   // Set to register a local agent of this harness; it cannot be changed afterwards.
   tilde.types.v1.Harness harness = 10;
 }
@@ -48,6 +52,10 @@ message ListAgentsRequest {
   optional bool paused = 5;
   uint32 page_size = 1;
   string page_token = 2;
+
+  // 6: taken by Tilde Cloud; never reuse.
+  reserved 6;
+
 }
 
 message ListAgentsResponse {

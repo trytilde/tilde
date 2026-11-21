@@ -148,6 +148,15 @@ pub async fn run(
     encryption: Arc<Encryption>,
     skills_store: Option<ObjectStore>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let examples = examples(pool.clone(), encryption.clone(), skills_store);
+    examples.await
+}
+
+async fn examples(
+    pool: Pool,
+    encryption: Arc<Encryption>,
+    skills_store: Option<ObjectStore>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::init_from_env()?;
     let selected: Vec<&str> = config
         .selected
@@ -194,7 +203,8 @@ pub async fn run(
         children.spawn(async move { (name, child.wait().await) });
     }
     // Seeding syncs from GitHub; it runs beside the examples so a shutdown never waits on it.
-    let seeding = tokio::spawn(super::dev_skills::seed(pool.clone(), skills_store.clone()));
+    let seeding = super::dev_skills::seed(pool.clone(), skills_store.clone());
+    let seeding = tokio::spawn(seeding);
     for server in TOOL_SERVERS
         .iter()
         .filter(|server| selected.is_empty() || selected.contains(&server.key))
@@ -209,11 +219,12 @@ pub async fn run(
         .collect();
     if selected.is_empty() {
         let connections = connections.clone();
-        tokio::spawn(async move {
+        let giving = async move {
             if let Err(error) = give_example_tools(connections, &examples).await {
                 eprintln!("Example agents were not given the example tool servers' tools: {error}");
             }
-        });
+        };
+        tokio::spawn(giving);
     }
     drop(config.openai_api_key);
     // Children are killed on drop, so one failed example or a shutdown stops them all.

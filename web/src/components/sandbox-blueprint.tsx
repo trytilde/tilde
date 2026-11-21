@@ -16,6 +16,7 @@ import { AgentTools } from "./agent-tools";
 import { useAgentRegistry } from "./agent-stack";
 import { DashboardNavigation, usePageCrumb } from "./dashboard-breadcrumbs";
 import { RemoveButton } from "./remove-button";
+import { BlueprintEgressGrants } from "./sandbox-egress";
 import {
   BlueprintFields,
   blueprintValues,
@@ -61,12 +62,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const BLUEPRINT_TABS = ["settings", "environment", "tools", "sandboxes"] as const;
+export const BLUEPRINT_TABS = ["settings", "environment", "egress", "tools", "sandboxes"] as const;
 export type BlueprintTab = (typeof BLUEPRINT_TABS)[number];
 /** How often the sandboxes table refetches while the page is visible. */
 const LIVE_MS = 10_000;
 
-/** One sandbox blueprint: its settings, environment, tools and sandboxes. */
+/** One sandbox blueprint: its settings, environment, egress, tools and sandboxes. */
 export function SandboxBlueprintPage({
   blueprintId,
   tab,
@@ -120,6 +121,7 @@ export function SandboxBlueprintPage({
         <TabsList aria-label="Blueprint settings">
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="environment">Environment</TabsTrigger>
+          <TabsTrigger value="egress">Egress</TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
           <TabsTrigger value="sandboxes">Sandboxes</TabsTrigger>
         </TabsList>
@@ -134,6 +136,11 @@ export function SandboxBlueprintPage({
       </TabsContent>
       <TabsContent value="environment" className={padded}>
         <BlueprintEnvironment blueprint={blueprint} onChanged={setBlueprint} />
+      </TabsContent>
+      <TabsContent value="egress" className={padded}>
+        {tab === "egress" && (
+          <BlueprintEgressGrants blueprint={blueprint} onChanged={setBlueprint} />
+        )}
       </TabsContent>
       <TabsContent value="tools" className="flex min-h-0 flex-1 flex-col">
         {tab === "tools" && <AgentTools blueprintId={blueprint.id} />}
@@ -174,7 +181,7 @@ function BlueprintSettings({
     setError("");
     try {
       await sandboxes.deleteSandboxBlueprint({ id: blueprint.id });
-      void navigate({ to: "/sandboxes" });
+      void navigate({ to: "/registry/sandboxes" });
     } catch (e) {
       setError(message(e));
       setDeleting(false);
@@ -253,7 +260,7 @@ function BlueprintSettings({
               {used.map((id) => (
                 <li key={id}>
                   <Link
-                    to="/agent/$agentId/capabilities"
+                    to="/registry/agent/$agentId/capabilities"
                     params={{ agentId: id }}
                     className="text-foreground underline"
                   >
@@ -647,7 +654,7 @@ function KeyedBy({ sandbox, registry }: { sandbox: Sandbox; registry: Map<string
     sandbox.agentId && (
       <Link
         key="agent"
-        to="/agent/$agentId/capabilities"
+        to="/registry/agent/$agentId/capabilities"
         params={{ agentId: sandbox.agentId }}
         className="hover:underline"
       >

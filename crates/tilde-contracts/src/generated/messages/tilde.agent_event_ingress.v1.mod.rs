@@ -70,6 +70,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CREDENTIAL_FIELD_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_CONFIGURATION_JSON_ANY);
         reg.register_json_any(super::__GET_CONFIGURATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SIDECAR_TOOL_JSON_ANY);
+        reg.register_json_any(super::__MCP_SERVER_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_GRANT_JSON_ANY);
     }
 }
@@ -225,6 +227,14 @@ pub use self::__buffa::view::ConnectionConfigurationOwnedView;
 pub use self::__buffa::view::GetConfigurationResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetConfigurationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SidecarToolView;
+#[doc(inline)]
+pub use self::__buffa::view::SidecarToolOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerView;
+#[doc(inline)]
+pub use self::__buffa::view::McpServerOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::IdentityGrantView;
 #[doc(inline)]

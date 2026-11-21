@@ -25,6 +25,11 @@ breaking:
   # GetLogsStatus and GetTracingStatus were deliberately retired: ClickHouse is required, so
   # there is no storage state to report.
   ignore_only:
+    FIELD_SAME_TYPE:
+      # ApplyService had shipped in no release when SignalTriggerSpec.filters moved from
+      # SignalFilter to its own SignalFilterSpec (same fields, numbers and JSON), so apply.proto
+      # ports to open-source Tilde byte-identical. Drop this once Apply has been released.
+      - proto/tilde/management/v1/apply.proto
     MESSAGE_NO_DELETE:
       - proto/tilde/agent_host/v1/agent.proto
       - proto/tilde/management/v1/logs.proto

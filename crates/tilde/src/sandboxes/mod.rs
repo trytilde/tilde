@@ -14,7 +14,11 @@
 //! holds the sandbox's lease. The sweeper sleeps idle sandboxes and terminates those idle past
 //! retention or no longer wanted (`sweep_due.sql`); rows keep their VM's provider ID until it is
 //! terminated, so nothing is cascaded away while it still runs.
+pub(crate) mod apply;
 pub mod db;
+pub mod egress;
+pub mod gateway;
+mod git;
 pub mod launch;
 pub mod rpc;
 pub mod tools;
@@ -66,6 +70,7 @@ pub struct Blueprint {
     pub timings: Timings,
     pub env_names: Vec<String>,
     pub agent_ids: Vec<Uuid>,
+    pub egress: Vec<egress::Grant>,
 }
 /// A blueprint's timings, in seconds: a running sandbox sleeps after `sleep_after` unused, any is
 /// terminated after `terminate_after` unused, and a launch or wake waits `connect_timeout` for the
@@ -126,6 +131,39 @@ fn env_binding<'a>(blueprint: Uuid, name: &'a str) -> SecretBinding<'a> {
         name,
     }
 }
+/// Points the agent's sandbox setting at `blueprint`, giving it its sandbox tool source (every
+/// sandbox tool) when it has none yet.
+async fn link_agent(
+    tx: &crate::database::Transaction<'_>,
+    agent: Uuid,
+    blueprint: Uuid,
+) -> Result<(), Error> {
+    db::agent_sandbox_set_execute(tx, agent, blueprint)
+        .await
+        .map_err(|e| match e.is_foreign_key_violation() {
+            true => Error::NotFound,
+            false => e.into(),
+        })?;
+    if db::agent_sandbox_get_opt(tx, agent)
+        .await?
+        .is_some_and(|row| row.source_id.is_none())
+    {
+        let source =
+            crate::tools::insert_source(tx, Owner::Agent(agent), Target::Sandbox, "sandbox")
+                .await?;
+        for tool in tools::definitions() {
+            crate::tools::db::agent_tool_set_execute(
+                tx,
+                source,
+                &tool.name,
+                &tool.name,
+                &ToolSettings::default(),
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
 fn text(value: &str, field: &str, max: usize) -> Result<String, Error> {
     let value = value.trim();
     if value.is_empty() || value.chars().count() > max {
@@ -160,26 +198,32 @@ impl Sandboxes {
             .ok_or(Error::NotFound)
     }
     async fn read(&self, id: Option<Uuid>, search: Option<&str>) -> Result<Vec<Blueprint>, Error> {
-        Ok(
-            db::blueprint_list_all(&self.connections.pool.get().await?, id, search)
-                .await?
-                .into_iter()
-                .map(|r| Blueprint {
-                    id: r.id,
-                    name: r.name,
-                    connection_id: r.connection_id,
-                    template: r.template,
-                    reuse: r.reuse,
-                    timings: Timings {
-                        sleep_after: r.sleep_after_secs as u32,
-                        terminate_after: r.terminate_after_secs as u32,
-                        connect_timeout: r.connect_timeout_secs as u32,
-                    },
-                    env_names: r.env_names,
-                    agent_ids: r.agent_ids,
-                })
-                .collect(),
-        )
+        let client = self.connections.pool.get().await?;
+        let rows = db::blueprint_list_all(&client, id, search).await?;
+        let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
+        let mut grants = db::egress_list_all(&client, &ids).await?;
+        drop(client);
+        Ok(rows
+            .into_iter()
+            .map(|r| Blueprint {
+                egress: grants
+                    .extract_if(.., |g| g.blueprint_id == r.id)
+                    .map(egress::Grant::from)
+                    .collect(),
+                id: r.id,
+                name: r.name,
+                connection_id: r.connection_id,
+                template: r.template,
+                reuse: r.reuse,
+                timings: Timings {
+                    sleep_after: r.sleep_after_secs as u32,
+                    terminate_after: r.terminate_after_secs as u32,
+                    connect_timeout: r.connect_timeout_secs as u32,
+                },
+                env_names: r.env_names,
+                agent_ids: r.agent_ids,
+            })
+            .collect())
     }
     /// Blueprints launch through a ready, installation-owned E2B or Modal connection.
     async fn check_connection(&self, connection: Uuid) -> Result<(), Error> {
@@ -209,8 +253,10 @@ impl Sandboxes {
         let timings = Timings::default().with(timings)?;
         self.check_connection(connection).await?;
         let id = Uuid::new_v4();
+        let mut client = self.connections.pool.get().await?;
+        let tx = client.transaction().await?;
         if db::blueprint_insert_execute(
-            &self.connections.pool.get().await?,
+            &tx,
             id,
             &name,
             connection,
@@ -223,6 +269,8 @@ impl Sandboxes {
         {
             return Err(invalid("Another blueprint has this name"));
         }
+        tx.commit().await?;
+        drop(client);
         self.blueprint(id).await
     }
     /// Sandboxes no longer wanted under the new settings are terminated by the sweep it starts.
@@ -324,16 +372,25 @@ impl Sandboxes {
         db::env_delete_execute(&self.connections.pool.get().await?, blueprint, name).await?;
         self.blueprint(blueprint).await
     }
-    /// The blueprint's environment, opened for a connecting sandbox process.
+    /// The blueprint's environment, opened for a connecting sandbox process: each variable's own
+    /// value, or the current value of the secret it references.
     pub(crate) async fn env(&self, blueprint: Uuid) -> Result<Vec<(String, SecretString)>, Error> {
         db::env_all(&self.connections.pool.get().await?, blueprint)
             .await?
             .into_iter()
             .map(|row| {
-                let value = self.connections.crypto.open(
-                    env_binding(blueprint, &row.name),
-                    SealedSecret::from_bytes(&row.encrypted_value)?,
-                )?;
+                let crypto = &self.connections.crypto;
+                let value = match (&row.encrypted_value, row.secret_id, &row.secret_value) {
+                    (Some(sealed), _, _) => crypto.open(
+                        env_binding(blueprint, &row.name),
+                        SealedSecret::from_bytes(sealed)?,
+                    )?,
+                    (None, Some(secret), Some(sealed)) => crypto.open(
+                        crate::secrets::binding(secret),
+                        SealedSecret::from_bytes(sealed)?,
+                    )?,
+                    _ => return Err(Error::Missing("Secret")),
+                };
                 Ok((row.name, value))
             })
             .collect()
@@ -351,30 +408,7 @@ impl Sandboxes {
         self.blueprint(blueprint).await?;
         let mut client = self.connections.pool.get().await?;
         let tx = client.transaction().await?;
-        db::agent_sandbox_set_execute(&tx, agent, blueprint)
-            .await
-            .map_err(|e| match e.is_foreign_key_violation() {
-                true => Error::NotFound,
-                false => e.into(),
-            })?;
-        if db::agent_sandbox_get_opt(&tx, agent)
-            .await?
-            .is_some_and(|row| row.source_id.is_none())
-        {
-            let source =
-                crate::tools::insert_source(&tx, Owner::Agent(agent), Target::Sandbox, "sandbox")
-                    .await?;
-            for tool in tools::definitions() {
-                crate::tools::db::agent_tool_set_execute(
-                    &tx,
-                    source,
-                    &tool.name,
-                    &tool.name,
-                    &ToolSettings::default(),
-                )
-                .await?;
-            }
-        }
+        link_agent(&tx, agent, blueprint).await?;
         tx.commit().await?;
         drop(client);
         self.sweep_soon();
@@ -704,6 +738,10 @@ impl Sandboxes {
     }
     /// Sleep idle sandboxes and terminate those idle past retention or no longer wanted.
     pub async fn sweep(&self) -> Result<(), Error> {
+        let run = self.sweep_all();
+        run.await
+    }
+    async fn sweep_all(&self) -> Result<(), Error> {
         let pool = &self.connections.pool;
         let due = {
             let mut client = pool.get().await?;
@@ -718,33 +756,42 @@ impl Sandboxes {
             due
         };
         for row in due {
-            let client = pool.get().await?;
-            if db::sandbox_lease_opt(&client, row.id, LEASE_SECS)
-                .await?
-                .is_none()
-            {
-                continue;
-            }
-            // A call may have used it since the list was read.
-            let Some(row) = db::sweep_due_all(&client, Some(row.id)).await?.pop() else {
-                db::sandbox_release_execute(&client, row.id).await?;
-                continue;
+            let step = async {
+                if let Err(error) = self.sweep_one(row.id).await {
+                    tracing::warn!(sandbox = %row.id, %error, "Sandbox sweep step failed");
+                }
             };
-            drop(client);
-            let done = match row.action.as_str() {
-                "sleep" => self.sleep(row.id).await,
-                _ => self.terminate_leased(row.id).await,
-            };
-            if let Err(error) = done {
-                tracing::warn!(sandbox = %row.id, %error, "Sandbox sweep step failed");
-            }
+            step.await;
         }
         for row in db::renew_due_all(&pool.get().await?, None).await? {
-            if let Err(error) = self.renew(row.id).await {
-                tracing::warn!(sandbox = %row.id, %error, "Sandbox renewal failed");
-            }
+            let step = async {
+                if let Err(error) = self.renew(row.id).await {
+                    tracing::warn!(sandbox = %row.id, %error, "Sandbox renewal failed");
+                }
+            };
+            step.await;
         }
         Ok(())
+    }
+    async fn sweep_one(&self, id: Uuid) -> Result<(), Error> {
+        let pool = &self.connections.pool;
+        let client = pool.get().await?;
+        if db::sandbox_lease_opt(&client, id, LEASE_SECS)
+            .await?
+            .is_none()
+        {
+            return Ok(());
+        }
+        // A call may have used it since the list was read.
+        let Some(row) = db::sweep_due_all(&client, Some(id)).await?.pop() else {
+            db::sandbox_release_execute(&client, id).await?;
+            return Ok(());
+        };
+        drop(client);
+        match row.action.as_str() {
+            "sleep" => self.sleep(row.id).await,
+            _ => self.terminate_leased(row.id).await,
+        }
     }
     /// Keep a running VM from the provider's own pause or end: an E2B VM's TTL is renewed; a
     /// Modal VM, which cannot be, is put to sleep before its lifetime ends so its files survive:

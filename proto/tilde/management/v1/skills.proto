@@ -46,17 +46,27 @@ message ListCatalogRequest {}
 message ListCatalogResponse { repeated tilde.types.v1.CatalogGroup groups = 1; }
 message GetCatalogGroupRequest { string id = 1; }
 message GetCatalogGroupResponse { tilde.types.v1.CatalogGroup group = 1; }
-message ListSkillSourcesRequest {}
+message ListSkillSourcesRequest {
+}
 message ListSkillSourcesResponse { repeated tilde.types.v1.SkillSource sources = 1; }
 message GetSkillSourceRequest { string id = 1; }
 // Connection ids link the whole source.
 message GetSkillSourceResponse { tilde.types.v1.SkillSource source = 1; repeated tilde.types.v1.Skill skills = 2; repeated string agent_ids = 3; repeated string connection_ids = 4; }
-message EnableCatalogGroupRequest { string group = 1; }
+message EnableCatalogGroupRequest {
+  string group = 1;
+}
 message EnableCatalogGroupResponse { tilde.types.v1.SkillSource source = 1; }
 // A GitHub https URL. `git_ref` defaults to main; `git_path` narrows the scan to a directory.
-message AddGitSourceRequest { string name = 1; string repository_url = 2; string git_ref = 3; string git_path = 4; }
+message AddGitSourceRequest {
+  string name = 1;
+  string repository_url = 2;
+  string git_ref = 3;
+  string git_path = 4;
+}
 message AddGitSourceResponse { tilde.types.v1.SkillSource source = 1; }
-message CreateEditorSourceRequest { string name = 1; }
+message CreateEditorSourceRequest {
+  string name = 1;
+}
 message CreateEditorSourceResponse { tilde.types.v1.SkillSource source = 1; }
 message SyncSkillSourceRequest { string id = 1; }
 message SyncSkillSourceResponse { tilde.types.v1.SkillSource source = 1; }

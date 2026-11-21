@@ -105,12 +105,27 @@ message MemoryBank {
   reserved "agent_ids";
 }
 message MemoryBankLink { string agent_id = 1; MemoryAccess access = 2; }
-message ListMemoryBanksRequest { optional string search = 1; }
+message ListMemoryBanksRequest {
+  optional string search = 1;
+
+  // 2: taken by Tilde Cloud; never reuse.
+  reserved 2;
+
+}
 message ListMemoryBanksResponse { repeated MemoryBank banks = 1; }
 message GetMemoryBankRequest { string id = 1; }
 message GetMemoryBankResponse { MemoryBank bank = 1; }
 // Unspecified scope means SHARED.
-message CreateMemoryBankRequest { string name = 1; string description = 2; MemoryBankScope scope = 3; optional string agent_id = 4; }
+message CreateMemoryBankRequest {
+  string name = 1;
+  string description = 2;
+  MemoryBankScope scope = 3;
+  optional string agent_id = 4;
+
+  // 5: taken by Tilde Cloud; never reuse.
+  reserved 5;
+
+}
 message CreateMemoryBankResponse { MemoryBank bank = 1; }
 message UpdateMemoryBankRequest { string id = 1; optional string name = 2; optional string description = 3; }
 message UpdateMemoryBankResponse { MemoryBank bank = 1; }

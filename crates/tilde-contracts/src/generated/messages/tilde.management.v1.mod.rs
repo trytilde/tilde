@@ -13,6 +13,7 @@ include!("tilde.management.v1.inference.rs");
 include!("tilde.management.v1.logs.rs");
 include!("tilde.management.v1.memory.rs");
 include!("tilde.management.v1.prompts.rs");
+include!("tilde.management.v1.secrets.rs");
 include!("tilde.management.v1.skills.rs");
 include!("tilde.management.v1.tilde_chat.rs");
 include!("tilde.management.v1.tracing.rs");
@@ -47,6 +48,7 @@ pub mod __buffa {
         include!("tilde.management.v1.logs.__view.rs");
         include!("tilde.management.v1.memory.__view.rs");
         include!("tilde.management.v1.prompts.__view.rs");
+        include!("tilde.management.v1.secrets.__view.rs");
         include!("tilde.management.v1.skills.__view.rs");
         include!("tilde.management.v1.tilde_chat.__view.rs");
         include!("tilde.management.v1.tracing.__view.rs");
@@ -126,6 +128,7 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_DEPLOYMENT_WEIGHTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CRON_TRIGGER_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_TRIGGER_JSON_ANY);
+        reg.register_json_any(super::__SIGNAL_FILTER_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_TRIGGER_JSON_ANY);
         reg.register_json_any(super::__ROUTINE_JSON_ANY);
         reg.register_json_any(super::__SIGNAL_TYPE_JSON_ANY);
@@ -141,6 +144,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_SIGNAL_TYPES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SIGNAL_TYPES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_BLUEPRINT_JSON_ANY);
+        reg.register_json_any(super::__BLUEPRINT_EGRESS_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_TIMINGS_JSON_ANY);
         reg.register_json_any(super::__LIST_SANDBOX_BLUEPRINTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SANDBOX_BLUEPRINTS_RESPONSE_JSON_ANY);
@@ -156,6 +160,10 @@ pub mod __buffa {
         reg.register_json_any(super::__SET_SANDBOX_ENV_VAR_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_SANDBOX_ENV_VAR_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DELETE_SANDBOX_ENV_VAR_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_BLUEPRINT_EGRESS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_BLUEPRINT_EGRESS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_BLUEPRINT_EGRESS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_BLUEPRINT_EGRESS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SANDBOX_JSON_ANY);
         reg.register_json_any(super::__LIST_SANDBOXES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_SANDBOXES_RESPONSE_JSON_ANY);
@@ -229,6 +237,8 @@ pub mod __buffa {
         reg.register_json_any(super::__FIELD_CHANGE_JSON_ANY);
         reg.register_json_any(super::__REQUIRED_ACTION_JSON_ANY);
         reg.register_json_any(super::__APPLIED_AGENT_JSON_ANY);
+        reg.register_json_any(super::__RUN_SETUP_QUERY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RUN_SETUP_QUERY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_PROVIDERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROVIDER_REQUEST_JSON_ANY);
@@ -360,6 +370,13 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_PROMPTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_PROMPT_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SECRET_JSON_ANY);
+        reg.register_json_any(super::__LIST_SECRETS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_SECRETS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_SECRET_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_SECRET_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SECRET_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_SECRET_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_CATALOG_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_CATALOG_GROUP_REQUEST_JSON_ANY);
@@ -704,6 +721,10 @@ pub use self::__buffa::view::SignalTriggerView;
 #[doc(inline)]
 pub use self::__buffa::view::SignalTriggerOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::SignalFilterView;
+#[doc(inline)]
+pub use self::__buffa::view::SignalFilterOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::RoutineTriggerView;
 #[doc(inline)]
 pub use self::__buffa::view::RoutineTriggerOwnedView;
@@ -764,6 +785,10 @@ pub use self::__buffa::view::SandboxBlueprintView;
 #[doc(inline)]
 pub use self::__buffa::view::SandboxBlueprintOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::BlueprintEgressView;
+#[doc(inline)]
+pub use self::__buffa::view::BlueprintEgressOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::SandboxTimingsView;
 #[doc(inline)]
 pub use self::__buffa::view::SandboxTimingsOwnedView;
@@ -823,6 +848,22 @@ pub use self::__buffa::view::DeleteSandboxEnvVarRequestOwnedView;
 pub use self::__buffa::view::DeleteSandboxEnvVarResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::DeleteSandboxEnvVarResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetBlueprintEgressRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetBlueprintEgressRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetBlueprintEgressResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetBlueprintEgressResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteBlueprintEgressRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteBlueprintEgressRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteBlueprintEgressResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteBlueprintEgressResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::SandboxView;
 #[doc(inline)]
@@ -1115,6 +1156,14 @@ pub use self::__buffa::view::RequiredActionOwnedView;
 pub use self::__buffa::view::AppliedAgentView;
 #[doc(inline)]
 pub use self::__buffa::view::AppliedAgentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RunSetupQueryRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RunSetupQueryRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RunSetupQueryResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RunSetupQueryResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListProvidersRequestView;
 #[doc(inline)]
@@ -1639,6 +1688,34 @@ pub use self::__buffa::view::GetPromptRequestOwnedView;
 pub use self::__buffa::view::GetPromptResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetPromptResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SecretView;
+#[doc(inline)]
+pub use self::__buffa::view::SecretOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSecretsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSecretsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSecretsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListSecretsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSecretRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSecretRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSecretResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetSecretResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSecretRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSecretRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSecretResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteSecretResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListCatalogRequestView;
 #[doc(inline)]
