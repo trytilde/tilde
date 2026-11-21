@@ -13,8 +13,10 @@ use serde::Deserialize;
 use std::path::Path;
 use tilde_contracts::proto::tilde::local::v1 as wire;
 
-/// The engine takes at most 500 events a request.
-const BATCH: usize = 200;
+/// The engine takes at most 500 events and 16 MiB a request; a session first reported long
+/// after it began can hold far more than either.
+const BATCH_EVENTS: usize = 200;
+const BATCH_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Deserialize)]
 struct Payload {
@@ -64,13 +66,13 @@ async fn report(
         .unwrap_or(0);
     let parsed = transcript::parse(harness, &text[..whole], from);
     let client = connection.client()?;
-    for events in parsed.events.chunks(BATCH) {
+    for events in batches(parsed.events) {
         client
             .ingest_with_options(
                 wire::IngestRequest {
                     session_id: session.to_owned(),
                     title: parsed.title.clone(),
-                    events: events.to_vec(),
+                    events,
                     ..Default::default()
                 },
                 options(),
@@ -81,6 +83,30 @@ async fn report(
     std::fs::create_dir_all(cursor.parent().context("cursor directory")?)?;
     std::fs::write(&cursor, whole.to_string())?;
     Ok(())
+}
+
+/// Events in order, in requests the engine accepts: an event's text is at most a megabyte, so
+/// a batch closed at `BATCH_BYTES` stays far below the request limit.
+fn batches(events: Vec<wire::Event>) -> Vec<Vec<wire::Event>> {
+    let mut batches = vec![vec![]];
+    let mut bytes = 0;
+    for event in events {
+        let size = match &event.detail {
+            Some(wire::event::Detail::User(m)) => m.text.len(),
+            Some(wire::event::Detail::Agent(m)) => m.text.len(),
+            Some(wire::event::Detail::Tool(t)) => t.input.len() + t.output.len(),
+            None => 0,
+        };
+        let batch = batches.last_mut().expect("never empty");
+        if !batch.is_empty() && (batch.len() == BATCH_EVENTS || bytes + size > BATCH_BYTES) {
+            batches.push(vec![]);
+            bytes = 0;
+        }
+        bytes += size;
+        batches.last_mut().expect("never empty").push(event);
+    }
+    batches.retain(|batch| !batch.is_empty());
+    batches
 }
 
 /// A session id as a file name: harnesses use UUIDs, and anything else is kept to safe characters.
@@ -256,6 +282,40 @@ mod tests {
             ingested()[2..],
             [turn(&["a2"])],
             "nothing new, nothing sent"
+        );
+    }
+
+    /// A session first reported long after it began is sent in requests the engine accepts,
+    /// in order.
+    #[test]
+    fn a_long_first_report_is_split_below_the_request_limit() {
+        let megabyte = "x".repeat(1024 * 1024);
+        let events: Vec<wire::Event> = (0..9)
+            .map(|n| wire::Event {
+                id: n.to_string(),
+                detail: Some(
+                    wire::UserMessage {
+                        text: megabyte.clone(),
+                        ..Default::default()
+                    }
+                    .into(),
+                ),
+                ..Default::default()
+            })
+            .collect();
+        let sent = batches(events);
+        assert_eq!(sent.iter().map(Vec::len).collect::<Vec<_>>(), [4, 4, 1]);
+        let ids: Vec<_> = sent.iter().flatten().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["0", "1", "2", "3", "4", "5", "6", "7", "8"]);
+        let small = (0..450)
+            .map(|n| wire::Event {
+                id: n.to_string(),
+                ..Default::default()
+            })
+            .collect();
+        assert_eq!(
+            batches(small).iter().map(Vec::len).collect::<Vec<_>>(),
+            [200, 200, 50]
         );
     }
 

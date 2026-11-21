@@ -40,9 +40,9 @@ pub async fn sync(connection: &Connection, root: &Path) -> Result<()> {
             );
             continue;
         }
-        // Written beside the folder and moved in whole, so a failed download leaves the
-        // installed version in place.
-        let staging = root.join(format!(".{}.tilde-sync", skill.name));
+        // Written outside the folder the harness reads and moved in whole, so a failed download
+        // leaves the installed version in place and no half skill for the harness to find.
+        let staging = root.with_file_name(".tilde-skill-sync");
         let _ = std::fs::remove_dir_all(&staging);
         for file in &skill.files {
             let read = client
@@ -71,6 +71,7 @@ pub async fn sync(connection: &Connection, root: &Path) -> Result<()> {
             write(&staging, &file.path, &bytes, file.executable)?;
         }
         std::fs::write(staging.join(MARKER), &skill.version_id)?;
+        std::fs::create_dir_all(root)?;
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::rename(&staging, &dir)?;
     }

@@ -207,11 +207,17 @@ fn read(path: &Path) -> Result<Map<String, Value>> {
         Err(error) => Err(error).with_context(|| format!("Could not read {}", path.display())),
     }
 }
+/// Written beside the file and moved over it, so the harness never reads half a file. A
+/// symlinked settings file (a dotfiles checkout) is written where it points.
 fn write(path: &Path, root: Map<String, Value>) -> Result<()> {
     std::fs::create_dir_all(path.parent().context("settings directory")?)?;
+    let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+    let staged = target.with_extension("tilde-tmp");
     let mut text = serde_json::to_string_pretty(&root)?;
     text.push('\n');
-    std::fs::write(path, text).with_context(|| format!("Could not write {}", path.display()))
+    std::fs::write(&staged, text)
+        .and_then(|()| std::fs::rename(&staged, &target))
+        .with_context(|| format!("Could not write {}", path.display()))
 }
 
 /// Put `command` on each of the harness's hook events (or, with none, take it off), leaving
@@ -231,7 +237,8 @@ fn set_hooks(path: &Path, harness: Harness, command: Option<&str>) -> Result<()>
     for event in events(harness) {
         let mut groups = match hooks.remove(*event) {
             Some(Value::Array(groups)) => groups,
-            _ => vec![],
+            None => vec![],
+            Some(_) => bail!("\"hooks.{event}\" in {} is not a list", path.display()),
         };
         groups.retain(|group| {
             !group["hooks"].as_array().is_some_and(|handlers| {
@@ -256,6 +263,9 @@ fn set_hooks(path: &Path, harness: Harness, command: Option<&str>) -> Result<()>
 /// Set or remove the `tilde` entry of Claude Desktop's `mcpServers`.
 fn set_desktop_server(dir: &Path, server: Option<Value>) -> Result<()> {
     let path = dir.join("claude_desktop_config.json");
+    if server.is_none() && !path.exists() {
+        return Ok(());
+    }
     let mut root = read(&path)?;
     let servers = root
         .entry("mcpServers")
@@ -274,21 +284,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hooks_are_added_once_and_removed_without_touching_other_hooks() {
+    fn hooks_are_added_once_and_removed_leaving_the_file_as_it_was() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.json");
-        std::fs::write(
-            &path,
-            r#"{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"notify-send done"}]}]}}"#,
-        )
-        .unwrap();
+        let theirs = json!({"theme": "dark", "hooks": {"Stop": [
+            {"hooks": [{"type": "command", "command": "notify-send done"}]}]}, "alwaysThinking": true});
+        let original = format!("{}\n", serde_json::to_string_pretty(&theirs).unwrap());
+        std::fs::write(&path, &original).unwrap();
         let command = "\"/bin/tilde\" local hook claude-code";
         set_hooks(&path, Harness::ClaudeCode, Some(command)).unwrap();
         // Installing again (a moved binary, say) replaces the entry instead of doubling it.
         set_hooks(&path, Harness::ClaudeCode, Some(command)).unwrap();
         let installed: Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(installed["theme"], "dark");
         let stop = installed["hooks"]["Stop"].as_array().unwrap();
         assert_eq!(stop.len(), 2);
         assert_eq!(stop[0]["hooks"][0]["command"], "notify-send done");
@@ -298,12 +306,8 @@ mod tests {
             1
         );
 
+        // Their hook, their other settings and the order of their keys are untouched.
         set_hooks(&path, Harness::ClaudeCode, None).unwrap();
-        let removed: Value =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(
-            removed,
-            json!({"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"notify-send done"}]}]}})
-        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
     }
 }

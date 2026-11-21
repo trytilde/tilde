@@ -183,7 +183,7 @@ fn claude_code(
     if let Some(title) = line["aiTitle"].as_str() {
         session.title = title.chars().take(80).collect();
     }
-    if line["isSidechain"] == true || line["isMeta"] == true {
+    if line["isSidechain"] == true || line["isMeta"] == true || line["isApiErrorMessage"] == true {
         return;
     }
     let (id, at) = (

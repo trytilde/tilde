@@ -67,6 +67,8 @@ impl Harness {
     }
 }
 
+const HOOK_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
 fn home() -> Result<PathBuf> {
     std::env::home_dir().context("This machine has no home directory")
 }
@@ -109,10 +111,13 @@ impl Connection {
         #[cfg(unix)]
         std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
         use std::io::Write as _;
-        options
-            .open(&path)
-            .and_then(|mut file| file.write_all(serde_json::to_string_pretty(self)?.as_bytes()))
-            .with_context(|| format!("Could not write {}", path.display()))
+        let written = options.open(&path).and_then(|mut file| {
+            // A file that was already there keeps its mode unless it is set.
+            #[cfg(unix)]
+            file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+            file.write_all(serde_json::to_string_pretty(self)?.as_bytes())
+        });
+        written.with_context(|| format!("Could not write {}", path.display()))
     }
     /// The agent's ingress, which serves its local service and its MCP endpoint.
     fn base(&self) -> String {
@@ -143,8 +148,11 @@ pub async fn run(args: Local) -> Result<()> {
             if !harness.has_hooks() {
                 bail!("{} has no hooks", harness.name());
             }
-            if let Err(error) = hook::run(harness).await {
-                eprintln!("tilde local: {error:#}");
+            // Nor may it hold the harness up: an unreachable gateway costs one deadline.
+            match tokio::time::timeout(HOOK_DEADLINE, hook::run(harness)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => eprintln!("tilde local: {error:#}"),
+                Err(_) => eprintln!("tilde local: Tilde did not answer in time"),
             }
             Ok(())
         }

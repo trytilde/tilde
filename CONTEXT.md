@@ -1628,10 +1628,12 @@ from deployment readiness; connected instances report health through heartbeats.
 
 - Local agent: an agent that runs in a harness on a person's machine, registered with
   `CreateAgent`'s `harness` (a row of `local_agents`; the harness is fixed). Tilde never runs or
-  wakes it, so it has no deployments (registering one is refused), and inference, prompts, chat
-  providers, routines and capabilities do not apply. It is still an agent of the registry: it
+  wakes it, so it has no deployments (registering one is refused, and so is starting a run:
+  nothing would serve it), and inference, prompts, chat providers, routines and capabilities do
+  not apply. It is still an agent of the registry: it
   is listed with the others, owns its Tilde chat connection, and is given tool sources and
-  skills like any agent. Everything else is a managed agent.
+  skills like any agent. The health sweep leaves it unsampled (unknown): nothing is expected
+  to serve it. Everything else is a managed agent.
 - Harness: where a local agent runs: Claude Code, Codex, Claude Desktop or ChatGPT Desktop
   (`local::Harness`). Each harness's adapter declares the features it supports
   (`Harness::features`, returned as `Agent.local.features`): the coding harnesses keep
