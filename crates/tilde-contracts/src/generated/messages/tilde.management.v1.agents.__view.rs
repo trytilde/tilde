@@ -20,6 +20,10 @@ pub struct CreateAgentRequestView<'a> {
     pub concurrency_policy: ::buffa::EnumValue<
         super::super::super::super::types::v1::AgentConcurrencyPolicy,
     >,
+    /// Set to register a local agent of this harness; it cannot be changed afterwards.
+    ///
+    /// Field 10: `harness`
+    pub harness: ::buffa::EnumValue<super::super::super::super::types::v1::Harness>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
@@ -101,6 +105,15 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                     ::buffa::types::decode_int32(&mut cur)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.harness = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(&mut cur)?,
+                );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -138,6 +151,7 @@ impl<'a> ::buffa::MessageView<'a> for CreateAgentRequestView<'a> {
                 None => ::buffa::MessageField::none(),
             },
             concurrency_policy: self.concurrency_policy,
+            harness: self.harness,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -172,6 +186,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
         if !self.description.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
         }
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -205,6 +225,12 @@ impl<'a> ::buffa::ViewEncode<'a> for CreateAgentRequestView<'a> {
         }
         if !self.description.is_empty() {
             ::buffa::types::put_string_field(8u32, &self.description, buf);
+        }
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -245,6 +271,9 @@ impl<'__a> ::serde::Serialize for CreateAgentRequestView<'__a> {
             &self.concurrency_policy,
         ) {
             __map.serialize_entry("concurrencyPolicy", &self.concurrency_policy)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.harness) {
+            __map.serialize_entry("harness", &self.harness)?;
         }
         __map.end()
     }
@@ -376,6 +405,15 @@ impl CreateAgentRequestOwnedView {
         super::super::super::super::types::v1::AgentConcurrencyPolicy,
     > {
         self.0.reborrow().concurrency_policy
+    }
+    /// Set to register a local agent of this harness; it cannot be changed afterwards.
+    ///
+    /// Field 10: `harness`
+    #[must_use]
+    pub fn harness(
+        &self,
+    ) -> ::buffa::EnumValue<super::super::super::super::types::v1::Harness> {
+        self.0.reborrow().harness
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<CreateAgentRequestView<'static>>>

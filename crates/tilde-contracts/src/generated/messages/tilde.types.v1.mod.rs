@@ -57,6 +57,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CHANNEL_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_VERIFICATION_JSON_ANY);
         reg.register_json_any(super::__AGENT_JSON_ANY);
+        reg.register_json_any(super::__HARNESS_FEATURES_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_AGENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_METRICS_JSON_ANY);
         reg.register_json_any(super::__AGENT_HEALTH_HOUR_JSON_ANY);
         reg.register_json_any(super::__CAPABILITIES_JSON_ANY);
@@ -142,6 +144,14 @@ pub use self::__buffa::view::IdentityVerificationOwnedView;
 pub use self::__buffa::view::AgentView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HarnessFeaturesView;
+#[doc(inline)]
+pub use self::__buffa::view::HarnessFeaturesOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAgentView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAgentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentMetricsView;
 #[doc(inline)]

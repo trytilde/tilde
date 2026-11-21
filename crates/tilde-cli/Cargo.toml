@@ -16,6 +16,9 @@ path = "src/main.rs"
 anyhow = "1"
 axum = "0.8"
 base64.workspace = true
+# Event times in a harness's transcript, as the local agent contract carries them.
+buffa-types.workspace = true
+chrono.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
 connectrpc.workspace = true
 globset = "0.4"

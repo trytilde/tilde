@@ -1132,7 +1132,8 @@ on a cold build, which is why the CLI depends on it rather than the engine.
 
 ## The tilde CLI
 
-`crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy` and `doctor`. The engine
+`crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy`, `doctor` and `local`
+(connecting a harness on this machine to its local agent; see Local agents). The engine
 crate already owns the binary name `tilde` and two workspace packages producing one binary name
 silently overwrite each other in `target/`, so the in-repo target is `tilde-cli` and every
 distribution channel installs it as `tilde`. It calls the management API through the
@@ -1584,8 +1585,8 @@ reads like a hosting console and links the commit back to GitHub. Registering a
 deployment issues its token once; the token is the join between the record and whatever
 runs. `agent_instances` is the observed half: every process that dials in with a
 deployment token, heartbeating on a short cadence. Every instance belongs to exactly one
-deployment, the gateway rejects registration otherwise, and local agents never federate
-into a deployed registry. Retiring a deployment invalidates its token. Policy
+deployment, the gateway rejects registration otherwise, and an agent process run locally never
+joins a deployed registry by itself (a local agent, see Local agents, has no deployments at all). Retiring a deployment invalidates its token. Policy
 (capabilities, connections, IAM), routing and the sidecar failure policy stay on the
 agent. Execution type belongs exclusively to each registered deployment: Gateway,
 Sidecar, or Lambda. Gateway agent servers and sidecars dial in with deployment tokens;
@@ -1622,6 +1623,58 @@ gateway uses the authenticated outbound connection for Gateway wakes.
 The invocation lease is renewed by the host's open command stream and by reports, so a
 host that dies stops renewing and expiry reclaims the run. Registry health is sampled
 from deployment readiness; connected instances report health through heartbeats.
+
+## Local agents
+
+- Local agent: an agent that runs in a harness on a person's machine, registered with
+  `CreateAgent`'s `harness` (a row of `local_agents`; the harness is fixed). Tilde never runs or
+  wakes it, so it has no deployments (registering one is refused, and so is starting a run:
+  nothing would serve it), and inference, prompts, chat providers, routines and capabilities do
+  not apply. It is still an agent of the registry: it
+  is listed with the others, owns its Tilde chat connection, and is given tool sources and
+  skills like any agent. The health sweep leaves it unsampled (unknown): nothing is expected
+  to serve it. Everything else is a managed agent.
+- Harness: where a local agent runs: Claude Code, Codex, Claude Desktop or ChatGPT Desktop
+  (`local::Harness`). Each harness's adapter declares the features it supports
+  (`Harness::features`, returned as `Agent.local.features`): the coding harnesses keep
+  transcripts on the machine and run hooks, so they report sessions (and traces) and take
+  skills and tools; the desktop apps keep conversations in the vendor's account and take tools
+  only. No harness reports logs yet. The agent's page shows a Setup tab and only the tabs its
+  harness's features name.
+- Harness credentials: the harness is one more application speaking for the agent, so it
+  authenticates with the agent's application key (the `api_key` of its Tilde connection, rotated
+  like any). The local endpoints answer only a local agent's key, at
+  `/agents/{agent}/tilde.local.v1.LocalAgentService/{method}` and `/agents/{agent}/mcp`.
+- Reported session: `LocalAgentService.Ingest` takes a harness session's events (what the
+  person said, what the agent said, each finished tool call). A session is one native thread
+  between the person and the agent (ids derived from the harness's session and event ids), its
+  messages are canonical chat messages at the times they were said, and every event is also a
+  span (`tilde.observation.*`, a turn being one trace), which is what the Sessions and Tracing
+  tabs show; a prompt is a generation with an input and no output, because the session
+  transcript reads messages from generations. Events are recorded once however often they are
+  sent. Tool calls are spans only: `chat_tool_calls` records calls Tilde ran.
+- Local MCP endpoint: the agent's tools on ready sources as an MCP server (streamable HTTP, JSON
+  answers, no session), with catalog names made MCP-safe (`source_tool`). Adding a source is the
+  grant; a call runs as the gateway runs an invocation's, with the agent as caller and no
+  thread, and is not a `chat_tool_calls` record (the harness's own transcript reports it).
+  Sandbox and personal tools are not served.
+- Skills: `ListSkills` and `ReadSkillFile` return the skills the agent is given, for the
+  harness's own skill folder.
+- `tilde local` (the CLI): `install <harness>` stores the gateway URL, agent id and key in
+  `~/.tilde/local/<harness>.json` (owner-readable), adds the harness's hooks (Claude Code
+  `settings.json`; Codex `hooks.json`, which Codex runs once trusted) and registers `tilde local
+  mcp <harness>`, a stdio bridge to the MCP endpoint, as the harness's MCP server (Claude
+  Desktop: `claude_desktop_config.json`), so the key never enters the harness's configuration.
+  `hook` runs on the harness's hook events: at a session's start it syncs the agent's skills
+  into the harness's skill folder (each carries a `.tilde` version marker; skills a person put
+  there are never touched), and when a turn or session ends it reads the transcript, parses it
+  with the harness's adapter and reports what follows the session's cursor, which moves only
+  once Tilde accepted it. ChatGPT Desktop takes remote MCP servers only: its Setup tab gives the
+  endpoint to add in ChatGPT.
+- Not built: logs from a harness's OpenTelemetry export; adapters that read a vendor account
+  instead of a machine (claude.ai and ChatGPT conversations, through compliance APIs or
+  exports), which would report through the same `Ingest`; policies that give many agents the
+  same tools and skills (trytilde/tilde#43).
 
 ## Agent deployments and sidecars
 
