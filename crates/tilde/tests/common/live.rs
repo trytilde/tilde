@@ -20,7 +20,7 @@ pub fn setting(name: &str) -> String {
     std::env::var(name)
         .ok()
         .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| panic!("{name} is required; run task secrets:load"))
+        .unwrap_or_else(|| panic!("{name} is required; set it in the environment"))
 }
 pub fn optional(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())

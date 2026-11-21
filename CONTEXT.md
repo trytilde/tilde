@@ -1908,9 +1908,10 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   and both chain in any order. MCP-served tools take plain strings, which preflight checks.
   `connection.ref(slug)` is typed through the `Connections` interface of `@trytilde/iac` (empty
   in the package), which a project fills by module augmentation: `tilde iac types` lists the
-  organization's ready connections (MCP servers, tool hosts' instances and ontology environments
-  included) with their tools and writes a `.d.ts` (`declare module "@trytilde/iac"`) mapping each
-  slug to its connection type and tool names. Connections that share a slug merge: one type keeps
+  organization's ready connections (MCP servers and tool hosts' instances included) with their
+  tools and writes a `.d.ts` (`declare module "@trytilde/iac"`) mapping each slug to its
+  connection type and tool names.
+  Connections that share a slug merge: one type keeps
   the union of their tools, different types (or unknown tools) leave that part plain strings. A
   generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
   plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
