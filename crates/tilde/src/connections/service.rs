@@ -357,7 +357,7 @@ impl Connections {
         }
         let setup = self.create_setup(&tx, id).await?;
         // App connections reauthorize their existing user-owned app rather than creating another,
-        // also once they need action again (a Plaid Item to re-link in update mode).
+        // also once they need action again (an account link the provider wants re-confirmed).
         let stored = row.status == "requires_action"
             && !crate::connections::db::values_get_all(&tx, id)
                 .await?
@@ -819,7 +819,7 @@ impl Connections {
         }
         crate::connections::db::values_delete_execute(&tx, setup.connection_id).await?;
         for row in crate::connections::db::setup_values_get_all(&tx, setup.id).await? {
-            // `_`-prefixed values are the setup's own working state (PKCE verifier, Plaid link token).
+            // `_`-prefixed values are the setup's own working state (PKCE verifier, a provider's link token).
             if row.field_key.starts_with('_') {
                 continue;
             }

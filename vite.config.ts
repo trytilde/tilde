@@ -8,7 +8,6 @@ const generated = [
   "**/node_modules/**",
   "**/dist/**",
   "**/provider-dist/**",
-  "**/storybook-static/**",
   "**/gen/**",
   "**/routeTree.gen.ts",
   "**/generated/**",

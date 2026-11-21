@@ -38,6 +38,10 @@ message OAuthConfiguration {
 enum OAuthClient {
   O_AUTH_CLIENT_UNSPECIFIED = 0;
   O_AUTH_CLIENT_FORM = 1;
+
+  // 2: taken by Tilde Cloud; never reuse.
+  reserved 2;
+
   O_AUTH_CLIENT_DYNAMIC = 3;
 }
 
@@ -80,6 +84,10 @@ message Provider {
  string id = 1; string name = 3; repeated ConnectionType connection_types = 5; repeated string categories = 10;
  reserved 2,4,6;
  oneof kind { BuiltInProvider built_in = 7; ConfiguredProvider configured = 8; RemoteProvider remote = 9; }
+
+ // 14: taken by Tilde Cloud; never reuse.
+ reserved 14;
+
  // What sandboxes may reach through the gateway with its egress-capable connections.
  optional EgressDescriptor egress = 15;
 }

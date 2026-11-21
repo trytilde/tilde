@@ -202,10 +202,11 @@ pub async fn credentials(
     }
 }
 
-/// Short-lived credentials for clients outside the engine and when they expire (`None`: unknown). In the connection's own account (`account` `None` or
-/// its own): the web identity session (`oidc`), else a `GetSessionToken` session from the
-/// access keys; keys that already carry a session token are temporary and go as they are. In
-/// another account: the session of the role the connection lists there, chained from those.
+/// Short-lived credentials for clients outside the engine and when they expire (`None`:
+/// unknown). In the connection's own account (`account` `None` or its own): the web identity
+/// session (`oidc`), else a `GetSessionToken` session from the access keys; keys that already
+/// carry a session token are temporary and go as they are. In another account: the session of
+/// the role the connection lists there, chained from those.
 pub async fn session(
     access: &Access,
     typ: &str,

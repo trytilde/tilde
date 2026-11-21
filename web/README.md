@@ -25,7 +25,6 @@ square-and-horizontal-stroke brand guidance. Fonts and assets are bundled locall
 Run `pnpm --dir web test` for cursor and table interaction tests, and
 `pnpm --dir web build` for type checking and the production bundle.
 
-
 The agent editor supports default-deny capabilities with Any or explicit target
 lists where supported.
 

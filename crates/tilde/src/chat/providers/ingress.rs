@@ -115,15 +115,13 @@ async fn receive(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
-    // `Some` is a JSON body to answer with; `None` an empty acknowledgement.
-    // Webhooks of ingestion-only connections (Tilde Cloud) are answered 200 or 401.
-    #[allow(unused_mut)]
-    let mut ingestion = false;
+    // `Some` is a JSON body to answer with (JSON null: an empty 200); `None` an empty acknowledgement.
     let result: ToolResult<Option<Value>> = async {
         let row = s.connections.get(id).await?;
         let provider = adapter(&row.provider_id, &row.type_id);
         let source = crate::signals::source(&row.provider_id, &row.type_id);
-        if provider.is_none() && source.is_none() && !ingestion {
+        let unknown = provider.is_none() && source.is_none();
+        if unknown {
             return Err(ConnectError::not_found("Unknown channel"));
         }
         let access = Access {
@@ -135,14 +133,11 @@ async fn receive(
         };
         // A chat adapter authenticates its provider's deliveries; signal-only providers are
         // authenticated by the signals module.
-        // `forward`: an ingestion provider's delivery may concern another account on the same app.
-        // Only Tilde Cloud forwards deliveries, so open-source Tilde never reads it.
-        #[allow(unused_variables)]
-        let (result, forward) = match provider {
-            Some(provider) => (provider.webhook(&access, &headers, &body).await?, true),
+        let result = match provider {
+            Some(provider) => provider.webhook(&access, &headers, &body).await?,
             None => {
                 crate::signals::verify(&row.provider_id, &access, &headers, &body).await?;
-                (Webhook::Messages(vec![]), true)
+                Webhook::Messages(vec![])
             }
         };
         if let Some(source) = source
@@ -191,24 +186,15 @@ async fn receive(
                 if row.provider_id == "google_chat" {
                     return Ok(Some(json!({})));
                 }
-                if ingestion {
-                    return Ok(Some(Value::Null));
-                }
                 Ok(None)
             }
         }
     }
     .await;
     match result {
-        // Ingestion providers (Xero's intent-to-receive check in particular) expect 200.
         Ok(Some(Value::Null)) => StatusCode::OK.into_response(),
         Ok(Some(body)) => axum::Json(body).into_response(),
         Ok(None) => StatusCode::NO_CONTENT.into_response(),
-        // Xero's intent-to-receive check expects 401 for a bad signature; so do Plaid and Intuit.
-        Err(error) if ingestion && error.code == connectrpc::ErrorCode::Unauthenticated => {
-            tracing::warn!(connection_id=%id,"Webhook signature rejected");
-            StatusCode::UNAUTHORIZED.into_response()
-        }
         Err(error) => {
             tracing::warn!(code=?error.code,connection_id=%id,"Chat webhook rejected");
             (StatusCode::BAD_REQUEST, "Webhook could not be accepted").into_response()
