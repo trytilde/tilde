@@ -42,7 +42,8 @@ pub async fn sync(connection: &Connection, root: &Path) -> Result<()> {
         }
         // Written outside the folder the harness reads and moved in whole, so a failed download
         // leaves the installed version in place and no half skill for the harness to find.
-        let staging = root.with_file_name(".tilde-skill-sync");
+        // Two sessions may start at once: each stages in a directory of its own.
+        let staging = root.with_file_name(format!(".tilde-skill-sync-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&staging);
         for file in &skill.files {
             let read = client

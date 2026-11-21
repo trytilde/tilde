@@ -56,17 +56,19 @@ pub async fn serve(harness: Harness) -> Result<()> {
     Ok(())
 }
 
-/// The gateway's answer to one message. A request (it has an id) is always answered, with an
-/// error when the gateway gave none; a notification never is.
+/// Forward one message and return the gateway's answer. A request (it has an id) is always
+/// answered, with an error when the gateway gave none; a notification is sent and never is.
 async fn forward(request: reqwest::RequestBuilder, line: String) -> Option<String> {
     let id = serde_json::from_str::<Value>(&line)
         .ok()
-        .and_then(|message| message.get("id").cloned())?;
+        .and_then(|message| message.get("id").cloned());
+    let sent = request.body(line).send().await;
+    let id = id?;
     let failure = |message: String| {
         json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32000, "message": message}})
             .to_string()
     };
-    Some(match request.body(line).send().await {
+    Some(match sent {
         Ok(response) if response.status().is_success() => match response.text().await {
             Ok(answer) if !answer.trim().is_empty() => answer.trim().to_owned(),
             _ => failure("Tilde gave no answer".into()),

@@ -207,7 +207,8 @@ fn read(path: &Path) -> Result<Map<String, Value>> {
         Err(error) => Err(error).with_context(|| format!("Could not read {}", path.display())),
     }
 }
-/// Written beside the file and moved over it, so the harness never reads half a file. A
+/// Keys come out sorted: serde_json keeps them in order only with a feature that would change
+/// how the rest of this crate hashes declarations. Written beside the file and moved over it, so the harness never reads half a file. A
 /// symlinked settings file (a dotfiles checkout) is written where it points.
 fn write(path: &Path, root: Map<String, Value>) -> Result<()> {
     std::fs::create_dir_all(path.parent().context("settings directory")?)?;
@@ -289,8 +290,7 @@ mod tests {
         let path = dir.path().join("settings.json");
         let theirs = json!({"theme": "dark", "hooks": {"Stop": [
             {"hooks": [{"type": "command", "command": "notify-send done"}]}]}, "alwaysThinking": true});
-        let original = format!("{}\n", serde_json::to_string_pretty(&theirs).unwrap());
-        std::fs::write(&path, &original).unwrap();
+        std::fs::write(&path, theirs.to_string()).unwrap();
         let command = "\"/bin/tilde\" local hook claude-code";
         set_hooks(&path, Harness::ClaudeCode, Some(command)).unwrap();
         // Installing again (a moved binary, say) replaces the entry instead of doubling it.
@@ -306,8 +306,10 @@ mod tests {
             1
         );
 
-        // Their hook, their other settings and the order of their keys are untouched.
+        // Their hook and their other settings are untouched.
         set_hooks(&path, Harness::ClaudeCode, None).unwrap();
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        let removed: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(removed, theirs);
     }
 }
