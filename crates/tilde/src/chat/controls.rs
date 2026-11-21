@@ -201,10 +201,13 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
                 for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop|Kind::Suspend));if seen.insert(command.id.clone()){yield command;}
                     if terminal{return;}}
                 // The open command stream is the host's liveness for this invocation: it
-                // renews the lease that expiry would otherwise reclaim.
+                // renews the lease that expiry would otherwise reclaim. Each renewal repeats
+                // Ready (hosts ignore a repeat): an idle stream is otherwise cut by proxies
+                // (a load balancer's 60 s idle timeout), and the SDKs give up on reconnecting
+                // when nothing arrived for 15 s.
                 let renew=tokio::time::sleep(Duration::from_secs(10));
-                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value,_=renew=>Some(chat.renew_lease(claims.invocation_id).await)};
-                match update{Some(value)=>value?,None=>break}
+                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value.map(|v|(v,false)),_=renew=>Some((chat.renew_lease(claims.invocation_id).await,true))};
+                match update{Some((value,renewed))=>{value?;if renewed{ready=false;}},None=>break}
             }
         })
     }

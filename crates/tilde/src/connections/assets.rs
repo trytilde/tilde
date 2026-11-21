@@ -108,7 +108,8 @@ async fn serve(state: &Assets, path: &str, query: Option<&str>) -> Response {
         else {
             return StatusCode::NOT_FOUND.into_response();
         };
-        let Ok(provider) = connections.provider(&id).await else {
+        let provider = connections.provider(&id);
+        let Ok(provider) = provider.await else {
             return StatusCode::NOT_FOUND.into_response();
         };
         let Some(remote) = provider.kind.remote() else {

@@ -1,5 +1,7 @@
 // This file was generated with `cornucopia`. Do not modify.
 
+pub mod apply_get;
+pub mod apply_update;
 pub mod avatar;
 pub mod create;
 pub mod delete;

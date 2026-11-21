@@ -428,6 +428,13 @@ pub struct SandboxBlueprint {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub timings: ::buffa::MessageField<SandboxTimings, ::buffa::Inline<SandboxTimings>>,
+    /// Field 9: `egress`
+    #[serde(
+        rename = "egress",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub egress: ::buffa::alloc::vec::Vec<BlueprintEgress>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -443,6 +450,7 @@ impl ::core::fmt::Debug for SandboxBlueprint {
             .field("env_names", &self.env_names)
             .field("agent_ids", &self.agent_ids)
             .field("timings", &self.timings)
+            .field("egress", &self.egress)
             .finish()
     }
 }
@@ -506,6 +514,14 @@ impl ::buffa::Message for SandboxBlueprint {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.egress {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -547,6 +563,14 @@ impl ::buffa::Message for SandboxBlueprint {
                 buf,
             );
             self.timings.write_to(__cache, buf);
+        }
+        for v in &self.egress {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -631,6 +655,18 @@ impl ::buffa::Message for SandboxBlueprint {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.egress.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -647,6 +683,7 @@ impl ::buffa::Message for SandboxBlueprint {
         self.env_names.clear();
         self.agent_ids.clear();
         self.timings = ::buffa::MessageField::none();
+        self.egress.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -677,6 +714,231 @@ pub const __SANDBOX_BLUEPRINT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
     type_url: "type.googleapis.com/tilde.management.v1.SandboxBlueprint",
     to_json: ::buffa::type_registry::any_to_json::<SandboxBlueprint>,
     from_json: ::buffa::type_registry::any_from_json::<SandboxBlueprint>,
+    is_wkt: false,
+};
+/// A blueprint's grant to reach a connection's upstream through the gateway at
+/// `/sandboxes/egress/{slug}/…`. Off until enabled.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BlueprintEgress {
+    /// Lowercase letters, digits and underscores, starting with a letter, at most 32.
+    ///
+    /// Field 1: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    /// Field 2: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    /// The grant's config: a JSON object of the provider's egress config schema.
+    ///
+    /// Field 3: `config_json`
+    #[serde(
+        rename = "configJson",
+        alias = "config_json",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub config_json: ::buffa::alloc::string::String,
+    /// Field 4: `config_version`
+    #[serde(
+        rename = "configVersion",
+        alias = "config_version",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub config_version: u32,
+    /// Field 5: `enabled`
+    #[serde(
+        rename = "enabled",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub enabled: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BlueprintEgress {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BlueprintEgress")
+            .field("slug", &self.slug)
+            .field("connection_id", &self.connection_id)
+            .field("config_json", &self.config_json)
+            .field("config_version", &self.config_version)
+            .field("enabled", &self.enabled)
+            .finish()
+    }
+}
+impl BlueprintEgress {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.BlueprintEgress";
+}
+::buffa::impl_default_instance!(BlueprintEgress);
+impl ::buffa::MessageName for BlueprintEgress {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "BlueprintEgress";
+    const FULL_NAME: &'static str = "tilde.management.v1.BlueprintEgress";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.BlueprintEgress";
+}
+impl ::buffa::Message for BlueprintEgress {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.config_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.config_json) as u64;
+        }
+        if self.config_version != 0u32 {
+            size
+                += 1u64 + ::buffa::types::uint32_encoded_len(self.config_version) as u64;
+        }
+        if self.enabled {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.slug, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.connection_id, buf);
+        }
+        if !self.config_json.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.config_json, buf);
+        }
+        if self.config_version != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.config_version, buf);
+        }
+        if self.enabled {
+            ::buffa::types::put_bool_field(5u32, self.enabled, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.config_json, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.config_version = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.enabled = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.slug.clear();
+        self.connection_id.clear();
+        self.config_json.clear();
+        self.config_version = 0u32;
+        self.enabled = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BlueprintEgress {
+    const PROTO_FQN: &'static str = "tilde.management.v1.BlueprintEgress";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BlueprintEgress {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BLUEPRINT_EGRESS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.BlueprintEgress",
+    to_json: ::buffa::type_registry::any_to_json::<BlueprintEgress>,
+    from_json: ::buffa::type_registry::any_from_json::<BlueprintEgress>,
     is_wkt: false,
 };
 /// When its sandboxes sleep and are terminated, and how long a launch or wake waits for the
@@ -3071,6 +3333,657 @@ pub const __DELETE_SANDBOX_ENV_VAR_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
     type_url: "type.googleapis.com/tilde.management.v1.DeleteSandboxEnvVarResponse",
     to_json: ::buffa::type_registry::any_to_json::<DeleteSandboxEnvVarResponse>,
     from_json: ::buffa::type_registry::any_from_json::<DeleteSandboxEnvVarResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetBlueprintEgressRequest {
+    /// Field 1: `blueprint_id`
+    #[serde(
+        rename = "blueprintId",
+        alias = "blueprint_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub blueprint_id: ::buffa::alloc::string::String,
+    /// Field 2: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    /// Field 3: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    /// Field 4: `config_json`
+    #[serde(
+        rename = "configJson",
+        alias = "config_json",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub config_json: ::buffa::alloc::string::String,
+    /// Field 5: `enabled`
+    #[serde(
+        rename = "enabled",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub enabled: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetBlueprintEgressRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetBlueprintEgressRequest")
+            .field("blueprint_id", &self.blueprint_id)
+            .field("slug", &self.slug)
+            .field("connection_id", &self.connection_id)
+            .field("config_json", &self.config_json)
+            .field("enabled", &self.enabled)
+            .finish()
+    }
+}
+impl SetBlueprintEgressRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressRequest";
+}
+::buffa::impl_default_instance!(SetBlueprintEgressRequest);
+impl ::buffa::MessageName for SetBlueprintEgressRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetBlueprintEgressRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetBlueprintEgressRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressRequest";
+}
+impl ::buffa::Message for SetBlueprintEgressRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.blueprint_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.blueprint_id) as u64;
+        }
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.config_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.config_json) as u64;
+        }
+        if self.enabled {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.blueprint_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.blueprint_id, buf);
+        }
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.slug, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.connection_id, buf);
+        }
+        if !self.config_json.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.config_json, buf);
+        }
+        if self.enabled {
+            ::buffa::types::put_bool_field(5u32, self.enabled, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.blueprint_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.config_json, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.enabled = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.blueprint_id.clear();
+        self.slug.clear();
+        self.connection_id.clear();
+        self.config_json.clear();
+        self.enabled = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetBlueprintEgressRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetBlueprintEgressRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetBlueprintEgressRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_BLUEPRINT_EGRESS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetBlueprintEgressRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetBlueprintEgressRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetBlueprintEgressRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetBlueprintEgressResponse {
+    /// Field 1: `blueprint`
+    #[serde(
+        rename = "blueprint",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub blueprint: ::buffa::MessageField<
+        SandboxBlueprint,
+        ::buffa::Inline<SandboxBlueprint>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetBlueprintEgressResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetBlueprintEgressResponse")
+            .field("blueprint", &self.blueprint)
+            .finish()
+    }
+}
+impl SetBlueprintEgressResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressResponse";
+}
+::buffa::impl_default_instance!(SetBlueprintEgressResponse);
+impl ::buffa::MessageName for SetBlueprintEgressResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetBlueprintEgressResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetBlueprintEgressResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressResponse";
+}
+impl ::buffa::Message for SetBlueprintEgressResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.blueprint.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.blueprint.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.blueprint.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.blueprint.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.blueprint.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.blueprint = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetBlueprintEgressResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.SetBlueprintEgressResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetBlueprintEgressResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_BLUEPRINT_EGRESS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.SetBlueprintEgressResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetBlueprintEgressResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetBlueprintEgressResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteBlueprintEgressRequest {
+    /// Field 1: `blueprint_id`
+    #[serde(
+        rename = "blueprintId",
+        alias = "blueprint_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub blueprint_id: ::buffa::alloc::string::String,
+    /// Field 2: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteBlueprintEgressRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteBlueprintEgressRequest")
+            .field("blueprint_id", &self.blueprint_id)
+            .field("slug", &self.slug)
+            .finish()
+    }
+}
+impl DeleteBlueprintEgressRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressRequest";
+}
+::buffa::impl_default_instance!(DeleteBlueprintEgressRequest);
+impl ::buffa::MessageName for DeleteBlueprintEgressRequest {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "DeleteBlueprintEgressRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.DeleteBlueprintEgressRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressRequest";
+}
+impl ::buffa::Message for DeleteBlueprintEgressRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.blueprint_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.blueprint_id) as u64;
+        }
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.blueprint_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.blueprint_id, buf);
+        }
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.slug, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.blueprint_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.blueprint_id.clear();
+        self.slug.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteBlueprintEgressRequest {
+    const PROTO_FQN: &'static str = "tilde.management.v1.DeleteBlueprintEgressRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteBlueprintEgressRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_BLUEPRINT_EGRESS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteBlueprintEgressRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteBlueprintEgressRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteBlueprintEgressResponse {
+    /// Field 1: `blueprint`
+    #[serde(
+        rename = "blueprint",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub blueprint: ::buffa::MessageField<
+        SandboxBlueprint,
+        ::buffa::Inline<SandboxBlueprint>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteBlueprintEgressResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteBlueprintEgressResponse")
+            .field("blueprint", &self.blueprint)
+            .finish()
+    }
+}
+impl DeleteBlueprintEgressResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressResponse";
+}
+::buffa::impl_default_instance!(DeleteBlueprintEgressResponse);
+impl ::buffa::MessageName for DeleteBlueprintEgressResponse {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "DeleteBlueprintEgressResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.DeleteBlueprintEgressResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressResponse";
+}
+impl ::buffa::Message for DeleteBlueprintEgressResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.blueprint.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.blueprint.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.blueprint.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.blueprint.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.blueprint.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.blueprint = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteBlueprintEgressResponse {
+    const PROTO_FQN: &'static str = "tilde.management.v1.DeleteBlueprintEgressResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteBlueprintEgressResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_BLUEPRINT_EGRESS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteBlueprintEgressResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteBlueprintEgressResponse>,
     is_wkt: false,
 };
 /// One VM. `agent_id`, `thread_id` and `identity_id` are what its reuse mode keys it by.

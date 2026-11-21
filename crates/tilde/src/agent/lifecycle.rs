@@ -45,6 +45,7 @@ impl Agents {
             crate::connections::db::tilde_delete_execute(&tx, tilde.id).await?;
         }
         crate::agent::db::delete_execute(&tx, id).await?;
+        crate::local::db::remove_execute(&tx, id).await?;
         // The agent row stays (soft delete), so its own banks and wikis, and what they hold, go here.
         crate::memory::db::agent_memory_delete_execute(&tx, id).await?;
         crate::wikis::db::agent_wiki_delete_execute(&tx, id).await?;

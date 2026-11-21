@@ -626,32 +626,44 @@ impl Deployments {
     }
     /// Hand completed messages to the other sidecar agents in a room.
     pub async fn relay_pending(&self) -> Result<(bool, usize), Error> {
-        let rows =
-            crate::deployment::db::relay_pending_all(&self.pool.get().await?, liveness_secs())
-                .await?;
+        let rows = async {
+            Ok::<_, Error>(
+                crate::deployment::db::relay_pending_all(&self.pool.get().await?, liveness_secs())
+                    .await?,
+            )
+        };
+        let rows = rows.await?;
         let more = rows.len() == 50;
         let mut delivered = 0;
-        let chat = self.chat();
         for row in rows {
-            let Some(instance) = self.target_for(row.agent_id, Some(row.thread_id)).await? else {
-                continue;
-            };
-            let relay = wire::RelayMessage {
-                thread: chat.thread(row.thread_id).await?.into(),
-                message: chat.message(row.message_id).await?.into(),
-                ..Default::default()
-            };
-            self.direct(row.agent_id, instance, Some(row.thread_id), relay.into())
-                .await?;
-            crate::deployment::db::project_dispatch_execute(
-                &self.pool.get().await?,
-                row.message_id,
-                row.agent_id,
-            )
-            .await?;
-            delivered += 1;
+            let relay = self.relay_message(row.agent_id, row.thread_id, row.message_id);
+            if relay.await? {
+                delivered += 1;
+            }
         }
         Ok((more, delivered))
+    }
+    /// Relay one message to a sidecar agent; false when the agent has no live replica.
+    async fn relay_message(
+        &self,
+        agent: uuid::Uuid,
+        thread: uuid::Uuid,
+        message: uuid::Uuid,
+    ) -> Result<bool, Error> {
+        let Some(instance) = self.target_for(agent, Some(thread)).await? else {
+            return Ok(false);
+        };
+        let chat = self.chat();
+        let relay = wire::RelayMessage {
+            thread: chat.thread(thread).await?.into(),
+            message: chat.message(message).await?.into(),
+            ..Default::default()
+        };
+        self.direct(agent, instance, Some(thread), relay.into())
+            .await?;
+        crate::deployment::db::project_dispatch_execute(&self.pool.get().await?, message, agent)
+            .await?;
+        Ok(true)
     }
     pub async fn relay_worker(self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
         let notifications = crate::database::notifications::Notifications::default();

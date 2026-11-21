@@ -10,6 +10,7 @@ pub fn definitions() -> Vec<model::Provider> {
 }
 fn definition(provider: Provider) -> model::Provider {
     model::Provider {
+        api_hosts: Vec::new(),
         account_name_label: Some(provider.account_name_label().into()),
         icon_url: Some(provider.icon_url()),
         instructions: Some(format!(

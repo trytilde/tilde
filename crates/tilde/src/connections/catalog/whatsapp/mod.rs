@@ -3,6 +3,7 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        api_hosts: Vec::new(),
         account_name_label: Some("WhatsApp phone number".into()),
         icon_url: Some(
             "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons/whatsapp/default.svg"

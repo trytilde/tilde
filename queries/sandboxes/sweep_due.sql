@@ -7,8 +7,10 @@
 -- differently or launches them with another connection, or the agent it was launched for (any
 -- agent, for a global one) no longer has the blueprint as its sandbox. `sleep`: running, unused
 -- past sleep_after, and with no operation queued or in flight.
-SELECT id,action FROM (
-  SELECT s.id, CASE
+SELECT id,action
+FROM (
+  SELECT s.id,
+  CASE
     WHEN s.reuse <> b.reuse OR s.connection_id <> b.connection_id
       OR s.last_used_at < NOW() - make_interval(secs => b.terminate_after_secs)
       OR (s.status='failed' AND s.last_used_at < NOW() - INTERVAL '1 hour')

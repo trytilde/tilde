@@ -39,7 +39,10 @@ function tildeFirst(left: string, right: string) {
 export function SkillCatalogPage() {
   const navigate = useNavigate();
   const { groupId: openId } = useParams({ strict: false });
-  usePageCrumb(openId ? `/skills/catalog/${openId}` : "/skills/catalog", "Tilde Catalog");
+  usePageCrumb(
+    openId ? `/registry/skills/catalog/${openId}` : "/registry/skills/catalog",
+    "Tilde Catalog",
+  );
   const [groups, setGroups] = useState<CatalogGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -117,7 +120,7 @@ export function SkillCatalogPage() {
                       badge={group.sourceId ? <Badge variant="secondary">Enabled</Badge> : null}
                       onOpen={() =>
                         void navigate({
-                          to: "/skills/catalog/$groupId",
+                          to: "/registry/skills/catalog/$groupId",
                           params: { groupId: group.id },
                         })
                       }
@@ -139,7 +142,7 @@ export function SkillCatalogPage() {
           key={open.id}
           group={open}
           refresh={refresh}
-          onClose={() => void navigate({ to: "/skills/catalog" })}
+          onClose={() => void navigate({ to: "/registry/skills/catalog" })}
         />
       ) : null}
     </section>
@@ -252,7 +255,7 @@ function CatalogGroupPanel({
                   : "Enabling adds these skills and keeps them up to date with Tilde."}
             </p>
             {group.sourceId ? (
-              <Link to="/skills" className={buttonVariants({ variant: "outline" })}>
+              <Link to="/registry/skills" className={buttonVariants({ variant: "outline" })}>
                 Open skills
               </Link>
             ) : (

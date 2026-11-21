@@ -41,6 +41,66 @@ fn for_end_user(mut activity: types::Activity) -> Option<types::Activity> {
 }
 
 impl ChatService for Rpc {
+    async fn list_connectable_providers<'a>(
+        &'a self,
+        ctx: RequestContext,
+        _r: ServiceRequest<'_, wire::ListConnectableProvidersRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<wire::ListConnectableProvidersResponse> + Send + use<'a>,
+    > {
+        let providers = super::connections::providers(&self.0, &scope(&ctx)?).await?;
+        Response::ok(wire::ListConnectableProvidersResponse {
+            providers,
+            ..Default::default()
+        })
+    }
+    async fn start_connection<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, wire::StartConnectionRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<wire::StartConnectionResponse> + Send + use<'a>>
+    {
+        let setup = super::connections::start(&self.0, &scope(&ctx)?, r.provider).await?;
+        Ok(Response::new(wire::StartConnectionResponse {
+            setup: setup.into(),
+            ..Default::default()
+        })
+        .with_header("cache-control", "no-store"))
+    }
+    async fn list_connections<'a>(
+        &'a self,
+        ctx: RequestContext,
+        _r: ServiceRequest<'_, wire::ListConnectionsRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<wire::ListConnectionsResponse> + Send + use<'a>>
+    {
+        let connections = super::connections::list(&self.0, &scope(&ctx)?).await?;
+        Response::ok(wire::ListConnectionsResponse {
+            connections,
+            ..Default::default()
+        })
+    }
+    async fn reconnect_connection<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, wire::ReconnectConnectionRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<wire::ReconnectConnectionResponse> + Send + use<'a>>
+    {
+        let setup = super::connections::reconnect(&self.0, &scope(&ctx)?, r.connection_id).await?;
+        Ok(Response::new(wire::ReconnectConnectionResponse {
+            setup: setup.into(),
+            ..Default::default()
+        })
+        .with_header("cache-control", "no-store"))
+    }
+    async fn delete_connection<'a>(
+        &'a self,
+        ctx: RequestContext,
+        r: ServiceRequest<'_, wire::DeleteConnectionRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<wire::DeleteConnectionResponse> + Send + use<'a>>
+    {
+        super::connections::delete(&self.0, &scope(&ctx)?, r.connection_id).await?;
+        Response::ok(wire::DeleteConnectionResponse::default())
+    }
     async fn search_messages<'a>(
         &'a self,
         _ctx: RequestContext,

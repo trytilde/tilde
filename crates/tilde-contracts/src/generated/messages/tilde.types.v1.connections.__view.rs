@@ -3088,6 +3088,17 @@ pub struct ProviderView<'a> {
     >,
     /// Field 10: `categories`
     pub categories: ::buffa::RepeatedView<'a, &'a str>,
+    /// Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
+    /// connections' request credentials may be sent to. Empty: they give none.
+    ///
+    /// Field 14: `api_hosts`
+    pub api_hosts: ::buffa::RepeatedView<'a, &'a str>,
+    /// What sandboxes may reach through the gateway with its egress-capable connections.
+    ///
+    /// Field 15: `egress`
+    pub egress: ::buffa::MessageFieldView<
+        super::super::__buffa::view::EgressDescriptorView<'a>,
+    >,
     pub kind: ::core::option::Option<
         super::super::__buffa::view::oneof::provider::Kind<'a>,
     >,
@@ -3156,6 +3167,27 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
                 )?;
                 view.name = ::buffa::types::borrow_str(&mut cur)?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.egress.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.egress = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::EgressDescriptorView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -3186,6 +3218,17 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
                     ::buffa::__private::element_footprint(&__elem),
                 )?;
                 view.categories.push(__elem);
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                view.api_hosts.push(__elem);
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -3313,6 +3356,16 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             categories: self.categories.iter().map(|s| s.to_string()).collect(),
+            api_hosts: self.api_hosts.iter().map(|s| s.to_string()).collect(),
+            egress: match self.egress.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::EgressDescriptor,
+                        ::buffa::Inline<super::super::EgressDescriptor>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
             kind: match self.kind.as_ref() {
                 ::core::option::Option::Some(v) => {
                     ::core::option::Option::Some(
@@ -3414,6 +3467,17 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         if let Some(ref v) = self.account_name_label {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.api_hosts {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if self.egress.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.egress.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3479,6 +3543,17 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         if let Some(ref v) = self.account_name_label {
             ::buffa::types::put_string_field(13u32, v, buf);
         }
+        for v in &self.api_hosts {
+            ::buffa::types::put_string_field(14u32, v, buf);
+        }
+        if self.egress.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.egress.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -3520,6 +3595,14 @@ impl<'__a> ::serde::Serialize for ProviderView<'__a> {
         }
         if !self.categories.is_empty() {
             __map.serialize_entry("categories", &*self.categories)?;
+        }
+        if !self.api_hosts.is_empty() {
+            __map.serialize_entry("apiHosts", &*self.api_hosts)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.egress.as_option() {
+                __map.serialize_entry("egress", __v)?;
+            }
         }
         if let ::core::option::Option::Some(ref __ov) = self.kind {
             match __ov {
@@ -3665,6 +3748,25 @@ impl ProviderOwnedView {
     pub fn categories(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().categories
     }
+    /// Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
+    /// connections' request credentials may be sent to. Empty: they give none.
+    ///
+    /// Field 14: `api_hosts`
+    #[must_use]
+    pub fn api_hosts(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+        &self.0.reborrow().api_hosts
+    }
+    /// What sandboxes may reach through the gateway with its egress-capable connections.
+    ///
+    /// Field 15: `egress`
+    #[must_use]
+    pub fn egress(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::EgressDescriptorView<'_>,
+    > {
+        &self.0.reborrow().egress
+    }
     /// Oneof `kind`.
     #[must_use]
     pub fn kind(
@@ -3698,6 +3800,650 @@ impl ::buffa::HasMessageView for super::super::Provider {
     type ViewHandle = ProviderOwnedView;
 }
 impl ::serde::Serialize for ProviderOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// A provider's egress: its protocols, and the schema of a grant's config. A property with
+/// `x-tilde-options: "<query>"` takes its choices from that setup query (RunSetupQuery).
+#[derive(Clone, Debug, Default)]
+pub struct EgressDescriptorView<'a> {
+    /// Field 1: `protocols`
+    pub protocols: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::EgressProtocolSummaryView<'a>,
+    >,
+    /// Field 2: `config_schema_json`
+    pub config_schema_json: &'a str,
+    /// Field 3: `config_version`
+    pub config_version: u32,
+    /// Field 4: `setup_queries`
+    pub setup_queries: ::buffa::RepeatedView<'a, &'a str>,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for EgressDescriptorView<'a> {
+    type Owned = super::super::EgressDescriptor;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.config_schema_json = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.config_version = ::buffa::types::decode_uint32(&mut cur)?;
+            }
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<
+                        super::super::__buffa::view::EgressProtocolSummaryView,
+                    >(),
+                )?;
+                view.protocols
+                    .push(
+                        <super::super::__buffa::view::EgressProtocolSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::borrow_str(&mut cur)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                view.setup_queries.push(__elem);
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::EgressDescriptor, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::EgressDescriptor, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::EgressDescriptor {
+            protocols: self
+                .protocols
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            config_schema_json: self.config_schema_json.to_string(),
+            config_version: self.config_version,
+            setup_queries: self.setup_queries.iter().map(|s| s.to_string()).collect(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for EgressDescriptorView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        for v in &self.protocols {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if !self.config_schema_json.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.config_schema_json)
+                        as u64;
+        }
+        if self.config_version != 0u32 {
+            size
+                += 1u64 + ::buffa::types::uint32_encoded_len(self.config_version) as u64;
+        }
+        for v in &self.setup_queries {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.protocols {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        if !self.config_schema_json.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.config_schema_json, buf);
+        }
+        if self.config_version != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.config_version, buf);
+        }
+        for v in &self.setup_queries {
+            ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for EgressDescriptorView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !self.protocols.is_empty() {
+            __map.serialize_entry("protocols", &*self.protocols)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.config_schema_json) {
+            __map.serialize_entry("configSchemaJson", self.config_schema_json)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_zero_u32(&self.config_version) {
+            __map
+                .serialize_entry(
+                    "configVersion",
+                    &::buffa::json_helpers::ProtoJson(&self.config_version),
+                )?;
+        }
+        if !self.setup_queries.is_empty() {
+            __map.serialize_entry("setupQueries", &*self.setup_queries)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for EgressDescriptorView<'a> {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "EgressDescriptor";
+    const FULL_NAME: &'static str = "tilde.types.v1.EgressDescriptor";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressDescriptor";
+}
+::buffa::impl_default_view_instance!(EgressDescriptorView);
+::buffa::impl_view_reborrow!(EgressDescriptorView);
+/** Self-contained, `'static` owned view of a `EgressDescriptor` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`EgressDescriptorView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`EgressDescriptorView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct EgressDescriptorOwnedView(::buffa::OwnedView<EgressDescriptorView<'static>>);
+impl EgressDescriptorOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressDescriptorOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressDescriptorOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::EgressDescriptor,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressDescriptorOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`EgressDescriptorView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &EgressDescriptorView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::EgressDescriptor {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `protocols`
+    #[must_use]
+    pub fn protocols(
+        &self,
+    ) -> &::buffa::RepeatedView<
+        '_,
+        super::super::__buffa::view::EgressProtocolSummaryView<'_>,
+    > {
+        &self.0.reborrow().protocols
+    }
+    /// Field 2: `config_schema_json`
+    #[must_use]
+    pub fn config_schema_json(&self) -> &'_ str {
+        self.0.reborrow().config_schema_json
+    }
+    /// Field 3: `config_version`
+    #[must_use]
+    pub fn config_version(&self) -> u32 {
+        self.0.reborrow().config_version
+    }
+    /// Field 4: `setup_queries`
+    #[must_use]
+    pub fn setup_queries(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+        &self.0.reborrow().setup_queries
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<EgressDescriptorView<'static>>>
+for EgressDescriptorOwnedView {
+    fn from(inner: ::buffa::OwnedView<EgressDescriptorView<'static>>) -> Self {
+        EgressDescriptorOwnedView(inner)
+    }
+}
+impl ::core::convert::From<EgressDescriptorOwnedView>
+for ::buffa::OwnedView<EgressDescriptorView<'static>> {
+    fn from(wrapper: EgressDescriptorOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<EgressDescriptorView<'static>>>
+for EgressDescriptorOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<EgressDescriptorView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::EgressDescriptor {
+    type View<'a> = EgressDescriptorView<'a>;
+    type ViewHandle = EgressDescriptorOwnedView;
+}
+impl ::serde::Serialize for EgressDescriptorOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// `protocol` is http or git; `upstream` the fixed origin requests go to.
+#[derive(Clone, Debug, Default)]
+pub struct EgressProtocolSummaryView<'a> {
+    /// Field 1: `protocol`
+    pub protocol: &'a str,
+    /// Field 2: `upstream`
+    pub upstream: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for EgressProtocolSummaryView<'a> {
+    type Owned = super::super::EgressProtocolSummary;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.protocol = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.upstream = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::EgressProtocolSummary,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::EgressProtocolSummary,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::EgressProtocolSummary {
+            protocol: self.protocol.to_string(),
+            upstream: self.upstream.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for EgressProtocolSummaryView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.protocol.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.protocol) as u64;
+        }
+        if !self.upstream.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.upstream) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.protocol.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.protocol, buf);
+        }
+        if !self.upstream.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.upstream, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for EgressProtocolSummaryView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.protocol) {
+            __map.serialize_entry("protocol", self.protocol)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.upstream) {
+            __map.serialize_entry("upstream", self.upstream)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for EgressProtocolSummaryView<'a> {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "EgressProtocolSummary";
+    const FULL_NAME: &'static str = "tilde.types.v1.EgressProtocolSummary";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.EgressProtocolSummary";
+}
+::buffa::impl_default_view_instance!(EgressProtocolSummaryView);
+::buffa::impl_view_reborrow!(EgressProtocolSummaryView);
+/** Self-contained, `'static` owned view of a `EgressProtocolSummary` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`EgressProtocolSummaryView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`EgressProtocolSummaryView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct EgressProtocolSummaryOwnedView(
+    ::buffa::OwnedView<EgressProtocolSummaryView<'static>>,
+);
+impl EgressProtocolSummaryOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressProtocolSummaryOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressProtocolSummaryOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::EgressProtocolSummary,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            EgressProtocolSummaryOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`EgressProtocolSummaryView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &EgressProtocolSummaryView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::EgressProtocolSummary {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `protocol`
+    #[must_use]
+    pub fn protocol(&self) -> &'_ str {
+        self.0.reborrow().protocol
+    }
+    /// Field 2: `upstream`
+    #[must_use]
+    pub fn upstream(&self) -> &'_ str {
+        self.0.reborrow().upstream
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<EgressProtocolSummaryView<'static>>>
+for EgressProtocolSummaryOwnedView {
+    fn from(inner: ::buffa::OwnedView<EgressProtocolSummaryView<'static>>) -> Self {
+        EgressProtocolSummaryOwnedView(inner)
+    }
+}
+impl ::core::convert::From<EgressProtocolSummaryOwnedView>
+for ::buffa::OwnedView<EgressProtocolSummaryView<'static>> {
+    fn from(wrapper: EgressProtocolSummaryOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<EgressProtocolSummaryView<'static>>>
+for EgressProtocolSummaryOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<EgressProtocolSummaryView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::EgressProtocolSummary {
+    type View<'a> = EgressProtocolSummaryView<'a>;
+    type ViewHandle = EgressProtocolSummaryOwnedView;
+}
+impl ::serde::Serialize for EgressProtocolSummaryOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

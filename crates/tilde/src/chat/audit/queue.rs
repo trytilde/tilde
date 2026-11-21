@@ -50,9 +50,8 @@ fn get(pool: &crate::database::Pool) -> Queue {
         .entry(key)
         .or_insert_with(|| {
             let (sender, receiver) = mpsc::channel(4096);
-            tokio::spawn(
-                run(pool.clone(), key, receiver).instrument(tracing::info_span!("audit.flush")),
-            );
+            let flush = run(pool.clone(), key, receiver);
+            tokio::spawn(flush.instrument(tracing::info_span!("audit.flush")));
             Queue {
                 sender,
                 memory: Arc::new(Semaphore::new(CAPACITY_BYTES)),

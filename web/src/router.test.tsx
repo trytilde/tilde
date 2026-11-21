@@ -57,7 +57,7 @@ it("opens agent rows at capabilities and routes tabs with working Back and Forwa
   const { router, history } = await open("/");
   fireEvent.click(await screen.findByRole("row", { name: "Edit Ada" }));
   await screen.findByRole("heading", { name: "Ada" });
-  expect(router.state.location.pathname).toBe("/agent/agent-ada/capabilities");
+  expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/capabilities");
   const header = screen.getByRole("navigation", { name: "Breadcrumb" }).closest("header")!;
   expect(within(header).getByRole("tablist", { name: "Agent settings" })).toBeTruthy();
   expect(
@@ -81,7 +81,7 @@ it("opens agent rows at capabilities and routes tabs with working Back and Forwa
     }),
   );
   await waitFor(() =>
-    expect(router.state.location.pathname).toBe("/agent/agent-ada/chat-providers"),
+    expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/chat-providers"),
   );
   expect(screen.getByRole("tabpanel").textContent).toContain("Assigned connections");
   fireEvent.click(
@@ -89,18 +89,18 @@ it("opens agent rows at capabilities and routes tabs with working Back and Forwa
       name: "IAM",
     }),
   );
-  await waitFor(() => expect(router.state.location.pathname).toBe("/agent/agent-ada/iam"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/iam"));
   fireEvent.change(screen.getByLabelText("IAM draft"), { target: { value: "retained" } });
   await act(async () => {
     history.back();
   });
   await waitFor(() =>
-    expect(router.state.location.pathname).toBe("/agent/agent-ada/chat-providers"),
+    expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/chat-providers"),
   );
   await act(async () => {
     history.forward();
   });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/agent/agent-ada/iam"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/iam"));
   expect((screen.getByLabelText("IAM draft") as HTMLInputElement).value).toBe("retained");
   expect(rpc.getAgent).toHaveBeenCalledTimes(1);
 });
@@ -109,7 +109,7 @@ it("loads a deep-linked agent tab without first listing agents", async () => {
   rpc.getAgent.mockResolvedValueOnce({
     agent: { ...ada, avatarUrl: "https://ada.example.com/avatar.png" },
   });
-  const { router } = await open("/agent/agent-ada/iam");
+  const { router } = await open("/registry/agent/agent-ada/iam");
   const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });
   await within(breadcrumb).findByText("Ada");
   expect(breadcrumb.querySelector("img")?.getAttribute("src")).toBe(
@@ -127,19 +127,26 @@ it("loads a deep-linked agent tab without first listing agents", async () => {
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();
   expect(within(breadcrumb).getByText("Ada").getAttribute("aria-current")).toBe("page");
   fireEvent.click(within(breadcrumb).getByRole("link", { name: "Agent Registry" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry"));
   expect(screen.queryByRole("tablist", { name: "Agent settings" })).toBeNull();
 });
 
-it("redirects the bare agent URL and shows a retryable missing-agent result", async () => {
+it("redirects the bare agent URL, retries a failed load and links a missing agent back", async () => {
   rpc.getAgent
-    .mockRejectedValueOnce(new ConnectError("missing", Code.NotFound))
+    .mockRejectedValueOnce(new ConnectError("down", Code.Unavailable))
     .mockResolvedValue({ agent: ada });
-  const { router } = await open("/agent/agent-ada");
-  await screen.findByText("Agent not found.");
-  expect(router.state.location.pathname).toBe("/agent/agent-ada/capabilities");
-  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  const { router } = await open("/registry/agent/agent-ada");
+  expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/capabilities");
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   await screen.findByRole("heading", { name: "Ada" });
+
+  cleanup();
+  rpc.getAgent.mockRejectedValueOnce(new ConnectError("missing", Code.NotFound));
+  await open("/registry/agent/agent-gone");
+  await screen.findByText("Agent not found.");
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Back to Agent Registry" }));
+  await screen.findByRole("row", { name: "Edit Ada" });
 });
 
 it("keeps connection brokering outside the dashboard layout", async () => {
@@ -149,7 +156,7 @@ it("keeps connection brokering outside the dashboard layout", async () => {
 });
 
 it("matches agent creation before the dynamic agent route", async () => {
-  await open("/agent/new");
+  await open("/registry/agent/new");
   await screen.findByRole("heading", { name: "Create agent" });
   expect(rpc.getAgent).not.toHaveBeenCalled();
 });
@@ -164,12 +171,12 @@ it("offers navigation back to the registry for unknown URLs", async () => {
   await screen.findByRole("heading", { name: "Page not found" });
   fireEvent.click(screen.getByRole("link", { name: "Back to agents" }));
   await screen.findByRole("row", { name: "Edit Ada" });
-  expect(router.state.location.pathname).toBe("/");
+  expect(router.state.location.pathname).toBe("/registry");
 });
 
 it("updates the agent breadcrumb after a successful rename without refetching", async () => {
   rpc.updateAgent.mockResolvedValue({ agent: { ...ada, name: "Ada Lovelace" } });
-  await open("/agent/agent-ada/capabilities");
+  await open("/registry/agent/agent-ada/capabilities");
   await screen.findByRole("heading", { name: "Ada" });
   fireEvent.click(screen.getByRole("button", { name: "Edit agent name" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Agent name" }), {
@@ -181,7 +188,7 @@ it("updates the agent breadcrumb after a successful rename without refetching", 
 });
 
 it("keeps the header tabs linked to their panels and supports keyboard navigation", async () => {
-  const { router } = await open("/agent/agent-ada/capabilities");
+  const { router } = await open("/registry/agent/agent-ada/capabilities");
   await screen.findByRole("heading", { name: "Ada" });
   const tabs = within(screen.getByRole("tablist", { name: "Agent settings" }));
   const capabilities = tabs.getByRole("tab", { name: "Capabilities" });
@@ -195,12 +202,12 @@ it("keeps the header tabs linked to their panels and supports keyboard navigatio
   fireEvent.keyDown(inferenceTab, { key: "ArrowRight" });
   const chatTab = tabs.getByRole("tab", { name: "Chat providers" });
   await waitFor(() => expect(document.activeElement).toBe(chatTab));
-  expect(router.state.location.pathname).toBe("/agent/agent-ada/capabilities");
+  expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/capabilities");
   // Base UI uses manual activation. JSDOM fireEvent does not synthesize Enter's native click.
   fireEvent.keyDown(chatTab, { key: "Enter" });
   fireEvent.click(chatTab);
   await waitFor(() =>
-    expect(router.state.location.pathname).toBe("/agent/agent-ada/chat-providers"),
+    expect(router.state.location.pathname).toBe("/registry/agent/agent-ada/chat-providers"),
   );
   const selected = tabs.getByRole("tab", { name: "Chat providers" });
   expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(selected.id);
@@ -208,7 +215,7 @@ it("keeps the header tabs linked to their panels and supports keyboard navigatio
 
 it("names the section in the breadcrumb on every top-level page and its create pages", async () => {
   for (const [path, section, current] of [
-    ["/agent/new", "Agent Registry", "Create agent"],
+    ["/registry/agent/new", "Agent Registry", "Create agent"],
   ] as const) {
     await open(path);
     const breadcrumb = screen.getByRole("navigation", { name: "Breadcrumb" });

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CopyIcon, RefreshCwIcon, ZapIcon } from "lucide-react";
-import type { Connection, Provider } from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
+import {
+  Capability,
+  type Connection,
+  type Provider,
+} from "@trytilde/contracts/tilde/types/v1/connections_pb.js";
 import { ToolHostType, type ToolHost } from "@trytilde/contracts/tilde/management/v1/tools_pb.js";
 import { connections, toolHosts, tools as toolsClient } from "@/client";
 import { usePageCrumb } from "./dashboard-breadcrumbs";
@@ -114,9 +118,9 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
   const name = source?.kind === "connection" ? source.connection.name : source?.host.name;
   const parent =
     kind === "connection"
-      ? ({ label: "Connections", to: "/tools/connections" } as const)
-      : ({ label: "Remote servers", to: "/tools/remote-servers" } as const);
-  usePageCrumb(`/tools/${id}`, name, parent);
+      ? ({ label: "Connections", to: "/registry/tools/connections" } as const)
+      : ({ label: "Remote servers", to: "/registry/tools/remote-servers" } as const);
+  usePageCrumb(`/registry/tools/${id}`, name, parent);
   async function remove() {
     setBusy(true);
     setError("");
@@ -255,7 +259,7 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
                   {source.instances.map((instance) => (
                     <li key={instance.id} className="flex items-center gap-4 px-4 py-2 text-sm">
                       <Link
-                        to="/tools/$toolId"
+                        to="/registry/tools/$toolId"
                         params={{ toolId: instance.id }}
                         search={{ kind: "connection" }}
                         className="min-w-0 flex-1 truncate font-medium hover:underline"
@@ -284,29 +288,33 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
               />
             </section>
           ) : (
-            <>
-              <section className="space-y-3" aria-label="Tools">
-                <h2 className="m-0 text-base font-semibold">Tools</h2>
-                {/* Tools are readable only once credentials exist; a pending setup has none yet. */}
-                {source.kind === "connection" && source.connection.status !== "ready" ? (
-                  <p className="text-sm text-muted-foreground">
-                    Finish setup to see this connection's tools.
-                  </p>
-                ) : (
-                  <ToolTable
-                    of={source.kind === "connection" ? { connectionId: id } : { toolHostId: id }}
-                    version={version}
-                    empty={
-                      <p className="text-sm text-muted-foreground">
-                        {source.kind === "host"
-                          ? "The host has not published any tools yet."
-                          : "No tools available."}
-                      </p>
-                    }
-                  />
-                )}
-              </section>
-            </>
+            // Connections that serve no tools (inference, chat only) have no tools section.
+            (source.kind !== "connection" ||
+              source.connection.capabilities.includes(Capability.TOOL)) && (
+              <>
+                <section className="space-y-3" aria-label="Tools">
+                  <h2 className="m-0 text-base font-semibold">Tools</h2>
+                  {/* Tools are readable only once credentials exist; a pending setup has none yet. */}
+                  {source.kind === "connection" && source.connection.status !== "ready" ? (
+                    <p className="text-sm text-muted-foreground">
+                      Finish setup to see this connection's tools.
+                    </p>
+                  ) : (
+                    <ToolTable
+                      of={source.kind === "connection" ? { connectionId: id } : { toolHostId: id }}
+                      version={version}
+                      empty={
+                        <p className="text-sm text-muted-foreground">
+                          {source.kind === "host"
+                            ? "The host has not published any tools yet."
+                            : "No tools available."}
+                        </p>
+                      }
+                    />
+                  )}
+                </section>
+              </>
+            )
           )}
         </>
       ) : null}

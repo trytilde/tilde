@@ -57,6 +57,8 @@ pub mod __buffa {
         reg.register_json_any(super::__CHANNEL_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__IDENTITY_VERIFICATION_JSON_ANY);
         reg.register_json_any(super::__AGENT_JSON_ANY);
+        reg.register_json_any(super::__HARNESS_FEATURES_JSON_ANY);
+        reg.register_json_any(super::__LOCAL_AGENT_JSON_ANY);
         reg.register_json_any(super::__AGENT_METRICS_JSON_ANY);
         reg.register_json_any(super::__AGENT_HEALTH_HOUR_JSON_ANY);
         reg.register_json_any(super::__CAPABILITIES_JSON_ANY);
@@ -89,6 +91,8 @@ pub mod __buffa {
         reg.register_json_any(super::__O_AUTH_CREDENTIAL_SOURCE_JSON_ANY);
         reg.register_json_any(super::__CUSTOM_CREDENTIAL_SOURCE_JSON_ANY);
         reg.register_json_any(super::__PROVIDER_JSON_ANY);
+        reg.register_json_any(super::__EGRESS_DESCRIPTOR_JSON_ANY);
+        reg.register_json_any(super::__EGRESS_PROTOCOL_SUMMARY_JSON_ANY);
         reg.register_json_any(super::__BUILT_IN_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CONFIGURED_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_JSON_ANY);
@@ -142,6 +146,14 @@ pub use self::__buffa::view::IdentityVerificationOwnedView;
 pub use self::__buffa::view::AgentView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::HarnessFeaturesView;
+#[doc(inline)]
+pub use self::__buffa::view::HarnessFeaturesOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAgentView;
+#[doc(inline)]
+pub use self::__buffa::view::LocalAgentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentMetricsView;
 #[doc(inline)]
@@ -270,6 +282,14 @@ pub use self::__buffa::view::CustomCredentialSourceOwnedView;
 pub use self::__buffa::view::ProviderView;
 #[doc(inline)]
 pub use self::__buffa::view::ProviderOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EgressDescriptorView;
+#[doc(inline)]
+pub use self::__buffa::view::EgressDescriptorOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::EgressProtocolSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::EgressProtocolSummaryOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::BuiltInProviderView;
 #[doc(inline)]

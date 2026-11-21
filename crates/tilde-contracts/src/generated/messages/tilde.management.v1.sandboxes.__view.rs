@@ -30,6 +30,11 @@ pub struct SandboxBlueprintView<'a> {
     pub timings: ::buffa::MessageFieldView<
         super::super::__buffa::view::SandboxTimingsView<'a>,
     >,
+    /// Field 9: `egress`
+    pub egress: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::BlueprintEgressView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for SandboxBlueprintView<'a> {
@@ -140,6 +145,26 @@ impl<'a> ::buffa::MessageView<'a> for SandboxBlueprintView<'a> {
                 )?;
                 view.agent_ids.push(__elem);
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<
+                        super::super::__buffa::view::BlueprintEgressView,
+                    >(),
+                )?;
+                view.egress
+                    .push(
+                        <super::super::__buffa::view::BlueprintEgressView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -178,6 +203,11 @@ impl<'a> ::buffa::MessageView<'a> for SandboxBlueprintView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            egress: self
+                .egress
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -217,6 +247,14 @@ impl<'a> ::buffa::ViewEncode<'a> for SandboxBlueprintView<'a> {
         if self.timings.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.timings.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        for v in &self.egress {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -265,6 +303,14 @@ impl<'a> ::buffa::ViewEncode<'a> for SandboxBlueprintView<'a> {
             );
             self.timings.write_to(__cache, buf);
         }
+        for v in &self.egress {
+            ::buffa::types::put_len_delimited_header(
+                9u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -311,6 +357,9 @@ impl<'__a> ::serde::Serialize for SandboxBlueprintView<'__a> {
             if let ::core::option::Option::Some(__v) = self.timings.as_option() {
                 __map.serialize_entry("timings", __v)?;
             }
+        }
+        if !self.egress.is_empty() {
+            __map.serialize_entry("egress", &*self.egress)?;
         }
         __map.end()
     }
@@ -458,6 +507,16 @@ impl SandboxBlueprintOwnedView {
     > {
         &self.0.reborrow().timings
     }
+    /// Field 9: `egress`
+    #[must_use]
+    pub fn egress(
+        &self,
+    ) -> &::buffa::RepeatedView<
+        '_,
+        super::super::__buffa::view::BlueprintEgressView<'_>,
+    > {
+        &self.0.reborrow().egress
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<SandboxBlueprintView<'static>>>
 for SandboxBlueprintOwnedView {
@@ -482,6 +541,363 @@ impl ::buffa::HasMessageView for super::super::SandboxBlueprint {
     type ViewHandle = SandboxBlueprintOwnedView;
 }
 impl ::serde::Serialize for SandboxBlueprintOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// A blueprint's grant to reach a connection's upstream through the gateway at
+/// `/sandboxes/egress/{slug}/…`. Off until enabled.
+#[derive(Clone, Debug, Default)]
+pub struct BlueprintEgressView<'a> {
+    /// Lowercase letters, digits and underscores, starting with a letter, at most 32.
+    ///
+    /// Field 1: `slug`
+    pub slug: &'a str,
+    /// Field 2: `connection_id`
+    pub connection_id: &'a str,
+    /// The grant's config: a JSON object of the provider's egress config schema.
+    ///
+    /// Field 3: `config_json`
+    pub config_json: &'a str,
+    /// Field 4: `config_version`
+    pub config_version: u32,
+    /// Field 5: `enabled`
+    pub enabled: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for BlueprintEgressView<'a> {
+    type Owned = super::super::BlueprintEgress;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.slug = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.connection_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.config_json = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.config_version = ::buffa::types::decode_uint32(&mut cur)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.enabled = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::BlueprintEgress, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::BlueprintEgress, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::BlueprintEgress {
+            slug: self.slug.to_string(),
+            connection_id: self.connection_id.to_string(),
+            config_json: self.config_json.to_string(),
+            config_version: self.config_version,
+            enabled: self.enabled,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for BlueprintEgressView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.config_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.config_json) as u64;
+        }
+        if self.config_version != 0u32 {
+            size
+                += 1u64 + ::buffa::types::uint32_encoded_len(self.config_version) as u64;
+        }
+        if self.enabled {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.slug, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.connection_id, buf);
+        }
+        if !self.config_json.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.config_json, buf);
+        }
+        if self.config_version != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.config_version, buf);
+        }
+        if self.enabled {
+            ::buffa::types::put_bool_field(5u32, self.enabled, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for BlueprintEgressView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+            __map.serialize_entry("slug", self.slug)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.connection_id) {
+            __map.serialize_entry("connectionId", self.connection_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.config_json) {
+            __map.serialize_entry("configJson", self.config_json)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_zero_u32(&self.config_version) {
+            __map
+                .serialize_entry(
+                    "configVersion",
+                    &::buffa::json_helpers::ProtoJson(&self.config_version),
+                )?;
+        }
+        if self.enabled {
+            __map.serialize_entry("enabled", &self.enabled)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for BlueprintEgressView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "BlueprintEgress";
+    const FULL_NAME: &'static str = "tilde.management.v1.BlueprintEgress";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.BlueprintEgress";
+}
+::buffa::impl_default_view_instance!(BlueprintEgressView);
+::buffa::impl_view_reborrow!(BlueprintEgressView);
+/** Self-contained, `'static` owned view of a `BlueprintEgress` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BlueprintEgressView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BlueprintEgressView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct BlueprintEgressOwnedView(::buffa::OwnedView<BlueprintEgressView<'static>>);
+impl BlueprintEgressOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            BlueprintEgressOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            BlueprintEgressOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::BlueprintEgress,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            BlueprintEgressOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`BlueprintEgressView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &BlueprintEgressView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::BlueprintEgress {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Lowercase letters, digits and underscores, starting with a letter, at most 32.
+    ///
+    /// Field 1: `slug`
+    #[must_use]
+    pub fn slug(&self) -> &'_ str {
+        self.0.reborrow().slug
+    }
+    /// Field 2: `connection_id`
+    #[must_use]
+    pub fn connection_id(&self) -> &'_ str {
+        self.0.reborrow().connection_id
+    }
+    /// The grant's config: a JSON object of the provider's egress config schema.
+    ///
+    /// Field 3: `config_json`
+    #[must_use]
+    pub fn config_json(&self) -> &'_ str {
+        self.0.reborrow().config_json
+    }
+    /// Field 4: `config_version`
+    #[must_use]
+    pub fn config_version(&self) -> u32 {
+        self.0.reborrow().config_version
+    }
+    /// Field 5: `enabled`
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.0.reborrow().enabled
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<BlueprintEgressView<'static>>>
+for BlueprintEgressOwnedView {
+    fn from(inner: ::buffa::OwnedView<BlueprintEgressView<'static>>) -> Self {
+        BlueprintEgressOwnedView(inner)
+    }
+}
+impl ::core::convert::From<BlueprintEgressOwnedView>
+for ::buffa::OwnedView<BlueprintEgressView<'static>> {
+    fn from(wrapper: BlueprintEgressOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<BlueprintEgressView<'static>>>
+for BlueprintEgressOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<BlueprintEgressView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::BlueprintEgress {
+    type View<'a> = BlueprintEgressView<'a>;
+    type ViewHandle = BlueprintEgressOwnedView;
+}
+impl ::serde::Serialize for BlueprintEgressOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,
@@ -5002,6 +5418,1226 @@ impl ::buffa::HasMessageView for super::super::DeleteSandboxEnvVarResponse {
     type ViewHandle = DeleteSandboxEnvVarResponseOwnedView;
 }
 impl ::serde::Serialize for DeleteSandboxEnvVarResponseOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct SetBlueprintEgressRequestView<'a> {
+    /// Field 1: `blueprint_id`
+    pub blueprint_id: &'a str,
+    /// Field 2: `slug`
+    pub slug: &'a str,
+    /// Field 3: `connection_id`
+    pub connection_id: &'a str,
+    /// Field 4: `config_json`
+    pub config_json: &'a str,
+    /// Field 5: `enabled`
+    pub enabled: bool,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for SetBlueprintEgressRequestView<'a> {
+    type Owned = super::super::SetBlueprintEgressRequest;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.blueprint_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.slug = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.connection_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.config_json = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.enabled = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::SetBlueprintEgressRequest,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::SetBlueprintEgressRequest,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::SetBlueprintEgressRequest {
+            blueprint_id: self.blueprint_id.to_string(),
+            slug: self.slug.to_string(),
+            connection_id: self.connection_id.to_string(),
+            config_json: self.config_json.to_string(),
+            enabled: self.enabled,
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for SetBlueprintEgressRequestView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.blueprint_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.blueprint_id) as u64;
+        }
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.config_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.config_json) as u64;
+        }
+        if self.enabled {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.blueprint_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.blueprint_id, buf);
+        }
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.slug, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.connection_id, buf);
+        }
+        if !self.config_json.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.config_json, buf);
+        }
+        if self.enabled {
+            ::buffa::types::put_bool_field(5u32, self.enabled, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for SetBlueprintEgressRequestView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.blueprint_id) {
+            __map.serialize_entry("blueprintId", self.blueprint_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+            __map.serialize_entry("slug", self.slug)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.connection_id) {
+            __map.serialize_entry("connectionId", self.connection_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.config_json) {
+            __map.serialize_entry("configJson", self.config_json)?;
+        }
+        if self.enabled {
+            __map.serialize_entry("enabled", &self.enabled)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for SetBlueprintEgressRequestView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetBlueprintEgressRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetBlueprintEgressRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressRequest";
+}
+::buffa::impl_default_view_instance!(SetBlueprintEgressRequestView);
+::buffa::impl_view_reborrow!(SetBlueprintEgressRequestView);
+/** Self-contained, `'static` owned view of a `SetBlueprintEgressRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetBlueprintEgressRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetBlueprintEgressRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct SetBlueprintEgressRequestOwnedView(
+    ::buffa::OwnedView<SetBlueprintEgressRequestView<'static>>,
+);
+impl SetBlueprintEgressRequestOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressRequestOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::SetBlueprintEgressRequest,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`SetBlueprintEgressRequestView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &SetBlueprintEgressRequestView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::SetBlueprintEgressRequest {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `blueprint_id`
+    #[must_use]
+    pub fn blueprint_id(&self) -> &'_ str {
+        self.0.reborrow().blueprint_id
+    }
+    /// Field 2: `slug`
+    #[must_use]
+    pub fn slug(&self) -> &'_ str {
+        self.0.reborrow().slug
+    }
+    /// Field 3: `connection_id`
+    #[must_use]
+    pub fn connection_id(&self) -> &'_ str {
+        self.0.reborrow().connection_id
+    }
+    /// Field 4: `config_json`
+    #[must_use]
+    pub fn config_json(&self) -> &'_ str {
+        self.0.reborrow().config_json
+    }
+    /// Field 5: `enabled`
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.0.reborrow().enabled
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<SetBlueprintEgressRequestView<'static>>>
+for SetBlueprintEgressRequestOwnedView {
+    fn from(inner: ::buffa::OwnedView<SetBlueprintEgressRequestView<'static>>) -> Self {
+        SetBlueprintEgressRequestOwnedView(inner)
+    }
+}
+impl ::core::convert::From<SetBlueprintEgressRequestOwnedView>
+for ::buffa::OwnedView<SetBlueprintEgressRequestView<'static>> {
+    fn from(wrapper: SetBlueprintEgressRequestOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<SetBlueprintEgressRequestView<'static>>>
+for SetBlueprintEgressRequestOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<SetBlueprintEgressRequestView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::SetBlueprintEgressRequest {
+    type View<'a> = SetBlueprintEgressRequestView<'a>;
+    type ViewHandle = SetBlueprintEgressRequestOwnedView;
+}
+impl ::serde::Serialize for SetBlueprintEgressRequestOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct SetBlueprintEgressResponseView<'a> {
+    /// Field 1: `blueprint`
+    pub blueprint: ::buffa::MessageFieldView<
+        super::super::__buffa::view::SandboxBlueprintView<'a>,
+    >,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for SetBlueprintEgressResponseView<'a> {
+    type Owned = super::super::SetBlueprintEgressResponse;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.blueprint.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.blueprint = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::SandboxBlueprintView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::SetBlueprintEgressResponse,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::SetBlueprintEgressResponse,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::SetBlueprintEgressResponse {
+            blueprint: match self.blueprint.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::SandboxBlueprint,
+                        ::buffa::Inline<super::super::SandboxBlueprint>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for SetBlueprintEgressResponseView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.blueprint.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.blueprint.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.blueprint.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.blueprint.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for SetBlueprintEgressResponseView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        {
+            if let ::core::option::Option::Some(__v) = self.blueprint.as_option() {
+                __map.serialize_entry("blueprint", __v)?;
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for SetBlueprintEgressResponseView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "SetBlueprintEgressResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.SetBlueprintEgressResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.SetBlueprintEgressResponse";
+}
+::buffa::impl_default_view_instance!(SetBlueprintEgressResponseView);
+::buffa::impl_view_reborrow!(SetBlueprintEgressResponseView);
+/** Self-contained, `'static` owned view of a `SetBlueprintEgressResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetBlueprintEgressResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetBlueprintEgressResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct SetBlueprintEgressResponseOwnedView(
+    ::buffa::OwnedView<SetBlueprintEgressResponseView<'static>>,
+);
+impl SetBlueprintEgressResponseOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressResponseOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::SetBlueprintEgressResponse,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SetBlueprintEgressResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`SetBlueprintEgressResponseView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &SetBlueprintEgressResponseView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::SetBlueprintEgressResponse {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `blueprint`
+    #[must_use]
+    pub fn blueprint(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::SandboxBlueprintView<'_>,
+    > {
+        &self.0.reborrow().blueprint
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<SetBlueprintEgressResponseView<'static>>>
+for SetBlueprintEgressResponseOwnedView {
+    fn from(inner: ::buffa::OwnedView<SetBlueprintEgressResponseView<'static>>) -> Self {
+        SetBlueprintEgressResponseOwnedView(inner)
+    }
+}
+impl ::core::convert::From<SetBlueprintEgressResponseOwnedView>
+for ::buffa::OwnedView<SetBlueprintEgressResponseView<'static>> {
+    fn from(wrapper: SetBlueprintEgressResponseOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<SetBlueprintEgressResponseView<'static>>>
+for SetBlueprintEgressResponseOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<SetBlueprintEgressResponseView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::SetBlueprintEgressResponse {
+    type View<'a> = SetBlueprintEgressResponseView<'a>;
+    type ViewHandle = SetBlueprintEgressResponseOwnedView;
+}
+impl ::serde::Serialize for SetBlueprintEgressResponseOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct DeleteBlueprintEgressRequestView<'a> {
+    /// Field 1: `blueprint_id`
+    pub blueprint_id: &'a str,
+    /// Field 2: `slug`
+    pub slug: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for DeleteBlueprintEgressRequestView<'a> {
+    type Owned = super::super::DeleteBlueprintEgressRequest;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.blueprint_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.slug = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::DeleteBlueprintEgressRequest,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::DeleteBlueprintEgressRequest,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::DeleteBlueprintEgressRequest {
+            blueprint_id: self.blueprint_id.to_string(),
+            slug: self.slug.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for DeleteBlueprintEgressRequestView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.blueprint_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.blueprint_id) as u64;
+        }
+        if !self.slug.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.blueprint_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.blueprint_id, buf);
+        }
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.slug, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for DeleteBlueprintEgressRequestView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.blueprint_id) {
+            __map.serialize_entry("blueprintId", self.blueprint_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+            __map.serialize_entry("slug", self.slug)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for DeleteBlueprintEgressRequestView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "DeleteBlueprintEgressRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.DeleteBlueprintEgressRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressRequest";
+}
+::buffa::impl_default_view_instance!(DeleteBlueprintEgressRequestView);
+::buffa::impl_view_reborrow!(DeleteBlueprintEgressRequestView);
+/** Self-contained, `'static` owned view of a `DeleteBlueprintEgressRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteBlueprintEgressRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteBlueprintEgressRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct DeleteBlueprintEgressRequestOwnedView(
+    ::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>>,
+);
+impl DeleteBlueprintEgressRequestOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressRequestOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::DeleteBlueprintEgressRequest,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`DeleteBlueprintEgressRequestView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &DeleteBlueprintEgressRequestView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::DeleteBlueprintEgressRequest {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `blueprint_id`
+    #[must_use]
+    pub fn blueprint_id(&self) -> &'_ str {
+        self.0.reborrow().blueprint_id
+    }
+    /// Field 2: `slug`
+    #[must_use]
+    pub fn slug(&self) -> &'_ str {
+        self.0.reborrow().slug
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>>>
+for DeleteBlueprintEgressRequestOwnedView {
+    fn from(
+        inner: ::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>>,
+    ) -> Self {
+        DeleteBlueprintEgressRequestOwnedView(inner)
+    }
+}
+impl ::core::convert::From<DeleteBlueprintEgressRequestOwnedView>
+for ::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>> {
+    fn from(wrapper: DeleteBlueprintEgressRequestOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<
+    ::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>>,
+> for DeleteBlueprintEgressRequestOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<DeleteBlueprintEgressRequestView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::DeleteBlueprintEgressRequest {
+    type View<'a> = DeleteBlueprintEgressRequestView<'a>;
+    type ViewHandle = DeleteBlueprintEgressRequestOwnedView;
+}
+impl ::serde::Serialize for DeleteBlueprintEgressRequestOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct DeleteBlueprintEgressResponseView<'a> {
+    /// Field 1: `blueprint`
+    pub blueprint: ::buffa::MessageFieldView<
+        super::super::__buffa::view::SandboxBlueprintView<'a>,
+    >,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for DeleteBlueprintEgressResponseView<'a> {
+    type Owned = super::super::DeleteBlueprintEgressResponse;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.blueprint.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.blueprint = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::SandboxBlueprintView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::DeleteBlueprintEgressResponse,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::DeleteBlueprintEgressResponse,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::DeleteBlueprintEgressResponse {
+            blueprint: match self.blueprint.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::SandboxBlueprint,
+                        ::buffa::Inline<super::super::SandboxBlueprint>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for DeleteBlueprintEgressResponseView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.blueprint.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.blueprint.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.blueprint.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.blueprint.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for DeleteBlueprintEgressResponseView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        {
+            if let ::core::option::Option::Some(__v) = self.blueprint.as_option() {
+                __map.serialize_entry("blueprint", __v)?;
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for DeleteBlueprintEgressResponseView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "DeleteBlueprintEgressResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.DeleteBlueprintEgressResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.DeleteBlueprintEgressResponse";
+}
+::buffa::impl_default_view_instance!(DeleteBlueprintEgressResponseView);
+::buffa::impl_view_reborrow!(DeleteBlueprintEgressResponseView);
+/** Self-contained, `'static` owned view of a `DeleteBlueprintEgressResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteBlueprintEgressResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteBlueprintEgressResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct DeleteBlueprintEgressResponseOwnedView(
+    ::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>>,
+);
+impl DeleteBlueprintEgressResponseOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressResponseOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::DeleteBlueprintEgressResponse,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            DeleteBlueprintEgressResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`DeleteBlueprintEgressResponseView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &DeleteBlueprintEgressResponseView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::DeleteBlueprintEgressResponse {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `blueprint`
+    #[must_use]
+    pub fn blueprint(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::SandboxBlueprintView<'_>,
+    > {
+        &self.0.reborrow().blueprint
+    }
+}
+impl ::core::convert::From<
+    ::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>>,
+> for DeleteBlueprintEgressResponseOwnedView {
+    fn from(
+        inner: ::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>>,
+    ) -> Self {
+        DeleteBlueprintEgressResponseOwnedView(inner)
+    }
+}
+impl ::core::convert::From<DeleteBlueprintEgressResponseOwnedView>
+for ::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>> {
+    fn from(wrapper: DeleteBlueprintEgressResponseOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<
+    ::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>>,
+> for DeleteBlueprintEgressResponseOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<DeleteBlueprintEgressResponseView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::DeleteBlueprintEgressResponse {
+    type View<'a> = DeleteBlueprintEgressResponseView<'a>;
+    type ViewHandle = DeleteBlueprintEgressResponseOwnedView;
+}
+impl ::serde::Serialize for DeleteBlueprintEgressResponseOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

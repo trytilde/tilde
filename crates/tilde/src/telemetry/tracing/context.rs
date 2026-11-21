@@ -4,7 +4,7 @@ use http_body::{Frame, SizeHint};
 use opentelemetry::{
     Context, KeyValue,
     propagation::{Extractor, Injector, TextMapPropagator},
-    trace::{FutureExt, SpanKind, TraceContextExt, Tracer},
+    trace::{FutureExt, Span, SpanKind, TraceContextExt, Tracer},
 };
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use std::{
@@ -94,12 +94,17 @@ pub async fn request(request: Request, next: Next) -> Response {
     {
         return next.run(request).await;
     }
-    let route = request
+    // Load-balancer probes were two thirds of all spans and say nothing.
+    if matches!(request.uri().path(), "/healthz" | "/readyz" | "/livez") {
+        return next.run(request).await;
+    }
+    let Some(route) = request
         .extensions()
         .get::<axum::extract::MatchedPath>()
-        .map(|p| p.as_str())
-        .unwrap_or("unmatched")
-        .to_owned();
+        .map(|p| p.as_str().to_owned())
+    else {
+        return unmatched(request, next).await;
+    };
     let parent = extract(request.headers());
     let cx = start(
         format!("{} {}", request.method(), route),
@@ -132,6 +137,30 @@ pub async fn request(request: Request, next: Next) -> Response {
             ended: false,
         }),
     )
+}
+/// Unmatched paths (web assets, scanners, 404s) are traced only when they fail on our side.
+async fn unmatched(request: Request, next: Next) -> Response {
+    let started = std::time::SystemTime::now();
+    let method = request.method().to_string();
+    let parent = extract(request.headers());
+    let response = next.run(request).await;
+    let status = response.status();
+    if status.is_server_error() {
+        let tracer = opentelemetry::global::tracer("tilde");
+        let mut span = tracer
+            .span_builder(format!("{method} unmatched"))
+            .with_kind(SpanKind::Server)
+            .with_start_time(started)
+            .with_attributes(vec![
+                KeyValue::new("http.request.method", method),
+                KeyValue::new("http.route", "unmatched"),
+                KeyValue::new("http.response.status_code", i64::from(status.as_u16())),
+            ])
+            .start_with_context(&tracer, &parent);
+        span.set_status(opentelemetry::trace::Status::error("HTTP server error"));
+        span.end();
+    }
+    response
 }
 struct TracedBody {
     body: Body,

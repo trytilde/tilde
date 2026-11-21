@@ -224,8 +224,8 @@ pub(crate) enum QueueChange {
     Before(Option<Uuid>),
     Steer,
 }
-/// A free function rather than `From`: both the query row and the contract type now live in
-/// other crates (`tilde-queries` and `tilde-contracts`), so an impl here would be an orphan.
+/// A free function rather than `From`: open-source Tilde compiles the contracts in their own crate
+/// (`tilde-contracts`), where both sides would be foreign and the impl an orphan.
 pub(crate) fn queued_input(row: db::Queue) -> types::QueuedInput {
     types::QueuedInput {
         id: row.id.to_string(),

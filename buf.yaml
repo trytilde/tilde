@@ -24,16 +24,31 @@ breaking:
   # RunService.Watch. InvokeRequest stays in that file and stays checked.
   # GetLogsStatus and GetTracingStatus were deliberately retired: ClickHouse is required, so
   # there is no storage state to report.
+  # Ontology dashboards were renamed spaces (SpaceService, ListLiveSpaces, OpenSpace and their
+  # fields) with no compatibility kept, by decision.
   ignore_only:
+    FIELD_SAME_JSON_NAME:
+      - proto/tilde/ontology_control/v1/control.proto
+    FIELD_SAME_NAME:
+      - proto/tilde/ontology_control/v1/control.proto
+    FIELD_SAME_TYPE:
+      - proto/tilde/ontology_control/v1/control.proto
+      # ApplyService had shipped in no release when SignalTriggerSpec.filters moved from
+      # SignalFilter to its own SignalFilterSpec (same fields, numbers and JSON), so apply.proto
+      # ports to open-source Tilde byte-identical. Drop this once Apply has been released.
+      - proto/tilde/management/v1/apply.proto
     MESSAGE_NO_DELETE:
       - proto/tilde/agent_host/v1/agent.proto
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
+      - proto/tilde/ontology_control/v1/control.proto
     ENUM_NO_DELETE:
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
     RPC_NO_DELETE:
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
+      - proto/tilde/ontology_control/v1/control.proto
     SERVICE_NO_DELETE:
       - proto/tilde/agent_host/v1/agent.proto
+      - proto/tilde/ontology_control/v1/control.proto

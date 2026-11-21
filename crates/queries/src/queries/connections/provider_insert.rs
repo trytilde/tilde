@@ -13,6 +13,8 @@ pub struct RunParams<
     T9: crate::StringSql,
     T10: crate::StringSql,
     T11: crate::StringSql,
+    T12: crate::StringSql,
+    T13: crate::ArraySql<Item = T12>,
 > {
     pub p1: T1,
     pub p2: T2,
@@ -26,13 +28,14 @@ pub struct RunParams<
     pub p10: Option<T10>,
     pub p11: Option<T11>,
     pub p12: Option<uuid::Uuid>,
+    pub p13: T13,
 }
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label,tool_host_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label,tool_host_id=excluded.tool_host_id",
+        "INSERT INTO connection_providers(provider_id,name,kind,remote_endpoint,remote_ui_url,remote_authorization,remote_authorization_id,categories,icon_url,instructions,account_name_label,tool_host_id,api_hosts) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(provider_id) DO UPDATE SET name=excluded.name,kind=excluded.kind,remote_endpoint=excluded.remote_endpoint,remote_ui_url=excluded.remote_ui_url,remote_authorization=excluded.remote_authorization,remote_authorization_id=excluded.remote_authorization_id,categories=excluded.categories,icon_url=excluded.icon_url,instructions=excluded.instructions,account_name_label=excluded.account_name_label,tool_host_id=excluded.tool_host_id,api_hosts=excluded.api_hosts",
         None,
     )
 }
@@ -60,6 +63,8 @@ impl RunStmt {
         T9: crate::StringSql,
         T10: crate::StringSql,
         T11: crate::StringSql,
+        T12: crate::StringSql,
+        T13: crate::ArraySql<Item = T12>,
     >(
         &'s self,
         client: &'c C,
@@ -75,9 +80,13 @@ impl RunStmt {
         p10: &'a Option<T10>,
         p11: &'a Option<T11>,
         p12: &'a Option<uuid::Uuid>,
+        p13: &'a T13,
     ) -> Result<u64, tokio_postgres::Error> {
         client
-            .execute(self.0, &[p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12])
+            .execute(
+                self.0,
+                &[p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13],
+            )
             .await
     }
 }
@@ -95,12 +104,14 @@ impl<
     T9: crate::StringSql,
     T10: crate::StringSql,
     T11: crate::StringSql,
+    T12: crate::StringSql,
+    T13: crate::ArraySql<Item = T12>,
 >
     crate::client::async_::Params<
         'a,
         'a,
         'a,
-        RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>,
+        RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>,
         std::pin::Pin<
             Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
         >,
@@ -110,7 +121,7 @@ impl<
     fn params(
         &'a self,
         client: &'a C,
-        params: &'a RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>,
+        params: &'a RunParams<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>,
     ) -> std::pin::Pin<
         Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
     > {
@@ -128,6 +139,7 @@ impl<
             &params.p10,
             &params.p11,
             &params.p12,
+            &params.p13,
         ))
     }
 }

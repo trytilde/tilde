@@ -129,6 +129,11 @@ pub struct Config {
     /// Origin providers deliver webhooks to when it differs from the public URL.
     #[envconfig(from = "ENGINE_INGRESS_PUBLIC_URL")]
     pub ingress_public_url: Option<String>,
+    /// The registry's OIDC issuer URL (`oidc`), when it differs from `{ingress public URL}/oidc`.
+    /// It must route to the event ingress's `/oidc` paths. Named apart from the sign-in
+    /// provider's `ENGINE_OIDC_*` settings: this is the issuer Tilde is, not one it trusts.
+    #[envconfig(from = "ENGINE_TOKEN_ISSUER_URL")]
+    pub oidc_issuer_url: Option<String>,
     /// Origin agent hosts call back when it differs from the public URL.
     #[envconfig(from = "ENGINE_RUNTIME_PUBLIC_URL")]
     pub runtime_public_url: Option<String>,
@@ -152,6 +157,9 @@ pub struct Config {
     pub clickhouse_user: String,
     #[envconfig(from = "ENGINE_CLICKHOUSE_PASSWORD")]
     pub clickhouse_password: Option<SecretEnv>,
+    /// PEM CA of a self-hosted server with its own certificate; when set it is the only root trusted.
+    #[envconfig(from = "ENGINE_CLICKHOUSE_CA_CERT")]
+    pub clickhouse_ca_cert: Option<String>,
     /// Days of log, span and metric history to keep. Unset keeps everything.
     #[envconfig(from = "ENGINE_CLICKHOUSE_RETENTION_DAYS")]
     pub clickhouse_retention_days: Option<u32>,
@@ -209,8 +217,12 @@ pub struct Config {
     pub connection_ui_dev_url: Option<String>,
     #[envconfig(from = "ENGINE_WEB_ENABLED", default = "true")]
     pub web_enabled: bool,
+    /// The query pool's connections; may be a transaction-pooling PgBouncer.
     #[envconfig(from = "DATABASE_URL")]
     pub database_url: SecretEnv,
+    /// The server itself, for sessions (LISTEN, migrations) when `DATABASE_URL` is a pooler.
+    #[envconfig(from = "DATABASE_DIRECT_URL")]
+    pub database_direct_url: Option<SecretEnv>,
     #[envconfig(from = "ENGINE_ALLOW_NETWORK", default = "false")]
     pub allow_network: bool,
     #[envconfig(from = "ENGINE_WEB_ORIGINS", default = "")]
@@ -234,6 +246,18 @@ pub struct Config {
 }
 
 impl Config {
+    /// The OIDC issuer's URL when configuration alone decides it: `ENGINE_TOKEN_ISSUER_URL`,
+    /// else the configured ingress (or public) origin plus `/oidc`. `None` when only the
+    /// registry's listening address could say, which other processes do not know.
+    pub fn token_issuer_url(&self) -> Option<String> {
+        self.oidc_issuer_url.clone().or_else(|| {
+            let origin = self
+                .ingress_public_url
+                .as_ref()
+                .or(self.public_url.as_ref())?;
+            Some(format!("{}/oidc", origin.trim_end_matches('/')))
+        })
+    }
     /// Dedicated credentials keep local MinIO configuration separate from AWS KMS credentials.
     /// One S3 client per configured bucket, sharing endpoint and credentials. Reads only, so
     /// `validate_services` still sees every bucket name whichever order the two are called in.
@@ -315,6 +339,14 @@ impl Config {
             }
         }
         Ok(())
+    }
+
+    /// `DATABASE_DIRECT_URL`, unless unset or empty (then `DATABASE_URL` is direct).
+    pub fn database_direct_url(&self) -> Option<&str> {
+        self.database_direct_url
+            .as_ref()
+            .map(|url| url.0.expose_secret())
+            .filter(|url| !url.trim().is_empty())
     }
 
     /// Validate configuration and consume wrapping-key material without making network calls.

@@ -98,6 +98,7 @@ async fn discovered_mcp_tools_are_called_through_tilde_with_the_connection_crede
         name: "Tracker".into(),
         kind: ProviderKind::Configured,
         categories: vec!["developer_tools".into()],
+        api_hosts: vec![],
         connection_types: vec![server_type(capabilities)],
     };
     // The MCP server is the adapter that lets a registered provider serve tools; nothing else can.
@@ -305,6 +306,7 @@ async fn the_provider_catalog_never_shows_a_personal_connections_discovery() {
                 name: "Tracker".into(),
                 kind: ProviderKind::Configured,
                 categories: vec!["developer_tools".into()],
+                api_hosts: vec![],
                 connection_types: vec![ConnectionType {
                     id: "api_key".into(),
                     name: "API key".into(),
@@ -433,6 +435,7 @@ async fn an_output_too_large_to_record_fails_the_call_and_is_still_delivered() {
                 name: "Warehouse".into(),
                 kind: ProviderKind::Configured,
                 categories: vec!["developer_tools".into()],
+                api_hosts: vec![],
                 connection_types: vec![ConnectionType {
                     id: "open".into(),
                     name: "Open".into(),

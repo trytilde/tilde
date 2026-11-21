@@ -2,39 +2,39 @@ import { AgentAvatar } from "./agent-avatar";
 import { Link, useParams, useRouterState } from "@tanstack/react-router";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useDashboardBreadcrumbs } from "./dashboard-breadcrumbs";
+import { useDashboardBreadcrumbs, type ParentCrumb } from "./dashboard-breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Top-level sections by path prefix; anything under them gets a second crumb. */
 const sections = [
-  { prefix: "/skills", label: "Skills", to: "/skills" },
-  { prefix: "/tools", label: "Tools", to: "/tools/connections" },
-  { prefix: "/sandboxes", label: "Sandboxes", to: "/sandboxes" },
-  { prefix: "/memory", label: "Memory", to: "/memory" },
-  { prefix: "/wikis", label: "Wikis", to: "/wikis" },
+  { prefix: "/registry/skills", label: "Skills", to: "/registry/skills" },
+  { prefix: "/registry/tools", label: "Tools", to: "/registry/tools/connections" },
+  { prefix: "/registry/sandboxes", label: "Sandboxes", to: "/registry/sandboxes" },
+  { prefix: "/registry/memory", label: "Memory", to: "/registry/memory" },
+  { prefix: "/registry/wikis", label: "Wikis", to: "/registry/wikis" },
 ] as const;
 export function SiteHeader() {
   const { agentId } = useParams({ strict: false });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const creating = pathname === "/agent/new";
+  const creating = pathname === "/registry/agent/new";
   const { agent, page, setNavigationHost, setActionsHost } = useDashboardBreadcrumbs();
   const section = sections.find(
     (candidate) => pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`),
-  ) ?? { prefix: "/", label: "Agent Registry", to: "/" as const };
+  ) ?? { prefix: "/registry", label: "Agent Registry", to: "/registry" as const };
   const named = page?.path === pathname ? page : undefined;
   let current: string | null | undefined = creating
     ? "Create agent"
-    : pathname === "/tools/remote-servers"
+    : pathname === "/registry/tools/remote-servers"
       ? "Remote servers"
-      : pathname === "/tools/connections"
+      : pathname === "/registry/tools/connections"
         ? "Connections"
-        : pathname === "/tools/catalog" || pathname.startsWith("/tools/catalog/")
+        : pathname === "/registry/tools/catalog" || pathname.startsWith("/registry/tools/catalog/")
           ? "Catalog"
-          : pathname.startsWith("/skills/") ||
-              pathname.startsWith("/tools/") ||
-              pathname.startsWith("/sandboxes/") ||
-              pathname.startsWith("/memory/") ||
-              pathname.startsWith("/wikis/")
+          : pathname.startsWith("/registry/skills/") ||
+              pathname.startsWith("/registry/tools/") ||
+              pathname.startsWith("/registry/sandboxes/") ||
+              pathname.startsWith("/registry/memory/") ||
+              pathname.startsWith("/registry/wikis/")
             ? (named?.label ?? null)
             : agentId
               ? agent?.id === agentId
@@ -69,7 +69,7 @@ export function SiteHeader() {
                 </li>
                 <li className="shrink-0">
                   <Link
-                    to={named.parent.to}
+                    {...linkOf(named.parent)}
                     className="text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {named.parent.label}
@@ -118,3 +118,6 @@ export function SiteHeader() {
     </header>
   );
 }
+
+/** A parent crumb's link props, without its label. */
+const linkOf = ({ label: _, ...link }: ParentCrumb) => link;

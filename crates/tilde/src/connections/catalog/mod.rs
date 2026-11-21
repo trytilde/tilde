@@ -5,23 +5,34 @@ use crate::error::Error;
 use std::collections::BTreeMap;
 
 pub mod agentmail;
+pub mod aws;
 pub mod github;
+pub mod google;
+pub mod google_chat;
 pub mod inference;
 pub mod linq;
+pub mod plaid;
+pub mod quickbooks;
 pub mod slack;
 pub mod telnyx;
 pub mod tilde;
 pub mod whatsapp;
+pub mod xero;
 
 pub fn builtins() -> Vec<Provider> {
     let mut providers: Vec<Provider> = vec![
         github::definition(),
         slack::definition(),
+        google_chat::definition(),
         agentmail::definition(),
         linq::definition(),
         whatsapp::definition(),
         telnyx::definition(),
         tilde::definition(),
+        plaid::definition(),
+        quickbooks::definition(),
+        google::definition(),
+        xero::definition(),
     ]
     .into_iter()
     .chain(inference::definitions())
@@ -35,6 +46,7 @@ pub fn builtins() -> Vec<Provider> {
         crate::tools::providers::google::search_console::definition(),
         crate::tools::providers::google::analytics::definition(),
         crate::tools::providers::sentry::definition(),
+        crate::tools::providers::linear::definition(),
         crate::tools::providers::posthog::definition(),
         crate::tools::providers::firecrawl::definition(),
         crate::tools::providers::stripe::definition(),
@@ -68,6 +80,15 @@ pub async fn register(
     }) {
         return Err(invalid(
             "The signal capability needs a signal source for the connection type",
+        ));
+    }
+    // Egress protocols are built-in catalog code.
+    if provider.connection_types.iter().any(|typ| {
+        typ.capabilities.contains(&Capability::Egress)
+            && crate::connections::egress::hook(&provider.id).is_none()
+    }) {
+        return Err(invalid(
+            "The egress capability needs egress protocols for the provider",
         ));
     }
     if !builtin
@@ -126,6 +147,7 @@ pub async fn register(
         provider.instructions.as_deref(),
         provider.account_name_label.as_deref(),
         tool_host,
+        &provider.api_hosts,
     )
     .await?;
     crate::connections::db::provider_clear_details_execute(&tx, &(provider.id)).await?;
@@ -169,6 +191,7 @@ pub async fn register(
                 .unwrap_or(""),
             typ.oauth().map(|o| o.client).unwrap_or_default().as_str(),
             typ.capabilities.contains(&Capability::Signal),
+            typ.capabilities.contains(&Capability::Egress),
         )
         .await?;
         for field in &oauth.result_fields {
@@ -279,6 +302,7 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
                 (row.inference_capable, Capability::Inference),
                 (row.tool_capable, Capability::Tool),
                 (row.signal_capable, Capability::Signal),
+                (row.egress_capable, Capability::Egress),
             ]
             .into_iter()
             .filter_map(|(capable, cap)| capable.then_some(cap))
@@ -313,6 +337,7 @@ pub async fn get(pool: &Pool, id: &str) -> Result<Provider, Error> {
         id: id.into(),
         name: head.name,
         categories: head.categories,
+        api_hosts: head.api_hosts,
         connection_types: types,
         kind: match head.kind.as_str() {
             "built_in" => ProviderKind::BuiltIn,
@@ -391,7 +416,7 @@ pub async fn list(
 #[derive(Clone, Default)]
 pub struct Endpoints(pub BTreeMap<String, String>);
 impl Endpoints {
-    pub(super) fn get<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
+    pub(crate) fn get<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
         self.0.get(key).map(String::as_str).unwrap_or(default)
     }
 }
@@ -415,11 +440,61 @@ pub(crate) fn runtime(id: &str, type_id: &str) -> &'static dyn runtime::Runtime 
     match (id, type_id) {
         ("github", "github_app") => &github::Github,
         ("slack", "slack_app") => &slack::Slack,
+        ("google_chat", "app") => &google_chat::GoogleChat,
+        ("aws", "oidc") => &aws::AwsOidc,
         ("agentmail", "inbox") => &agentmail::Agentmail,
         ("linq", "account") => &linq::Linq,
         ("whatsapp", "meta") => &whatsapp::Whatsapp,
         ("telnyx", "whatsapp") => &telnyx::Telnyx,
         ("tilde", "application") => &tilde::Tilde,
+        (plaid::PROVIDER_ID, _) => &plaid::Plaid,
+        (quickbooks::PROVIDER_ID, _) => &quickbooks::Quickbooks,
+        (xero::PROVIDER_ID, _) => &xero::Xero,
         _ => inference::runtime(id).unwrap_or(&runtime::Configured),
+    }
+}
+
+/// Providers whose webhooks only start ingestion (no chat adapter, no signals): Plaid, QuickBooks
+/// and Xero. Their deliveries are answered 200, or 401 when they fail verification.
+pub(crate) fn verifies_webhooks(provider: &str) -> bool {
+    matches!(
+        provider,
+        plaid::PROVIDER_ID | quickbooks::PROVIDER_ID | xero::PROVIDER_ID
+    )
+}
+
+/// Authenticates a delivery of a [`verifies_webhooks`] provider; whether it concerns this
+/// connection's Item, company or organisation (and so reaches ontology environments). A Plaid
+/// Item that needs its holder again puts the connection in `requires_action` for Reconnect.
+pub(crate) async fn verify_webhook(
+    service: &super::service::Connections,
+    connection: &Connection,
+    access: &crate::chat::providers::Access,
+    headers: &http::HeaderMap,
+    body: &[u8],
+) -> crate::chat::tools::ToolResult<bool> {
+    match connection.provider_id.as_str() {
+        plaid::PROVIDER_ID => {
+            plaid::verify(access, headers, body).await?;
+            let payload: serde_json::Value = serde_json::from_slice(body)
+                .map_err(|_| connectrpc::ConnectError::invalid_argument("Invalid Plaid webhook"))?;
+            let ours = payload["item_id"].as_str() == optional(&access.values, "item_id");
+            if ours && plaid::needs_holder(&payload) {
+                let client = service.pool.get().await.map_err(Error::from)?;
+                super::db::connection_reauthorize_execute(
+                    &client,
+                    connection.id,
+                    connection.credential_version,
+                )
+                .await
+                .map_err(Error::from)?;
+            }
+            Ok(ours)
+        }
+        quickbooks::PROVIDER_ID => quickbooks::verify(access, headers, body),
+        xero::PROVIDER_ID => xero::verify(access, headers, body),
+        _ => Err(connectrpc::ConnectError::not_found(
+            "Unknown webhook provider",
+        )),
     }
 }

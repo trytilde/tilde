@@ -50,8 +50,12 @@ async fn committed_activity_reaches_another_instance_and_drains_multiple_pages()
         .next_sequence;
     let cursor = writer.ingress_activity(thread_id, "", 100).await.unwrap().1;
     // Separate service and pool, as on another gateway instance.
-    let reader_pool =
-        tilde::database::pool_from_config(db.pool.config().as_ref().clone(), 2).unwrap();
+    let reader_pool = tilde::database::pool_from_config(
+        db.pool.config().as_ref().clone(),
+        db.pool.direct_config().as_ref().clone(),
+        2,
+    )
+    .unwrap();
     let reader = Chat::new(
         reader_pool.clone(),
         crypto.clone(),
@@ -227,7 +231,9 @@ async fn listener_reconnect_invalidates_subscribers_and_resumes_notifications() 
     // Distinct application name lets the test disconnect only its own listener.
     let mut options = db.pool.config().as_ref().clone();
     options.application_name("tilde-notification-reconnect-test");
-    let pool = tilde::database::pool_from_config(options, 1).unwrap();
+    let mut direct = db.pool.direct_config().as_ref().clone();
+    direct.application_name("tilde-notification-reconnect-test");
+    let pool = tilde::database::pool_from_config(options, direct, 1).unwrap();
     let hub = Notifications::default();
     let mut a = hub.subscribe(&pool, "tilde_reconnect_test").await.unwrap();
     let mut b = hub.subscribe(&pool, "tilde_reconnect_test").await.unwrap();

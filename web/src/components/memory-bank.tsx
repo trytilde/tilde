@@ -1,9 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Controller, useForm } from "react-hook-form";
+import { Link, useBlocker, useNavigate, useRouterState } from "@tanstack/react-router";
 import { timestampDate, timestampFromDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 import { formatDistanceToNow } from "date-fns";
-import { PencilIcon, PlusIcon } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  BotIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  LayersIcon,
+  PencilIcon,
+  PlusIcon,
+  SparklesIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react";
 import { NativeSelect } from "@trytilde/connection-ui";
 import type { Agent } from "@trytilde/contracts/tilde/types/v1/agent_pb.js";
 import {
@@ -24,10 +38,12 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useAgentRegistry } from "./agent-stack";
 import { DashboardNavigation, usePageCrumb } from "./dashboard-breadcrumbs";
 import { TildeLoader } from "./loading-screen";
+import { MarkdownEditor, saveKey } from "./markdown-editor";
 import { KINDS, SCOPES, scopeOf } from "./memory";
 import { LinkedAgentsTable, OwnerLink } from "./linked-agents";
 import { BankSynthesis, SourceLink } from "./memory-synthesis";
 import { RemoveButton } from "./remove-button";
+import { ToolbarSelect } from "./toolbar-select";
 import { CatalogSearchField } from "./tool-catalog";
 import { message } from "./tool-connections";
 import { Badge } from "@/components/ui/badge";
@@ -45,13 +61,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 export const BANK_TABS = ["memories", "settings"] as const;
 export type BankTab = (typeof BANK_TABS)[number];
@@ -69,6 +78,8 @@ export function MemoryBankPage({
 }) {
   const [bank, setBank] = useState<MemoryBank>();
   const [error, setError] = useState("");
+  // The header row's right side, where the memories tab puts its search, filters and Add fact.
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const registry = useAgentRegistry();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   usePageCrumb(pathname, bank?.name);
@@ -103,14 +114,27 @@ export function MemoryBankPage({
       onValueChange={(value) => onTabChange(value as BankTab)}
     >
       <DashboardNavigation>
-        <TabsList aria-label="Memory bank">
-          <TabsTrigger value="memories">Memories</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+        <div className="flex min-w-max items-center gap-3">
+          <TabsList aria-label="Memory bank">
+            <TabsTrigger value="memories">Memories</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+          <div
+            ref={setToolbar}
+            role="group"
+            aria-label="Memory filters"
+            className="trace-controls ml-auto flex items-center justify-end gap-1.5 empty:hidden"
+          />
+        </div>
       </DashboardNavigation>
       <TabsContent value="memories" className="flex min-h-0 flex-1 flex-col">
         {tab === "memories" && (
-          <BankMemories bank={bank} registry={registry} onChanged={() => void reload()} />
+          <BankMemories
+            bank={bank}
+            registry={registry}
+            toolbar={toolbar}
+            onChanged={() => void reload()}
+          />
         )}
       </TabsContent>
       <TabsContent
@@ -124,6 +148,18 @@ export function MemoryBankPage({
 }
 
 const when = (t?: Timestamp) => (t ? timestampDate(t).toLocaleString() : "");
+const ago = (t?: Timestamp) =>
+  t ? formatDistanceToNow(timestampDate(t), { addSuffix: true }) : "";
+/** How long ago, in a few characters for a table column: 5m, 3h, 2d, then the date. */
+function short(t?: Timestamp) {
+  if (!t) return "";
+  const date = timestampDate(t);
+  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)}h`;
+  if (minutes < 60 * 24 * 30) return `${Math.round(minutes / 60 / 24)}d`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 /** When a memory holds: a moment, a period, ongoing, or always. */
 function validity(m: Pick<Memory, "validFrom" | "validTo">) {
   if (!m.validFrom) return "";
@@ -135,8 +171,41 @@ function validity(m: Pick<Memory, "validFrom" | "validTo">) {
     : `${from.toLocaleString()} – ${to.toLocaleString()}`;
 }
 
+type Kind = keyof typeof KINDS;
+/** A dot per kind, so a column of kinds reads at a glance. */
+const KIND_TONES: Record<Kind, string> = {
+  [MemoryKind.PROFILE]: "bg-sky-500",
+  [MemoryKind.PREFERENCES]: "bg-violet-500",
+  [MemoryKind.ENTITIES]: "bg-emerald-500",
+  [MemoryKind.EVENTS]: "bg-amber-500",
+  [MemoryKind.CASES]: "bg-rose-500",
+  [MemoryKind.PATTERNS]: "bg-indigo-500",
+  [MemoryKind.TOOLS]: "bg-stone-500",
+  [MemoryKind.SKILLS]: "bg-teal-500",
+};
+function KindLabel({ kind }: { kind: MemoryKind }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${KIND_TONES[kind as Kind]}`} />
+      {KINDS[kind as Kind] ?? "Memory"}
+    </span>
+  );
+}
+
+const ORIGINS = [
+  { value: String(MemoryOrigin.UNSPECIFIED), label: "Any writer" },
+  { value: String(MemoryOrigin.EXPLICIT), label: "Written by agents" },
+  { value: String(MemoryOrigin.OWNER), label: "Written by people" },
+  { value: String(MemoryOrigin.SYNTHESIZED), label: "Synthesized" },
+];
+const KIND_OPTIONS = [
+  { value: String(MemoryKind.UNSPECIFIED), label: "Any kind" },
+  ...Object.entries(KINDS).map(([value, label]) => ({ value, label })),
+];
+
+type Node = { path: string; name: string; depth: number; count: number };
 /** Every path with memories, and its ancestors, with how many memories each holds in total. */
-function tree(paths: MemoryPath[]) {
+function tree(paths: MemoryPath[]): Node[] {
   const totals = new Map<string, number>();
   for (const { path, count } of paths) {
     const segments = path ? path.split("/") : [];
@@ -145,16 +214,64 @@ function tree(paths: MemoryPath[]) {
       totals.set(prefix, (totals.get(prefix) ?? 0) + count);
     }
   }
-  return [...totals.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([path, count]) => ({
+      path,
+      name: path.slice(path.lastIndexOf("/") + 1),
+      depth: path.split("/").length - 1,
+      count,
+    }));
+}
+const parentsOf = (path: string) =>
+  path
+    .split("/")
+    .slice(0, -1)
+    .map((_, i, all) => all.slice(0, i + 1).join("/"));
+
+/** Who wrote a memory, as an icon and a name. */
+function Writer({
+  m,
+  registry,
+  personName,
+}: {
+  m: Memory;
+  registry: Map<string, Agent>;
+  personName: (id?: string) => string;
+}) {
+  const [Icon, name] =
+    m.origin === MemoryOrigin.OWNER
+      ? [UserIcon, "A person"]
+      : m.origin === MemoryOrigin.SYNTHESIZED
+        ? [SparklesIcon, "Synthesis"]
+        : [BotIcon, registry.get(m.writtenByAgentId ?? "")?.name ?? "An agent"];
+  return (
+    <span className="flex min-w-0 items-center gap-1.5" title={name}>
+      <Icon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+      <span className="truncate">
+        {name}
+        {m.identityId && (
+          <span className="text-muted-foreground"> · for {personName(m.identityId)}</span>
+        )}
+      </span>
+    </span>
+  );
 }
 
+/**
+ * A bank's memories, master-detail: the folder tree its paths make, a dense table of the
+ * memories in the chosen folder (or ranked by a search), and the chosen memory's panel, which
+ * also edits and adds facts. Search, filters and Add fact sit in the page header's tab row.
+ */
 function BankMemories({
   bank,
   registry,
+  toolbar,
   onChanged,
 }: {
   bank: MemoryBank;
   registry: Map<string, Agent>;
+  toolbar: HTMLDivElement | null;
   onChanged: () => void;
 }) {
   let editable = true;
@@ -179,6 +296,15 @@ function BankMemories({
   useEffect(() => {
     if (wanted) setSelected(wanted);
   }, [wanted]);
+  const navigate = useNavigate();
+  /** Opens a memory's panel (or closes it), dropping a `?memory=` that named another. */
+  function pick(id?: string) {
+    setSelected(id);
+    if (wanted && id !== wanted)
+      void navigate({ to: ".", search: (prev) => ({ ...prev, memory: undefined }), replace: true });
+  }
+  // Below lg the folder tree folds away behind a toggle.
+  const [folders, setFolders] = useState(false);
   // The memory being edited; null adds a fact.
   const [editing, setEditing] = useState<Memory | null>();
   const [version, setVersion] = useState(0);
@@ -206,145 +332,217 @@ function BankMemories({
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    void Promise.all([
-      page("", abort.signal),
-      memory.listMemoryPaths({ bankId: bank.id }, { signal: abort.signal }),
-      perPerson
-        ? memory.listMemoryPeople({ bankId: bank.id }, { signal: abort.signal })
-        : Promise.resolve({ people: [] }),
-    ])
-      .then(([list, found, who]) => {
+    page("", abort.signal)
+      .then((list) => {
         setMemories(list.memories);
         setNext(list.nextPageToken);
-        setPaths(found.paths);
-        setPeople(who.people);
         setError("");
       })
       .catch((e) => !abort.signal.aborted && setError(message(e)))
       .finally(() => !abort.signal.aborted && setLoading(false));
     return () => abort.abort();
-  }, [page, bank.id, perPerson, version]);
+  }, [page, version]);
+  // The folders and people change only with the bank's memories, not with the filters.
+  useEffect(() => {
+    const abort = new AbortController();
+    void Promise.all([
+      memory.listMemoryPaths({ bankId: bank.id }, { signal: abort.signal }),
+      perPerson
+        ? memory.listMemoryPeople({ bankId: bank.id }, { signal: abort.signal })
+        : Promise.resolve({ people: [] }),
+    ])
+      .then(([found, who]) => {
+        setPaths(found.paths);
+        setPeople(who.people);
+      })
+      .catch((e) => !abort.signal.aborted && setError(message(e)));
+    return () => abort.abort();
+  }, [bank.id, perPerson, version]);
   const nodes = useMemo(() => tree(paths), [paths]);
   const total = paths.reduce((sum, p) => sum + p.count, 0);
   const personName = (id?: string) => people.find((p) => p.identityId === id)?.name || "A person";
+  const filtered = !!(search || kind || origin || person);
+  const rows = useRef<HTMLTableSectionElement>(null);
+  /** Arrow keys walk the table, opening each memory as they go. */
+  function step(by: number) {
+    const index = memories.findIndex((m) => m.id === selected);
+    const target = memories[Math.min(Math.max(index + by, 0), memories.length - 1)];
+    if (!target) return;
+    pick(target.id);
+    rows.current
+      ?.querySelector<HTMLElement>(`[data-id="${target.id}"]`)
+      ?.focus({ preventScroll: false });
+  }
+  const tools = (
+    <>
+      <div className="w-56">
+        <CatalogSearchField label="Search memories" value={query} onChange={setQuery} />
+      </div>
+      <ToolbarSelect
+        label="Kind"
+        value={String(kind)}
+        options={KIND_OPTIONS}
+        onChange={(value) => setKind(Number(value) as MemoryKind)}
+      />
+      <ToolbarSelect
+        label="Written by"
+        value={String(origin)}
+        options={ORIGINS}
+        onChange={(value) => setOrigin(Number(value) as MemoryOrigin)}
+      />
+      {perPerson && (
+        <ToolbarSelect
+          label="Person"
+          value={person}
+          icon={<UserIcon className="text-muted-foreground" />}
+          options={[
+            { value: "", label: "Everyone" },
+            ...people.map((p) => ({
+              value: p.identityId,
+              label: `${p.name || "Unnamed person"} (${p.count})`,
+            })),
+          ]}
+          onChange={setPerson}
+        />
+      )}
+      <Button
+        size="sm"
+        className="h-[26px] gap-1.5 px-2.5 text-[11px]"
+        onClick={() => setEditing(null)}
+      >
+        <PlusIcon className="size-3.5" />
+        Add fact
+      </Button>
+    </>
+  );
+  const panel = editing !== undefined || !!selected;
   return (
-    <div className="grid min-h-0 flex-1 lg:grid-cols-[14rem_minmax(0,1fr)_26rem]">
-      <nav aria-label="Memory paths" className="overflow-y-auto border-r p-3 text-sm">
-        <PathButton label="All memories" count={total} active={!path} onClick={() => setPath("")} />
-        {nodes.map(([prefix, count]) => (
-          <PathButton
-            key={prefix}
-            label={prefix.slice(prefix.lastIndexOf("/") + 1)}
-            title={prefix}
-            depth={prefix.split("/").length}
-            count={count}
-            active={path === prefix}
-            onClick={() => setPath(prefix)}
-          />
-        ))}
-      </nav>
-      <section aria-label="Memories" className="flex min-h-0 flex-col border-r">
-        <div
-          className="trace-controls flex min-h-10 flex-wrap items-center gap-2 border-b bg-background px-3 py-1.5"
-          role="group"
-          aria-label="Memory filters"
-        >
-          <CatalogSearchField label="Search memories" value={query} onChange={setQuery} />
-          <NativeSelect
-            aria-label="Kind"
-            className="w-auto"
-            value={String(kind)}
-            onChange={(event) => setKind(Number(event.target.value) as MemoryKind)}
+    <div
+      className={`grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] ${
+        editing !== undefined
+          ? "lg:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1.3fr)]"
+          : panel
+            ? "lg:grid-cols-[15rem_minmax(0,1fr)_27rem]"
+            : "lg:grid-cols-[15rem_minmax(0,1fr)]"
+      }`}
+    >
+      {toolbar ? createPortal(tools, toolbar) : null}
+      <FolderTree
+        nodes={nodes}
+        total={total}
+        path={path}
+        open={folders}
+        onPath={(next) => {
+          setPath(next);
+          setFolders(false);
+        }}
+      />
+      <section aria-label="Memories" className="@container flex min-h-0 flex-col">
+        <div className="trace-controls flex h-8 shrink-0 items-center gap-2 border-b bg-muted/30 px-3 text-muted-foreground">
+          <button
+            type="button"
+            aria-expanded={folders}
+            aria-label={folders ? "Hide folders" : "Show folders"}
+            className="flex shrink-0 items-center hover:text-foreground lg:hidden"
+            onClick={() => setFolders(!folders)}
           >
-            <option value={MemoryKind.UNSPECIFIED}>Any kind</option>
-            {Object.entries(KINDS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </NativeSelect>
-          <NativeSelect
-            aria-label="Written by"
-            className="w-auto"
-            value={String(origin)}
-            onChange={(event) => setOrigin(Number(event.target.value) as MemoryOrigin)}
-          >
-            <option value={MemoryOrigin.UNSPECIFIED}>Agents, people and synthesis</option>
-            <option value={MemoryOrigin.EXPLICIT}>Written by agents</option>
-            <option value={MemoryOrigin.OWNER}>Written by people</option>
-            <option value={MemoryOrigin.SYNTHESIZED}>Synthesized</option>
-          </NativeSelect>
-          {perPerson && (
-            <NativeSelect
-              aria-label="Person"
-              className="w-auto"
-              value={person}
-              onChange={(event) => setPerson(event.target.value)}
-            >
-              <option value="">Everyone</option>
-              {people.map((p) => (
-                <option key={p.identityId} value={p.identityId}>
-                  {p.name || "Unnamed person"} ({p.count})
-                </option>
-              ))}
-            </NativeSelect>
-          )}
-          <Button size="sm" className="ml-auto gap-2" onClick={() => setEditing(null)}>
-            <PlusIcon />
-            Add fact
-          </Button>
+            <FolderIcon className="size-3.5" />
+          </button>
+          <FolderCrumbs path={path} onPath={setPath} />
+          <span className="ml-auto shrink-0 tabular-nums">
+            {loading
+              ? "Loading…"
+              : search
+                ? `${memories.length}${next ? "+" : ""} ranked by relevance`
+                : `${memories.length}${next ? "+" : ""} ${memories.length === 1 ? "memory" : "memories"}`}
+          </span>
         </div>
         {error && (
           <p role="alert" className="px-4 pt-3 text-sm text-destructive">
             {error}
           </p>
         )}
-        <ul className="min-h-0 flex-1 divide-y overflow-y-auto" aria-label="Memory list">
-          {memories.map((m) => (
-            <li key={m.id}>
-              <button
-                type="button"
-                aria-current={selected === m.id}
-                className="w-full px-4 py-3 text-left hover:bg-muted/50 aria-[current=true]:bg-muted"
-                onClick={() => setSelected(m.id)}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.title}</span>
-                  {m.matched.map((how) => (
-                    <Badge key={how} variant="secondary">
-                      {how === MemoryMatch.MEANING ? "Meaning" : "Keywords"}
-                    </Badge>
-                  ))}
-                </span>
-                <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">
-                  {m.content}
-                </span>
-                <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                  <span>{KINDS[m.kind as keyof typeof KINDS]}</span>
-                  {m.path && <code>{m.path}</code>}
-                  <span>
-                    {m.origin === MemoryOrigin.OWNER
-                      ? "Written by a person"
-                      : m.origin === MemoryOrigin.SYNTHESIZED
-                        ? "Synthesized"
-                        : (registry.get(m.writtenByAgentId ?? "")?.name ?? "An agent")}
-                  </span>
-                  {m.identityId && <span>For {personName(m.identityId)}</span>}
-                </span>
-              </button>
-            </li>
-          ))}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <table
+            aria-label="Memory list"
+            className="tracing-table w-full table-fixed border-collapse text-[11px]"
+          >
+            <thead className="sticky top-0 z-10 bg-background shadow-[inset_0_-1px_0_var(--border)]">
+              <tr className="h-7 text-left text-muted-foreground [&>th]:px-3 [&>th]:font-semibold">
+                <th>Memory</th>
+                <th className="w-28">Kind</th>
+                <th className="hidden w-32 @2xl:table-cell">Folder</th>
+                <th className="hidden w-40 @xl:table-cell">Written by</th>
+                <th className="w-20 text-right">Updated</th>
+              </tr>
+            </thead>
+            <tbody
+              ref={rows}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                event.preventDefault();
+                step(event.key === "ArrowDown" ? 1 : -1);
+              }}
+            >
+              {memories.map((m) => (
+                <tr
+                  key={m.id}
+                  data-id={m.id}
+                  tabIndex={0}
+                  aria-selected={selected === m.id}
+                  className="h-8 cursor-pointer border-b border-border/50 outline-none hover:bg-muted/50 focus-visible:bg-accent aria-selected:bg-muted [&>td]:px-3 [&>td]:whitespace-nowrap"
+                  onClick={() => pick(m.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") pick(m.id);
+                  }}
+                >
+                  <td className="max-w-0 truncate">
+                    <span
+                      className={`font-semibold text-foreground ${m.supersededBy ? "line-through opacity-60" : ""}`}
+                    >
+                      {m.title}
+                    </span>
+                    {m.matched.map((how) => (
+                      <Badge
+                        key={how}
+                        variant="secondary"
+                        className="ml-1.5 h-4 px-1 align-middle text-[10px]"
+                      >
+                        {how === MemoryMatch.MEANING ? "meaning" : "keywords"}
+                      </Badge>
+                    ))}
+                    <span className="ml-2 text-muted-foreground">{m.content}</span>
+                  </td>
+                  <td>
+                    <KindLabel kind={m.kind} />
+                  </td>
+                  <td className="hidden max-w-0 truncate text-muted-foreground @2xl:table-cell">
+                    {m.path || "/"}
+                  </td>
+                  <td className="hidden max-w-0 overflow-hidden @xl:table-cell">
+                    <Writer m={m} registry={registry} personName={personName} />
+                  </td>
+                  <td
+                    className="text-right text-muted-foreground tabular-nums"
+                    title={when(m.updatedAt)}
+                  >
+                    {short(m.updatedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {!memories.length && (
-            <li className="p-8 text-center text-sm text-muted-foreground">
+            <p className="p-8 text-center text-sm text-muted-foreground">
               {loading
                 ? "Loading memories…"
-                : search || path || kind || origin || person
+                : filtered || path
                   ? "No memories match."
                   : "No memories yet. Agents linked to this bank write them as they learn."}
-            </li>
+            </p>
           )}
           {next && (
-            <li className="p-3 text-center">
+            <div className="p-3 text-center">
               <Button
                 variant="outline"
                 size="sm"
@@ -359,73 +557,237 @@ function BankMemories({
               >
                 Load more
               </Button>
-            </li>
+            </div>
           )}
-        </ul>
+        </div>
       </section>
-      <aside aria-label="Memory detail" className="min-h-0 overflow-y-auto p-4">
-        {selected ? (
-          <MemoryDetail
-            key={`${selected}-${version}`}
-            id={selected}
-            registry={registry}
-            personName={personName}
-            editable={editable}
-            onSelect={setSelected}
-            onEdit={setEditing}
-            onDeleted={() => {
-              setSelected(undefined);
-              changed();
-            }}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">Select a memory to see it in full.</p>
-        )}
-      </aside>
-      <FactDialog
-        open={editing !== undefined}
-        bank={bank}
-        memory={editing ?? undefined}
-        people={people}
-        path={path}
-        onClose={() => setEditing(undefined)}
-        onSaved={(m) => {
-          setEditing(undefined);
-          setSelected(m.id);
-          changed();
-        }}
-      />
+      {panel && (
+        <aside
+          aria-label={editing !== undefined ? "Edit memory" : "Memory detail"}
+          className="flex min-h-0 flex-col border-t lg:border-t-0 lg:border-l"
+        >
+          {editing !== undefined ? (
+            <MemoryEditor
+              key={editing?.id ?? "new"}
+              bank={bank}
+              memory={editing ?? undefined}
+              people={people}
+              paths={nodes.map((n) => n.path)}
+              path={path}
+              onClose={() => setEditing(undefined)}
+              onSaved={(m) => {
+                setEditing(undefined);
+                pick(m.id);
+                changed();
+              }}
+            />
+          ) : (
+            selected && (
+              <MemoryDetail
+                key={`${selected}-${version}`}
+                id={selected}
+                registry={registry}
+                personName={personName}
+                editable={editable}
+                onSelect={pick}
+                onPath={setPath}
+                onClose={() => pick(undefined)}
+                onEdit={setEditing}
+                onDeleted={() => {
+                  pick(undefined);
+                  changed();
+                }}
+              />
+            )
+          )}
+        </aside>
+      )}
     </div>
   );
 }
 
-function PathButton({
+/** The folders memory paths make, collapsible, each with how many memories it holds. */
+function FolderTree({
+  nodes,
+  total,
+  path,
+  open,
+  onPath,
+}: {
+  nodes: Node[];
+  total: number;
+  path: string;
+  /** Shown below lg; it is always shown beside the table from lg up. */
+  open: boolean;
+  onPath: (path: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const parents = useMemo(() => new Set(nodes.flatMap((n) => parentsOf(n.path))), [nodes]);
+  const toggle = (folder: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(folder)) next.add(folder);
+      return next;
+    });
+  return (
+    <nav
+      aria-label="Memory paths"
+      className={`trace-controls max-h-72 min-h-0 overflow-y-auto border-b bg-muted/20 p-2 lg:block lg:max-h-none lg:border-r lg:border-b-0 ${open ? "block" : "hidden"}`}
+    >
+      <p className="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+        Folders
+      </p>
+      <FolderRow
+        label="All memories"
+        icon={<LayersIcon className="size-3.5" />}
+        count={total}
+        depth={0}
+        active={!path}
+        onClick={() => onPath("")}
+      />
+      {nodes
+        .filter((n) => !parentsOf(n.path).some((p) => collapsed.has(p)))
+        .map((n) => (
+          <FolderRow
+            key={n.path}
+            label={n.name}
+            title={n.path}
+            depth={n.depth + 1}
+            count={n.count}
+            active={path === n.path}
+            open={parents.has(n.path) ? !collapsed.has(n.path) : undefined}
+            onToggle={() => toggle(n.path)}
+            icon={
+              path === n.path ? (
+                <FolderOpenIcon className="size-3.5" />
+              ) : (
+                <FolderIcon className="size-3.5" />
+              )
+            }
+            onClick={() => onPath(n.path)}
+          />
+        ))}
+      {!nodes.length && (
+        <p className="px-2 py-2 text-muted-foreground">
+          Memories with a path, like <code>team/conventions</code>, group into folders here.
+        </p>
+      )}
+    </nav>
+  );
+}
+
+function FolderRow({
   label,
   title,
-  depth = 0,
+  icon,
+  depth,
   count,
   active,
+  open,
+  onToggle,
   onClick,
 }: {
   label: string;
   title?: string;
-  depth?: number;
+  icon: ReactNode;
+  depth: number;
   count: number;
   active: boolean;
+  /** Whether a folder with subfolders is expanded; undefined for a leaf. */
+  open?: boolean;
+  onToggle?: () => void;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
+    <div
+      className="group flex h-7 items-center rounded-md pr-2 hover:bg-muted aria-[current=true]:bg-muted aria-[current=true]:font-semibold"
       aria-current={active}
-      className="flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left hover:bg-muted aria-[current=true]:bg-muted aria-[current=true]:font-medium"
-      style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
-      onClick={onClick}
+      style={{ paddingLeft: `${depth * 0.75}rem` }}
     >
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
-    </button>
+      {open === undefined ? (
+        <span className="w-5 shrink-0" />
+      ) : (
+        <button
+          type="button"
+          aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
+          aria-expanded={open}
+          className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+          onClick={onToggle}
+        >
+          <ChevronRightIcon className={`size-3 transition-transform ${open ? "rotate-90" : ""}`} />
+        </button>
+      )}
+      <button
+        type="button"
+        title={title}
+        aria-current={active}
+        className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+        onClick={onClick}
+      >
+        <span className="shrink-0 text-muted-foreground">{icon}</span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">{count}</span>
+      </button>
+    </div>
+  );
+}
+
+/** The chosen folder as clickable segments. */
+function FolderCrumbs({ path, onPath }: { path: string; onPath: (path: string) => void }) {
+  const segments = path ? path.split("/") : [];
+  return (
+    <nav aria-label="Folder" className="flex min-w-0 items-center gap-1 truncate">
+      <button
+        type="button"
+        className="shrink-0 hover:text-foreground"
+        onClick={() => onPath("")}
+        aria-current={!path}
+      >
+        All memories
+      </button>
+      {segments.map((segment, i) => {
+        const prefix = segments.slice(0, i + 1).join("/");
+        return (
+          <span key={prefix} className="flex min-w-0 items-center gap-1">
+            <ChevronRightIcon aria-hidden className="size-3 shrink-0" />
+            <button
+              type="button"
+              className="truncate hover:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground"
+              aria-current={prefix === path}
+              onClick={() => onPath(prefix)}
+            >
+              {segment}
+            </button>
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** A memory's text: agents and people often write Markdown. Raw HTML is not rendered. */
+function MemoryContent({ content }: { content: string }) {
+  return (
+    <div className="wiki-prose">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+        components={{
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
+          img: ({ src, alt }) => (
+            <a href={String(src ?? "")} target="_blank" rel="noopener noreferrer">
+              [Image{alt ? `: ${alt}` : ""}]
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
 
@@ -437,12 +799,109 @@ const OPERATIONS: Record<MemoryOperation, string> = {
   [MemoryOperation.FORGET]: "Forgotten",
 };
 
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="space-y-2 border-t px-4 py-3">
+      <h3 className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** Another memory by id, named by its title once loaded. */
+function MemoryLink({
+  id,
+  prefix,
+  onSelect,
+}: {
+  id: string;
+  prefix: string;
+  onSelect: (id: string) => void;
+}) {
+  const [title, setTitle] = useState<string>();
+  useEffect(() => {
+    const abort = new AbortController();
+    memory
+      .getMemory({ id }, { signal: abort.signal })
+      .then(({ memory }) => setTitle(memory?.title))
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [id]);
+  return (
+    <button
+      type="button"
+      className="flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
+      onClick={() => onSelect(id)}
+    >
+      <span className="shrink-0 text-muted-foreground">{prefix}</span>
+      <span className="min-w-0 truncate underline-offset-2 hover:underline">
+        {title ?? "Another memory"}
+      </span>
+    </button>
+  );
+}
+
+/** Up to five other current memories in the same folder (or below it). */
+function SameFolder({
+  m,
+  onSelect,
+  onPath,
+}: {
+  m: Memory;
+  onSelect: (id: string) => void;
+  onPath: (path: string) => void;
+}) {
+  const [others, setOthers] = useState<Memory[]>([]);
+  useEffect(() => {
+    if (!m.path) return;
+    const abort = new AbortController();
+    memory
+      .listMemories({ bankId: m.bankId, path: m.path, limit: 6 }, { signal: abort.signal })
+      .then(({ memories }) => setOthers(memories.filter((o) => o.id !== m.id).slice(0, 5)))
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [m.bankId, m.path, m.id]);
+  if (!m.path || !others.length) return null;
+  return (
+    <Section title={`Also in ${m.path}`}>
+      <ul className="-mx-2">
+        {others.map((o) => (
+          <li key={o.id}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
+              onClick={() => onSelect(o.id)}
+            >
+              <span
+                aria-hidden
+                className={`size-1.5 shrink-0 rounded-full ${KIND_TONES[o.kind as Kind]}`}
+              />
+              <span className="min-w-0 truncate">{o.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+        onClick={() => onPath(m.path)}
+      >
+        Show the whole folder
+      </button>
+    </Section>
+  );
+}
+
 function MemoryDetail({
   id,
   registry,
   personName,
   editable,
   onSelect,
+  onPath,
+  onClose,
   onEdit,
   onDeleted,
 }: {
@@ -451,6 +910,8 @@ function MemoryDetail({
   personName: (id?: string) => string;
   editable: boolean;
   onSelect: (id: string) => void;
+  onPath: (path: string) => void;
+  onClose: () => void;
   onEdit: (memory: Memory) => void;
   onDeleted: () => void;
 }) {
@@ -466,17 +927,40 @@ function MemoryDetail({
   }, [id]);
   if (!found)
     return error ? (
-      <p role="alert" className="text-sm text-destructive">
+      <p role="alert" className="p-4 text-sm text-destructive">
         {error}
       </p>
     ) : null;
   const { memory: m, revisions } = found;
   const agentName = (agent?: string) => registry.get(agent ?? "")?.name ?? "An agent";
-  const facts: [string, React.ReactNode][] = [
-    ["Kind", KINDS[m.kind as keyof typeof KINDS]],
-    ["Path", m.path ? <code>{m.path}</code> : "The bank's root"],
+  const facts: [string, ReactNode][] = [
+    [
+      "Folder",
+      m.path ? (
+        <button
+          type="button"
+          className="font-mono underline-offset-2 hover:underline"
+          onClick={() => onPath(m.path)}
+        >
+          {m.path}
+        </button>
+      ) : (
+        "The bank's root"
+      ),
+    ],
     ["Holds", validity(m) || "Always"],
-    ["Importance", m.importance.toFixed(2)],
+    [
+      "Importance",
+      <span className="inline-flex items-center gap-2">
+        <span className="h-1 w-16 overflow-hidden rounded-full bg-muted">
+          <span
+            className="block h-full bg-foreground/60"
+            style={{ width: `${Math.round(m.importance * 100)}%` }}
+          />
+        </span>
+        <span className="tabular-nums">{m.importance.toFixed(2)}</span>
+      </span>,
+    ],
     [
       "Written by",
       m.origin === MemoryOrigin.OWNER
@@ -487,111 +971,123 @@ function MemoryDetail({
     ],
     ...(m.identityId ? [["For", personName(m.identityId)] as [string, string]] : []),
     ["Embedded", m.embedded ? "Yes" : "Not yet"],
-    ["Created", when(m.createdAt)],
+    ["Created", <span title={when(m.createdAt)}>{ago(m.createdAt)}</span>],
   ];
+  const sources = m.evidence.length > 0 || (m.threadId && m.writtenByAgentId);
   return (
-    <article className="space-y-4" aria-label={m.title}>
-      <div className="flex items-start gap-2">
-        <h2 className="min-w-0 flex-1 text-base font-semibold">{m.title}</h2>
-        {editable && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={m.origin === MemoryOrigin.OWNER ? "Edit memory" : "Take over and edit"}
-              title={
-                m.origin === MemoryOrigin.OWNER
-                  ? "Edit memory"
-                  : "Take over and edit: the memory becomes a person's, which agents cannot change"
-              }
-              onClick={() => onEdit(m)}
-            >
-              <PencilIcon />
-            </Button>
-            <RemoveButton
-              label="Delete memory"
-              title={`Delete ${m.title}?`}
-              description="Agents no longer recall it. Its history is kept."
-              confirmLabel="Delete"
-              onConfirm={() =>
-                memory
-                  .deleteMemory({ id: m.id })
-                  .then(onDeleted)
-                  .catch((e) => setError(message(e)))
-              }
-            />
-          </>
-        )}
-      </div>
+    <article className="min-h-0 flex-1 overflow-y-auto" aria-label={m.title}>
+      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-[11px] text-muted-foreground">
+              <KindLabel kind={m.kind} />
+            </p>
+            <h2 className="text-base leading-snug font-semibold">{m.title}</h2>
+          </div>
+          {editable && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={m.origin === MemoryOrigin.OWNER ? "Edit memory" : "Take over and edit"}
+                title={
+                  m.origin === MemoryOrigin.OWNER
+                    ? "Edit memory"
+                    : "Take over and edit: the memory becomes a person's, which agents cannot change"
+                }
+                onClick={() => onEdit(m)}
+              >
+                <PencilIcon />
+              </Button>
+              <RemoveButton
+                label="Delete memory"
+                title={`Delete ${m.title}?`}
+                description="Agents no longer recall it. Its history is kept."
+                confirmLabel="Delete"
+                onConfirm={() =>
+                  memory
+                    .deleteMemory({ id: m.id })
+                    .then(onDeleted)
+                    .catch((e) => setError(message(e)))
+                }
+              />
+            </>
+          )}
+          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={onClose}>
+            <XIcon />
+          </Button>
+        </div>
+      </header>
       {m.supersededBy && (
-        <p className="rounded-md bg-muted px-3 py-2 text-xs">
+        <p className="mx-4 mt-3 rounded-md bg-muted px-3 py-2 text-xs">
           Replaced by a newer memory, so agents no longer recall it.{" "}
           <button type="button" className="underline" onClick={() => onSelect(m.supersededBy!)}>
             Show the current one
           </button>
         </p>
       )}
-      <p className="whitespace-pre-wrap text-sm">{m.content}</p>
-      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
-        {facts.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-        {m.threadId && m.writtenByAgentId && (
-          <div className="contents">
-            <dt className="text-muted-foreground">Source</dt>
-            <dd>
-              <Link
-                to="/agent/$agentId/sessions"
-                params={{ agentId: m.writtenByAgentId }}
-                search={{ session: m.threadId }}
-                className="underline"
-              >
-                The conversation it came from
-              </Link>
-            </dd>
-          </div>
-        )}
-        {m.evidence.length > 0 && (
-          <div className="contents">
-            <dt className="text-muted-foreground">Derived from</dt>
-            <dd>
-              <ul className="space-y-0.5">
-                {m.evidence.map((e, index) => (
-                  <li key={index}>
-                    <SourceLink
-                      source={e}
-                      agentName={(id) => registry.get(id)?.name ?? "an agent"}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </dd>
-          </div>
-        )}
-        {m.supersedesId && (
-          <div className="contents">
-            <dt className="text-muted-foreground">Replaces</dt>
-            <dd>
-              <button type="button" className="underline" onClick={() => onSelect(m.supersedesId!)}>
-                The memory it replaced
-              </button>
-            </dd>
-          </div>
-        )}
-      </dl>
+      <div className="px-4 py-3">
+        <MemoryContent content={m.content} />
+      </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="px-4 pb-3 text-sm text-destructive">
           {error}
         </p>
       )}
-      <section aria-label="History" className="space-y-2 border-t pt-4">
-        <h3 className="text-sm font-medium">History</h3>
-        <ol className="space-y-2">
+      <Section title="Properties">
+        <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-xs">
+          {facts.map(([label, value]) => (
+            <div key={label} className="contents">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </Section>
+      {(m.supersedesId || m.supersededBy) && (
+        <Section title="Versions">
+          <div className="-mx-2">
+            {m.supersededBy && (
+              <MemoryLink id={m.supersededBy} prefix="Replaced by" onSelect={onSelect} />
+            )}
+            {m.supersedesId && (
+              <MemoryLink id={m.supersedesId} prefix="Replaces" onSelect={onSelect} />
+            )}
+          </div>
+        </Section>
+      )}
+      {sources && (
+        <Section title="Sources">
+          <ul className="space-y-1 text-xs">
+            {m.threadId && m.writtenByAgentId && (
+              <li>
+                <Link
+                  to="/registry/agent/$agentId/sessions"
+                  params={{ agentId: m.writtenByAgentId }}
+                  search={{ session: m.threadId }}
+                  className="underline"
+                >
+                  The conversation it came from
+                </Link>
+              </li>
+            )}
+            {m.evidence.map((e, index) => (
+              <li key={index}>
+                <SourceLink source={e} agentName={(id) => registry.get(id)?.name ?? "an agent"} />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      <SameFolder m={m} onSelect={onSelect} onPath={onPath} />
+      <Section title="History">
+        <ol className="relative space-y-3 border-l pl-4">
           {revisions.map((r, index) => (
-            <li key={index} className="text-xs">
+            <li key={index} className="relative text-xs">
+              <span
+                aria-hidden
+                className="absolute top-1 -left-[1.3rem] size-2 rounded-full border-2 border-background bg-muted-foreground/60"
+              />
               <span className="font-medium">{OPERATIONS[r.operation]}</span>{" "}
               <span className="text-muted-foreground">
                 by{" "}
@@ -610,7 +1106,7 @@ function MemoryDetail({
             </li>
           ))}
         </ol>
-      </section>
+      </Section>
     </article>
   );
 }
@@ -649,185 +1145,248 @@ function factValues(m: Memory | undefined, path: string): FactValues {
 }
 
 /**
- * A person's fact, new or edited. Agents recall it but never change it; editing an agent's
- * memory makes it the person's.
+ * A person's fact, new or edited, in the detail pane. Agents recall it but never change it;
+ * editing an agent's memory makes it the person's.
  */
-function FactDialog({
-  open,
+function MemoryEditor({
   bank,
   memory: editing,
   people,
+  paths,
   path,
   onClose,
   onSaved,
 }: {
-  open: boolean;
   bank: MemoryBank;
   memory?: Memory;
   people: MemoryPerson[];
+  /** Existing folders, offered while typing a path. */
+  paths: string[];
   path: string;
   onClose: () => void;
   onSaved: (memory: Memory) => void;
 }) {
   const form = useForm<FactValues>({ defaultValues: factValues(editing, path) });
   const [error, setError] = useState("");
-  useEffect(() => {
-    if (open) form.reset(factValues(editing, path));
-  }, [open, editing, path, form]);
   const ongoing = form.watch("ongoing");
+  const importance = form.watch("importance");
   const perPerson = scopeOf(bank.scope) === MemoryBankScope.PER_PERSON;
-  function close() {
+  const dirty = form.formState.isDirty;
+  // Set once saved, so the navigation that follows is not asked about.
+  const leaving = useRef(false);
+  useBlocker({
+    shouldBlockFn: () =>
+      !leaving.current && dirty && !window.confirm("Discard your unsaved changes to this memory?"),
+    enableBeforeUnload: () => !leaving.current && dirty,
+  });
+  function cancel() {
+    if (dirty && !window.confirm("Discard your unsaved changes to this memory?")) return;
     onClose();
-    setError("");
   }
+  const submit = form.handleSubmit(async (values) => {
+    setError("");
+    const fields = {
+      kind: Number(values.kind) as MemoryKind,
+      path: values.path.trim(),
+      title: values.title.trim(),
+      content: values.content.trim(),
+      importance: Number(values.importance),
+      validFrom: stamp(values.validFrom),
+      validTo: values.ongoing ? undefined : stamp(values.validTo),
+      ongoing: values.ongoing && !!values.validFrom,
+    };
+    try {
+      const saved = editing
+        ? (
+            await memory.updateMemory({
+              id: editing.id,
+              ...fields,
+              clearValidity: !values.validFrom,
+            })
+          ).memory
+        : (
+            await memory.createMemory({
+              bankId: bank.id,
+              ...fields,
+              identityId: values.identityId || undefined,
+            })
+          ).memory;
+      if (saved) {
+        leaving.current = true;
+        onSaved(saved);
+      }
+    } catch (e) {
+      setError(message(e));
+    }
+  });
+  const errors = form.formState.errors;
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Edit memory" : "Add a fact"}</DialogTitle>
-        </DialogHeader>
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      aria-label="Memory"
+      onSubmit={(event) => void submit(event)}
+      onKeyDown={(event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          void submit();
+        }
+        // Menus inside the editor handle (and prevent) their own Escape.
+        if (event.key === "Escape" && !event.defaultPrevented) cancel();
+      }}
+    >
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
+        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {editing ? "Edit memory" : "New fact"}
+        </h2>
+        <Button type="button" variant="ghost" size="sm" onClick={cancel}>
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          size="sm"
+          className="gap-2"
+          disabled={form.formState.isSubmitting}
+          title={`Save (${saveKey()})`}
+        >
+          {form.formState.isSubmitting ? "Saving…" : editing ? "Save" : "Add fact"}
+        </Button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {editing?.origin === MemoryOrigin.EXPLICIT && (
-          <p className="text-xs text-muted-foreground">
+          <p className="mx-4 mt-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
             Saving makes this memory yours: agents still recall it but can no longer change it.
           </p>
         )}
-        <form
-          className="space-y-4"
-          aria-label="Memory"
-          onSubmit={form.handleSubmit(async (values) => {
-            setError("");
-            const fields = {
-              kind: Number(values.kind) as MemoryKind,
-              path: values.path.trim(),
-              title: values.title.trim(),
-              content: values.content.trim(),
-              importance: Number(values.importance),
-              validFrom: stamp(values.validFrom),
-              validTo: values.ongoing ? undefined : stamp(values.validTo),
-              ongoing: values.ongoing && !!values.validFrom,
-            };
-            try {
-              const saved = editing
-                ? (
-                    await memory.updateMemory({
-                      id: editing.id,
-                      ...fields,
-                      clearValidity: !values.validFrom,
-                    })
-                  ).memory
-                : (
-                    await memory.createMemory({
-                      bankId: bank.id,
-                      ...fields,
-                      identityId: values.identityId || undefined,
-                    })
-                  ).memory;
-              if (saved) onSaved(saved);
-            } catch (e) {
-              setError(message(e));
-            }
-          })}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="fact-title">Title</Label>
-            <Input
-              id="fact-title"
+        <div className="space-y-3 px-4 pt-4">
+          <label className="block">
+            <span className="sr-only">Title</span>
+            <input
+              autoFocus
+              aria-label="Title"
+              aria-invalid={!!errors.title}
               placeholder="The fact in a few words"
-              aria-invalid={!!form.formState.errors.title}
+              className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-muted-foreground/60 aria-invalid:placeholder:text-destructive/70"
               {...form.register("title", { validate: (value) => !!value.trim() })}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="fact-content">Content</Label>
-            <Textarea
-              id="fact-content"
-              rows={4}
-              aria-invalid={!!form.formState.errors.content}
-              {...form.register("content", { validate: (value) => !!value.trim() })}
+          </label>
+          <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-xs">
+            <Label htmlFor="fact-kind" className="text-xs text-muted-foreground">
+              Kind
+            </Label>
+            <NativeSelect id="fact-kind" className="h-7 text-xs" {...form.register("kind")}>
+              {Object.entries(KINDS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+            <Label htmlFor="fact-path" className="text-xs text-muted-foreground">
+              Folder
+            </Label>
+            <Input
+              id="fact-path"
+              list="fact-paths"
+              className="h-7 font-mono text-xs"
+              placeholder="team/conventions"
+              {...form.register("path")}
             />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="fact-kind">Kind</Label>
-              <NativeSelect id="fact-kind" {...form.register("kind")}>
-                {Object.entries(KINDS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </NativeSelect>
+            <datalist id="fact-paths">
+              {paths.map((p) => (
+                <option key={p} value={p} />
+              ))}
+            </datalist>
+            <Label htmlFor="fact-importance" className="text-xs text-muted-foreground">
+              Importance
+            </Label>
+            <div className="flex items-center gap-2">
+              <input
+                id="fact-importance"
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                className="h-1 flex-1 accent-foreground"
+                title="Orders memories that match a search equally well"
+                {...form.register("importance", { valueAsNumber: true, min: 0, max: 1 })}
+              />
+              <span className="w-8 text-right tabular-nums">{Number(importance).toFixed(2)}</span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="fact-path">Path</Label>
-              <Input id="fact-path" placeholder="team/conventions" {...form.register("path")} />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="fact-from">Holds from</Label>
-              <Input id="fact-from" type="datetime-local" {...form.register("validFrom")} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fact-to">Until</Label>
+            <Label htmlFor="fact-from" className="text-xs text-muted-foreground">
+              Holds from
+            </Label>
+            <Input
+              id="fact-from"
+              type="datetime-local"
+              className="h-7 text-xs"
+              {...form.register("validFrom")}
+            />
+            <Label htmlFor="fact-to" className="text-xs text-muted-foreground">
+              Until
+            </Label>
+            <div className="flex items-center gap-3">
               <Input
                 id="fact-to"
                 type="datetime-local"
+                className="h-7 flex-1 text-xs"
                 disabled={ongoing}
                 {...form.register("validTo")}
               />
+              <label className="flex shrink-0 items-center gap-1.5">
+                <input type="checkbox" {...form.register("ongoing")} />
+                Still holds
+              </label>
             </div>
+            {perPerson && !editing && (
+              <>
+                <Label htmlFor="fact-person" className="text-xs text-muted-foreground">
+                  For
+                </Label>
+                <NativeSelect
+                  id="fact-person"
+                  className="h-7 text-xs"
+                  {...form.register("identityId")}
+                >
+                  <option value="">Everyone</option>
+                  {people.map((p) => (
+                    <option key={p.identityId} value={p.identityId}>
+                      {p.name || "Unnamed person"}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </>
+            )}
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" {...form.register("ongoing")} />
-            Still holds (no end yet)
-          </label>
-          <p className="text-xs text-muted-foreground">
-            With only a start, the fact is a single moment. Leave both empty for a fact that always
+          <p className="text-[11px] text-muted-foreground">
+            With only a start the fact is a single moment; leave both empty for one that always
             holds.
           </p>
-          <div className="space-y-2">
-            <Label htmlFor="fact-importance">Importance</Label>
-            <Input
-              id="fact-importance"
-              type="number"
-              min={0}
-              max={1}
-              step={0.1}
-              {...form.register("importance", { valueAsNumber: true, min: 0, max: 1 })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Orders memories that match a search equally well; 0.5 by default.
-            </p>
-          </div>
-          {perPerson && !editing && (
-            <div className="space-y-2">
-              <Label htmlFor="fact-person">For</Label>
-              <NativeSelect id="fact-person" {...form.register("identityId")}>
-                <option value="">Everyone</option>
-                {people.map((p) => (
-                  <option key={p.identityId} value={p.identityId}>
-                    {p.name || "Unnamed person"}
-                  </option>
-                ))}
-              </NativeSelect>
-            </div>
-          )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={close}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {editing ? "Save" : "Add fact"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+        <div className="p-4">
+          <Controller
+            control={form.control}
+            name="content"
+            rules={{ validate: (value) => !!value.trim() }}
+            render={({ field, fieldState }) => (
+              <MarkdownEditor
+                label="Content"
+                value={field.value}
+                onChange={field.onChange}
+                onSave={() => void submit()}
+                placeholder="What agents should remember. Type / for lists, tables and code…"
+                minHeight="min-h-[220px]"
+                contentClassName="wiki-prose"
+                className={fieldState.invalid ? "border-destructive" : ""}
+              />
+            )}
+          />
+        </div>
+        {error && (
+          <p role="alert" className="px-4 pb-4 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+    </form>
   );
 }
 
@@ -849,7 +1408,7 @@ function BankSettings({
     setBusy(true);
     try {
       await memory.deleteMemoryBank({ id: bank.id });
-      void navigate({ to: "/memory" });
+      void navigate({ to: "/registry/memory" });
     } catch (e) {
       setError(message(e));
       setDeleting(false);

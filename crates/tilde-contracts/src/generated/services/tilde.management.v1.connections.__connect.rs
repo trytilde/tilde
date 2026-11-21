@@ -102,6 +102,16 @@ pub type OwnedDisconnectRequestView = ::buffa::view::OwnedView<
 pub type OwnedDisconnectResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::management::v1::__buffa::view::DisconnectResponseView<'static>,
 >;
+///Shorthand for `OwnedView<RunSetupQueryRequestView<'static>>`.
+pub type OwnedRunSetupQueryRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RunSetupQueryResponseView<'static>>`.
+pub type OwnedRunSetupQueryResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::ListProvidersResponse>
 for crate::proto::tilde::management::v1::__buffa::view::ListProvidersResponseView<'_> {
     fn encode(
@@ -482,6 +492,42 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::RunSetupQueryResponse>
+for crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::RunSetupQueryResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const CONNECTIONS_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.ConnectionsService";
 /// Static [`Spec`](::connectrpc::Spec) for the `ListProviders` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -544,6 +590,12 @@ pub const CONNECTIONS_SERVICE_DISCONNECT_SPEC: ::connectrpc::Spec = ::connectrpc
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `RunSetupQuery` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CONNECTIONS_SERVICE_RUN_SETUP_QUERY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.ConnectionsService/RunSetupQuery",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// Server trait for ConnectionsService.
 ///
 /// # Implementing handlers
@@ -822,6 +874,31 @@ pub trait ConnectionsService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::DisconnectResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Runs one of the provider's egress setup queries (`Provider.egress.setup_queries`, e.g.
+    /// `github.list_repositories`) with the connection, for choices in a grant's config form. Needs
+    /// edit on the connection, or edit on `blueprint_id` and view on the connection.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn run_setup_query<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::RunSetupQueryRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::RunSetupQueryResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1147,6 +1224,35 @@ impl<S: ConnectionsService> ConnectionsServiceExt for S {
                 },
             )
             .with_spec(CONNECTIONS_SERVICE_DISCONNECT_SPEC)
+            .route_view_idempotent(
+                CONNECTIONS_SERVICE_SERVICE_NAME,
+                "RunSetupQuery",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::RunSetupQueryRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.run_setup_query(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::RunSetupQueryResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTIONS_SERVICE_RUN_SETUP_QUERY_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1261,6 +1367,12 @@ impl<T: ConnectionsService> ::connectrpc::Dispatcher for ConnectionsServiceServe
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(CONNECTIONS_SERVICE_DISCONNECT_SPEC),
+                )
+            }
+            "RunSetupQuery" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(CONNECTIONS_SERVICE_RUN_SETUP_QUERY_SPEC),
                 )
             }
             _ => None,
@@ -1496,6 +1608,28 @@ impl<T: ConnectionsService> ::connectrpc::Dispatcher for ConnectionsServiceServe
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::DisconnectResponse,
+                        >(format)
+                })
+            }
+            "RunSetupQuery" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::RunSetupQueryRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::RunSetupQueryRequest,
+                    >::from_parts(&req, &body);
+                    svc.run_setup_query(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::RunSetupQueryResponse,
                         >(format)
                 })
             }
@@ -2074,6 +2208,51 @@ where
                 &self.transport,
                 &self.config,
                 CONNECTIONS_SERVICE_DISCONNECT_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RunSetupQuery RPC. Sends a request to /tilde.management.v1.ConnectionsService/RunSetupQuery.
+    pub async fn run_setup_query(
+        &self,
+        request: crate::proto::tilde::management::v1::RunSetupQueryRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.run_setup_query_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RunSetupQuery RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn run_setup_query_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::RunSetupQueryRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::RunSetupQueryResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTIONS_SERVICE_RUN_SETUP_QUERY_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

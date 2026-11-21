@@ -61,6 +61,7 @@ pub async fn create_agent(agents: &Agents, name: &str, capabilities: types::Capa
 }
 pub struct Fixture {
     pub db: Database,
+    pub crypto: Arc<Encryption>,
     pub chat: Chat,
     pub agents: Agents,
     pub connections: Connections,
@@ -94,16 +95,21 @@ impl Fixture {
         connections.seed().await.unwrap();
         let chat = Chat::new(db.pool.clone(), crypto.clone(), "http://127.0.0.1:1".into())
             .with_connections(connections.clone());
-        let agents = Agents::new(db.pool.clone(), crypto);
-        let agent = create_agent(&agents, "Operator", capabilities).await;
-        let user = chat.create_user("User").await.unwrap();
-        let (thread, token) = invocation(&chat, &db, agent, &user.id).await;
+        let agents = Agents::new(db.pool.clone(), crypto.clone());
+        let work = async {
+            let agent = create_agent(&agents, "Operator", capabilities).await;
+            let user = chat.create_user("User").await.unwrap();
+            let (thread, token) = invocation(&chat, &db, agent, &user.id).await;
+            (agent, user, thread, token)
+        };
+        let (agent, user, thread, token) = work.await;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let router = tilde::iam::listeners::agent_rpc_router(agents.clone(), chat.clone());
         let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
         Self {
             db,
+            crypto,
             chat,
             agents,
             connections,
@@ -115,7 +121,7 @@ impl Fixture {
             server,
         }
     }
-    /// Run `f` where the fixture's rows live.
+    /// Run `f` where the fixture's rows live: inside its organization in Tilde Cloud.
     pub async fn within<F: std::future::Future>(&self, f: F) -> F::Output {
         f.await
     }
@@ -138,8 +144,8 @@ impl Fixture {
     /// Continue as the agent's next invocation (in a thread of its own): an agent's catalog is
     /// read once per invocation, so changes to its tools show there.
     pub async fn next_invocation(&mut self) {
-        (self.thread, self.token) =
-            invocation(&self.chat, &self.db, self.agent, &self.user_id).await;
+        let next = invocation(&self.chat, &self.db, self.agent, &self.user_id);
+        (self.thread, self.token) = self.within(next).await;
     }
     /// The single response envelope: `outputJson` on success, `error` otherwise.
     pub async fn invoke(&self, name: &str, input: Value) -> Value {
@@ -167,18 +173,13 @@ impl Fixture {
     }
     /// Gives the fixture's agent `tools` of a connection; returns the prefix of their names.
     pub async fn use_tools(&self, connection: Uuid, tools: &[&str]) -> String {
-        self.chat
-            .tools
-            .as_ref()
-            .unwrap()
-            .add_source(
-                tilde::tools::Owner::Agent(self.agent),
-                tilde::tools::Target::Connection(connection),
-                &tools.iter().map(|t| t.to_string()).collect::<Vec<_>>(),
-            )
-            .await
-            .unwrap()
-            .slug
+        let tools = tools.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+        let added = self.chat.tools.as_ref().unwrap().add_source(
+            tilde::tools::Owner::Agent(self.agent),
+            tilde::tools::Target::Connection(connection),
+            &tools,
+        );
+        self.within(added).await.unwrap().slug
     }
     pub async fn close(self) {
         self.server.abort();
@@ -187,7 +188,12 @@ impl Fixture {
 }
 
 /// A thread with the agent and `user`, a running invocation in it, and that invocation's token.
-async fn invocation(chat: &Chat, db: &Database, agent: Uuid, user: &str) -> (Uuid, SecretString) {
+pub async fn invocation(
+    chat: &Chat,
+    db: &Database,
+    agent: Uuid,
+    user: &str,
+) -> (Uuid, SecretString) {
     let thread = chat
         .create_thread(application::CreateThread {
             title: "Ops".into(),

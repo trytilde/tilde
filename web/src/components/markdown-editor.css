@@ -1,0 +1,66 @@
+/* Tiptap document details the typography classes do not cover. */
+.markdown-editor .markdown-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.25rem;
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-top: 0.3em;
+  user-select: none;
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+.markdown-editor .markdown-editor-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+.markdown-editor .markdown-editor-content table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.markdown-editor .markdown-editor-content :is(th, td) {
+  position: relative;
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+  vertical-align: top;
+}
+.markdown-editor .markdown-editor-content :is(th, td) > p {
+  margin: 0;
+}
+.markdown-editor .markdown-editor-content th {
+  background: var(--muted);
+  font-weight: 600;
+}
+.markdown-editor .markdown-editor-content .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+.markdown-editor .markdown-editor-content a {
+  cursor: text;
+}
+.markdown-editor .markdown-editor-content code::before,
+.markdown-editor .markdown-editor-content code::after {
+  content: none;
+}

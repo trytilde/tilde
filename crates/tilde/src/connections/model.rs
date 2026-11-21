@@ -16,6 +16,9 @@ pub enum Capability {
     Tool,
     /// Webhook events routines trigger on; a routine naming the connection is its use.
     Signal,
+    /// Sandboxes reach the provider's upstream through the gateway with the connection's
+    /// credential (`connections::egress`); a sandbox blueprint's egress grant is its use.
+    Egress,
 }
 impl Capability {
     pub fn as_str(self) -> &'static str {
@@ -25,6 +28,7 @@ impl Capability {
             Self::Skills => "skills",
             Self::Tool => "tool",
             Self::Signal => "signal",
+            Self::Egress => "egress",
         }
     }
 }
@@ -383,6 +387,10 @@ pub struct Provider {
     pub kind: ProviderKind,
     pub categories: Vec<String>,
     pub connection_types: Vec<ConnectionType>,
+    /// The hosts its API answers at (`api.linear.app`, `*.sentry.io` for any subdomain), over
+    /// HTTPS: the only hosts a connection's request credentials may be sent to
+    /// (`connections::credentials`). Empty: its connections give no request credentials.
+    pub api_hosts: Vec<String>,
 }
 #[derive(Debug, Clone)]
 pub struct Connection {
@@ -414,6 +422,8 @@ impl Connection {
             Capability::Skills => true,
             Capability::Tool => self.tool_capable,
             Capability::Signal => self.signal_capable,
+            // Granted by sandbox blueprints (checked against the catalog), never assigned.
+            Capability::Egress => false,
         }
     }
 }
@@ -527,6 +537,21 @@ pub fn identifier(id: &str) -> Result<(), Error> {
     }
     Ok(())
 }
+/// A lower-case DNS name of at least two labels, or `*.` and one (a wildcard over its subdomains).
+fn valid_api_host(host: &str) -> bool {
+    let name = host.strip_prefix("*.").unwrap_or(host);
+    name.len() <= 253
+        && name.contains('.')
+        && name.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        })
+}
 impl Provider {
     pub fn validate(&self) -> Result<(), Error> {
         if self
@@ -554,6 +579,11 @@ impl Provider {
         }
         if self.categories.is_empty() || self.categories.len() > 32 {
             return Err(invalid("Provider categories are required"));
+        }
+        if self.api_hosts.len() > 32 || !self.api_hosts.iter().all(|h| valid_api_host(h)) {
+            return Err(invalid(
+                "API hosts are DNS names, optionally `*.` for any subdomain, without scheme or port",
+            ));
         }
         let mut categories = BTreeSet::new();
         for category in &self.categories {
@@ -619,11 +649,16 @@ impl ConnectionType {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
-        // A type is at most one of channel or inference; it may also ship tools and signals.
+        // A type is at most one of channel or inference; it may also ship tools, signals and egress.
         let exclusive = self
             .capabilities
             .iter()
-            .filter(|c| !matches!(c, Capability::Tool | Capability::Signal))
+            .filter(|c| {
+                !matches!(
+                    c,
+                    Capability::Tool | Capability::Signal | Capability::Egress
+                )
+            })
             .count();
         let repeated = (1..self.capabilities.len())
             .any(|i| self.capabilities[..i].contains(&self.capabilities[i]));

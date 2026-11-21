@@ -56,7 +56,11 @@ const tavily = create(ToolSourceSchema, {
 
 function renderTab(owner: { agentId: string } | { blueprintId: string } = { agentId: "agent-1" }) {
   const root = createRootRoute({ component: () => <AgentTools {...owner} /> });
-  const tools = createRoute({ getParentRoute: () => root, path: "/tools", component: () => null });
+  const tools = createRoute({
+    getParentRoute: () => root,
+    path: "/registry/tools",
+    component: () => null,
+  });
   const router = createRouter({
     routeTree: root.addChildren([tools]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -381,7 +385,7 @@ it("shows the agent's sandbox tools read-only, like bundled ones", async () => {
   });
   renderTab();
   const link = await screen.findByRole("link", { name: "Sandbox · Dev box" });
-  expect(link.getAttribute("href")).toBe("/sandboxes/bp-1/settings");
+  expect(link.getAttribute("href")).toBe("/registry/sandboxes/bp-1/settings");
   const group = link.closest("tr")!;
   expect(within(group).getByText("Sandbox").getAttribute("title")).toContain(
     "Remove the sandbox in Capabilities",

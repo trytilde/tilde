@@ -54,17 +54,19 @@ struct Webhooks {
 }
 pub fn router(chat: Chat, connections: Connections) -> axum::Router {
     let routines = crate::routines::Routines::new(connections.pool.clone(), chat.clone());
-    axum::Router::new()
-        .route(
-            "/connections/webhooks/{connection_id}",
-            post(receive).get(challenge),
-        )
+    let oidc = connections.oidc.clone().router();
+    let router = axum::Router::new().route(
+        "/connections/webhooks/{connection_id}",
+        post(receive).get(challenge),
+    );
+    router
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
         .with_state(Webhooks {
             chat,
             connections,
             routines,
         })
+        .merge(oidc)
 }
 #[derive(serde::Deserialize)]
 struct Challenge {
@@ -113,11 +115,14 @@ async fn receive(
     headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
-    let result: ToolResult<Option<String>> = async {
+    // `Some` is a JSON body to answer with; `None` an empty acknowledgement.
+    let mut ingestion = false;
+    let result: ToolResult<Option<Value>> = async {
         let row = s.connections.get(id).await?;
         let provider = adapter(&row.provider_id, &row.type_id);
         let source = crate::signals::source(&row.provider_id, &row.type_id);
-        if provider.is_none() && source.is_none() {
+        ingestion = crate::connections::catalog::verifies_webhooks(&row.provider_id);
+        if provider.is_none() && source.is_none() && !ingestion {
             return Err(ConnectError::not_found("Unknown channel"));
         }
         let access = Access {
@@ -125,14 +130,29 @@ async fn receive(
             values: s.connections.resolve(id).await?,
             http: s.connections.http.clone(),
             endpoints: s.connections.endpoints.clone(),
+            oidc: None,
         };
         // A chat adapter authenticates its provider's deliveries; signal-only providers are
         // authenticated by the signals module.
-        let result = match provider {
-            Some(provider) => provider.webhook(&access, &headers, &body).await?,
+        // `forward`: an ingestion provider's delivery may concern another account on the same app.
+        // Only Tilde Cloud forwards deliveries, so open-source Tilde never reads it.
+        #[allow(unused_variables)]
+        let (result, forward) = match provider {
+            Some(provider) => (provider.webhook(&access, &headers, &body).await?, true),
+            None if ingestion => {
+                let forward = crate::connections::catalog::verify_webhook(
+                    &s.connections,
+                    &row,
+                    &access,
+                    &headers,
+                    &body,
+                )
+                .await?;
+                (Webhook::Messages(vec![]), forward)
+            }
             None => {
-                crate::signals::verify(&row.provider_id, &access, &headers, &body)?;
-                Webhook::Messages(vec![])
+                crate::signals::verify(&row.provider_id, &access, &headers, &body).await?;
+                (Webhook::Messages(vec![]), true)
             }
         };
         if let Some(source) = source
@@ -144,7 +164,7 @@ async fn receive(
             }
         }
         match result {
-            Webhook::Challenge(value) => Ok(Some(value)),
+            Webhook::Challenge(value) => Ok(Some(json!({"challenge": value}))),
             Webhook::Messages(messages) => {
                 let owner = crate::chat::db::channel_owner_opt(
                     &s.connections.pool.get().await.map_err(ChatError::from)?,
@@ -176,14 +196,29 @@ async fn receive(
                     }
                     s.chat.ingest(id, message).await?;
                 }
+                // Google Chat reads a JSON body as the app's synchronous reply; an empty one
+                // sends nothing, the agent replies through the Chat API.
+                if row.provider_id == "google_chat" {
+                    return Ok(Some(json!({})));
+                }
+                if ingestion {
+                    return Ok(Some(Value::Null));
+                }
                 Ok(None)
             }
         }
     }
     .await;
     match result {
-        Ok(Some(challenge)) => axum::Json(json!({"challenge":challenge})).into_response(),
+        // Ingestion providers (Xero's intent-to-receive check in particular) expect 200.
+        Ok(Some(Value::Null)) => StatusCode::OK.into_response(),
+        Ok(Some(body)) => axum::Json(body).into_response(),
         Ok(None) => StatusCode::NO_CONTENT.into_response(),
+        // Xero's intent-to-receive check expects 401 for a bad signature; so do Plaid and Intuit.
+        Err(error) if ingestion && error.code == connectrpc::ErrorCode::Unauthenticated => {
+            tracing::warn!(connection_id=%id,"Webhook signature rejected");
+            StatusCode::UNAUTHORIZED.into_response()
+        }
         Err(error) => {
             tracing::warn!(code=?error.code,connection_id=%id,"Chat webhook rejected");
             (StatusCode::BAD_REQUEST, "Webhook could not be accepted").into_response()
@@ -243,6 +278,67 @@ pub fn standard(a: &Access, h: &HeaderMap, body: &[u8], key: &str, prefix: &str)
         }
     }
     Err(ConnectError::unauthenticated("Invalid webhook signature"))
+}
+/// The RSA public key (PKCS#1 DER) of a PEM X.509 certificate that is currently valid. Callers
+/// trust the certificate by where it was fetched from (a pinned HTTPS provider origin).
+pub fn certificate_rsa_key(pem: &str) -> ToolResult<Vec<u8>> {
+    use x509_cert::der::Decode;
+    let invalid = || ConnectError::unauthenticated("Invalid signing certificate");
+    let body = pem
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect::<String>();
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(body.trim())
+        .map_err(|_| invalid())?;
+    let certificate = x509_cert::Certificate::from_der(&der).map_err(|_| invalid())?;
+    let validity = &certificate.tbs_certificate.validity;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| invalid())?;
+    if validity.not_before.to_unix_duration() > now || validity.not_after.to_unix_duration() < now {
+        return Err(invalid());
+    }
+    Ok(certificate
+        .tbs_certificate
+        .subject_public_key_info
+        .subject_public_key
+        .raw_bytes()
+        .to_vec())
+}
+/// A provider's published signing material (certificates), fetched once per `ttl` per URL.
+pub async fn published(
+    http: &reqwest::Client,
+    url: &str,
+    ttl: std::time::Duration,
+) -> ToolResult<std::sync::Arc<String>> {
+    use std::{
+        collections::HashMap,
+        sync::{Arc, LazyLock, Mutex},
+        time::Instant,
+    };
+    /// URL to when it was fetched and its body.
+    type Cache = Mutex<HashMap<String, (Instant, Arc<String>)>>;
+    static CACHE: LazyLock<Cache> = LazyLock::new(Default::default);
+    if let Some((at, body)) = CACHE.lock().ok().and_then(|c| c.get(url).cloned())
+        && at.elapsed() < ttl
+    {
+        return Ok(body);
+    }
+    let unavailable = || ConnectError::unavailable("Signing certificates are unavailable");
+    let response = http.get(url).send().await.map_err(|_| unavailable())?;
+    if !response.status().is_success() {
+        return Err(unavailable());
+    }
+    let body = Arc::new(response.text().await.map_err(|_| unavailable())?);
+    if let Ok(mut cache) = CACHE.lock() {
+        // Bounded by the handful of provider URLs callers accept.
+        if cache.len() > 256 {
+            cache.clear();
+        }
+        cache.insert(url.to_owned(), (Instant::now(), body.clone()));
+    }
+    Ok(body)
 }
 pub fn payload(body: &[u8]) -> ToolResult<Value> {
     serde_json::from_slice(body)

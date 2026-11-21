@@ -15,7 +15,8 @@ function initialTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function ThemeToggle() {
+/** The light or dark theme, applied to the document and remembered in the browser. */
+export function useTheme() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -23,6 +24,20 @@ export function ThemeToggle() {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "dark" ? "#211714" : "#ffffff");
   }, [theme]);
+  const toggle = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
+      localStorage.setItem(storageKey, next);
+    } catch {
+      /* Keep the in-memory choice. */
+    }
+  };
+  return { theme, toggle };
+}
+
+export function ThemeToggle() {
+  const { theme, toggle } = useTheme();
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   return (
     <Button
@@ -31,15 +46,7 @@ export function ThemeToggle() {
       className="ml-auto mr-2 shrink-0"
       aria-label={label}
       title={label}
-      onClick={() => {
-        const next = theme === "dark" ? "light" : "dark";
-        setTheme(next);
-        try {
-          localStorage.setItem(storageKey, next);
-        } catch {
-          /* Keep the in-memory choice. */
-        }
-      }}
+      onClick={toggle}
     >
       {theme === "dark" ? <SunIcon /> : <MoonIcon />}
     </Button>

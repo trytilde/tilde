@@ -245,6 +245,23 @@ impl ConnectionsService for Rpc {
         self.0.disconnect(target).await?;
         Response::ok(management::DisconnectResponse::default())
     }
+    async fn run_setup_query<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        request: ServiceRequest<'_, management::RunSetupQueryRequest>,
+    ) -> ServiceResult<impl Encodable<management::RunSetupQueryResponse> + Send + use<'a>> {
+        let r = request.to_owned_message();
+        let target = id(&r.connection_id)?;
+        let input: serde_json::Value = match r.input_json.trim() {
+            "" => serde_json::json!({}),
+            text => serde_json::from_str(text).map_err(|_| m::invalid("input_json is not JSON"))?,
+        };
+        let output = self.0.setup_query(target, &r.query, input).await?;
+        Response::ok(management::RunSetupQueryResponse {
+            output_json: output.to_string(),
+            ..Default::default()
+        })
+    }
 }
 
 fn provider_source(

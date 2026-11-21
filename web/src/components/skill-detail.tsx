@@ -75,7 +75,7 @@ function SkillEditor({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
-  usePageCrumb(`/skills/${id}`, skill?.name);
+  usePageCrumb(`/registry/skills/${id}`, skill?.name);
   const load = useCallback(
     async (signal?: AbortSignal) => {
       const response = await skills.getSkill({ id }, { signal });
@@ -285,8 +285,12 @@ function SkillEditor({ id }: { id: string }) {
     );
   }
   return (
-    <section className="flex min-h-0 flex-1" aria-label={skill ? `Skill ${skill.name}` : "Skill"}>
-      <aside className="flex w-64 shrink-0 flex-col gap-4 border-r pt-4 lg:pt-6">
+    <section
+      className="flex min-h-0 flex-1 flex-col md:flex-row"
+      aria-label={skill ? `Skill ${skill.name}` : "Skill"}
+    >
+      {/* Below md the file tree sits above the file, capped so the file stays in view. */}
+      <aside className="flex shrink-0 flex-col gap-4 border-b pt-4 max-md:max-h-64 max-md:overflow-y-auto md:w-64 md:border-r md:border-b-0 lg:pt-6">
         {skill && (
           <div className="space-y-1 px-4 lg:px-6">
             <div className="flex flex-wrap items-center gap-2">

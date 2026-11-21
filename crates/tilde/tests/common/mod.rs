@@ -16,6 +16,9 @@ use uuid::Uuid;
 pub struct Storage {
     #[envconfig(from = "TEST_DATABASE_URL")]
     pub database_url: Option<SecretEnv>,
+    /// The server itself when `TEST_DATABASE_URL` is a PgBouncer in front of it.
+    #[envconfig(from = "TEST_DATABASE_DIRECT_URL")]
+    pub database_direct_url: Option<SecretEnv>,
     #[envconfig(from = "TEST_S3_ENDPOINT", default = "http://127.0.0.1:19000")]
     pub s3_endpoint: String,
     /// Provisioned by `minio-init` beside the development buckets; tests share it and keep
@@ -51,26 +54,39 @@ impl Database {
         db
     }
     pub async fn unmigrated() -> Self {
-        let url = Storage::load()
+        let storage = Storage::load();
+        let url = storage
             .database_url
+            .as_ref()
             .expect("TEST_DATABASE_URL is required; run task test for isolated Postgres");
         let url = url.0.expose_secret();
-        let admin = database::pool(url, 2).unwrap();
+        let direct = storage
+            .database_direct_url
+            .as_ref()
+            .map(|u| u.0.expose_secret());
+        let admin = database::pool(url, direct, 2).unwrap();
         let schema = format!("test_{}", Uuid::new_v4().simple());
         // Extensions are database-wide: install pgvector once in public, which every test
         // schema then sees, instead of inside whichever schema migrates first.
-        admin
-            .get()
-            .await
-            .unwrap()
-            .batch_execute(&format!(
-                "BEGIN; SELECT pg_advisory_xact_lock(7370617); CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public; COMMIT; CREATE SCHEMA {schema}"
-            ))
-            .await
+        let setup = async {
+            admin
+                .get()
+                .await
+                .unwrap()
+                .batch_execute(&format!(
+                    "BEGIN; SELECT pg_advisory_xact_lock(7370617); CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public; COMMIT; CREATE SCHEMA {schema}"
+                ))
+                .await
+                .unwrap()
+        };
+        setup.await;
+        let in_schema = |url: &str| {
+            let mut config = tokio_postgres::Config::from_str(url).unwrap();
+            config.options(format!("-c search_path={schema},public"));
+            config
+        };
+        let pool = database::pool_from_config(in_schema(url), in_schema(direct.unwrap_or(url)), 4)
             .unwrap();
-        let mut config = tokio_postgres::Config::from_str(url).unwrap();
-        config.options(format!("-c search_path={schema},public"));
-        let pool = database::pool_from_config(config, 4).unwrap();
         Self {
             pool,
             admin,
@@ -78,6 +94,10 @@ impl Database {
         }
     }
     pub async fn close(self) {
+        let close = self.teardown();
+        close.await
+    }
+    async fn teardown(self) {
         if !self.pool.is_closed() {
             tilde::chat::audit::flush(&self.pool).await.unwrap();
         }
@@ -370,7 +390,9 @@ pub fn span(
     assert_eq!(spans.len(), 1, "one {name} span");
     spans.remove(0)
 }
+pub mod host;
 pub mod invocation;
+pub mod live;
 
 /// A TCP proxy to `target` (`host:port`) that closes both sides once neither has sent a byte for
 /// `idle`, as a load balancer's idle timeout does. Returns its `http://` origin.

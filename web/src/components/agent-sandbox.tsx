@@ -79,6 +79,8 @@ export function AgentSandbox({ agentId }: { agentId: string }) {
   }
   const chosen = blueprints.find((b) => b.id === form.watch("blueprintId"));
   const confirmed = blueprints.find((b) => b.id === confirming);
+  // The root only marks itself disabled; the input needs it too to be disabled.
+  const locked = saved === undefined || feedback.state === "saving";
   const iconOf = (blueprint: SandboxBlueprint) => {
     const connection = available?.connections.find((c) => c.id === blueprint.connectionId);
     return connection && available?.providers.get(connection.providerId)?.iconUrl;
@@ -100,12 +102,13 @@ export function AgentSandbox({ agentId }: { agentId: string }) {
         }}
         itemToStringLabel={(blueprint: SandboxBlueprint) => blueprint.name}
         itemToStringValue={(blueprint: SandboxBlueprint) => blueprint.id}
-        disabled={saved === undefined || feedback.state === "saving"}
+        disabled={locked}
       >
         <ComboboxInput
           id="agent-sandbox"
           placeholder="No sandbox"
           aria-describedby="agent-sandbox-help"
+          disabled={locked}
           className="w-50"
           showClear={Boolean(chosen)}
         >
@@ -144,7 +147,7 @@ export function AgentSandbox({ agentId }: { agentId: string }) {
             <>
               {REUSE[reuseOf(chosen.reuse)].label}: {REUSE[reuseOf(chosen.reuse)].description}{" "}
               <Link
-                to="/sandboxes/$blueprintId/settings"
+                to="/registry/sandboxes/$blueprintId/settings"
                 params={{ blueprintId: chosen.id }}
                 className="text-foreground underline"
               >
@@ -154,7 +157,7 @@ export function AgentSandbox({ agentId }: { agentId: string }) {
           ) : !blueprints.length && saved !== undefined ? (
             <>
               No blueprints yet.{" "}
-              <Link to="/sandboxes" className="text-foreground underline">
+              <Link to="/registry/sandboxes" className="text-foreground underline">
                 Create one
               </Link>
               .

@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LocalAgentSetup } from "@/components/local-agent";
 import { ArrowLeftIcon, PauseIcon, PencilIcon, PlayIcon } from "lucide-react";
 import { useForm, NativeSelect } from "@trytilde/connection-ui";
 
@@ -151,6 +152,33 @@ const capabilityOptions: readonly CapabilityOption[] = [
       "Use accounts a person connects for themselves, only while serving that person. Selected targets are provider IDs.",
   },
 ];
+
+/** A local agent's tabs: its setup, then what its harness's adapter supports. */
+function localTabs(agent: Agent): AgentTab[] {
+  const features = agent.local?.features;
+  return [
+    "capabilities",
+    ...(features?.skills ? (["skills"] as const) : []),
+    ...(features?.tools ? (["tools"] as const) : []),
+    ...(features?.sessions ? (["sessions"] as const) : []),
+    ...(features?.traces ? (["tracing"] as const) : []),
+    ...(features?.logs ? (["logs"] as const) : []),
+  ];
+}
+const TAB_LABELS: Record<AgentTab, string> = {
+  capabilities: "Capabilities",
+  inference: "Inference",
+  "chat-providers": "Chat providers",
+  prompts: "Prompts",
+  skills: "Skills",
+  tools: "Tools",
+  routines: "Routines",
+  iam: "IAM",
+  sessions: "Sessions",
+  tracing: "Tracing",
+  logs: "Logs",
+  deployment: "Deployment",
+};
 
 export type AgentTab =
   | "capabilities"
@@ -675,6 +703,12 @@ export function AgentEditor({
       )}
     </header>
   );
+  // A local agent has only the tabs its harness supports; any other opens its setup.
+  const tabs = agent?.local ? localTabs(agent) : (Object.keys(TAB_LABELS) as AgentTab[]);
+  const hidden = !!tab && !tabs.includes(tab);
+  useEffect(() => {
+    if (hidden) onTabChange?.("capabilities");
+  }, [hidden, onTabChange]);
   // These tabs run edge to edge and lay out their own padding.
   // An open prompt fills the page like the skill editor it mirrors.
   const fullWidth =
@@ -717,58 +751,77 @@ export function AgentEditor({
             <DashboardNavigation>
               <div className="flex min-w-0 items-center">
                 <TabsList aria-label="Agent settings">
-                  <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
-                  <TabsTrigger value="inference">Inference</TabsTrigger>
-                  <TabsTrigger value="chat-providers">Chat providers</TabsTrigger>
-                  <TabsTrigger value="prompts">Prompts</TabsTrigger>
-                  <TabsTrigger value="skills">Skills</TabsTrigger>
-                  <TabsTrigger value="tools">Tools</TabsTrigger>
-                  <TabsTrigger value="routines">Routines</TabsTrigger>
-                  <TabsTrigger value="iam">IAM</TabsTrigger>
-                  <TabsTrigger value="sessions">Sessions</TabsTrigger>
-                  <TabsTrigger value="tracing">Tracing</TabsTrigger>
-                  <TabsTrigger value="logs">Logs</TabsTrigger>
-                  <TabsTrigger value="deployment">Deployment</TabsTrigger>
+                  {tabs.map((value) => (
+                    <TabsTrigger key={value} value={value}>
+                      {agent.local && value === "capabilities" ? "Setup" : TAB_LABELS[value]}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
               </div>
             </DashboardNavigation>
             <TabsContent value="capabilities" keepMounted className="grid gap-8">
               {identityHeader}
-              {form}
+              {agent.local ? <LocalAgentSetup agent={agent} /> : form}
             </TabsContent>
-            <TabsContent value="chat-providers" keepMounted>
-              <AgentConnections agentId={agent.id} />
-            </TabsContent>
-            <TabsContent value="tools" className="flex min-h-0 flex-1 flex-col">
-              {tab === "tools" && <AgentTools agentId={agent.id} />}
-            </TabsContent>
-            <TabsContent value="inference" keepMounted>
-              <AgentConnections agentId={agent.id} capability={Capability.INFERENCE} />
-            </TabsContent>
-            <TabsContent value="deployment" className="flex min-h-0 flex-1 flex-col">
-              <AgentDeployment agentId={agent.id} />
-            </TabsContent>
-            <TabsContent value="logs" className="flex min-h-0 flex-1 flex-col">
-              {tab === "logs" && <AgentLogs agentId={agent.id} />}
-            </TabsContent>
-            <TabsContent value="sessions" className="flex min-h-0 flex-1 flex-col">
-              {tab === "sessions" && <AgentTracing agentId={agent.id} view="sessions" />}
-            </TabsContent>
-            <TabsContent value="tracing" className="flex min-h-0 flex-1 flex-col">
-              {tab === "tracing" && <AgentTracing agentId={agent.id} />}
-            </TabsContent>
-            <TabsContent value="iam" keepMounted>
-              <AgentIam key={agent.id} agentId={agent.id} active={tab === "iam"} />
-            </TabsContent>
-            <TabsContent value="prompts" className={promptOpen ? "flex min-h-0 flex-1" : undefined}>
-              {tab === "prompts" && <AgentPrompts agentId={agent.id} />}
-            </TabsContent>
-            <TabsContent value="skills">
-              {tab === "skills" && <AgentSkills agentId={agent.id} />}
-            </TabsContent>
-            <TabsContent value="routines">
-              {tab === "routines" && <AgentRoutines agentId={agent.id} />}
-            </TabsContent>
+            {/* A local agent has only its harness's tabs: the rest are not mounted at all. */}
+            {tabs.includes("chat-providers") && (
+              <TabsContent value="chat-providers" keepMounted>
+                <AgentConnections agentId={agent.id} />
+              </TabsContent>
+            )}
+            {tabs.includes("tools") && (
+              <TabsContent value="tools" className="flex min-h-0 flex-1 flex-col">
+                {tab === "tools" && <AgentTools agentId={agent.id} />}
+              </TabsContent>
+            )}
+            {tabs.includes("inference") && (
+              <TabsContent value="inference" keepMounted>
+                <AgentConnections agentId={agent.id} capability={Capability.INFERENCE} />
+              </TabsContent>
+            )}
+            {tabs.includes("deployment") && (
+              <TabsContent value="deployment" className="flex min-h-0 flex-1 flex-col">
+                <AgentDeployment agentId={agent.id} />
+              </TabsContent>
+            )}
+            {tabs.includes("logs") && (
+              <TabsContent value="logs" className="flex min-h-0 flex-1 flex-col">
+                {tab === "logs" && <AgentLogs agentId={agent.id} />}
+              </TabsContent>
+            )}
+            {tabs.includes("sessions") && (
+              <TabsContent value="sessions" className="flex min-h-0 flex-1 flex-col">
+                {tab === "sessions" && <AgentTracing agentId={agent.id} view="sessions" />}
+              </TabsContent>
+            )}
+            {tabs.includes("tracing") && (
+              <TabsContent value="tracing" className="flex min-h-0 flex-1 flex-col">
+                {tab === "tracing" && <AgentTracing agentId={agent.id} />}
+              </TabsContent>
+            )}
+            {tabs.includes("iam") && (
+              <TabsContent value="iam" keepMounted>
+                <AgentIam key={agent.id} agentId={agent.id} active={tab === "iam"} />
+              </TabsContent>
+            )}
+            {tabs.includes("prompts") && (
+              <TabsContent
+                value="prompts"
+                className={promptOpen ? "flex min-h-0 flex-1" : undefined}
+              >
+                {tab === "prompts" && <AgentPrompts agentId={agent.id} />}
+              </TabsContent>
+            )}
+            {tabs.includes("skills") && (
+              <TabsContent value="skills">
+                {tab === "skills" && <AgentSkills agentId={agent.id} />}
+              </TabsContent>
+            )}
+            {tabs.includes("routines") && (
+              <TabsContent value="routines">
+                {tab === "routines" && <AgentRoutines agentId={agent.id} />}
+              </TabsContent>
+            )}
           </Tabs>
         ) : (
           <>

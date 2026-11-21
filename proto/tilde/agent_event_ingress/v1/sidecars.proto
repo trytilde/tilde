@@ -95,5 +95,16 @@ message CredentialField { string name = 1; string value = 2 [debug_redact = true
 message ConnectionConfiguration { tilde.types.v1.Capability capability = 12; string alias = 13; bool inference_blocked = 14; tilde.types.v1.ChannelAccessMode access_mode = 9; repeated IdentityGrant identities = 10; int64 expires_at = 11; string id = 1; string provider_id = 2; string type_id = 3; string name = 4; string status = 5; string account_label = 6; int64 credential_version = 7; repeated CredentialField credentials = 8; }
 // Blocked budgets: `inference_blocked` for the agent itself, `inference_blocked_identities` for
 // chat identities whose runs must not carry inference connections in their tokens.
-message GetConfigurationResponse { bool inference_blocked = 7; repeated string inference_blocked_identities = 8; reserved 5, 6, 9; reserved "tracing_enabled", "logs_enabled", "metrics_enabled"; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; reserved 3; reserved "webhook_signing_key"; repeated ConnectionConfiguration connections = 4; }
+message GetConfigurationResponse { bool inference_blocked = 7; repeated string inference_blocked_identities = 8; reserved 5, 6, 9; reserved "tracing_enabled", "logs_enabled", "metrics_enabled"; tilde.types.v1.Agent agent = 1; int64 agent_generation = 2; reserved 3; reserved "webhook_signing_key"; repeated ConnectionConfiguration connections = 4; repeated SidecarTool tools = 10; }
+// One of the agent's tools that the sidecar runs itself, exactly as the gateway's catalog offers
+// it: `definition` carries the catalog name `{source slug}.{tool name}` and the agent's wording,
+// `deferred` its tool mode. It calls `tool_name` on the replicated connection `connection_id`
+// (in `connections`, with the TOOL capability unless it is also assigned another way): a managed
+// provider's tool, or with `mcp` set a tool of the MCP server serving the connection's type.
+// Tools only the gateway can run (tool hosts, sandbox tools and other sources only the gateway reaches) are listed and
+// called through tilde.runtime.v1.GatewayToolService instead.
+message SidecarTool { tilde.types.v1.ToolDefinition definition = 1; bool deferred = 2; string connection_id = 3; string tool_name = 4; McpServer mcp = 5; }
+// How a connection's credential reaches its MCP server: `credential` is none, bearer, header
+// or query, with the header or query parameter `credential_name` and header `credential_prefix`.
+message McpServer { string url = 1; string credential = 2; string credential_name = 3; string credential_prefix = 4; }
 message IdentityGrant { string id = 1; tilde.types.v1.IdentityType identity_type = 2; string value = 3; bool verified = 4; bool allowed = 5; }

@@ -15,7 +15,8 @@ pub fn agent_runtime_router(
     chat: Chat,
     tracing: &crate::telemetry::tracing::Tracing,
 ) -> Router {
-    agent_rpc_router(agents, chat).merge(tracing.agent_ingestion_router())
+    let ingestion = tracing.agent_ingestion_router();
+    agent_rpc_router(agents, chat).merge(ingestion)
 }
 
 /// Invocation RPCs validate signed claims and expiry; renewal checks current live state.
@@ -39,18 +40,20 @@ pub fn agent_rpc_router(agents: Agents, chat: Chat) -> Router {
     if let Some(inference) = chat.inference.clone() {
         router = router.merge(crate::inference::router(inference));
     }
-    let mut router = router
-        .layer(middleware::from_fn_with_state(chat.clone(), agent_guard))
-        .merge(crate::chat::controls::router(chat.clone()));
+    let router = router.layer(middleware::from_fn_with_state(chat.clone(), agent_guard));
+    let controls = crate::chat::controls::router(chat.clone());
+    let mut router = router.merge(controls);
     // Tool hosts and sandbox processes dial in with their own tokens.
     if let Some(tools) = &chat.tools {
-        router = router
-            .merge(crate::tools::hosts::router(tools.hosts.clone()))
-            .merge(crate::sandboxes::rpc::router(tools.clone()));
+        let hosts = crate::tools::hosts::router(tools.hosts.clone());
+        let sandboxes = crate::sandboxes::rpc::router(tools.clone())
+            .merge(crate::sandboxes::gateway::router(tools.sandboxes.clone()));
+        router = router.merge(hosts).merge(sandboxes);
     }
     // Hosts that dial in: deployment-token Watch/Heartbeat and capability-scoped Report.
     if let Some(deployments) = chat.deployments.clone() {
-        router = router.merge(crate::deployment::run::router(deployments, chat));
+        let run = crate::deployment::run::router(deployments, chat);
+        router = router.merge(run);
     }
     router
 }
@@ -71,10 +74,19 @@ pub fn management_router(
     )
     .with_skills(chat.skills().expect("management routes require Postgres"));
     let access = crate::chat::access::AgentAccess::new(connections.clone(), chat.clone());
+    // Management never launches a sandbox, so it needs no runtime URL of its own.
+    let tools = chat
+        .tools
+        .clone()
+        .unwrap_or_else(|| crate::tools::Tools::new(connections.clone(), String::new()));
+    // Required-action links of an apply are relative to the app unless its origin is known.
+    let links = String::new();
     Router::new()
         .merge(crate::identities::Identities::new(connections.clone()).router())
-        .merge(crate::agent::rpc::management::router(agents))
-        .merge(crate::deployment::rpc::management_router(deployments))
+        .merge(crate::agent::rpc::management::router(agents.clone()))
+        .merge(crate::deployment::rpc::management_router(
+            deployments.clone(),
+        ))
         .merge(crate::chat::access::rpc::management_router(access.clone()))
         .merge(crate::chat::providers::tilde::management_router(
             chat.clone(),
@@ -82,12 +94,19 @@ pub fn management_router(
         .merge(crate::connections::rpc::management::router(
             connections.clone(),
         ))
+        .merge(crate::secrets::rpc::router(crate::secrets::Secrets::new(
+            chat.pg()
+                .expect("management routes require Postgres")
+                .clone(),
+            chat.encryption.clone(),
+        )))
+        .merge(crate::apply::rpc::router(crate::apply::Apply::new(
+            agents.clone(),
+            tools.clone(),
+            deployments.clone(),
+            links,
+        )))
         .merge({
-            // Management never launches a sandbox, so it needs no runtime URL of its own.
-            let tools = chat
-                .tools
-                .clone()
-                .unwrap_or_else(|| crate::tools::Tools::new(connections.clone(), String::new()));
             crate::sandboxes::rpc::management_router(tools.sandboxes.clone())
                 .merge(crate::memory::rpc::router(tools.memory.clone()))
                 .merge(crate::wikis::rpc::router(tools.wikis.clone()))

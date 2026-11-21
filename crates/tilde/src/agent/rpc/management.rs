@@ -49,18 +49,21 @@ impl AgentService for Rpc {
             body.capabilities.into_option().unwrap_or_default(),
         )?;
         // Creation is retry-safe by id: create returns an identical existing agent.
-        let agent = self
-            .agents
-            .create(CreateAgent {
-                concurrency_policy: crate::agent::ConcurrencyPolicy::from_wire(
-                    body.concurrency_policy.to_i32(),
-                )?,
-                id: target,
-                capabilities: caps,
-                name: body.name,
-                description: body.description,
-            })
-            .await?;
+        let harness = crate::local::Harness::from_wire(body.harness.as_known())?;
+        let agents = self.agents.clone();
+        let input = CreateAgent {
+            concurrency_policy: crate::agent::ConcurrencyPolicy::from_wire(
+                body.concurrency_policy.to_i32(),
+            )?,
+            id: target,
+            capabilities: caps,
+            name: body.name,
+            description: body.description,
+        };
+        let agent = match harness {
+            Some(harness) => agents.create_local(input, harness).await?,
+            None => agents.create(input).await?,
+        };
         Response::ok(management::CreateAgentResponse {
             agent: project(&self.agents, agent).await?.into(),
             ..Default::default()
@@ -99,12 +102,14 @@ impl AgentService for Rpc {
 
         let ids = page.agents.iter().map(|agent| agent.id).collect::<Vec<_>>();
         let mut metrics = self.agents.metrics(&ids).await?;
+        let harnesses = self.agents.harnesses(&ids).await?;
         Response::ok(management::ListAgentsResponse {
             agents: futures::future::try_join_all(page.agents.into_iter().map(|agent| {
                 let detail = metrics.remove(&agent.id);
+                let harness = harnesses.get(&agent.id).copied();
                 async move {
                     let avatar_url = self.agents.avatar_url(&agent).await?;
-                    Ok::<_, crate::error::Error>(wire(agent, detail, avatar_url))
+                    Ok::<_, crate::error::Error>(wire(agent, detail, avatar_url, harness))
                 }
             }))
             .await?,

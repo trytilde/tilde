@@ -112,7 +112,8 @@ impl ToolService for Rpc {
             }
             (None, None) => {
                 let connection = id(&request.connection_id)?;
-                self.0.provider_tools(connection).await?
+                let tools = self.0.provider_tools(connection);
+                tools.await?
             }
             _ => return Err(Error::Invalid("Name one provider or tool host".into()).into()),
         };

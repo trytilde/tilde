@@ -1,0 +1,3 @@
+kind: Added
+body: "Sandbox egress on the server: blueprints grant sandboxes a connection's upstream through the gateway at `/sandboxes/egress/{slug}/\u2026` with a minted credential that never enters the VM. Connection types gain the `egress` capability (GitHub App, personal access token and OAuth connections first); SetBlueprintEgress and DeleteBlueprintEgress manage a blueprint's grants, whose config only narrows the provider's rules; git fetch and push (granted branches only, never deletes, rewrites or the default branch) and a small REST allowlist are checked, and every request is traced on the sandbox's invocation. The blueprint page gets an Egress section."
+time: 2026-11-21T17:03:00+00:00

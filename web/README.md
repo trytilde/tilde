@@ -1,13 +1,13 @@
 # Tilde UI
 
 React/Vite with shadcn/ui and Tailwind CSS. The layout starts from
-`npx shadcn@latest add dashboard-01`, reduced to the Agent Registry sidebar item,
+`npx shadcn@latest add space-01`, reduced to the Agent Registry sidebar item,
 header, and data table. Agent creation and editing have dedicated routes.
 
 TanStack Router uses file-based routing in `src/routes`. Add routes with
 `createFileRoute`; Vite generates `src/routeTree.gen.ts` during development and builds.
 Commit the generated tree, but do not edit it by hand. `_app/route.tsx` owns the
-dashboard layout; public connection brokering sits outside it. The shared
+space layout; public connection brokering sits outside it. The shared
 `_app/agent/$agentId/route.tsx` editor stays mounted as its child tab routes change.
 Agent routes are grouped under `_app/agent/`, with tab routes in `$agentId/`. The
 standalone Connections and Chat pages are not exposed.
@@ -24,6 +24,13 @@ square-and-horizontal-stroke brand guidance. Fonts and assets are bundled locall
 
 Run `pnpm --dir web test` for cursor and table interaction tests, and
 `pnpm --dir web build` for type checking and the production bundle.
+
+`task storybook` serves every screen at http://127.0.0.1:6006 without the engine:
+stories in `src/stories` render the real router at a path (`page()` in `src/stories/app.tsx`)
+while `src/stories/mocks` answers every `fetch` in the browser, serving Connect calls from
+a Connect router over per-area fixtures (`mocks/areas/*.ts`). A story's
+`parameters.backend` seeds, fails or hangs calls. `task storybook:test` runs every story and
+its play function in headless Chromium; `task storybook:build` builds the static site.
 
 The agent editor supports default-deny capabilities with Any or explicit target
 lists where supported.

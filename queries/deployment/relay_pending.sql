@@ -1,7 +1,8 @@
 --: Record()
 
 --! run (p1) : Record
-SELECT m.id AS message_id,m.thread_id,p.agent_id AS agent_id FROM chat_messages m
+SELECT m.id AS message_id,m.thread_id,p.agent_id AS agent_id
+FROM chat_messages m
 JOIN chat_participants p ON p.thread_id=m.thread_id AND p.agent_id IS NOT NULL AND p.active
 JOIN agents a ON a.id=p.agent_id AND NOT a.paused AND a.deleted_at IS NULL
 JOIN chat_participants author ON author.id=m.participant_id

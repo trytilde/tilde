@@ -46,6 +46,15 @@ impl Chat {
         let thread = id(&r.thread_id)?;
         let agent = id(&r.agent_id)?;
         let goal = r.goal_id.as_deref().map(id).transpose()?;
+        // Nothing would ever serve the run: a local agent has no deployments.
+        if crate::local::db::harness_opt(&self.pg()?.get().await?, agent)
+            .await?
+            .is_some()
+        {
+            return Err(ChatError::Invalid(
+                "A local agent runs in its harness; Tilde cannot start it".into(),
+            ));
+        }
         let roster = self.thread(thread).await?;
         if !roster
             .participants
@@ -668,7 +677,8 @@ impl Chat {
         claim.commit().await?;
         drop(claim_client);
         // Off the wake path: the agent's first tool and credential reads are already in memory.
-        tokio::spawn(self.clone().prime(scope.agent_id, scope.thread_id));
+        let prime = self.clone().prime(scope.agent_id, scope.thread_id);
+        tokio::spawn(prime);
         let parent =
             crate::telemetry::tracing::context::restore(&scope.traceparent, &scope.tracestate);
         let cx = crate::telemetry::tracing::context::start(
@@ -1031,11 +1041,12 @@ impl Chat {
                     Ok(rows) => {
                         for row in rows.into_iter().take(32 - workers.len()) {
                             let chat = self.clone();
-                            workers.spawn(async move {
-                            if chat.execute(row.id).await.is_err() {
-                                tracing::warn!(invocation_id=%row.id, "Agent invocation failed");
-                            }
-                        });
+                            let run = async move {
+                                if chat.execute(row.id).await.is_err() {
+                                    tracing::warn!(invocation_id=%row.id, "Agent invocation failed");
+                                }
+                            };
+                            workers.spawn(run);
                         }
                     }
                     Err(_) => {

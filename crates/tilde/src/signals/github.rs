@@ -65,7 +65,9 @@ impl Source for Github {
             .map(|(id, name, title)| SignalType {
                 id: format!("github.{id}"),
                 name: (*name).into(),
-                description: format!("{name} in a repository the GitHub App is installed on."),
+                description: format!(
+                    "{name} in a repository the connection receives webhooks from."
+                ),
                 default_thread_title: (*title).into(),
             })
             .collect()
@@ -134,15 +136,16 @@ impl Source for Github {
             },
         ]
     }
-    /// Bot senders, the installation's own app among them, emit nothing, so a routine that
-    /// comments cannot trigger itself.
+    /// Bot senders, the installation's own app among them, emit no conversation signals, so a
+    /// routine that comments cannot trigger itself. Check runs are reported by bots (GitHub
+    /// Actions) and pass.
     fn signals(&self, _: &Access, h: &HeaderMap, p: &Value) -> Vec<Signal> {
         let event = h.get("x-github-event").and_then(|v| v.to_str().ok());
         let delivery = h.get("x-github-delivery").and_then(|v| v.to_str().ok());
         let (Some(event), Some(delivery)) = (event, delivery) else {
             return vec![];
         };
-        if str_at(p, "/sender/type") == Some("Bot") {
+        if event != "check_run" && str_at(p, "/sender/type") == Some("Bot") {
             return vec![];
         }
         let action = str_at(p, "/action").unwrap_or_default();

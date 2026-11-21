@@ -556,7 +556,7 @@ it("opens the prompts, skills and tools a deployment shipped", async () => {
     expect.anything(),
   );
   const link = within(prompts).getByRole("link", { name: "support/instructions" });
-  expect(link.getAttribute("href")).toBe("/agent/agent-1/prompts?prompt=p1");
+  expect(link.getAttribute("href")).toBe("/registry/agent/agent-1/prompts?prompt=p1");
   expect(within(prompts).getByText("v3")).toBeTruthy();
   expect(within(prompts).getByText("Dynamic")).toBeTruthy();
   expect(within(prompts).getByText("src/mastra/index.ts#support.instructions")).toBeTruthy();

@@ -60,7 +60,7 @@ export function WikisPage() {
     return () => abort.abort();
   }, [refresh]);
   const open = (wiki: Wiki) =>
-    void navigate({ to: "/wikis/$wikiId/pages", params: { wikiId: wiki.id } });
+    void navigate({ to: "/registry/wikis/$wikiId/pages", params: { wikiId: wiki.id } });
   return (
     <div className="flex flex-col">
       <div
@@ -69,14 +69,16 @@ export function WikisPage() {
         aria-label="Wiki filter bar"
       >
         <CatalogSearchField label="Search wikis" value={query} onChange={setQuery} />
+        <Button
+          size="sm"
+          className="ml-auto h-[26px] gap-1.5 px-2.5 text-[11px]"
+          onClick={() => setCreating(true)}
+        >
+          <PlusIcon className="size-3.5" />
+          New wiki
+        </Button>
       </div>
-      <div className="flex flex-col gap-6 p-4 lg:p-6">
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button className="gap-2" onClick={() => setCreating(true)}>
-            <PlusIcon />
-            New wiki
-          </Button>
-        </div>
+      <div className="flex flex-col gap-4 p-4 lg:p-6">
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -98,7 +100,7 @@ export function WikisPage() {
                   <TableRow key={wiki.id}>
                     <TableCell className="h-12 font-medium">
                       <Link
-                        to="/wikis/$wikiId/pages"
+                        to="/registry/wikis/$wikiId/pages"
                         params={{ wikiId: wiki.id }}
                         className="hover:underline"
                       >

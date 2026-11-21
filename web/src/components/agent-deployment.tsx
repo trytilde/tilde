@@ -533,7 +533,24 @@ export function AgentDeployment({ agentId }: { agentId: string }) {
         </p>
       )}
       {loaded === undefined ? (
-        <TildeLoader />
+        error ? (
+          <div className="px-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError("");
+                void load().catch((cause) =>
+                  setError(message(cause, "Unable to load deployment.")),
+                );
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <TildeLoader />
+        )
       ) : (
         <>
           <section aria-label="Deployment settings" className="shrink-0 border-b px-4 py-5 lg:px-6">

@@ -4,6 +4,7 @@ include!("tilde.runtime.v1.agents.rs");
 include!("tilde.runtime.v1.cache.rs");
 include!("tilde.runtime.v1.chat.rs");
 include!("tilde.runtime.v1.controls.rs");
+include!("tilde.runtime.v1.gateway_tools.rs");
 include!("tilde.runtime.v1.knowledge.rs");
 include!("tilde.runtime.v1.prompts.rs");
 include!("tilde.runtime.v1.skills.rs");
@@ -28,6 +29,7 @@ pub mod __buffa {
         include!("tilde.runtime.v1.cache.__view.rs");
         include!("tilde.runtime.v1.chat.__view.rs");
         include!("tilde.runtime.v1.controls.__view.rs");
+        include!("tilde.runtime.v1.gateway_tools.__view.rs");
         include!("tilde.runtime.v1.knowledge.__view.rs");
         include!("tilde.runtime.v1.prompts.__view.rs");
         include!("tilde.runtime.v1.skills.__view.rs");
@@ -100,6 +102,10 @@ pub mod __buffa {
         reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_GATEWAY_TOOLS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_GATEWAY_TOOLS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_GATEWAY_TOOL_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__INVOKE_GATEWAY_TOOL_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_KNOWLEDGE_TOOLS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_KNOWLEDGE_TOOLS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__INVOKE_KNOWLEDGE_TOOL_REQUEST_JSON_ANY);
@@ -349,6 +355,22 @@ pub use self::__buffa::view::AcknowledgeCommandRequestOwnedView;
 pub use self::__buffa::view::AcknowledgeCommandResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::AcknowledgeCommandResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListGatewayToolsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListGatewayToolsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListGatewayToolsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListGatewayToolsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeGatewayToolRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeGatewayToolRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeGatewayToolResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::InvokeGatewayToolResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListKnowledgeToolsRequestView;
 #[doc(inline)]

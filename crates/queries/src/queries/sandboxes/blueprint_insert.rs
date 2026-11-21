@@ -16,7 +16,7 @@ use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO sandbox_blueprints(id,name,connection_id,template,reuse,sleep_after_secs,terminate_after_secs,connect_timeout_secs) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(name) DO NOTHING",
+        "INSERT INTO sandbox_blueprints(id,name,connection_id,template,reuse,sleep_after_secs,terminate_after_secs,connect_timeout_secs) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT ON CONSTRAINT sandbox_blueprints_name_key DO NOTHING",
         None,
     )
 }

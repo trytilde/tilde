@@ -7,22 +7,23 @@ use super::{
     rest::{self, Rest, Verb},
 };
 use crate::chat::{providers::Access, tools::ToolResult};
+use crate::connections::mints;
 use crate::proto::tilde::types::v1 as types;
 use connectrpc::ConnectError;
 use futures::future::BoxFuture;
+use secrecy::ExposeSecret;
 use serde_json::{Map, Value, json};
 
 const API: &str = "https://api.github.com";
 
-/// GitHub App installations and OAuth connections hold an `access_token` (the installation
-/// token is refreshed by the connection); personal access tokens are a static `token`.
+/// The connection type's credential comes from `connections::mints`: an App installation's
+/// refreshed token, an OAuth connection's access token, or a personal access token.
 pub struct Github {
-    key: &'static str,
+    typ: &'static str,
 }
-pub static ACCESS_TOKEN: Github = Github {
-    key: "access_token",
-};
-pub static PERSONAL_TOKEN: Github = Github { key: "token" };
+pub static APP: Github = Github { typ: "github_app" };
+pub static ACCESS_TOKEN: Github = Github { typ: "oauth" };
+pub static PERSONAL_TOKEN: Github = Github { typ: "pat" };
 
 struct Tool {
     rest: Rest,
@@ -260,12 +261,16 @@ impl ToolProvider for Github {
                 Value::Object(body)
             });
             let mut request = rest::request(access, "github_api", API, &tool.rest, input.into())?
-                .bearer_auth(access.secret(self.key)?)
                 .header("Accept", "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header("User-Agent", "tilde");
             if let Some(body) = body {
                 request = request.json(&body);
+            }
+            let minted =
+                mints::mint(access, "github", self.typ, &Default::default(), "tool").await?;
+            for (name, value) in minted.headers() {
+                request = request.header(name, value.expose_secret());
             }
             let response = request
                 .send()

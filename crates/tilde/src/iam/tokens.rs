@@ -47,32 +47,32 @@ impl PostgresTokens {
         }
     }
     async fn key(&self) -> Result<&SecretString> {
-        self.key
-            .get_or_try_init(|| async {
-                let binding = || SecretBinding {
-                    resource_kind: "iam",
-                    resource_id: Uuid::nil(),
-                    name: "agent_token_signing_key",
-                };
-                let mut bytes = zeroize::Zeroizing::new([0u8; 32]);
-                rand::rngs::OsRng.fill_bytes(&mut *bytes);
-                let secret = SecretString::from(hex::encode(bytes.as_slice()));
-                let sealed = self
-                    .encryption
-                    .seal(binding(), &secret)
-                    .map_err(|_| ChatError::Transport)?
-                    .into_bytes();
-                drop(secret);
-                crate::iam::db::key_insert_execute(&self.pool.get().await?, &(sealed)).await?;
-                let row = crate::iam::db::key_get_one(&self.pool.get().await?).await?;
-                self.encryption
-                    .open(
-                        binding(),
-                        SealedSecret::from_bytes(&row.sealed).map_err(|_| ChatError::Transport)?,
-                    )
-                    .map_err(|_| ChatError::Transport)
-            })
-            .await
+        let init = self.key.get_or_try_init(|| self.init_key());
+        init.await
+    }
+    async fn init_key(&self) -> Result<SecretString> {
+        let binding = || SecretBinding {
+            resource_kind: "iam",
+            resource_id: Uuid::nil(),
+            name: "agent_token_signing_key",
+        };
+        let mut bytes = zeroize::Zeroizing::new([0u8; 32]);
+        rand::rngs::OsRng.fill_bytes(&mut *bytes);
+        let secret = SecretString::from(hex::encode(bytes.as_slice()));
+        let sealed = self
+            .encryption
+            .seal(binding(), &secret)
+            .map_err(|_| ChatError::Transport)?
+            .into_bytes();
+        drop(secret);
+        crate::iam::db::key_insert_execute(&self.pool.get().await?, &(sealed)).await?;
+        let row = crate::iam::db::key_get_one(&self.pool.get().await?).await?;
+        self.encryption
+            .open(
+                binding(),
+                SealedSecret::from_bytes(&row.sealed).map_err(|_| ChatError::Transport)?,
+            )
+            .map_err(|_| ChatError::Transport)
     }
     pub async fn issue(
         &self,

@@ -26,7 +26,12 @@ async fn migration_preserves_legacy_history_serializes_starters_and_checks_check
         .batch_execute("ALTER TABLE _tilde_migrations RENAME TO _sqlx_migrations")
         .await
         .unwrap();
-    let other = database::pool_from_config(db.pool.config().as_ref().clone(), 2).unwrap();
+    let other = database::pool_from_config(
+        db.pool.config().as_ref().clone(),
+        db.pool.direct_config().as_ref().clone(),
+        2,
+    )
+    .unwrap();
     let (first, second) = tokio::join!(database::migrate(&db.pool), database::migrate(&other));
     first.unwrap();
     second.unwrap();
@@ -86,7 +91,9 @@ async fn canceled_migration_releases_its_connection_and_lock() {
         .unwrap();
     let mut config = db.pool.config().as_ref().clone();
     config.application_name("tilde-canceled-migration-test");
-    let pool = database::pool_from_config(config, 1).unwrap();
+    let mut direct = db.pool.direct_config().as_ref().clone();
+    direct.application_name("tilde-canceled-migration-test");
+    let pool = database::pool_from_config(config, direct, 1).unwrap();
     let attempt = tokio::spawn({
         let pool = pool.clone();
         async move { database::migrate(&pool).await }

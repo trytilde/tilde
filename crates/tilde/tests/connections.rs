@@ -63,6 +63,7 @@ fn custom(id: &str, driver: Driver, oauth: Option<OAuth>) -> Provider {
         name: "Custom account".into(),
         kind: ProviderKind::Configured,
         categories: vec!["other".into()],
+        api_hosts: vec![],
         connection_types: vec![ConnectionType {
             mcp: None,
             id: "account".into(),
@@ -609,7 +610,12 @@ async fn github_and_slack_apps_use_the_broker_and_type_scoped_channel_capability
     assert_eq!(app.driver(), Driver::Custom);
     assert_eq!(
         app.capabilities,
-        vec![Capability::Channel, Capability::Tool, Capability::Signal]
+        vec![
+            Capability::Channel,
+            Capability::Tool,
+            Capability::Signal,
+            Capability::Egress
+        ]
     );
     let id = Uuid::new_v4();
     let start = service

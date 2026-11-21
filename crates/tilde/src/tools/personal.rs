@@ -3,6 +3,12 @@
 //! in that person's conversations only. Nothing is added to the agent's tools; the catalog resolves
 //! the invocation's user each time, so a connection follows its owner across agents and is
 //! invisible everywhere else. Catalog names are `user.{provider}.{account}.{tool}`.
+//!
+//! The owner decides which of those agents may: every agent `tools.personal` permits (the
+//! default, and what every connection made before owners could choose kept), or only the agents
+//! they list. Both the grant and the owner's choice are checked whenever the catalog is built,
+//! so a revocation applies from the agent's next listing or call. Each call records the
+//! connection it ran on (`chat_tool_calls.personal_connection_id`), and so whose account it was.
 use super::{Tools, builtin::definition, db, providers};
 use crate::chat::{
     Scope,
@@ -58,23 +64,7 @@ impl Personal {
     }
     /// Tool-capable providers this agent may use personally and that have an installed provider.
     async fn connectable(&self, scope: &Scope) -> ToolResult<Vec<db::ToolProviderTypeRow>> {
-        let mut seen = std::collections::BTreeSet::new();
-        Ok(
-            db::tool_provider_types_all(&self.0.connections.pool.get().await.map_err(Error::from)?)
-                .await
-                .map_err(Error::from)?
-                .into_iter()
-                .filter(|t| {
-                    scope
-                        .capabilities
-                        .permits(Capability::ToolsPersonal, &t.provider_id)
-                        && (t.tool_host_id.is_some()
-                            || t.mcp
-                            || providers::provider(&t.provider_id, &t.type_id).is_some())
-                        && seen.insert(t.provider_id.clone())
-                })
-                .collect(),
-        )
+        Ok(connectable(&self.0.connections.pool, &scope.capabilities).await?)
     }
     async fn catalog(
         &self,
@@ -85,6 +75,7 @@ impl Personal {
             &self.0.connections.pool.get().await.map_err(Error::from)?,
             user.id,
             user.root_identity_id,
+            scope.agent_id,
         )
         .await
         .map_err(Error::from)?;
@@ -160,26 +151,7 @@ impl Personal {
             .ok_or_else(|| {
                 ConnectError::permission_denied("This agent may not use that provider personally")
             })?;
-        let connection = Uuid::new_v4();
-        // The setup page collects the real account name; until then the provider names it.
-        let started = self
-            .0
-            .connections
-            .start(connection, provider, provider, &typ.type_id, &[])
-            .await?;
-        if db::personal_owner_set_execute(
-            &self.0.connections.pool.get().await.map_err(Error::from)?,
-            connection,
-            user.id,
-        )
-        .await
-        .map_err(Error::from)?
-            == 0
-        {
-            return Err(ConnectError::internal(
-                "Connection ownership could not be recorded",
-            ));
-        }
+        let started = start(&self.0.connections, user.id, provider, &typ.type_id).await?;
         Ok(json!({
             "setup_url": started.brokering_url,
             "expires_in_minutes": 10,
@@ -187,6 +159,56 @@ impl Personal {
         }))
     }
 }
+/// Tool-capable providers an agent with `capabilities` may use personally.
+pub(crate) async fn connectable(
+    pool: &crate::database::Pool,
+    capabilities: &crate::iam::capabilities::Capabilities,
+) -> Result<Vec<db::ToolProviderTypeRow>, Error> {
+    Ok(personal_capable(pool)
+        .await?
+        .into_iter()
+        .filter(|t| capabilities.permits(Capability::ToolsPersonal, &t.provider_id))
+        .collect())
+}
+/// Tool-capable providers a person can connect, one type each (the easiest to set up), when
+/// something can serve their tools.
+pub(crate) async fn personal_capable(
+    pool: &crate::database::Pool,
+) -> Result<Vec<db::ToolProviderTypeRow>, Error> {
+    let mut seen = std::collections::BTreeSet::new();
+    Ok(db::tool_provider_types_all(&pool.get().await?)
+        .await?
+        .into_iter()
+        .filter(|t| {
+            (t.tool_host_id.is_some()
+                || t.mcp
+                || providers::provider(&t.provider_id, &t.type_id).is_some())
+                && seen.insert(t.provider_id.clone())
+        })
+        .collect())
+}
+
+/// Start a connection owned by the chat user `owner`; its setup page collects the account.
+pub(crate) async fn start(
+    connections: &crate::connections::service::Connections,
+    owner: Uuid,
+    provider: &str,
+    type_id: &str,
+) -> Result<crate::connections::model::Started, Error> {
+    let connection = Uuid::new_v4();
+    // The setup page collects the real account name; until then the provider names it.
+    let started = connections
+        .start(connection, provider, provider, type_id, &[])
+        .await?;
+    if db::personal_owner_set_execute(&connections.pool.get().await?, connection, owner).await? == 0
+    {
+        return Err(Error::Invalid(
+            "Connection ownership could not be recorded".into(),
+        ));
+    }
+    Ok(started)
+}
+
 impl Provider for Personal {
     fn tools<'a>(
         &'a self,
@@ -250,6 +272,13 @@ impl Provider for Personal {
                 .into_iter()
                 .find(|(d, _)| d.name == name)
                 .ok_or_else(|| ConnectError::not_found("Tool is not available for this user"))?;
+            db::personal_call_execute(
+                &self.0.connections.pool.get().await.map_err(Error::from)?,
+                context.call_id,
+                target.connection,
+            )
+            .await
+            .map_err(Error::from)?;
             let schema: Value = serde_json::from_str(&definition.input_schema_json)
                 .map_err(|_| ConnectError::internal("Invalid provider schema"))?;
             if !jsonschema::validator_for(&schema)
@@ -303,6 +332,7 @@ impl Provider for Personal {
                 values: self.0.connections.resolve(target.connection).await?,
                 http: self.0.connections.http.clone(),
                 endpoints: self.0.connections.endpoints.clone(),
+                oidc: Some(self.0.connections.oidc.clone()),
             };
             provider
                 .invoke(&access, context.call_id, &target.tool_name, input)

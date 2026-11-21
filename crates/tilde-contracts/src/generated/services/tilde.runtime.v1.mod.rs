@@ -2,6 +2,7 @@
 include!("tilde.runtime.v1.agents.__connect.rs");
 include!("tilde.runtime.v1.chat.__connect.rs");
 include!("tilde.runtime.v1.controls.__connect.rs");
+include!("tilde.runtime.v1.gateway_tools.__connect.rs");
 include!("tilde.runtime.v1.knowledge.__connect.rs");
 include!("tilde.runtime.v1.prompts.__connect.rs");
 include!("tilde.runtime.v1.skills.__connect.rs");

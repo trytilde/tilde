@@ -46,7 +46,7 @@ function renderPage() {
   const root = createRootRoute({ component: Outlet });
   const catalog = createRoute({
     getParentRoute: () => root,
-    path: "/skills/catalog",
+    path: "/registry/skills/catalog",
     component: SkillCatalogPage,
   });
   const panel = createRoute({
@@ -56,12 +56,12 @@ function renderPage() {
   });
   const source = createRoute({
     getParentRoute: () => root,
-    path: "/skills",
+    path: "/registry/skills",
     component: () => <p>Skills page</p>,
   });
   const router = createRouter({
     routeTree: root.addChildren([catalog.addChildren([panel]), source]),
-    history: createMemoryHistory({ initialEntries: ["/skills/catalog"] }),
+    history: createMemoryHistory({ initialEntries: ["/registry/skills/catalog"] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -129,7 +129,7 @@ it("previews a provider's skills at its own path, enables it and links to the ne
   });
   fireEvent.click(await screen.findByRole("button", { name: /^Cloudflare/ }));
   const panel = await screen.findByRole("dialog", { name: "Cloudflare" });
-  expect(router.state.location.pathname).toBe("/skills/catalog/cloudflare");
+  expect(router.state.location.pathname).toBe("/registry/skills/catalog/cloudflare");
   expect(
     within(panel)
       .getByRole("link", { name: /github\.com\/cloudflare\/skills/ })
@@ -171,7 +171,7 @@ it("lists a built-in group's skills up front and closes back to the catalog", as
   expect(within(panel).queryByRole("button", { name: "Enable" })).toBeNull();
   expect(within(panel).getByRole("link", { name: "Open skills" })).toBeTruthy();
   fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/skills/catalog"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry/skills/catalog"));
 });
 
 it("shows why a provider's preview failed", async () => {

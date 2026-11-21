@@ -46,7 +46,7 @@ function renderPage() {
   });
   const detail = createRoute({
     getParentRoute: () => root,
-    path: "/sandboxes/$blueprintId/settings",
+    path: "/registry/sandboxes/$blueprintId/settings",
     component: () => <p>Blueprint page</p>,
   });
   const router = createRouter({

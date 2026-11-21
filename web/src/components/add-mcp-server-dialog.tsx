@@ -153,7 +153,7 @@ export function AddMcpServer({
               .finally(
                 () =>
                   void navigate({
-                    to: "/tools/$toolId",
+                    to: "/registry/tools/$toolId",
                     params: { toolId: connectionId },
                     search: { kind: "connection" },
                   }),

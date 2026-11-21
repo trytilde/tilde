@@ -28,6 +28,7 @@ const FILE_TIMEOUT_MS: u64 = 10_000;
 
 pub fn definition() -> model::Provider {
     model::Provider {
+        api_hosts: Vec::new(),
         account_name_label: Some("Modal workspace".into()),
         icon_url: Some("/provider-icons/modal_sandbox.svg".into()),
         instructions: Some(

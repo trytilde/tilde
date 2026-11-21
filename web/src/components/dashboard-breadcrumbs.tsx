@@ -13,7 +13,10 @@ import {
 
 type AgentCrumb = Pick<Agent, "id" | "name" | "avatarSeed" | "avatarUrl">;
 /** A listing page between the section and a detail page, e.g. Tools › Connections › Tavily. */
-export type ParentCrumb = { label: string; to: "/tools/connections" | "/tools/remote-servers" };
+export type ParentCrumb = {
+  label: string;
+  to: "/registry/tools/connections" | "/registry/tools/remote-servers";
+};
 /** The last crumb of a detail page, keyed by the path it names. */
 type PageCrumb = { path: string; label: string; parent?: ParentCrumb };
 const BreadcrumbContext = createContext<{
@@ -69,15 +72,15 @@ export function DashboardActions({ children }: { children: ReactNode }) {
 /** Names the current detail page in the header; a no-op outside the dashboard. */
 export function usePageCrumb(path: string, label: string | undefined, parent?: ParentCrumb) {
   const setPage = useContext(BreadcrumbContext)?.setPage;
-  const parentLabel = parent?.label;
-  const parentTo = parent?.to;
+  // Keyed by value: callers pass a fresh object each render.
+  const parentKey = parent && JSON.stringify(parent);
   useEffect(() => {
     if (!setPage || !label) return;
     setPage({
       path,
       label,
-      parent: parentLabel && parentTo ? { label: parentLabel, to: parentTo } : undefined,
+      parent: parentKey ? (JSON.parse(parentKey) as ParentCrumb) : undefined,
     });
     return () => setPage(undefined);
-  }, [setPage, path, label, parentLabel, parentTo]);
+  }, [setPage, path, label, parentKey]);
 }

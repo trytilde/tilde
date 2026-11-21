@@ -3,6 +3,7 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
+        api_hosts: vec!["slack.com".into()],
         account_name_label: Some("Slack workspace".into()),
         icon_url: Some("/provider-icons/slack.svg".into()),
         instructions: Some(
@@ -12,15 +13,74 @@ pub fn definition() -> Provider {
         name: "Slack".into(),
         kind: ProviderKind::BuiltIn,
         categories: vec![CATEGORY_CHAT.into()],
-        connection_types: vec![ConnectionType {
-            mcp: None,
-            id: "slack_app".into(),
-            name: "Slack App".into(),
-            credential_source: CredentialSource::Custom,
-            capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
-        }],
+        connection_types: vec![
+            ConnectionType {
+                mcp: None,
+                id: "slack_app".into(),
+                name: "Slack App".into(),
+                credential_source: CredentialSource::Custom,
+                capabilities: vec![Capability::Channel, Capability::Tool, Capability::Signal],
+            },
+            user_oauth(),
+        ],
     }
 }
+
+/// A person's own Slack user token (standard OAuth v2 with `user_scope`), read-only, so an
+/// ontology's `slack` ducktail pipeline can ingest the conversations that person sees: public
+/// and private channels, DMs and group DMs they are in, threads, and the workspace's users.
+/// It is a type of this provider, not a provider of its own: same workspace, API and hosts
+/// (`slack.com`), and request credentials are its bearer token. It has no capability: the bot
+/// app (`slack_app`) stays the agent's channel; this one only feeds ingestion. Slack returns
+/// the user token under `authed_user`; with token rotation enabled it expires and refreshes.
+fn user_oauth() -> ConnectionType {
+    let mut oauth = OAuth::standard("https://slack.com/api/oauth.v2.access");
+    oauth.authorization_url = Some("https://slack.com/oauth/v2/authorize".into());
+    oauth.pkce = false;
+    oauth.success_path = Some("/ok".into());
+    oauth.access_token_path = "/authed_user/access_token".into();
+    oauth.refresh_token_path = "/authed_user/refresh_token".into();
+    oauth.expires_in_path = "/authed_user/expires_in".into();
+    oauth.scope_path = "/authed_user/scope".into();
+    // User scopes go in `user_scope`; the bot `scope` stays empty.
+    oauth.authorization_parameters = [("user_scope".to_owned(), USER_SCOPES.join(","))].into();
+    oauth.result_fields = vec![
+        ResultField {
+            key: "slack_team_id".into(),
+            path: "/team/id".into(),
+            required: true,
+        },
+        ResultField {
+            key: "slack_user_id".into(),
+            path: "/authed_user/id".into(),
+            required: true,
+        },
+    ];
+    ConnectionType {
+        mcp: None,
+        id: "user_oauth".into(),
+        name: "Your messages (user token)".into(),
+        credential_source: CredentialSource::OAuth {
+            grant: OAuthGrant::AuthorizationCode,
+            configuration: Box::new(oauth),
+            additional_schema: None,
+        },
+        capabilities: vec![],
+    }
+}
+
+pub const USER_SCOPES: &[&str] = &[
+    "channels:history",
+    "groups:history",
+    "im:history",
+    "mpim:history",
+    "channels:read",
+    "groups:read",
+    "im:read",
+    "mpim:read",
+    "users:read",
+    "users:read.email",
+];
 
 use super::{Endpoints, url};
 use crate::{

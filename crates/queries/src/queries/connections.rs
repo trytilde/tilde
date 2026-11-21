@@ -4,6 +4,7 @@ pub mod agent_exists;
 pub mod assignment_delete;
 pub mod assignment_insert;
 pub mod connection_bump_version;
+pub mod connection_by_slug;
 pub mod connection_create;
 pub mod connection_disconnect;
 pub mod connection_fail;

@@ -1,5 +1,6 @@
 // This file was generated with `cornucopia`. Do not modify.
 
+pub mod agent_aliases;
 pub mod aliases;
 pub mod assigned_connections;
 pub mod budget_delete;

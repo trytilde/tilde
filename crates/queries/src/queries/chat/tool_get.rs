@@ -17,6 +17,7 @@ pub struct Record {
     pub summary: String,
     pub detached: bool,
     pub display: String,
+    pub personal_connection_id: Option<uuid::Uuid>,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
@@ -34,6 +35,7 @@ pub struct RecordBorrowed<'a> {
     pub summary: &'a str,
     pub detached: bool,
     pub display: &'a str,
+    pub personal_connection_id: Option<uuid::Uuid>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -53,6 +55,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             summary,
             detached,
             display,
+            personal_connection_id,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -71,6 +74,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             summary: summary.into(),
             detached,
             display: display.into(),
+            personal_connection_id,
         }
     }
 }
@@ -180,6 +184,7 @@ impl RunStmt {
                         summary: row.try_get(12)?,
                         detached: row.try_get(13)?,
                         display: row.try_get(14)?,
+                        personal_connection_id: row.try_get(15)?,
                     })
                 },
             mapper: |it| Record::from(it),

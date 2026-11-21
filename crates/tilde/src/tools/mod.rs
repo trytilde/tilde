@@ -9,8 +9,12 @@
 //! sandboxes (`crate::sandboxes`). An agent with a sandbox has the sandbox itself as a source of
 //! the fixed sandbox tools, added and removed with the agent's sandbox setting.
 //!
-//! Gateway only for now: sidecar-hosted agents do not yet receive tool sources in their
-//! replicated configuration, so their catalogs contain channel tools alone.
+//! Sidecar-hosted agents get the same catalog. Managed provider tools and tools of MCP-served
+//! connections run on the sidecar: its replicated configuration carries their catalog entries
+//! (`Tools::sidecar_tools`) and their connections' credentials, and a change to either pushes a
+//! new configuration. Tool hosts (which dial the gateway), sandbox tools and providers that sign
+//! with the gateway's own keys run on the gateway; the sidecar lists and calls them through the
+//! registry relay (`relay`). `Callee::on_sidecar` draws the line.
 use crate::chat::{
     Scope,
     tools::{Context, InputStream, Provider, ToolResult},
@@ -20,12 +24,14 @@ use crate::connections::{
     service::Connections,
 };
 use crate::error::Error;
+use crate::proto::tilde::agent_event_ingress::v1 as sidecar;
 use crate::proto::tilde::types::v1 as types;
 use connectrpc::ConnectError;
 use futures::{StreamExt, future::BoxFuture};
 use serde_json::Value;
 use uuid::Uuid;
 
+pub(crate) mod apply;
 pub mod builtin;
 pub mod db;
 pub mod hosts;
@@ -33,6 +39,7 @@ pub mod mcp;
 pub mod mcp_catalog;
 pub mod personal;
 pub mod providers;
+pub mod relay;
 pub mod rpc;
 
 /// One owner's use of one source.
@@ -152,6 +159,23 @@ fn tool_name_for(tool: &str, others: &[(&str, String)]) -> Result<String, Error>
     Ok(name)
 }
 
+/// The name a connection's source slug is derived from: its name, prefixed by its provider
+/// unless the name already says it.
+fn source_name(provider: &str, name: &str) -> String {
+    if catalog_safe(name, true, 32) == catalog_safe(provider, true, 32) {
+        name.to_owned()
+    } else {
+        format!("{provider} {name}")
+    }
+}
+fn slug_base(name: &str) -> String {
+    match catalog_safe(name, true, 28) {
+        slug if slug.is_empty() || RESERVED_SLUGS.contains(&slug.as_str()) => {
+            format!("{slug}_tools").trim_start_matches('_').to_owned()
+        }
+        slug => slug,
+    }
+}
 /// Insert a source with the first free slug from `base`. Column checks own the slug alphabet; a
 /// slug the owner already uses inserts nothing.
 pub(crate) async fn insert_source(
@@ -217,11 +241,27 @@ pub(crate) enum Callee {
     /// A fixed sandbox tool, run in the invocation's sandbox.
     Sandbox(String),
 }
+impl Callee {
+    /// Whether a sidecar runs the tool itself, with its replicated copy of the connection's
+    /// credentials. Tool hosts dial the gateway, sandboxes and other gateway-only sources are
+    /// reached from it, and some providers sign with the gateway's own keys, so those stay there.
+    pub(crate) fn on_sidecar(&self) -> bool {
+        match self {
+            Callee::Connection(row) => !providers::needs_gateway(&row.provider_id, &row.type_id),
+            Callee::Mcp(..) => true,
+            Callee::Host(..) | Callee::Sandbox(_) => false,
+        }
+    }
+}
 /// Who a call is made for, as tool hosts are told.
 pub(crate) struct Caller {
     pub call_id: Uuid,
     pub agent: Option<Uuid>,
     pub thread: Option<Uuid>,
+    /// The invocation's run; a sandbox's process has none. Only the ontology tool source (Tilde
+    /// Cloud) reads it.
+    #[allow(dead_code)]
+    pub run: Option<Uuid>,
     pub sandbox: Option<Uuid>,
 }
 /// Tool text limits in characters, as Postgres `length()` checks them: every definition, agent
@@ -370,13 +410,7 @@ impl Tools {
                             "Connection not found, personal, or its type does not provide tools",
                         )
                     })?;
-                let name = if catalog_safe(&row.name, true, 32)
-                    == catalog_safe(&row.provider_id, true, 32)
-                {
-                    row.name
-                } else {
-                    format!("{} {}", row.provider_id, row.name)
-                };
+                let name = source_name(&row.provider_id, &row.name);
                 Ok((self.provider_tools(id).await?, name))
             }
             Target::ToolHost(id) => {
@@ -421,13 +455,7 @@ impl Tools {
         {
             return Err(invalid("This source is already in use here"));
         }
-        let base = match catalog_safe(&name, true, 28) {
-            slug if slug.is_empty() || RESERVED_SLUGS.contains(&slug.as_str()) => {
-                format!("{slug}_tools").trim_start_matches('_').to_owned()
-            }
-            slug => slug,
-        };
-        let id = insert_source(&tx, owner, target, &base).await?;
+        let id = insert_source(&tx, owner, target, &slug_base(&name)).await?;
         for (tool, name) in &named {
             db::agent_tool_set_execute(&tx, id, tool, name, &ToolSettings::default()).await?;
         }
@@ -606,11 +634,12 @@ impl Tools {
         if !discovered.is_empty() {
             return Ok(discovered);
         }
+        let key = url.to_owned();
         let cached = self
             .probes
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .get(url)
+            .get(&key)
             .filter(|(at, _)| at.elapsed() < PROBE_TTL)
             .map(|(_, tools)| tools.clone());
         let probed = match cached {
@@ -620,7 +649,7 @@ impl Tools {
                 self.probes
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
-                    .insert(url.to_owned(), (std::time::Instant::now(), tools.clone()));
+                    .insert(key, (std::time::Instant::now(), tools.clone()));
                 tools
             }
         };
@@ -823,36 +852,7 @@ impl Tools {
             apply(&mut definition, row.summary, row.description, &row.display);
             out.push((definition, Callee::Sandbox(row.tool_name), dynamic));
         }
-        for row in proxied {
-            let mut definition = types::ToolDefinition {
-                name: format!("{}.{}", row.slug, row.name),
-                provider_id: row.provider_id.clone(),
-                description: row.tool_description,
-                input_schema_json: row.input_schema_json,
-                output_schema_json: row.output_schema_json,
-                detached: row.is_async,
-                annotations: types::ToolAnnotations {
-                    read_only: row.read_only,
-                    destructive: row.destructive,
-                    idempotent: row.idempotent,
-                    open_world: row.open_world,
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
-            };
-            apply(&mut definition, row.summary, row.description, &row.display);
-            out.push((
-                definition,
-                Callee::Mcp(
-                    row.connection_id,
-                    row.provider_id,
-                    row.type_id,
-                    row.tool_name,
-                ),
-                dynamic,
-            ));
-        }
+        out.extend(proxied.into_iter().map(|row| mcp_entry(row, dynamic)));
         for row in hosted {
             let mut definition = types::ToolDefinition {
                 name: format!("{}.{}", row.slug, row.name),
@@ -880,27 +880,60 @@ impl Tools {
             };
             out.push((definition, Callee::Host(target, row.tool_name), dynamic));
         }
-        for row in rows {
-            // A provider release may drop a tool an agent still uses; it then disappears from
-            // the catalog instead of failing every ListTools.
-            let Some(mut definition) = providers::provider(&row.provider_id, &row.type_id)
-                .and_then(|p| p.tools().into_iter().find(|t| t.name == row.tool_name))
-            else {
-                continue;
-            };
-            definition.name = format!("{}.{}", row.slug, row.name);
-            definition.provider_id = row.provider_id.clone();
-            definition.detached = row.is_async;
-            apply(
-                &mut definition,
-                row.summary.clone(),
-                row.description.clone(),
-                &row.display,
-            );
-            out.push((definition, Callee::Connection(row), dynamic));
-        }
+        out.extend(
+            rows.into_iter()
+                .filter_map(|row| connection_entry(row, dynamic)),
+        );
         Ok(out)
     }
+}
+/// A managed provider's tool as the agent's catalog offers it. A provider release may drop a
+/// tool an agent still uses; it then disappears from the catalog instead of failing every
+/// ListTools.
+fn connection_entry(row: db::AgentFunctionRow, dynamic: bool) -> Option<Entry> {
+    let mut definition = providers::provider(&row.provider_id, &row.type_id)
+        .and_then(|p| p.tools().into_iter().find(|t| t.name == row.tool_name))?;
+    definition.name = format!("{}.{}", row.slug, row.name);
+    definition.provider_id = row.provider_id.clone();
+    definition.detached = row.is_async;
+    apply(
+        &mut definition,
+        row.summary.clone(),
+        row.description.clone(),
+        &row.display,
+    );
+    Some((definition, Callee::Connection(row), dynamic))
+}
+/// A discovered tool of an MCP-served connection as the agent's catalog offers it.
+fn mcp_entry(row: db::AgentMcpFunctionRow, dynamic: bool) -> Entry {
+    let mut definition = types::ToolDefinition {
+        name: format!("{}.{}", row.slug, row.name),
+        provider_id: row.provider_id.clone(),
+        description: row.tool_description,
+        input_schema_json: row.input_schema_json,
+        output_schema_json: row.output_schema_json,
+        detached: row.is_async,
+        annotations: types::ToolAnnotations {
+            read_only: row.read_only,
+            destructive: row.destructive,
+            idempotent: row.idempotent,
+            open_world: row.open_world,
+            ..Default::default()
+        }
+        .into(),
+        ..Default::default()
+    };
+    apply(&mut definition, row.summary, row.description, &row.display);
+    (
+        definition,
+        Callee::Mcp(
+            row.connection_id,
+            row.provider_id,
+            row.type_id,
+            row.tool_name,
+        ),
+        dynamic,
+    )
 }
 /// Tool input is checked against the tool's own schema before any provider sees it.
 pub(crate) fn validate(definition: &types::ToolDefinition, input: &Value) -> ToolResult<()> {
@@ -971,6 +1004,127 @@ impl Tools {
             .await
     }
 }
+impl Tools {
+    /// The agent's tools a sidecar runs itself, for its replicated configuration, with the
+    /// connections they need credentials for. Built from the same rows and wording as the
+    /// gateway's catalog, without the sources only the gateway can reach.
+    pub(crate) async fn sidecar_tools(
+        &self,
+        agent: Uuid,
+    ) -> Result<(Vec<sidecar::SidecarTool>, Vec<Uuid>), Error> {
+        let dynamic = self.mode(agent).await?;
+        let client = self.connections.pool.get().await?;
+        let rows = db::agent_functions_all(&client, Some(agent), None).await?;
+        let proxied = db::agent_mcp_functions_all(&client, Some(agent), None).await?;
+        drop(client);
+        let entries = rows
+            .into_iter()
+            .filter_map(|row| connection_entry(row, dynamic))
+            .chain(proxied.into_iter().map(|row| mcp_entry(row, dynamic)))
+            .filter(|(_, callee, _)| callee.on_sidecar());
+        let mut tools = Vec::new();
+        let mut connections = Vec::new();
+        for (definition, callee, deferred) in entries {
+            let (connection, tool_name, mcp) = match callee {
+                Callee::Connection(row) => (row.connection_id, row.tool_name, None),
+                Callee::Mcp(connection, provider, typ, tool_name) => {
+                    // A type no longer served by an MCP server drops its tools, not the rest.
+                    let server = match self.mcp_target(connection, &provider, &typ).await {
+                        Ok(target) => target.server,
+                        Err(error) => {
+                            tracing::warn!(%connection, %error, "MCP tool left out of a sidecar configuration");
+                            continue;
+                        }
+                    };
+                    let mcp = sidecar::McpServer {
+                        credential: server.credential.as_str().into(),
+                        credential_name: server.credential.name().unwrap_or_default().into(),
+                        credential_prefix: server.credential.prefix().into(),
+                        url: server.url,
+                        ..Default::default()
+                    };
+                    (connection, tool_name, Some(mcp))
+                }
+                _ => continue,
+            };
+            if !connections.contains(&connection) {
+                connections.push(connection);
+            }
+            tools.push(sidecar::SidecarTool {
+                definition: definition.into(),
+                deferred,
+                connection_id: connection.to_string(),
+                tool_name,
+                mcp: mcp.into(),
+                ..Default::default()
+            });
+        }
+        Ok((tools, connections))
+    }
+    /// The invocation's tools only the gateway can run, listed and deferred, for a sidecar.
+    pub(crate) async fn gateway_tools(
+        &self,
+        scope: &Scope,
+    ) -> ToolResult<(Vec<types::ToolDefinition>, Vec<types::ToolDefinition>)> {
+        let (mut listed, mut deferred) = (Vec::new(), Vec::new());
+        for (definition, callee, dynamic) in self.catalog(scope).await?.iter() {
+            if !callee.on_sidecar() {
+                if *dynamic { &mut deferred } else { &mut listed }.push(definition.clone());
+            }
+        }
+        Ok((listed, deferred))
+    }
+    /// Run one of those tools for a sidecar. The relay verified the invocation; its capability
+    /// ceiling is checked again here as the sidecar's registry did.
+    pub(crate) async fn call_gateway_tool(
+        &self,
+        scope: &Scope,
+        call_id: Uuid,
+        name: &str,
+        input: Value,
+    ) -> ToolResult<Value> {
+        if !scope
+            .capabilities
+            .permits(crate::iam::capabilities::Capability::ToolsInvoke, name)
+        {
+            return Err(ConnectError::permission_denied(
+                "Tool is not available to this agent",
+            ));
+        }
+        let (definition, callee, _) = self
+            .catalog(scope)
+            .await?
+            .iter()
+            .find(|(definition, callee, _)| definition.name == name && !callee.on_sidecar())
+            .cloned()
+            .ok_or_else(|| ConnectError::not_found("Tool is not available to this agent"))?;
+        validate(&definition, &input)?;
+        self.dispatch(scope, call_id, callee, input).await
+    }
+    async fn dispatch(
+        &self,
+        scope: &Scope,
+        call_id: Uuid,
+        callee: Callee,
+        input: Value,
+    ) -> ToolResult<Value> {
+        if let Callee::Sandbox(tool_name) = callee {
+            return self.sandboxes.invoke(scope, &tool_name, input).await;
+        }
+        self.run(
+            callee,
+            Caller {
+                call_id,
+                agent: Some(scope.agent_id),
+                thread: Some(scope.thread_id),
+                run: Some(scope.run_id),
+                sandbox: None,
+            },
+            input,
+        )
+        .await
+    }
+}
 impl Provider for Tools {
     fn tools<'a>(
         &'a self,
@@ -1022,21 +1176,8 @@ impl Provider for Tools {
                 .ok_or_else(|| ConnectError::not_found("Tool is not available to this agent"))?;
             validate(&definition, &input)?;
             context.authorize().await?;
-            let scope = context.scope();
-            if let Callee::Sandbox(tool_name) = callee {
-                return self.sandboxes.invoke(scope, &tool_name, input).await;
-            }
-            self.run(
-                callee,
-                Caller {
-                    call_id: context.call_id,
-                    agent: Some(scope.agent_id),
-                    thread: Some(scope.thread_id),
-                    sandbox: None,
-                },
-                input,
-            )
-            .await
+            self.dispatch(context.scope(), context.call_id, callee, input)
+                .await
         })
     }
 }

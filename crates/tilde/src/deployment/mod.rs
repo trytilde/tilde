@@ -2,6 +2,7 @@
 //! Postgres is the record and the gateway its only writer. A replica caches the
 //! threads it holds a lease on, executes the agent for them, and ships typed
 //! events back asynchronously. Replicas dial in; the gateway never dials out.
+pub(crate) mod apply;
 pub mod attachments;
 pub mod db;
 pub mod gateway;
@@ -333,6 +334,39 @@ impl Deployments {
         agent: Uuid,
         r: RegisterDeployment,
     ) -> Result<(types::AgentDeployment, Option<SecretString>, bool), Error> {
+        if crate::local::db::harness_opt(&self.pool.get().await?, agent)
+            .await?
+            .is_some()
+        {
+            return Err(Error::Invalid(
+                "A local agent runs in its harness and has no deployments".into(),
+            ));
+        }
+        let prepared = self.prepare(r).await?;
+        if let Some(external) = &prepared.external
+            && let Some(existing) = crate::deployment::db::deployment_external_opt(
+                &self.pool.get().await?,
+                agent,
+                external,
+            )
+            .await?
+        {
+            return Ok((self.deployment(agent, existing.id).await?, None, false));
+        }
+        let mut tx_client = self.pool.get().await?;
+        let tx = tx_client.transaction().await?;
+        let registered = self.register_in(&tx, agent, &prepared).await?;
+        tx.commit().await?;
+        drop(tx_client);
+        match registered {
+            Registered::Existing(id) => Ok((self.deployment(agent, id).await?, None, false)),
+            Registered::Created(id, token) => {
+                Ok((self.deployment(agent, id).await?, Some(token), true))
+            }
+        }
+    }
+    /// Validates a registration and loads its declared skills, outside any transaction.
+    pub(crate) async fn prepare(&self, r: RegisterDeployment) -> Result<Prepared, Error> {
         let source = match r.source {
             types::DeploymentSource::Ci => "ci",
             types::DeploymentSource::Manual => "manual",
@@ -379,16 +413,6 @@ impl Deployments {
         let commit_message = short(r.commit_message, "Commit message")?;
         let branch = short(r.branch, "Branch")?;
         let commit_author = short(r.commit_author, "Commit author")?;
-        if let Some(external) = &external
-            && let Some(existing) = crate::deployment::db::deployment_external_opt(
-                &self.pool.get().await?,
-                agent,
-                external,
-            )
-            .await?
-        {
-            return Ok((self.deployment(agent, existing.id).await?, None, false));
-        }
         let prompts = declared_prompts(r.declarations.prompts)?;
         if r.declarations.skills.len() > MAX_DECLARED {
             return Err(Error::Invalid(
@@ -397,49 +421,66 @@ impl Deployments {
         }
         let tools = declared_tools(r.declarations.tools)?;
         let skills = self.skills().prepare(r.declarations.skills).await?;
-        let mut tx_client = self.pool.get().await?;
-        let tx = tx_client.transaction().await?;
-        let current = crate::deployment::db::lock_opt(&tx, agent)
+        Ok(Prepared {
+            source,
+            target,
+            reference,
+            repository,
+            commit,
+            external,
+            label,
+            commit_message,
+            branch,
+            commit_author,
+            prompts,
+            tools,
+            skills,
+        })
+    }
+    /// Registers a prepared deployment inside `tx`, or finds the agent's one with its external ID.
+    pub(crate) async fn register_in(
+        &self,
+        tx: &Transaction<'_>,
+        agent: Uuid,
+        p: &Prepared,
+    ) -> Result<Registered, Error> {
+        let current = crate::deployment::db::lock_opt(tx, agent)
             .await?
             .ok_or(Error::NotFound)?;
-        if let Some(external) = &external
+        if let Some(external) = &p.external
             && let Some(existing) =
-                crate::deployment::db::deployment_external_opt(&tx, agent, external).await?
+                crate::deployment::db::deployment_external_opt(tx, agent, external).await?
         {
-            tx.commit().await?;
-            drop(tx_client);
-            return Ok((self.deployment(agent, existing.id).await?, None, false));
+            return Ok(Registered::Existing(existing.id));
         }
         let id = Uuid::new_v4();
         let token = secrets::random_secret();
         let hash = Sha256::digest(token.expose_secret().as_bytes()).to_vec();
         crate::deployment::db::deployment_create_one(
-            &tx,
+            tx,
             id,
             agent,
-            source,
-            target,
-            reference.as_deref(),
-            repository.as_deref(),
-            commit.as_deref(),
-            external.as_deref(),
-            &(label),
-            &(hash),
-            commit_message.as_deref(),
-            branch.as_deref(),
-            commit_author.as_deref(),
+            p.source,
+            p.target,
+            p.reference.as_deref(),
+            p.repository.as_deref(),
+            p.commit.as_deref(),
+            p.external.as_deref(),
+            &p.label,
+            &hash,
+            p.commit_message.as_deref(),
+            p.branch.as_deref(),
+            p.commit_author.as_deref(),
         )
         .await?;
-        crate::prompts::register(&tx, agent, id, &prompts).await?;
-        crate::skills::Skills::register_code(&tx, agent, id, &skills).await?;
-        crate::tools::register_declared(&tx, id, &tools).await?;
-        self.ensure_secrets(&tx, agent).await?;
+        crate::prompts::register(tx, agent, id, &p.prompts).await?;
+        crate::skills::Skills::register_code(tx, agent, id, &p.skills).await?;
+        crate::tools::register_declared(tx, id, &p.tools).await?;
+        self.ensure_secrets(tx, agent).await?;
         if current.routing == "latest" || current.serving_deployment_id.is_none() {
-            self.promote_in(&tx, agent, id).await?;
+            self.promote_in(tx, agent, id).await?;
         }
-        tx.commit().await?;
-        drop(tx_client);
-        Ok((self.deployment(agent, id).await?, Some(token), true))
+        Ok(Registered::Created(id, token))
     }
     /// The prompt and skill versions and the bundled tools a deployment shipped.
     pub async fn contents(
@@ -722,8 +763,15 @@ impl Deployments {
         instance: Uuid,
         r: &wire::Heartbeat,
     ) -> Result<(), Error> {
+        let mut client = self.pool.get().await?;
+        let tx = client.transaction().await?;
+        // A heartbeat is superseded by the next one, so it does not wait for its WAL flush: a
+        // crash loses at most the latest few, which liveness tolerates. Flushes stall for
+        // seconds when other work on the server writes heavily.
+        tx.batch_execute("SET LOCAL synchronous_commit = off")
+            .await?;
         if crate::deployment::db::heartbeat_execute(
-            &self.pool.get().await?,
+            &tx,
             agent,
             instance,
             r.ready,
@@ -738,7 +786,7 @@ impl Deployments {
         }
         if let Ok(sample) = id(&r.sample_id) {
             crate::deployment::db::telemetry_health_execute(
-                &self.pool.get().await?,
+                &tx,
                 sample,
                 agent,
                 &(instance.to_string()),
@@ -748,6 +796,7 @@ impl Deployments {
             )
             .await?;
         }
+        tx.commit().await?;
         Ok(())
     }
     pub async fn instance_live(&self, agent: Uuid, instance: Uuid) -> Result<bool, Error> {
@@ -823,23 +872,25 @@ impl Deployments {
             agent_generation: row.generation,
             ..Default::default()
         };
+        let credentials = async |connection: &crate::connections::model::Connection| {
+            if connection.status != "ready" {
+                return Ok::<_, Error>(vec![]);
+            }
+            let values = self.connections.resolve(connection.id).await?;
+            Ok(values
+                .iter()
+                .map(|(name, value)| wire::CredentialField {
+                    name: name.clone(),
+                    value: value.expose_secret().into(),
+                    ..Default::default()
+                })
+                .collect())
+        };
         for assigned in
             crate::deployment::db::assigned_connections_all(&self.pool.get().await?, agent).await?
         {
             let connection = self.connections.get(assigned.id).await?;
-            let credentials = if connection.status == "ready" {
-                let values = self.connections.resolve(assigned.id).await?;
-                values
-                    .iter()
-                    .map(|(name, value)| wire::CredentialField {
-                        name: name.clone(),
-                        value: value.expose_secret().into(),
-                        ..Default::default()
-                    })
-                    .collect()
-            } else {
-                vec![]
-            };
+            let credentials = credentials(&connection).await?;
             let capability = if assigned.capability == "inference" {
                 types::Capability::Inference
             } else {
@@ -891,6 +942,44 @@ impl Deployments {
                 ..Default::default()
             });
         }
+        // The agent's tools the sidecar runs itself, and the credentials of their connections. A
+        // connection already replicated for a channel or inference is not repeated: older
+        // sidecars find connections by id alone. A tool connection whose credentials cannot be
+        // resolved (a failed refresh) leaves its tools out rather than failing the configuration.
+        let (mut tools, used) = crate::tools::Tools::new(self.connections.clone(), String::new())
+            .sidecar_tools(agent)
+            .await?;
+        for id in used {
+            if response.connections.iter().any(|c| c.id == id.to_string()) {
+                continue;
+            }
+            let connection = self.connections.get(id).await?;
+            let credentials = match credentials(&connection).await {
+                Ok(credentials) => credentials,
+                Err(error) => {
+                    tracing::warn!(connection=%id, %error, "Tool connection left out of a sidecar configuration");
+                    tools.retain(|tool| tool.connection_id != id.to_string());
+                    continue;
+                }
+            };
+            response.connections.push(wire::ConnectionConfiguration {
+                capability: types::Capability::Tool.into(),
+                expires_at: connection
+                    .token_expires_at
+                    .map(|t| t.timestamp_millis())
+                    .unwrap_or(0),
+                credentials,
+                id: id.to_string(),
+                provider_id: connection.provider_id,
+                type_id: connection.type_id,
+                name: connection.name,
+                status: connection.status,
+                account_label: connection.account_label.unwrap_or_default(),
+                credential_version: connection.credential_version,
+                ..Default::default()
+            });
+        }
+        response.tools = tools;
         Ok(response)
     }
     pub(crate) async fn signing_key(&self, agent: Uuid) -> Result<SecretString, Error> {
@@ -1342,6 +1431,26 @@ pub struct RegisterDeployment {
     /// Prompts, skills and bundled tools the agent's code declares (`tilde deploy`).
     pub declarations: management::DeploymentDeclarations,
 }
+/// A validated registration, ready to write.
+pub(crate) struct Prepared {
+    source: &'static str,
+    target: &'static str,
+    reference: Option<String>,
+    repository: Option<String>,
+    commit: Option<String>,
+    external: Option<String>,
+    label: String,
+    commit_message: Option<String>,
+    branch: Option<String>,
+    commit_author: Option<String>,
+    prompts: Vec<crate::prompts::Declared>,
+    tools: Vec<(types::ToolDefinition, String)>,
+    skills: Vec<(crate::skills::package::Package, String)>,
+}
+pub(crate) enum Registered {
+    Existing(Uuid),
+    Created(Uuid, SecretString),
+}
 const MAX_DECLARED: usize = 1024;
 /// Validate declared bundled tools as an invocation's registered ones are.
 fn declared_tools(
@@ -1530,11 +1639,12 @@ impl Drop for WatchConnection {
             self.connection,
         );
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            handle.spawn(async move {
+            let close = async move {
                 if let Ok(client) = pool.get().await {
                     let _ = db::watch_close_execute(&client, agent, instance, connection).await;
                 }
-            });
+            };
+            handle.spawn(close);
         }
     }
 }

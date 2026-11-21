@@ -116,6 +116,12 @@ impl Registry {
             providers.push(Arc::new(
                 crate::deployment::runtime::providers::GatewayKnowledge(local.clone()),
             ));
+            providers.push(Arc::new(
+                crate::deployment::runtime::providers::ReplicatedTools(local.clone()),
+            ));
+            providers.push(Arc::new(
+                crate::deployment::runtime::providers::GatewayTools::new(local.clone()),
+            ));
         }
         Self::new(providers)
     }
@@ -232,8 +238,7 @@ impl Registry {
         let call_id = super::id(&first.call_id)?;
         let entries = self.entries(&scope).await?;
         if ![dynamic::SEARCH, dynamic::SCHEMAS, dynamic::EXECUTE].contains(&first.name.as_str()) {
-            return self
-                .call(chat, scope, capability, requests, first, entries, call_id)
+            return Box::pin(self.call(chat, scope, capability, requests, first, entries, call_id))
                 .await;
         }
         if !entries.iter().any(|(_, _, deferred)| *deferred)
@@ -340,12 +345,11 @@ impl Registry {
             capability: SecretString::from(capability.expose_secret()),
         };
         let _end = crate::telemetry::tracing::context::EndOnDrop(cx.clone());
-        let result = self
-            .execute(
-                chat, capability, requests, first, definition, provider, context, input,
-            )
-            .with_context(cx.clone())
-            .await;
+        let result = Box::pin(self.execute(
+            chat, capability, requests, first, definition, provider, context, input,
+        ))
+        .with_context(cx.clone())
+        .await;
         finish(&cx, &result);
         result
     }
@@ -432,7 +436,7 @@ impl Registry {
                     KeyValue::new("tilde.tool.background", true),
                 ],
             );
-            tokio::spawn(async move {
+            let task = async move {
                 let _end = crate::telemetry::tracing::context::EndOnDrop(background.clone());
                 let mut result = provider
                     .invoke(context, &name, input, stream)
@@ -448,7 +452,8 @@ impl Registry {
                     // The result stays readable by ticket through tools.result.
                     tracing::warn!(%ticket, %error, "Background tool result was not delivered");
                 }
-            });
+            };
+            tokio::spawn(task);
             return Ok(serde_json::json!({
                 "ticket": ticket,
                 "status": "processing",

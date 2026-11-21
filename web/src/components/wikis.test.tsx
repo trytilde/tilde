@@ -29,11 +29,18 @@ vi.mock("./agent-memory", () => ({
   applyMemoryDraft: vi.fn(),
   NO_MEMORY: { own: null, links: [] },
 }));
-// Monaco does not run in jsdom; a textarea stands in for the raw Markdown editor.
-vi.mock("./code-editor", () => ({
-  default: ({ value, onChange }: { value: string; onChange?: (value: string) => void }) => (
-    <textarea aria-label="Markdown" value={value} onChange={(e) => onChange?.(e.target.value)} />
-  ),
+// Tiptap needs a real layout engine; a textarea stands in for the markdown editor.
+vi.mock("./markdown-editor", async (original) => ({
+  ...(await original<typeof import("./markdown-editor")>()),
+  MarkdownEditor: ({
+    value,
+    onChange,
+    label,
+  }: {
+    value: string;
+    onChange?: (value: string) => void;
+    label?: string;
+  }) => <textarea aria-label={label} value={value} onChange={(e) => onChange?.(e.target.value)} />,
 }));
 const rpc = vi.hoisted(() => ({
   agents: { createAgent: vi.fn(), updateAgent: vi.fn(), listAgents: vi.fn() },
@@ -130,7 +137,7 @@ it("resolves a stale save by saving on top of the latest revision, and restores 
     .mockResolvedValue({ page: latest });
   renderWiki("wiki-handbook", "pages");
 
-  await screen.findByRole("heading", { name: "Deploys", level: 2 });
+  await screen.findByRole("heading", { name: "Deploys", level: 1 });
   // GitHub tables render.
   within(screen.getByRole("article", { name: "Deploys" })).getByRole("cell", { name: "Ship" });
   fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -142,7 +149,11 @@ it("resolves a stale save by saving on top of the latest revision, and restores 
   // The raw Markdown goes back unchanged, table included.
   await waitFor(() =>
     expect(rpc.wikis.updateWikiPage).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2, title: "Deploying", content: page.content }),
+      expect.objectContaining({
+        expectedRevision: 2,
+        title: "Deploying",
+        content: page.content.replace("# Deploys", "# Deploying"),
+      }),
     ),
   );
   // Someone saved first: their change shows, and the draft can go on top of it.
@@ -192,7 +203,9 @@ it("opens wiki links in the app and never loads images from elsewhere", () => {
   ));
   return waitFor(() => {
     const page = screen.getByRole("link", { name: "Deploys" });
-    expect(page.getAttribute("href")).toBe("/wikis/wiki-handbook/pages?page=runbooks%2Fdeploys");
+    expect(page.getAttribute("href")).toBe(
+      "/registry/wikis/wiki-handbook/pages?page=runbooks%2Fdeploys",
+    );
     expect(page.getAttribute("target")).toBeNull();
     expect(screen.getByRole("link", { name: "Docs" }).getAttribute("target")).toBe("_blank");
     // The remote image is a link, not an <img> the browser would fetch.
@@ -224,10 +237,14 @@ it("holds creating an agent while its own wiki's name is another wiki's", async 
 
 it("offers to create a page a URL names that does not exist", async () => {
   rpc.wikis.listWikiPages.mockResolvedValue({ pages: [], more: false });
-  renderWiki("wiki-handbook", "pages", "/wikis/wiki-handbook/pages?page=runbooks%2Fmissing");
+  renderWiki(
+    "wiki-handbook",
+    "pages",
+    "/registry/wikis/wiki-handbook/pages?page=runbooks%2Fmissing",
+  );
   await screen.findByText(/No page at/);
   screen.getByText("runbooks/missing");
   fireEvent.click(screen.getByRole("button", { name: "Create it" }));
-  const path = (await screen.findByRole("textbox", { name: "Path" })) as HTMLInputElement;
+  const path = (await screen.findByRole("combobox", { name: "Path" })) as HTMLInputElement;
   expect(path.value).toBe("runbooks/missing");
 });

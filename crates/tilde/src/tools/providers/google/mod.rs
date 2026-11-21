@@ -40,6 +40,7 @@ fn definition(
         .map(|(key, value)| (key.to_owned(), value.to_owned()))
         .into();
     model::Provider {
+        api_hosts: vec!["*.googleapis.com".into()],
         account_name_label: Some("Account name".into()),
         icon_url: Some(format!("/provider-icons/{id}.svg")),
         instructions: Some(format!(

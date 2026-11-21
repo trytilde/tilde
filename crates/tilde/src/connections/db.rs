@@ -358,10 +358,11 @@ pub async fn provider_insert_execute(
     p10: Option<&str>,
     p11: Option<&str>,
     p12: Option<uuid::Uuid>,
+    p13: &[String],
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::provider_insert::run()
         .bind(
-            db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12,
+            db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12, &p13,
         )
         .await?)
 }
@@ -794,11 +795,12 @@ pub async fn types_insert_execute(
     p23: &str,
     p24: &str,
     p25: bool,
+    p26: bool,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::types_insert::run()
         .bind(
             db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12, &p13, &p14, &p15,
-            &p16, &p17, &p18, &p19, &p20, &p21, &p22, &p23, &p24, &p25,
+            &p16, &p17, &p18, &p19, &p20, &p21, &p22, &p23, &p24, &p25, &p26,
         )
         .await?)
 }
@@ -900,6 +902,19 @@ pub async fn connection_bump_version_execute(
     Ok(
         tilde_queries::queries::connections::connection_bump_version::run()
             .bind(db, &p1)
+            .await?,
+    )
+}
+pub use tilde_queries::queries::connections::connection_by_slug::Record as SlugRow;
+pub async fn connection_by_slug_all(
+    db: &impl GenericClient,
+    provider: &str,
+    name: &str,
+) -> DbResult<Vec<SlugRow>> {
+    Ok(
+        tilde_queries::queries::connections::connection_by_slug::run()
+            .bind(db, &provider.to_owned(), &name.to_owned())
+            .all()
             .await?,
     )
 }

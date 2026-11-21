@@ -339,7 +339,7 @@ it("never saves one skill's files over the next skill opened", async () => {
   const root = createRootRoute();
   const route = createRoute({
     getParentRoute: () => root,
-    path: "/skills/$skillId",
+    path: "/registry/skills/$skillId",
     component: function Page() {
       const { skillId } = useParams({ strict: false }) as { skillId: string };
       return <SkillDetail id={skillId} />;
@@ -347,7 +347,7 @@ it("never saves one skill's files over the next skill opened", async () => {
   });
   const router = createRouter({
     routeTree: root.addChildren([route]),
-    history: createMemoryHistory({ initialEntries: ["/skills/s1"] }),
+    history: createMemoryHistory({ initialEntries: ["/registry/skills/s1"] }),
   });
   render(<RouterProvider router={router} />);
   await screen.findByRole("treeitem", { name: "first-only.txt" });
@@ -355,7 +355,7 @@ it("never saves one skill's files over the next skill opened", async () => {
   fireEvent.change(await screen.findByRole("textbox", { name: "Contents of SKILL.md" }), {
     target: { value: "# refunds\nUnsaved.\n" },
   });
-  await router.navigate({ to: "/skills/$skillId", params: { skillId: "s2" } });
+  await router.navigate({ to: "/registry/skills/$skillId", params: { skillId: "s2" } });
   await screen.findByRole("treeitem", { name: "second-only.txt" });
   expect(screen.queryByRole("treeitem", { name: "first-only.txt" })).toBeNull();
   fireEvent.change(await screen.findByRole("textbox", { name: "Contents of SKILL.md" }), {

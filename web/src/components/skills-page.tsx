@@ -212,7 +212,7 @@ export function SkillsPage() {
           <Pill
             icon={<LayoutGridIcon />}
             label="Tilde Catalog"
-            onClick={() => void navigate({ to: "/skills/catalog" })}
+            onClick={() => void navigate({ to: "/registry/skills/catalog" })}
           />
           <Pill icon={<GitBranchIcon />} label="Add from Git" onClick={() => setDialog("git")} />
           <Pill
@@ -336,14 +336,14 @@ export function SkillsPage() {
                             className="cursor-pointer"
                             onClick={() =>
                               void navigate({
-                                to: "/skills/$skillId",
+                                to: "/registry/skills/$skillId",
                                 params: { skillId: skill.id },
                               })
                             }
                           >
                             <TableCell className="pl-14">
                               <Link
-                                to="/skills/$skillId"
+                                to="/registry/skills/$skillId"
                                 params={{ skillId: skill.id }}
                                 className="font-mono font-medium hover:underline"
                                 onClick={(event) => event.stopPropagation()}

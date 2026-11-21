@@ -89,7 +89,7 @@ impl Signer {
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\n{}",
             request.method(),
-            canonical_uri(request.url()),
+            canonical_uri(request.url(), &self.service),
             canonical_query(request.url()),
             canonical_headers,
             signed_headers,
@@ -145,7 +145,7 @@ impl Signer {
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\nUNSIGNED-PAYLOAD",
             method,
-            canonical_uri(&url),
+            canonical_uri(&url, &self.service),
             canonical_query(&url),
             canonical_headers,
             signed_headers
@@ -220,12 +220,22 @@ fn canonical_header_values(
 fn normalize(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
-fn canonical_uri(url: &Url) -> &str {
-    if url.path().is_empty() {
+/// The canonical URI: the path as sent for S3; for every other service each segment of the path
+/// as sent is URI-encoded again, as SigV4 requires (`%3A` in a Lambda function ARN signs as
+/// `%253A`, and a raw `:` as `%3A`).
+fn canonical_uri(url: &Url, service: &str) -> String {
+    let path = if url.path().is_empty() {
         "/"
     } else {
         url.path()
+    };
+    if service == "s3" {
+        return path.to_owned();
     }
+    path.split('/')
+        .map(|segment| aws_encode(segment.as_bytes()))
+        .collect::<Vec<_>>()
+        .join("/")
 }
 fn canonical_query(url: &Url) -> String {
     let mut pairs = url
@@ -298,6 +308,32 @@ mod tests {
         assert_eq!(
             auth,
             "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20151123/us-east-1/iam/aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date, Signature=dbf58bfffd80cb426e938e92f05fc55d186f79a6e07506afbfc4c1315a999c37"
+        );
+    }
+    /// A Lambda invoke names the function by its URL-encoded ARN; non-S3 services sign that path
+    /// encoded again. Vector computed with botocore's SigV4Auth.
+    #[test]
+    fn signs_an_encoded_path_encoded_again() {
+        let lambda = Signer::new(signer().credentials.clone(), "us-east-1", "lambda");
+        let mut request = reqwest::Client::new()
+            .post("https://lambda.us-east-1.amazonaws.com/2015-03-31/functions/arn%3Aaws%3Alambda%3Aus-east-1%3A123456789012%3Afunction%3Aagent/invocations")
+            .header("x-amz-invocation-type", "Event")
+            .build()
+            .unwrap();
+        lambda
+            .sign_request_at(
+                &mut request,
+                b"{}",
+                UNIX_EPOCH + Duration::from_secs(1_448_250_400),
+            )
+            .unwrap();
+        assert!(
+            request.headers()[header::AUTHORIZATION]
+                .to_str()
+                .unwrap()
+                .ends_with(
+                    "Signature=ec70c4d5f2e61edbb2746f50caafbf9e456579d707e3564d3a1f943646c10a91"
+                )
         );
     }
     #[test]

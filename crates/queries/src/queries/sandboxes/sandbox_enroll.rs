@@ -1,9 +1,10 @@
 // This file was generated with `cornucopia`. Do not modify.
 
 #[derive(Debug)]
-pub struct RunParams<T1: crate::BytesSql, T2: crate::BytesSql> {
+pub struct RunParams<T1: crate::BytesSql, T2: crate::BytesSql, T3: crate::BytesSql> {
     pub p2: T1,
-    pub p1: T2,
+    pub p3: T2,
+    pub p1: T3,
 }
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Record {
@@ -79,7 +80,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "UPDATE sandboxes SET enrollment_hash=NULL,session_hash=$1,connected_at=NOW() WHERE enrollment_hash=$2 RETURNING id,blueprint_id",
+        "UPDATE sandboxes SET enrollment_hash=NULL,session_hash=$1,egress_hash=$2,connected_at=NOW() WHERE enrollment_hash=$3 RETURNING id,blueprint_id",
         None,
     )
 }
@@ -91,15 +92,24 @@ impl RunStmt {
         self.1 = Some(client.prepare(self.0).await?);
         Ok(self)
     }
-    pub fn bind<'c, 'a, 's, C: GenericClient, T1: crate::BytesSql, T2: crate::BytesSql>(
+    pub fn bind<
+        'c,
+        'a,
+        's,
+        C: GenericClient,
+        T1: crate::BytesSql,
+        T2: crate::BytesSql,
+        T3: crate::BytesSql,
+    >(
         &'s self,
         client: &'c C,
         p2: &'a T1,
-        p1: &'a T2,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
+        p3: &'a T2,
+        p1: &'a T3,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
         RecordQuery {
             client,
-            params: [p2, p1],
+            params: [p2, p3, p1],
             query: self.0,
             cached: self.1.as_ref(),
             extractor: |row: &tokio_postgres::Row| -> Result<Record, tokio_postgres::Error> {
@@ -112,21 +122,21 @@ impl RunStmt {
         }
     }
 }
-impl<'c, 'a, 's, C: GenericClient, T1: crate::BytesSql, T2: crate::BytesSql>
+impl<'c, 'a, 's, C: GenericClient, T1: crate::BytesSql, T2: crate::BytesSql, T3: crate::BytesSql>
     crate::client::async_::Params<
         'c,
         'a,
         's,
-        RunParams<T1, T2>,
-        RecordQuery<'c, 'a, 's, C, Record, 2>,
+        RunParams<T1, T2, T3>,
+        RecordQuery<'c, 'a, 's, C, Record, 3>,
         C,
     > for RunStmt
 {
     fn params(
         &'s self,
         client: &'c C,
-        params: &'a RunParams<T1, T2>,
-    ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
-        self.bind(client, &params.p2, &params.p1)
+        params: &'a RunParams<T1, T2, T3>,
+    ) -> RecordQuery<'c, 'a, 's, C, Record, 3> {
+        self.bind(client, &params.p2, &params.p3, &params.p1)
     }
 }

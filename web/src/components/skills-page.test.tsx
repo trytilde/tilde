@@ -65,17 +65,17 @@ function renderPage() {
   const index = createRoute({ getParentRoute: () => root, path: "/", component: SkillsPage });
   const source = createRoute({
     getParentRoute: () => root,
-    path: "/skills",
+    path: "/registry/skills",
     component: () => <p>Skills list</p>,
   });
   const catalogPage = createRoute({
     getParentRoute: () => root,
-    path: "/skills/catalog",
+    path: "/registry/skills/catalog",
     component: () => <p>Catalog page</p>,
   });
   const detail = createRoute({
     getParentRoute: () => root,
-    path: "/skills/$skillId",
+    path: "/registry/skills/$skillId",
     component: () => <p>Skill {useParams({ strict: false }).skillId}</p>,
   });
   const router = createRouter({

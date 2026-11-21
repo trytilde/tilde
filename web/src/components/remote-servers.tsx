@@ -202,7 +202,7 @@ export function RemoteServersPage() {
   return (
     <div className="flex flex-col">
       <div
-        className="trace-controls flex min-h-10 items-center gap-2 border-b bg-background px-3 py-1.5"
+        className="trace-controls flex min-h-10 flex-wrap items-center gap-2 border-b bg-background px-3 py-1.5"
         role="group"
         aria-label="Remote server filter bar"
       >

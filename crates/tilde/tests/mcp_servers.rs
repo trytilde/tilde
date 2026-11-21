@@ -117,6 +117,7 @@ async fn a_dynamically_registered_mcp_server_is_set_up_and_called_with_its_own_t
             name: "Wiki".into(),
             kind: ProviderKind::BuiltIn,
             categories: vec!["documents_and_files".into()],
+            api_hosts: vec![],
             connection_types: vec![ConnectionType {
                 id: "oauth".into(),
                 name: "Sign in with Wiki".into(),
@@ -294,6 +295,7 @@ async fn discovery_never_follows_a_server_to_a_private_address() {
             name: "Intranet".into(),
             kind: ProviderKind::BuiltIn,
             categories: vec!["developer_tools".into()],
+            api_hosts: vec![],
             connection_types: vec![ConnectionType {
                 id: "oauth".into(),
                 name: "Sign in".into(),
@@ -351,14 +353,7 @@ async fn discovery_never_follows_a_server_to_a_private_address() {
 #[test]
 fn every_catalogue_server_is_a_valid_tool_provider() {
     let providers = tilde::connections::catalog::builtins();
-    for id in [
-        "notion",
-        "linear",
-        "hubspot",
-        "vercel",
-        "twilio-docs",
-        "browserbase",
-    ] {
+    for id in ["notion", "hubspot", "vercel", "twilio-docs", "browserbase"] {
         let provider = providers
             .iter()
             .find(|p| p.id == id)
@@ -430,9 +425,16 @@ async fn the_catalog_lists_what_a_provider_offers_before_any_connection() {
         tools.into_iter().map(|t| t.name).collect::<Vec<_>>()
     };
     // Before any connection: what the server lists without credentials, else its snapshot.
+    // Linear's built-in tools come first, then its MCP server's.
     assert_eq!(
         names(tools.catalog_tools("linear",).await.unwrap()),
-        ["list_issues"]
+        [
+            "get_issue",
+            "search_issues",
+            "create_comment",
+            "update_issue_state",
+            "list_issues"
+        ]
     );
     assert!(names(tools.catalog_tools("notion",).await.unwrap()).contains(&"post-search".into()));
     assert_eq!(tools.catalog_tools("google_mail",).await.unwrap().len(), 11);

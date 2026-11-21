@@ -61,6 +61,12 @@ impl Boundary {
             origins: allowed,
         })
     }
+    fn allows_host(&self, host: &str) -> bool {
+        self.hosts.contains(host)
+    }
+    fn allows_origin(&self, origin: &str) -> bool {
+        self.origins.contains(origin)
+    }
 }
 
 /// Reject unrecognized hosts and browser origins before an RPC can run.
@@ -77,7 +83,8 @@ pub async fn guard(State(boundary): State<Boundary>, request: Request, next: Nex
                 .and_then(|h| h.parse::<http::uri::Authority>().ok())
                 .map(|a| a.host().to_string())
         });
-    if !host.is_some_and(|host| boundary.hosts.contains(host.trim_matches(['[', ']']))) {
+    let health = false;
+    if !health && !host.is_some_and(|host| boundary.allows_host(host.trim_matches(['[', ']']))) {
         return connectrpc::ConnectError::permission_denied("Host is not allowed").into_response();
     }
     // Sandboxed provider pages fetch public module assets with an opaque ("null") origin.
@@ -99,20 +106,79 @@ pub async fn guard(State(boundary): State<Boundary>, request: Request, next: Nex
     // OAuth form_post redirects are cross-origin by design and validate their own state.
     let provider_callback = request.uri().path() == crate::connections::CALLBACK_PATH
         && matches!(*request.method(), http::Method::GET | http::Method::POST);
+    let origin = request.headers().get(http::header::ORIGIN).cloned();
     if !public_connection_asset
         && !provider_callback
-        && let Some(origin) = request.headers().get(http::header::ORIGIN)
+        && let Some(origin) = &origin
         && !origin
             .to_str()
-            .is_ok_and(|value| boundary.origins.contains(value))
+            .is_ok_and(|value| boundary.allows_origin(value))
     {
         return connectrpc::ConnectError::permission_denied("Origin is not allowed")
             .into_response();
+    }
+    cors_then(&boundary, request, next).await
+}
+
+/// Credentialed CORS for exactly the boundary's allowed browser origins, without its other checks:
+/// a listener of its own behind the same load balancer (the ontology control plane's), which the
+/// hosted app at trytilde.ai/app calls across origins too. Preflights are answered before any
+/// route or authentication.
+pub async fn cors(State(boundary): State<Boundary>, request: Request, next: Next) -> Response {
+    cors_then(&boundary, request, next).await
+}
+
+// An allowed browser origin on another host (the hosted app at trytilde.ai/app calling
+// api.trytilde.ai) reads responses with its cookies.
+async fn cors_then(boundary: &Boundary, request: Request, next: Next) -> Response {
+    let cors = request
+        .headers()
+        .get(http::header::ORIGIN)
+        .filter(|o| o.to_str().is_ok_and(|v| boundary.allows_origin(v)))
+        .cloned();
+    if let Some(origin) = &cors
+        && request.method() == http::Method::OPTIONS
+        && request
+            .headers()
+            .contains_key(http::header::ACCESS_CONTROL_REQUEST_METHOD)
+    {
+        let mut response = http::StatusCode::NO_CONTENT.into_response();
+        let headers = response.headers_mut();
+        cors_headers(headers, origin);
+        headers.insert(
+            http::header::ACCESS_CONTROL_ALLOW_METHODS,
+            http::HeaderValue::from_static("GET, POST, PUT, PATCH, DELETE"),
+        );
+        if let Some(requested) = request
+            .headers()
+            .get(http::header::ACCESS_CONTROL_REQUEST_HEADERS)
+        {
+            headers.insert(
+                http::header::ACCESS_CONTROL_ALLOW_HEADERS,
+                requested.clone(),
+            );
+        }
+        headers.insert(
+            http::header::ACCESS_CONTROL_MAX_AGE,
+            http::HeaderValue::from_static("7200"),
+        );
+        return response;
     }
     let mut response = next.run(request).await;
     response.headers_mut().insert(
         http::header::X_CONTENT_TYPE_OPTIONS,
         http::HeaderValue::from_static("nosniff"),
     );
+    if let Some(origin) = &cors {
+        cors_headers(response.headers_mut(), origin);
+    }
     response
+}
+fn cors_headers(headers: &mut http::HeaderMap, origin: &http::HeaderValue) {
+    headers.insert(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, origin.clone());
+    headers.insert(
+        http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        http::HeaderValue::from_static("true"),
+    );
+    headers.append(http::header::VARY, http::HeaderValue::from_static("Origin"));
 }

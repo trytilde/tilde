@@ -6,9 +6,11 @@ use sha2::{Digest, Sha384};
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio_postgres_rustls::MakeRustlsConnect;
 use tokio_util::sync::CancellationToken;
+mod client;
 pub mod db;
 pub mod notifications;
-pub use deadpool_postgres::{Client, Transaction};
+pub use client::Client;
+pub use deadpool_postgres::Transaction;
 pub use tilde_queries::client::GenericClient;
 
 #[derive(Debug, thiserror::Error)]
@@ -58,19 +60,39 @@ impl DbError {
 
 /// Pool identity, connection configuration and shutdown travel together. In particular,
 /// each test schema and each LISTEN connection must use its own pool's configuration.
+///
+/// The pool's own connections (`DATABASE_URL`) may go through a transaction-pooling PgBouncer:
+/// nothing on them relies on session state (see [`Client`]). Work that needs a real session,
+/// LISTEN and migrations, connects with the direct configuration (`DATABASE_DIRECT_URL`, the
+/// server itself), outside the pool.
 #[derive(Clone)]
 pub struct Pool(Arc<PoolInner>);
 struct PoolInner {
     connections: deadpool_postgres::Pool,
     config: Arc<tokio_postgres::Config>,
+    direct: Arc<tokio_postgres::Config>,
+    /// A search path the pooled URL asked for, set per transaction (see [`pool`]).
+    search_path: Option<String>,
     closed: CancellationToken,
 }
 impl Pool {
     pub async fn get(&self) -> DbResult<Client> {
-        Ok(self.0.connections.get().await?)
+        let client = self.0.connections.get().await?;
+        let scope: Option<String> = None;
+        let scope = match (&self.0.search_path, scope) {
+            (Some(path), Some(scope)) => Some(format!("SET LOCAL search_path = {path}; {scope}")),
+            (Some(path), None) => Some(format!("SET LOCAL search_path = {path}")),
+            (None, scope) => scope,
+        };
+        Ok(Client::new(client, scope))
     }
+    /// The pooled connections' configuration; its address identifies the pool.
     pub fn config(&self) -> Arc<tokio_postgres::Config> {
         self.0.config.clone()
+    }
+    /// The server itself, for sessions: LISTEN and migrations.
+    pub fn direct_config(&self) -> Arc<tokio_postgres::Config> {
+        self.0.direct.clone()
     }
     pub fn is_closed(&self) -> bool {
         self.0.connections.is_closed()
@@ -83,7 +105,9 @@ impl Pool {
         self.0.connections.close();
     }
 }
-pub(crate) fn tls() -> DbResult<MakeRustlsConnect> {
+/// Certificate-validated TLS for Postgres connections outside the pool (the URL's `sslmode`
+/// decides whether it is used).
+pub fn tls() -> DbResult<MakeRustlsConnect> {
     // Match the URL's sslmode with certificate-validated TLS when the server supports it.
     static TLS: std::sync::OnceLock<MakeRustlsConnect> = std::sync::OnceLock::new();
     if let Some(tls) = TLS.get() {
@@ -102,12 +126,81 @@ pub(crate) fn tls() -> DbResult<MakeRustlsConnect> {
     let connector = MakeRustlsConnect::new(config);
     Ok(TLS.get_or_init(|| connector).clone())
 }
-pub fn pool(url: &str, max_size: usize) -> Result<Pool, Error> {
-    let config = tokio_postgres::Config::from_str(url)
-        .map_err(|_| Error::Invalid("Invalid DATABASE_URL".into()))?;
-    pool_from_config(config, max_size)
+/// A pool on `url`; sessions use `direct_url`, or `url` when it is the server itself.
+///
+/// With `direct_url`, `url` is a transaction pooler. PlanetScale's PgBouncer refuses a
+/// `search_path` in the startup `options` (Tilde in a schema of its own:
+/// `options=-c search_path=tilde_cloud,public`), so the pooled URL's is taken off the
+/// connection and set per transaction instead (`SET LOCAL`); `direct_url` keeps its own for
+/// migrations.
+pub fn pool(url: &str, direct_url: Option<&str>, max_size: usize) -> Result<Pool, Error> {
+    let invalid = || Error::Invalid("Invalid DATABASE_URL".into());
+    let (url, search_path) = match direct_url {
+        Some(_) => pooled_search_path(url).ok_or_else(invalid)?,
+        None => (url.to_owned(), None),
+    };
+    let config = tokio_postgres::Config::from_str(&url).map_err(|_| invalid())?;
+    let direct = match direct_url {
+        Some(direct) => tokio_postgres::Config::from_str(direct)
+            .map_err(|_| Error::Invalid("Invalid DATABASE_DIRECT_URL".into()))?,
+        None => config.clone(),
+    };
+    build(config, direct, search_path, max_size)
 }
-pub fn pool_from_config(config: tokio_postgres::Config, max_size: usize) -> Result<Pool, Error> {
+/// `url` without an `options` that only sets `search_path`, and that search path. Other
+/// options, and key/value connection strings, are kept as they are.
+fn pooled_search_path(url: &str) -> Option<(String, Option<String>)> {
+    let Ok(mut parsed) = url::Url::parse(url) else {
+        return Some((url.to_owned(), None));
+    };
+    let options = parsed
+        .query_pairs()
+        .find(|(k, _)| k == "options")
+        .map(|(_, v)| v.into_owned());
+    let path = options.as_deref().and_then(|options| {
+        let mut words = options.split_whitespace();
+        let setting = match words.next()? {
+            "-c" => words.next()?,
+            word => word.strip_prefix("-c")?,
+        };
+        (words.next().is_none()).then_some(())?;
+        setting.strip_prefix("search_path=").map(str::to_owned)
+    });
+    let Some(path) = path else {
+        return Some((url.to_owned(), None));
+    };
+    // A list of schema names, never SQL.
+    if path.is_empty()
+        || !path
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_,$\" ".contains(c))
+    {
+        return None;
+    }
+    let rest: Vec<(String, String)> = parsed
+        .query_pairs()
+        .filter(|(k, _)| k != "options")
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    parsed.set_query(None);
+    if !rest.is_empty() {
+        parsed.query_pairs_mut().extend_pairs(rest);
+    }
+    Some((parsed.to_string(), Some(path)))
+}
+pub fn pool_from_config(
+    config: tokio_postgres::Config,
+    direct: tokio_postgres::Config,
+    max_size: usize,
+) -> Result<Pool, Error> {
+    build(config, direct, None, max_size)
+}
+fn build(
+    config: tokio_postgres::Config,
+    direct: tokio_postgres::Config,
+    search_path: Option<String>,
+    max_size: usize,
+) -> Result<Pool, Error> {
     let manager = Manager::from_config(
         config.clone(),
         tls()?,
@@ -125,13 +218,34 @@ pub fn pool_from_config(config: tokio_postgres::Config, max_size: usize) -> Resu
     Ok(Pool(Arc::new(PoolInner {
         connections,
         config: Arc::new(config),
+        direct: Arc::new(direct),
+        search_path,
         closed: CancellationToken::new(),
     })))
 }
-pub async fn connect(url: &str) -> Result<Pool, Error> {
-    let pool = pool(url, 10)?;
+/// The pool of a process's own work. Behind a transaction pooler (`direct_url` set) a checkout
+/// holds a server connection only while a transaction runs, and PgBouncer queues the rest, so
+/// the client pool can exceed the server's share. Four were too few in prod: a database stall of
+/// a few seconds held all of them, and every request and worker behind it timed out at once.
+/// On the server itself a checkout is one session of its `max_connections`.
+const POOLED_SIZE: usize = 12;
+const DIRECT_SIZE: usize = 16;
+pub async fn connect(url: &str, direct_url: Option<&str>) -> Result<Pool, Error> {
+    let size = if direct_url.is_some() {
+        POOLED_SIZE
+    } else {
+        DIRECT_SIZE
+    };
+    let pool = pool(url, direct_url, size)?;
     migrate(&pool).await?;
     Ok(pool)
+}
+
+/// A session of its own on the server, outside the pool; closes when the client drops.
+pub async fn session(config: &tokio_postgres::Config) -> DbResult<tokio_postgres::Client> {
+    let (client, connection) = config.connect(tls()?).await?;
+    tokio::spawn(connection);
+    Ok(client)
 }
 
 pub struct Migration {
@@ -142,17 +256,19 @@ pub struct Migration {
 /// Every migration under `migrations/`, in version order.
 pub const MIGRATIONS: &[Migration] = include!(concat!(env!("OUT_DIR"), "/migrations.rs"));
 
-/// Used by startup and tests; migration checksums protect applied history.
+/// Migrate under a transaction-scoped lock, on a direct session as the login role (the
+/// owner). Cancellation rolls back both schema changes and the ledger. Used by startup and
+/// tests; migration checksums protect applied history.
 pub async fn migrate(pool: &Pool) -> Result<(), Error> {
     migrate_through(pool, i64::MAX).await
 }
-
-/// Migrate under a transaction-scoped lock. Cancellation rolls back both schema
-/// changes and the ledger; a pooled connection cannot retain a migration lock.
-/// Existing SHA-384 checksums are kept when renaming the previous driver's ledger.
+/// Migrate up to and including version `through`: tests of a migration's data changes seed
+/// rows in the schema just before it.
 pub async fn migrate_through(pool: &Pool, through: i64) -> Result<(), Error> {
-    let mut client = pool.get().await?;
+    let mut client = session(&pool.direct_config()).await?;
     let tx = client.transaction().await?;
+    tx.batch_execute(include_str!("../../../queries/_migrations/schema.sql"))
+        .await?;
     tx.batch_execute(include_str!("../../../queries/_migrations/lock.sql"))
         .await?;
     tx.batch_execute(include_str!(

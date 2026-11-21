@@ -397,9 +397,16 @@ impl Memory {
 
     /// Synthesizes one batch of the bank that waited longest; false when no bank was due.
     pub async fn synthesize_pending(&self) -> Result<bool, Error> {
-        let Some(claim) = db::synthesis_claim_opt(&self.client().await?, LEASE_SECS).await? else {
+        let claimed = async {
+            Ok::<_, Error>(db::synthesis_claim_opt(&self.client().await?, LEASE_SECS).await?)
+        };
+        let Some(claim) = claimed.await? else {
             return Ok(false);
         };
+        let run = self.synthesize(claim);
+        run.await
+    }
+    async fn synthesize(&self, claim: db::ClaimRow) -> Result<bool, Error> {
         let bank = claim.bank_id;
         if self.forget_gone_page(bank).await? {
             db::synthesis_done_execute(&self.client().await?, bank, 0.0, true).await?;

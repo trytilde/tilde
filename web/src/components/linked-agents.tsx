@@ -67,7 +67,7 @@ export function LinkedAgentsTable({
                 <TableRow key={agentId}>
                   <TableCell>
                     <Link
-                      to="/agent/$agentId/capabilities"
+                      to="/registry/agent/$agentId/capabilities"
                       params={{ agentId }}
                       className="hover:underline"
                     >
@@ -169,7 +169,11 @@ export function LinkedAgentsTable({
 export function OwnerLink({ agentId, name }: { agentId?: string; name?: string }) {
   if (!agentId) return <span className="text-muted-foreground">Shared</span>;
   return (
-    <Link to="/agent/$agentId/capabilities" params={{ agentId }} className="hover:underline">
+    <Link
+      to="/registry/agent/$agentId/capabilities"
+      params={{ agentId }}
+      className="hover:underline"
+    >
       {name ?? "Agent"}
     </Link>
   );

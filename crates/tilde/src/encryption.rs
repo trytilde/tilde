@@ -1,5 +1,5 @@
 //! Internal encryption for database secrets, with seed or AWS KMS key protection.
-//! Resource identity is authenticated with each ciphertext; no tenant model is involved.
+//! Resource identity is authenticated with each ciphertext.
 //! The legacy context labels are persisted cryptographic identifiers, not product branding.
 pub mod db;
 use crate::database::Pool;
@@ -237,11 +237,12 @@ impl Encryption {
         binding: SecretBinding<'_>,
         value: &SecretString,
     ) -> Result<SealedSecret, Error> {
+        let (key_id, key) = (self.key_id, &self.key);
         let nonce = random_nonce();
-        let aad = secret_context(self.key_id, binding)?;
-        let ciphertext = encrypt(&self.key, &nonce, &aad, value.expose_secret().as_bytes())?;
+        let aad = secret_context(key_id, binding)?;
+        let ciphertext = encrypt(key, &nonce, &aad, value.expose_secret().as_bytes())?;
         Ok(SealedSecret {
-            key_id: self.key_id,
+            key_id,
             format_version: FORMAT_VERSION,
             nonce: nonce.to_vec(),
             ciphertext,
@@ -254,7 +255,8 @@ impl Encryption {
         binding: SecretBinding<'_>,
         sealed: SealedSecret,
     ) -> Result<SecretString, Error> {
-        if sealed.key_id != self.key_id || sealed.format_version != FORMAT_VERSION {
+        let (key, expected) = (&self.key, self.key_id);
+        if sealed.key_id != expected || sealed.format_version != FORMAT_VERSION {
             return Err(Error::Encryption);
         }
         let nonce: [u8; 12] = sealed
@@ -263,9 +265,9 @@ impl Encryption {
             .try_into()
             .map_err(|_| Error::Encryption)?;
         let plaintext = decrypt(
-            &self.key,
+            key,
             &nonce,
-            &secret_context(self.key_id, binding)?,
+            &secret_context(sealed.key_id, binding)?,
             &sealed.ciphertext,
         )?;
         let text = std::str::from_utf8(&plaintext).map_err(|_| Error::Encryption)?;

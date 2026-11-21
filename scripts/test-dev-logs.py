@@ -10,6 +10,7 @@ assert local['ENGINE_CLICKHOUSE_URL']=='http://127.0.0.1:18123'
 external=module.configure({'ENGINE_CLICKHOUSE_URL':'https://logs.example','ENGINE_CLICKHOUSE_PASSWORD':'external'})
 assert external['TILDE_LOCAL_CLICKHOUSE']=='0' and external['ENGINE_CLICKHOUSE_PASSWORD']=='external'
 assert module.configure({'TS_ADDR':'100.64.1.2'})['ENGINE_CLICKHOUSE_URL']=='http://127.0.0.1:18123'
+assert module.configure(local)['TILDE_LOCAL_CLICKHOUSE']=='1'
 with patch.object(module.subprocess,'run') as run:
     module.start(local)
     module.start(external)

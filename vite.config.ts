@@ -8,6 +8,7 @@ const generated = [
   "**/node_modules/**",
   "**/dist/**",
   "**/provider-dist/**",
+  "**/storybook-static/**",
   "**/gen/**",
   "**/routeTree.gen.ts",
   "**/generated/**",
@@ -22,6 +23,14 @@ const generated = [
   "crates/tilde/src/tools/providers/*/catalog.json",
   ".run/**",
   ".git/**",
+  // The ontology and ducktail crates format and type-check their TypeScript with Deno in their own
+  // tasks (`task ontology:check`), under Deno's rules rather than the web app's.
+  "crates/ontology/**",
+  "crates/ducktail/**",
+  // A sample ontology project (Deno-style imports of the ontology SDK) the deploy tests build.
+  "crates/ontology-control/tests/fixtures/**",
+  // SOPS-encrypted: reformatting would invalidate its MAC.
+  "secrets.enc.yaml",
 ];
 export default defineConfig({
   lint: {

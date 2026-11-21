@@ -1,0 +1,65 @@
+syntax = "proto3";
+package tilde.local.v1;
+import "google/protobuf/timestamp.proto";
+import "tilde/runtime/v1/skills.proto";
+
+// What a local agent's harness calls, through the `tilde local` hooks installed in it. Served
+// on the agent's ingress (`/agents/{agent}/tilde.local.v1.LocalAgentService/{method}`) with the
+// agent's application key as bearer, and only for local agents. The agent's tools are served
+// beside it as an MCP server at `/agents/{agent}/mcp`, under the same key.
+service LocalAgentService {
+  // Report what happened in one of the harness's sessions. A session is one thread; an event
+  // is recorded once however often it is sent, so a hook may resend what it is unsure of.
+  rpc Ingest(IngestRequest) returns (IngestResponse);
+  // The skills the agent is given, for the harness's own skill folder.
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc ReadSkillFile(ReadSkillFileRequest) returns (ReadSkillFileResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+}
+
+message IngestRequest {
+  // The harness's own session id.
+  string session_id = 1;
+  // Names the thread when the session is first seen.
+  string title = 2;
+  // In the order they happened; at most 500.
+  repeated Event events = 3;
+}
+message IngestResponse {}
+
+message Event {
+  // The harness's id for the event, unique within the session.
+  string id = 1;
+  // The id of the user message that began the turn: a turn is one trace.
+  string turn_id = 2;
+  google.protobuf.Timestamp at = 3;
+  oneof detail {
+    UserMessage user = 4;
+    AgentMessage agent = 5;
+    ToolCall tool = 6;
+  }
+}
+message UserMessage { string text = 1; }
+message AgentMessage {
+  string text = 1;
+  string model = 2;
+}
+// A finished tool call. `input` and `output` are as the harness recorded them, cut to 64 KiB.
+message ToolCall {
+  string name = 1;
+  string input = 2;
+  string output = 3;
+  bool failed = 4;
+  google.protobuf.Timestamp started_at = 5;
+}
+
+message ListSkillsRequest {}
+message ListSkillsResponse { repeated tilde.runtime.v1.SkillSummary skills = 1; }
+message ReadSkillFileRequest {
+  string name = 1;
+  string path = 2;
+}
+// Text files return `content`; other files a short-lived `download_url`.
+message ReadSkillFileResponse {
+  string content = 1;
+  string download_url = 2;
+}

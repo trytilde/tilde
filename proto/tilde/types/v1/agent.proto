@@ -31,6 +31,36 @@ message Agent {
   reserved "secret_names";
   AgentMetrics metrics = 8;
   Capabilities capabilities = 9;
+  // Set for a local agent: one that runs in a harness on a person's machine.
+  LocalAgent local = 15;
+}
+
+// Where a local agent runs. Tilde never runs or wakes a local agent: its harness reports
+// sessions to Tilde and is given the agent's tools and skills.
+enum Harness {
+  HARNESS_UNSPECIFIED = 0;
+  HARNESS_CLAUDE_CODE = 1;
+  HARNESS_CODEX = 2;
+  HARNESS_CLAUDE_DESKTOP = 3;
+  HARNESS_CHATGPT_DESKTOP = 4;
+}
+
+// What a harness's adapter supports. Nothing else of an agent applies to a local agent.
+message HarnessFeatures {
+  // Its conversations are reported to Tilde as threads.
+  bool sessions = 1;
+  // Each reported turn is also a trace.
+  bool traces = 2;
+  bool logs = 3;
+  // The agent's tools are served to the harness over MCP.
+  bool tools = 4;
+  // The agent's skills are installed into the harness's own skill folder.
+  bool skills = 5;
+}
+
+message LocalAgent {
+  Harness harness = 1;
+  HarnessFeatures features = 2;
 }
 
 message AgentMetrics {

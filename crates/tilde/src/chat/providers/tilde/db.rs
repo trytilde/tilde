@@ -129,3 +129,16 @@ pub async fn cancel_message(db: &impl GenericClient, thread: Uuid, id: Uuid) -> 
     q::cancel_message().bind(db, &thread, &id).await?;
     Ok(())
 }
+pub use q::UserConnection;
+pub async fn user_connections(
+    db: &impl GenericClient,
+    user: Uuid,
+) -> DbResult<Vec<UserConnection>> {
+    Ok(q::user_connections().bind(db, &user).all().await?)
+}
+pub async fn agent_capabilities(
+    db: &impl GenericClient,
+    agent: Uuid,
+) -> DbResult<Option<serde_json::Value>> {
+    Ok(q::agent_capabilities().bind(db, &agent).opt().await?)
+}

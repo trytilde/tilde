@@ -178,7 +178,7 @@ it("switches a group on or off as a whole, and each skill of an enabled group al
   // Adding new skills happens on the Skills page.
   expect(
     (await screen.findByRole("menuitem", { name: "Add a new skill" })).getAttribute("href"),
-  ).toBe("/skills");
+  ).toBe("/registry/skills");
   fireEvent.click(await screen.findByRole("menuitem", { name: "Choose existing" }));
   const picker = await screen.findByRole("listbox", { name: "Available groups" });
   expect(within(picker).queryByRole("option", { name: /Tilde runtime/ })).toBeNull();
@@ -283,7 +283,7 @@ it("lists the newest registered deployment's bundled skills when none is serving
   expect(within(row).getByText("Issue refunds within policy.")).toBeTruthy();
   // Bundled skills open on the (read-only) skill page.
   const link = within(row).getByRole("link", { name: "refunds" });
-  expect(link.getAttribute("href")).toBe("/skills/s-code");
+  expect(link.getAttribute("href")).toBe("/registry/skills/s-code");
   expect(link.getAttribute("title")).toBe("Declared at src/mastra/skills/refunds");
 });
 

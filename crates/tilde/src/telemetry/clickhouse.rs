@@ -24,6 +24,7 @@ pub struct Store {
     user: String,
     password: Option<SecretEnv>,
     retention_days: Option<u32>,
+    ca_cert: Option<String>,
     client: reqwest::Client,
 }
 impl Store {
@@ -59,15 +60,28 @@ impl Store {
                 "Invalid ClickHouse database identifier".into(),
             ));
         }
+        let mut client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none());
+        let ca_cert = config
+            .clickhouse_ca_cert
+            .clone()
+            .filter(|v| !v.trim().is_empty());
+        if let Some(pem) = &ca_cert {
+            let ca = reqwest::Certificate::from_pem(pem.as_bytes())
+                .map_err(|_| Error::Invalid("Invalid ENGINE_CLICKHOUSE_CA_CERT".into()))?;
+            client = client
+                .tls_built_in_root_certs(false)
+                .add_root_certificate(ca);
+        }
         Ok(Self {
             url,
             database: config.clickhouse_database.clone(),
             user: config.clickhouse_user.clone(),
             password: config.clickhouse_password.clone(),
             retention_days: config.clickhouse_retention_days,
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(10))
-                .redirect(reqwest::redirect::Policy::none())
+            ca_cert,
+            client: client
                 .build()
                 .map_err(|_| Error::Invalid("Unable to configure ClickHouse client".into()))?,
         })
@@ -186,6 +200,9 @@ impl Store {
         .with_async_insert(true);
         if let Some(password) = &self.password {
             builder = builder.with_password(password.0.expose_secret().to_owned());
+        }
+        if let Some(pem) = &self.ca_cert {
+            builder = builder.with_ca_pem(pem.clone());
         }
         builder
             .build()

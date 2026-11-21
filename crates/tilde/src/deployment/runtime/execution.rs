@@ -654,7 +654,11 @@ impl Runtime {
             let connection = configuration
                 .connections
                 .iter()
-                .find(|c| c.id == t.thread.channel.connection_id && c.status == "ready")
+                .find(|c| {
+                    c.id == t.thread.channel.connection_id
+                        && c.status == "ready"
+                        && c.capability == types::Capability::Channel
+                })
                 .ok_or(ChatError::Denied)?;
             let allowed = match connection.access_mode.as_known() {
                 Some(types::ChannelAccessMode::Public) => true,

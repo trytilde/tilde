@@ -183,7 +183,7 @@ export function AgentSkills({ agentId }: { agentId: string }) {
               <LayersIcon />
               Choose existing
             </DropdownMenuItem>
-            <DropdownMenuItem render={<Link to="/skills" />}>
+            <DropdownMenuItem render={<Link to="/registry/skills" />}>
               <SparklesIcon />
               Add a new skill
             </DropdownMenuItem>
@@ -348,7 +348,7 @@ export function AgentSkills({ agentId }: { agentId: string }) {
                             <span className="flex items-center gap-2">
                               {/* Bundled skills open read-only; the title says where the code declared them. */}
                               <Link
-                                to="/skills/$skillId"
+                                to="/registry/skills/$skillId"
                                 params={{ skillId: row.id }}
                                 className="font-mono font-medium hover:underline"
                                 title={row.origin ? `Declared at ${row.origin}` : undefined}

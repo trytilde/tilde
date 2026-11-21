@@ -29,6 +29,8 @@ message CreateAgentRequest {
   reserved "endpoint_url", "webhook_signing_key";
   tilde.types.v1.Capabilities capabilities = 6;
   tilde.types.v1.AgentConcurrencyPolicy concurrency_policy = 7;
+  // Set to register a local agent of this harness; it cannot be changed afterwards.
+  tilde.types.v1.Harness harness = 10;
 }
 
 message CreateAgentResponse { tilde.types.v1.Agent agent = 1; }

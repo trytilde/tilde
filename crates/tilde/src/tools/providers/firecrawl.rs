@@ -17,6 +17,7 @@ const ORIGIN: &str = "tilde-managed-provider";
 
 pub fn definition() -> model::Provider {
     model::Provider {
+        api_hosts: Vec::new(),
         account_name_label: Some("API key name".into()),
         icon_url: Some("/provider-icons/firecrawl.svg".into()),
         instructions: Some(

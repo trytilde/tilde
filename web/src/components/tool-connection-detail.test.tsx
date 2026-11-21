@@ -48,6 +48,7 @@ beforeEach(() => {
   );
   rpc.connections.getConnection.mockResolvedValue({
     connection: create(ConnectionSchema, {
+      capabilities: [Capability.TOOL],
       id: "c1",
       name: "Tavily",
       providerId: "tavily",
@@ -119,15 +120,15 @@ function renderPage(kind: "connection" | "host" = "connection") {
   });
   const detail = createRoute({
     getParentRoute: () => root,
-    path: "/tools/$toolId",
+    path: "/registry/tools/$toolId",
     component: () => <ToolConnectionDetail id={id} kind={kind} />,
   });
-  const lists = ["/tools/connections", "/tools/remote-servers"].map((path) =>
+  const lists = ["/registry/tools/connections", "/registry/tools/remote-servers"].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => <p>{path}</p> }),
   );
   const router = createRouter({
     routeTree: root.addChildren([detail, ...lists]),
-    history: createMemoryHistory({ initialEntries: [`/tools/${id}?kind=${kind}`] }),
+    history: createMemoryHistory({ initialEntries: [`/registry/tools/${id}?kind=${kind}`] }),
   });
   render(<RouterProvider router={router} />);
   return router;
@@ -145,8 +146,8 @@ it("names the connection in the breadcrumbs, leaving agents to the table", async
   await screen.findByRole("heading", { name: "Tavily" });
   await waitFor(() =>
     expect(crumbs()).toEqual([
-      ["Tools", "/tools/connections"],
-      ["Connections", "/tools/connections"],
+      ["Tools", "/registry/tools/connections"],
+      ["Connections", "/registry/tools/connections"],
       ["Tavily", null],
     ]),
   );
@@ -187,7 +188,7 @@ it("disconnects only once confirmed, then returns to Connections", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
   dialog = await screen.findByRole("alertdialog", { name: "Disconnect Tavily?" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Disconnect" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/tools/connections"));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/registry/tools/connections"));
   expect(rpc.connections.disconnect).toHaveBeenCalledWith({ id: "c1" });
 });
 
@@ -198,8 +199,8 @@ it("confirms rotating a tool host's token and deleting the host", async () => {
   await screen.findByRole("heading", { name: "ops-host" });
   await waitFor(() =>
     expect(crumbs()).toEqual([
-      ["Tools", "/tools/connections"],
-      ["Remote servers", "/tools/remote-servers"],
+      ["Tools", "/registry/tools/connections"],
+      ["Remote servers", "/registry/tools/remote-servers"],
       ["ops-host", null],
     ]),
   );
@@ -220,7 +221,9 @@ it("confirms rotating a tool host's token and deleting the host", async () => {
   confirm = await screen.findByRole("alertdialog", { name: "Delete ops-host?" });
   expect(rpc.toolHosts.deleteToolHost).not.toHaveBeenCalled();
   fireEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
-  await waitFor(() => expect(router.state.location.pathname).toBe("/tools/remote-servers"));
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/registry/tools/remote-servers"),
+  );
   expect(rpc.toolHosts.deleteToolHost).toHaveBeenCalledWith({ id: "h1" });
 });
 

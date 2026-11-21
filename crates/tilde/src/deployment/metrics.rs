@@ -136,6 +136,7 @@ mod tests {
                 callback_url: "http://127.0.0.1:1".into(),
                 idle_after: Duration::from_secs(60),
                 cache_bytes: 1024 * 1024,
+                endpoints: Default::default(),
             },
         ));
         let deployment = Uuid::new_v4();

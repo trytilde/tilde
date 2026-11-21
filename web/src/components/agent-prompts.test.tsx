@@ -31,11 +31,11 @@ afterEach(() => {
   cleanup();
   vi.resetAllMocks();
 });
-function mount(initial = "/agent/agent-1/prompts") {
+function mount(initial = "/registry/agent/agent-1/prompts") {
   const root = createRootRoute();
   const route = createRoute({
     getParentRoute: () => root,
-    path: "/agent/$agentId/prompts",
+    path: "/registry/agent/$agentId/prompts",
     validateSearch: (raw: Record<string, unknown>) =>
       typeof raw.prompt === "string" ? { prompt: raw.prompt } : {},
     component: () => <AgentPrompts agentId="agent-1" />,
@@ -147,7 +147,7 @@ it("opens a linked prompt and shows a dynamic version's function source instead 
   });
   rpc.listPrompts.mockResolvedValue({ prompts: [support] });
   rpc.getPrompt.mockResolvedValue({ prompt: support, versions: [dynamic], usage: [] });
-  const router = mount("/agent/agent-1/prompts?prompt=p2");
+  const router = mount("/registry/agent/agent-1/prompts?prompt=p2");
   await screen.findByRole("region", { name: "Prompt support/instructions" });
   expect(rpc.getPrompt).toHaveBeenCalledWith({ id: "p2" }, expect.anything());
   expect(screen.getByText("Dynamic — rendered at runtime")).toBeTruthy();
@@ -188,6 +188,6 @@ it("shows a prompt's text whole, even when it opens with --- lines", async () =>
   });
   rpc.listPrompts.mockResolvedValue({ prompts: [guard] });
   rpc.getPrompt.mockResolvedValue({ prompt: guard, versions: [fenced], usage: [] });
-  mount("/agent/agent-1/prompts?prompt=p3");
+  mount("/registry/agent/agent-1/prompts?prompt=p3");
   expect((await screen.findByTestId("markdown")).textContent).toBe(fenced.template);
 });

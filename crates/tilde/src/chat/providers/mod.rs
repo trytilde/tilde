@@ -5,6 +5,7 @@ use crate::proto::tilde::types::v1 as types;
 pub mod agentmail;
 pub(crate) mod files;
 pub mod github;
+pub mod google_chat;
 pub mod ingress;
 pub mod linq;
 pub mod slack;
@@ -34,6 +35,8 @@ pub struct Access {
     pub values: Values,
     pub(crate) http: crate::connections::oauth::Http,
     pub(crate) endpoints: crate::connections::catalog::Endpoints,
+    /// Mints web identity tokens; absent where no gateway holds the issuer (sidecars).
+    pub(crate) oidc: Option<crate::oidc::Issuer>,
 }
 impl Access {
     pub fn secret(&self, key: &str) -> ToolResult<&str> {
@@ -111,6 +114,7 @@ pub trait Adapter: Send + Sync {
 pub(crate) fn adapter(provider: &str, typ: &str) -> Option<&'static dyn Adapter> {
     match (provider, typ) {
         ("slack", "slack_app") => Some(&slack::Slack),
+        ("google_chat", "app") => Some(&google_chat::GoogleChat),
         ("github", "github_app") => Some(&github::Github),
         ("agentmail", "inbox") => Some(&agentmail::Agentmail),
         ("linq", "account") => Some(&linq::Linq),
@@ -262,6 +266,7 @@ impl Provider for Channels {
                 values: self.connections.resolve(connection).await?,
                 http: self.connections.http.clone(),
                 endpoints: self.connections.endpoints.clone(),
+                oidc: Some(self.connections.oidc.clone()),
             };
             provider.invoke(&access, &context, name, input).await
         })

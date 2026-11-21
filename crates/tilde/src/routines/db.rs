@@ -5,17 +5,16 @@ use chrono::{DateTime, Utc};
 use tilde_queries::queries::routines as q;
 use uuid::Uuid;
 
+pub use q::routine::Routine as RoutineRow;
 pub use q::routine_due::Record as DueRow;
-pub use q::routine_list::Record as RoutineRow;
 pub use q::routine_signal_matches::Record as MatchRow;
 pub use q::signal_connection::Record as SignalConnectionRow;
 
-pub async fn routine_list_all(
-    db: &impl GenericClient,
-    agent: Option<Uuid>,
-    id: Option<Uuid>,
-) -> DbResult<Vec<RoutineRow>> {
-    Ok(q::routine_list::run().bind(db, &agent, &id).all().await?)
+pub async fn routine_list_all(db: &impl GenericClient, agent: Uuid) -> DbResult<Vec<RoutineRow>> {
+    Ok(q::routine::list().bind(db, &agent).all().await?)
+}
+pub async fn routine_get_opt(db: &impl GenericClient, id: Uuid) -> DbResult<Option<RoutineRow>> {
+    Ok(q::routine::get().bind(db, &id).opt().await?)
 }
 pub async fn routine_insert_execute(
     db: &impl GenericClient,
@@ -124,4 +123,25 @@ pub async fn signal_connection_opt(
     id: Uuid,
 ) -> DbResult<Option<SignalConnectionRow>> {
     Ok(q::signal_connection::run().bind(db, &id).opt().await?)
+}
+pub use q::filter_list::Record as FilterRow;
+pub async fn filter_list_all(
+    db: &impl GenericClient,
+    routines: &[Uuid],
+) -> DbResult<Vec<FilterRow>> {
+    Ok(q::filter_list::run().bind(db, &routines).all().await?)
+}
+pub async fn filter_insert_execute(
+    db: &impl GenericClient,
+    routine: Uuid,
+    position: i32,
+    path: &str,
+    allowed: &[String],
+) -> DbResult<u64> {
+    Ok(q::filter_insert::run()
+        .bind(db, &routine, &position, &path, &allowed)
+        .await?)
+}
+pub async fn filter_clear_execute(db: &impl GenericClient, routine: Uuid) -> DbResult<u64> {
+    Ok(q::filter_clear::run().bind(db, &routine).await?)
 }

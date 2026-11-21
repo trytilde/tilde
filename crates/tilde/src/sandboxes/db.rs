@@ -8,6 +8,9 @@ pub use q::agent_sandbox_get::Record as AgentSandboxRow;
 pub use q::blueprint_list::Record as BlueprintRow;
 pub use q::call_claim::Record as CallRow;
 pub use q::call_take::Record as CallResultRow;
+pub use q::egress_grant::Record as EgressGrantRow;
+pub use q::egress_list::Record as EgressRow;
+pub use q::egress_wiring::Record as EgressWiringRow;
 pub use q::env_all::Record as EnvRow;
 pub use q::launch_connection::Record as LaunchConnectionRow;
 pub use q::renew_due::Record as RenewRow;
@@ -266,9 +269,10 @@ pub async fn sandbox_enroll_opt(
     db: &impl GenericClient,
     enrollment: &[u8],
     session: &[u8],
+    egress: &[u8],
 ) -> DbResult<Option<EnrolledRow>> {
     Ok(q::sandbox_enroll::run()
-        .bind(db, &session, &enrollment)
+        .bind(db, &session, &egress, &enrollment)
         .opt()
         .await?)
 }
@@ -350,5 +354,73 @@ pub async fn trace_scope_opt(
     Ok(q::trace_scope::run()
         .bind(db, &operation, &sandbox)
         .opt()
+        .await?)
+}
+
+pub async fn egress_set_execute(
+    db: &impl GenericClient,
+    blueprint: Uuid,
+    slug: &str,
+    connection: Uuid,
+    config: &serde_json::Value,
+    config_version: i32,
+    enabled: bool,
+) -> DbResult<u64> {
+    Ok(q::egress_set::run()
+        .bind(
+            db,
+            &blueprint,
+            &slug,
+            &connection,
+            config,
+            &config_version,
+            &enabled,
+        )
+        .await?)
+}
+pub async fn egress_delete_execute(
+    db: &impl GenericClient,
+    blueprint: Uuid,
+    slug: &str,
+) -> DbResult<u64> {
+    Ok(q::egress_delete::run().bind(db, &blueprint, &slug).await?)
+}
+pub async fn egress_list_all(
+    db: &impl GenericClient,
+    blueprints: &[Uuid],
+) -> DbResult<Vec<EgressRow>> {
+    Ok(q::egress_list::run().bind(db, &blueprints).all().await?)
+}
+pub async fn egress_grant_opt(
+    db: &impl GenericClient,
+    egress: &[u8],
+    slug: &str,
+) -> DbResult<Option<EgressGrantRow>> {
+    Ok(q::egress_grant::run()
+        .bind(db, &slug, &egress)
+        .opt()
+        .await?)
+}
+pub async fn egress_wiring_all(
+    db: &impl GenericClient,
+    blueprint: Uuid,
+) -> DbResult<Vec<EgressWiringRow>> {
+    Ok(q::egress_wiring::run().bind(db, &blueprint).all().await?)
+}
+pub use q::blueprint_by_name::Record as BlueprintByNameRow;
+pub async fn blueprint_by_name_opt(
+    db: &impl GenericClient,
+    name: &str,
+) -> DbResult<Option<BlueprintByNameRow>> {
+    Ok(q::blueprint_by_name::run().bind(db, &name).opt().await?)
+}
+pub async fn env_set_secret_execute(
+    db: &impl GenericClient,
+    blueprint: Uuid,
+    name: &str,
+    secret: Uuid,
+) -> DbResult<u64> {
+    Ok(q::env_set_secret::run()
+        .bind(db, &blueprint, &name, &secret)
         .await?)
 }

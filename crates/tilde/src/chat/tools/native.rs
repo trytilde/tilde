@@ -511,9 +511,10 @@ impl Drop for MessageEvents {
             let id = self.id;
             let thread = self.scope.thread_id;
             if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-                runtime.spawn(async move {
+                let abort = async move {
                     let _ = chat.abort_message(id, thread).await;
-                });
+                };
+                runtime.spawn(abort);
             }
         }
     }

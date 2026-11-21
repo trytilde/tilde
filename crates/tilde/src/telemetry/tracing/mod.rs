@@ -153,9 +153,10 @@ impl Runtime {
             let _ = pipeline.start(NoInspect, pipeline_stop).await;
         });
         let collect_queue = queue.clone();
-        let collector = tokio::spawn(async move {
+        let collect = async move {
             collect_queue.collect(export_rx).await;
-        });
+        };
+        let collector = tokio::spawn(collect);
         let provider = platform_provider(sender.clone(), "tilde");
         Self {
             tracing: Tracing {

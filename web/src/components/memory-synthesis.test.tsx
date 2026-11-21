@@ -112,7 +112,7 @@ it("learns only from agents that may write, from linked wikis, and shows why bat
   within(batches).getByRole("link", { name: "office/deploys, revision 2" });
   expect(
     within(batches).getByRole("link", { name: "Deploys on Tuesdays" }).getAttribute("href"),
-  ).toBe("/memory/bank-team/memories?memory=m1");
+  ).toBe("/registry/memory/bank-team/memories?memory=m1");
   // What it forgot is listed, not linked.
   within(batches).getByText("Deploys on Mondays");
   expect(within(batches).queryByRole("link", { name: "Deploys on Mondays" })).toBeNull();

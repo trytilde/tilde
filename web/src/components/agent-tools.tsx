@@ -286,7 +286,7 @@ export function AgentTools(props: { agentId: string } | { blueprintId: string })
                 <CableIcon />
                 Choose existing
               </DropdownMenuItem>
-              <DropdownMenuItem render={<Link to="/tools/connections" />}>
+              <DropdownMenuItem render={<Link to="/registry/tools/connections" />}>
                 <WrenchIcon />
                 Connect a new tool
               </DropdownMenuItem>
@@ -467,7 +467,7 @@ function SandboxRows({ entry }: { entry: Entry }) {
       title={
         entry.blueprintId ? (
           <Link
-            to="/sandboxes/$blueprintId/settings"
+            to="/registry/sandboxes/$blueprintId/settings"
             params={{ blueprintId: entry.blueprintId }}
             className="font-medium hover:underline"
           >
@@ -626,7 +626,7 @@ function SourceRows({
           <span className="flex items-center gap-3">
             <GroupToggle name={name} expanded={expanded} onToggle={setExpanded} />
             <Link
-              to="/tools/$toolId"
+              to="/registry/tools/$toolId"
               params={{ toolId: source.connectionId ?? source.toolHostId ?? "" }}
               search={{ kind: source.toolHostId ? "host" : "connection" }}
               className="font-medium hover:underline"

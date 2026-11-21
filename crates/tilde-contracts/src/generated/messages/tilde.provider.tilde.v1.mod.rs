@@ -84,6 +84,19 @@ pub mod __buffa {
         reg.register_json_any(super::__STEER_QUEUED_MESSAGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SEARCH_MESSAGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SEARCH_MESSAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CONNECTABLE_PROVIDER_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTABLE_PROVIDERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTABLE_PROVIDERS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__START_CONNECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CONNECTION_SETUP_JSON_ANY);
+        reg.register_json_any(super::__START_CONNECTION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__USER_CONNECTION_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTIONS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__RECONNECT_CONNECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__RECONNECT_CONNECTION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_CONNECTION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_CONNECTION_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -334,5 +347,57 @@ pub use self::__buffa::view::SearchMessagesRequestOwnedView;
 pub use self::__buffa::view::SearchMessagesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SearchMessagesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectableProviderView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectableProviderOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectableProvidersRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectableProvidersRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectableProvidersResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectableProvidersResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StartConnectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::StartConnectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionSetupView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionSetupOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StartConnectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::StartConnectionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UserConnectionView;
+#[doc(inline)]
+pub use self::__buffa::view::UserConnectionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectionsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectionsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectionsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectionsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReconnectConnectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ReconnectConnectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ReconnectConnectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ReconnectConnectionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteConnectionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteConnectionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteConnectionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteConnectionResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

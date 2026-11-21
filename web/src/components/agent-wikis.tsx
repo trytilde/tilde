@@ -130,7 +130,7 @@ export function AgentWikis({
         </div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           The agent reads its wikis' reference pages and, where it may write, keeps them up to date.{" "}
-          <Link to="/wikis" className="text-foreground underline">
+          <Link to="/registry/wikis" className="text-foreground underline">
             All wikis
           </Link>
         </p>
@@ -139,7 +139,11 @@ export function AgentWikis({
         <Label htmlFor="agent-own-wiki">Its own wiki</Label>
         {own ? (
           <span className="text-sm">
-            <Link to="/wikis/$wikiId/pages" params={{ wikiId: own.id }} className="underline">
+            <Link
+              to="/registry/wikis/$wikiId/pages"
+              params={{ wikiId: own.id }}
+              className="underline"
+            >
               {own.name}
             </Link>{" "}
             <span className="text-muted-foreground">· {own.pageCount} pages</span>
@@ -204,14 +208,18 @@ export function AgentWikis({
         links={links}
         locked={locked}
         open={(wiki) => (
-          <Link to="/wikis/$wikiId/pages" params={{ wikiId: wiki.id }} className="underline">
+          <Link
+            to="/registry/wikis/$wikiId/pages"
+            params={{ wikiId: wiki.id }}
+            className="underline"
+          >
             {wiki.name}
           </Link>
         )}
         empty={
           <>
             No shared wikis yet.{" "}
-            <Link to="/wikis" className="text-foreground underline">
+            <Link to="/registry/wikis" className="text-foreground underline">
               Create one
             </Link>
             .

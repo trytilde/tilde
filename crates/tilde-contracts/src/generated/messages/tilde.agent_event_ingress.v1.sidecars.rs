@@ -8846,6 +8846,13 @@ pub struct GetConfigurationResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub connections: ::buffa::alloc::vec::Vec<ConnectionConfiguration>,
+    /// Field 10: `tools`
+    #[serde(
+        rename = "tools",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub tools: ::buffa::alloc::vec::Vec<SidecarTool>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8858,6 +8865,7 @@ impl ::core::fmt::Debug for GetConfigurationResponse {
             .field("agent", &self.agent)
             .field("agent_generation", &self.agent_generation)
             .field("connections", &self.connections)
+            .field("tools", &self.tools)
             .finish()
     }
 }
@@ -8915,6 +8923,14 @@ impl ::buffa::Message for GetConfigurationResponse {
         for v in &self.inference_blocked_identities {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.tools {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -8949,6 +8965,14 @@ impl ::buffa::Message for GetConfigurationResponse {
         }
         for v in &self.inference_blocked_identities {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        for v in &self.tools {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9011,6 +9035,18 @@ impl ::buffa::Message for GetConfigurationResponse {
                 )?;
                 self.inference_blocked_identities.push(__elem);
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.tools.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9024,6 +9060,7 @@ impl ::buffa::Message for GetConfigurationResponse {
         self.connections.clear();
         self.inference_blocked = false;
         self.inference_blocked_identities.clear();
+        self.tools.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9054,6 +9091,459 @@ pub const __GET_CONFIGURATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.GetConfigurationResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetConfigurationResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetConfigurationResponse>,
+    is_wkt: false,
+};
+/// One of the agent's tools that the sidecar runs itself, exactly as the gateway's catalog offers
+/// it: `definition` carries the catalog name `{source slug}.{tool name}` and the agent's wording,
+/// `deferred` its tool mode. It calls `tool_name` on the replicated connection `connection_id`
+/// (in `connections`, with the TOOL capability unless it is also assigned another way): a managed
+/// provider's tool, or with `mcp` set a tool of the MCP server serving the connection's type.
+/// Tools only the gateway can run (tool hosts, sandbox tools and other sources only the gateway reaches) are listed and
+/// called through tilde.runtime.v1.GatewayToolService instead.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SidecarTool {
+    /// Field 1: `definition`
+    #[serde(
+        rename = "definition",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub definition: ::buffa::MessageField<
+        super::super::types::v1::ToolDefinition,
+        ::buffa::Inline<super::super::types::v1::ToolDefinition>,
+    >,
+    /// Field 2: `deferred`
+    #[serde(
+        rename = "deferred",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub deferred: bool,
+    /// Field 3: `connection_id`
+    #[serde(
+        rename = "connectionId",
+        alias = "connection_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub connection_id: ::buffa::alloc::string::String,
+    /// Field 4: `tool_name`
+    #[serde(
+        rename = "toolName",
+        alias = "tool_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tool_name: ::buffa::alloc::string::String,
+    /// Field 5: `mcp`
+    #[serde(
+        rename = "mcp",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub mcp: ::buffa::MessageField<McpServer, ::buffa::Inline<McpServer>>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SidecarTool {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SidecarTool")
+            .field("definition", &self.definition)
+            .field("deferred", &self.deferred)
+            .field("connection_id", &self.connection_id)
+            .field("tool_name", &self.tool_name)
+            .field("mcp", &self.mcp)
+            .finish()
+    }
+}
+impl SidecarTool {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.SidecarTool";
+}
+::buffa::impl_default_instance!(SidecarTool);
+impl ::buffa::MessageName for SidecarTool {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "SidecarTool";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.SidecarTool";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.SidecarTool";
+}
+impl ::buffa::Message for SidecarTool {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.definition.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.definition.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.deferred {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.tool_name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.tool_name) as u64;
+        }
+        if self.mcp.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.mcp.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.definition.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.definition.write_to(__cache, buf);
+        }
+        if self.deferred {
+            ::buffa::types::put_bool_field(2u32, self.deferred, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.connection_id, buf);
+        }
+        if !self.tool_name.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.tool_name, buf);
+        }
+        if self.mcp.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.mcp.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.definition.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.deferred = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.connection_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tool_name, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.mcp.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.definition = ::buffa::MessageField::none();
+        self.deferred = false;
+        self.connection_id.clear();
+        self.tool_name.clear();
+        self.mcp = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SidecarTool {
+    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.SidecarTool";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SidecarTool {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SIDECAR_TOOL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.SidecarTool",
+    to_json: ::buffa::type_registry::any_to_json::<SidecarTool>,
+    from_json: ::buffa::type_registry::any_from_json::<SidecarTool>,
+    is_wkt: false,
+};
+/// How a connection's credential reaches its MCP server: `credential` is none, bearer, header
+/// or query, with the header or query parameter `credential_name` and header `credential_prefix`.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct McpServer {
+    /// Field 1: `url`
+    #[serde(
+        rename = "url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub url: ::buffa::alloc::string::String,
+    /// Field 2: `credential`
+    #[serde(
+        rename = "credential",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub credential: ::buffa::alloc::string::String,
+    /// Field 3: `credential_name`
+    #[serde(
+        rename = "credentialName",
+        alias = "credential_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub credential_name: ::buffa::alloc::string::String,
+    /// Field 4: `credential_prefix`
+    #[serde(
+        rename = "credentialPrefix",
+        alias = "credential_prefix",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub credential_prefix: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for McpServer {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("McpServer")
+            .field("url", &self.url)
+            .field("credential", &self.credential)
+            .field("credential_name", &self.credential_name)
+            .field("credential_prefix", &self.credential_prefix)
+            .finish()
+    }
+}
+impl McpServer {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.McpServer";
+}
+::buffa::impl_default_instance!(McpServer);
+impl ::buffa::MessageName for McpServer {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "McpServer";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.McpServer";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.McpServer";
+}
+impl ::buffa::Message for McpServer {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        if !self.credential.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.credential) as u64;
+        }
+        if !self.credential_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.credential_name) as u64;
+        }
+        if !self.credential_prefix.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.credential_prefix) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        if !self.credential.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.credential, buf);
+        }
+        if !self.credential_name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.credential_name, buf);
+        }
+        if !self.credential_prefix.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.credential_prefix, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.url, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.credential, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.credential_name, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.credential_prefix, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.url.clear();
+        self.credential.clear();
+        self.credential_name.clear();
+        self.credential_prefix.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for McpServer {
+    const PROTO_FQN: &'static str = "tilde.agent_event_ingress.v1.McpServer";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for McpServer {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MCP_SERVER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.agent_event_ingress.v1.McpServer",
+    to_json: ::buffa::type_registry::any_to_json::<McpServer>,
+    from_json: ::buffa::type_registry::any_from_json::<McpServer>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

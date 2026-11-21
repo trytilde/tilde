@@ -12,6 +12,7 @@ pub mod e2b;
 pub mod firecrawl;
 pub mod github;
 pub mod google;
+pub mod linear;
 pub mod linq;
 pub mod modal;
 pub mod payload;
@@ -36,6 +37,11 @@ pub trait ToolProvider: Send + Sync {
         input: Value,
     ) -> BoxFuture<'a, ToolResult<Value>>;
 }
+/// Connection types whose calls need the gateway itself: AWS OIDC federates with web identity
+/// tokens from the gateway's OIDC issuer, which no sidecar holds.
+pub(crate) fn needs_gateway(provider: &str, typ: &str) -> bool {
+    (provider, typ) == ("aws", "oidc")
+}
 pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolProvider> {
     match (provider, typ) {
         ("tavily", "api") => Some(&tavily::Tavily),
@@ -48,9 +54,12 @@ pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolPro
         ("google_analytics", "oauth") => Some(&google::analytics::GoogleAnalytics),
         ("sentry", "token") => Some(&sentry::TOKEN),
         ("sentry", "oauth") => Some(&sentry::OAUTH),
-        ("github", "github_app" | "oauth") => Some(&github::ACCESS_TOKEN),
+        ("github", "github_app") => Some(&github::APP),
+        ("github", "oauth") => Some(&github::ACCESS_TOKEN),
         ("github", "pat") => Some(&github::PERSONAL_TOKEN),
         ("slack", "slack_app") => Some(&slack::Slack),
+        ("linear", "api_key") => Some(&linear::API_KEY),
+        ("linear", "oauth") => Some(&linear::OAUTH),
         ("posthog", "api") => Some(&posthog::Posthog),
         ("firecrawl", "api") => Some(&firecrawl::Firecrawl),
         ("stripe", "api") => Some(&stripe::Stripe),
@@ -60,7 +69,8 @@ pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolPro
         ("whatsapp", "meta") => Some(&whatsapp::Whatsapp { telnyx: false }),
         ("telnyx", "whatsapp") => Some(&whatsapp::Whatsapp { telnyx: true }),
         ("e2b", "api") => Some(&e2b::E2b),
-        ("aws", "iam") => Some(&aws::Aws),
+        ("aws", "iam") => Some(&aws::IAM),
+        ("aws", "oidc") => Some(&aws::OIDC),
         ("modal", "api") => Some(&modal::Modal),
         _ => None,
     }

@@ -62,7 +62,7 @@ export function AgentPrompts({ agentId }: { agentId: string }) {
   const navigate = useNavigate();
   const setOpen = (prompt: string | undefined) =>
     void navigate({
-      to: "/agent/$agentId/prompts",
+      to: "/registry/agent/$agentId/prompts",
       params: { agentId },
       search: prompt ? { prompt } : {},
     });
@@ -109,8 +109,14 @@ export function AgentPrompts({ agentId }: { agentId: string }) {
             ) : list.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={COLUMNS} className="h-24 text-center text-muted-foreground">
-                  No prompts registered yet. They appear when <code>tilde deploy</code> registers a
-                  deployment whose code declares one.
+                  {error ? (
+                    "Unable to load prompts."
+                  ) : (
+                    <>
+                      No prompts registered yet. They appear when <code>tilde deploy</code>{" "}
+                      registers a deployment whose code declares one.
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
@@ -185,10 +191,10 @@ function PromptDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const noop = () => {};
   return (
     <section
-      className="flex min-h-0 flex-1"
+      className="flex min-h-0 flex-1 flex-col md:flex-row"
       aria-label={prompt ? `Prompt ${prompt.name}` : "Prompt"}
     >
-      <aside className="flex w-64 shrink-0 flex-col gap-4 border-r pt-4 lg:pt-6">
+      <aside className="flex shrink-0 flex-col gap-4 border-b pt-4 max-md:max-h-64 max-md:overflow-y-auto md:w-64 md:border-r md:border-b-0 lg:pt-6">
         {version && (
           <div className="space-y-1 px-4 lg:px-6">
             <div className="flex flex-wrap items-center gap-2">

@@ -59,11 +59,11 @@ beforeEach(() => {
       .mockReturnValue({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
   });
 });
-function mount(initial = "/agent/agent-one/logs") {
+function mount(initial = "/registry/agent/agent-one/logs") {
   const root = createRootRoute(),
     route = createRoute({
       getParentRoute: () => root,
-      path: "/agent/$agentId/logs",
+      path: "/registry/agent/$agentId/logs",
       validateSearch: parseLogSearch,
       component: () => <AgentLogs agentId="agent-one" />,
     });
@@ -155,7 +155,7 @@ it("shows whole-range log counts without latency and preserves the histogram whe
     ),
   });
   const router = mount(
-    "/agent/agent-one/logs?range=custom&from=2026-09-12T00:00:00Z&to=2026-09-12T04:00:00Z&service=example-agent-1",
+    "/registry/agent/agent-one/logs?range=custom&from=2026-09-12T00:00:00Z&to=2026-09-12T04:00:00Z&service=example-agent-1",
   );
   const region = await screen.findByRole("region", { name: "Log activity" });
   await waitFor(() => expect(region.querySelectorAll('[data-slot="activity-bar"]').length).toBe(4));

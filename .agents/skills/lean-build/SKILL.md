@@ -13,6 +13,7 @@ Postgres/cloud architecture.
 - Deliver one coherent end-to-end path across responsible layers.
 - Reuse a fitting seam. Refactor when patching would duplicate behavior, weaken ownership, or hide the root cause.
 - Preserve authentication, authorization, tenancy, secrets, provider, database, and ownership-transfer boundaries.
+- Check whether the deployment SDK needs support: a new or changed platform resource or setting needs its `@trytilde/iac` spec field and `Apply` preflight and plan in the same change, or a stated reason it doesn't.
 - Omit modes, providers, configuration, extensibility, and polish unless acceptance requires them.
 - Add a dependency, service, configuration surface, or migration only when acceptance or lifecycle correctness requires it; state the material tradeoff.
 

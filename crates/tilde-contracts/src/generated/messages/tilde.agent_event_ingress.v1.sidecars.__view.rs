@@ -13643,6 +13643,11 @@ pub struct GetConfigurationResponseView<'a> {
         'a,
         super::super::__buffa::view::ConnectionConfigurationView<'a>,
     >,
+    /// Field 10: `tools`
+    pub tools: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::SidecarToolView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for GetConfigurationResponseView<'a> {
@@ -13739,6 +13744,26 @@ impl<'a> ::buffa::MessageView<'a> for GetConfigurationResponseView<'a> {
                         )?,
                     );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<
+                        super::super::__buffa::view::SidecarToolView,
+                    >(),
+                )?;
+                view.tools
+                    .push(
+                        <super::super::__buffa::view::SidecarToolView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -13788,6 +13813,11 @@ impl<'a> ::buffa::MessageView<'a> for GetConfigurationResponseView<'a> {
                 .iter()
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+            tools: self
+                .tools
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -13826,6 +13856,14 @@ impl<'a> ::buffa::ViewEncode<'a> for GetConfigurationResponseView<'a> {
         for v in &self.inference_blocked_identities {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        for v in &self.tools {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -13861,6 +13899,14 @@ impl<'a> ::buffa::ViewEncode<'a> for GetConfigurationResponseView<'a> {
         }
         for v in &self.inference_blocked_identities {
             ::buffa::types::put_string_field(8u32, v, buf);
+        }
+        for v in &self.tools {
+            ::buffa::types::put_len_delimited_header(
+                10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13907,6 +13953,9 @@ impl<'__a> ::serde::Serialize for GetConfigurationResponseView<'__a> {
         }
         if !self.connections.is_empty() {
             __map.serialize_entry("connections", &*self.connections)?;
+        }
+        if !self.tools.is_empty() {
+            __map.serialize_entry("tools", &*self.tools)?;
         }
         __map.end()
     }
@@ -14037,6 +14086,13 @@ impl GetConfigurationResponseOwnedView {
     > {
         &self.0.reborrow().connections
     }
+    /// Field 10: `tools`
+    #[must_use]
+    pub fn tools(
+        &self,
+    ) -> &::buffa::RepeatedView<'_, super::super::__buffa::view::SidecarToolView<'_>> {
+        &self.0.reborrow().tools
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<GetConfigurationResponseView<'static>>>
 for GetConfigurationResponseOwnedView {
@@ -14061,6 +14117,752 @@ impl ::buffa::HasMessageView for super::super::GetConfigurationResponse {
     type ViewHandle = GetConfigurationResponseOwnedView;
 }
 impl ::serde::Serialize for GetConfigurationResponseOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// One of the agent's tools that the sidecar runs itself, exactly as the gateway's catalog offers
+/// it: `definition` carries the catalog name `{source slug}.{tool name}` and the agent's wording,
+/// `deferred` its tool mode. It calls `tool_name` on the replicated connection `connection_id`
+/// (in `connections`, with the TOOL capability unless it is also assigned another way): a managed
+/// provider's tool, or with `mcp` set a tool of the MCP server serving the connection's type.
+/// Tools only the gateway can run (tool hosts, sandbox tools and other sources only the gateway reaches) are listed and
+/// called through tilde.runtime.v1.GatewayToolService instead.
+#[derive(Clone, Debug, Default)]
+pub struct SidecarToolView<'a> {
+    /// Field 1: `definition`
+    pub definition: ::buffa::MessageFieldView<
+        super::super::super::super::types::v1::__buffa::view::ToolDefinitionView<'a>,
+    >,
+    /// Field 2: `deferred`
+    pub deferred: bool,
+    /// Field 3: `connection_id`
+    pub connection_id: &'a str,
+    /// Field 4: `tool_name`
+    pub tool_name: &'a str,
+    /// Field 5: `mcp`
+    pub mcp: ::buffa::MessageFieldView<super::super::__buffa::view::McpServerView<'a>>,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for SidecarToolView<'a> {
+    type Owned = super::super::SidecarTool;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.definition.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.definition = ::buffa::MessageFieldView::set(
+                            <super::super::super::super::types::v1::__buffa::view::ToolDefinitionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.deferred = ::buffa::types::decode_bool(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.connection_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.tool_name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.mcp.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.mcp = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::McpServerView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::SidecarTool, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::SidecarTool, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::SidecarTool {
+            definition: match self.definition.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::super::super::types::v1::ToolDefinition,
+                        ::buffa::Inline<
+                            super::super::super::super::types::v1::ToolDefinition,
+                        >,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            deferred: self.deferred,
+            connection_id: self.connection_id.to_string(),
+            tool_name: self.tool_name.to_string(),
+            mcp: match self.mcp.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::McpServer,
+                        ::buffa::Inline<super::super::McpServer>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for SidecarToolView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.definition.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.definition.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if self.deferred {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if !self.connection_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.connection_id) as u64;
+        }
+        if !self.tool_name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.tool_name) as u64;
+        }
+        if self.mcp.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.mcp.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.definition.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.definition.write_to(__cache, buf);
+        }
+        if self.deferred {
+            ::buffa::types::put_bool_field(2u32, self.deferred, buf);
+        }
+        if !self.connection_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.connection_id, buf);
+        }
+        if !self.tool_name.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.tool_name, buf);
+        }
+        if self.mcp.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                5u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.mcp.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for SidecarToolView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        {
+            if let ::core::option::Option::Some(__v) = self.definition.as_option() {
+                __map.serialize_entry("definition", __v)?;
+            }
+        }
+        if self.deferred {
+            __map.serialize_entry("deferred", &self.deferred)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.connection_id) {
+            __map.serialize_entry("connectionId", self.connection_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.tool_name) {
+            __map.serialize_entry("toolName", self.tool_name)?;
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.mcp.as_option() {
+                __map.serialize_entry("mcp", __v)?;
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for SidecarToolView<'a> {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "SidecarTool";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.SidecarTool";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.SidecarTool";
+}
+::buffa::impl_default_view_instance!(SidecarToolView);
+::buffa::impl_view_reborrow!(SidecarToolView);
+/** Self-contained, `'static` owned view of a `SidecarTool` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SidecarToolView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SidecarToolView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct SidecarToolOwnedView(::buffa::OwnedView<SidecarToolView<'static>>);
+impl SidecarToolOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SidecarToolOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SidecarToolOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::SidecarTool,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            SidecarToolOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`SidecarToolView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &SidecarToolView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::SidecarTool {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `definition`
+    #[must_use]
+    pub fn definition(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::super::super::types::v1::__buffa::view::ToolDefinitionView<'_>,
+    > {
+        &self.0.reborrow().definition
+    }
+    /// Field 2: `deferred`
+    #[must_use]
+    pub fn deferred(&self) -> bool {
+        self.0.reborrow().deferred
+    }
+    /// Field 3: `connection_id`
+    #[must_use]
+    pub fn connection_id(&self) -> &'_ str {
+        self.0.reborrow().connection_id
+    }
+    /// Field 4: `tool_name`
+    #[must_use]
+    pub fn tool_name(&self) -> &'_ str {
+        self.0.reborrow().tool_name
+    }
+    /// Field 5: `mcp`
+    #[must_use]
+    pub fn mcp(
+        &self,
+    ) -> &::buffa::MessageFieldView<super::super::__buffa::view::McpServerView<'_>> {
+        &self.0.reborrow().mcp
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<SidecarToolView<'static>>>
+for SidecarToolOwnedView {
+    fn from(inner: ::buffa::OwnedView<SidecarToolView<'static>>) -> Self {
+        SidecarToolOwnedView(inner)
+    }
+}
+impl ::core::convert::From<SidecarToolOwnedView>
+for ::buffa::OwnedView<SidecarToolView<'static>> {
+    fn from(wrapper: SidecarToolOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<SidecarToolView<'static>>>
+for SidecarToolOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<SidecarToolView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::SidecarTool {
+    type View<'a> = SidecarToolView<'a>;
+    type ViewHandle = SidecarToolOwnedView;
+}
+impl ::serde::Serialize for SidecarToolOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// How a connection's credential reaches its MCP server: `credential` is none, bearer, header
+/// or query, with the header or query parameter `credential_name` and header `credential_prefix`.
+#[derive(Clone, Debug, Default)]
+pub struct McpServerView<'a> {
+    /// Field 1: `url`
+    pub url: &'a str,
+    /// Field 2: `credential`
+    pub credential: &'a str,
+    /// Field 3: `credential_name`
+    pub credential_name: &'a str,
+    /// Field 4: `credential_prefix`
+    pub credential_prefix: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for McpServerView<'a> {
+    type Owned = super::super::McpServer;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.url = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.credential = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.credential_name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.credential_prefix = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::McpServer, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::McpServer, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::McpServer {
+            url: self.url.to_string(),
+            credential: self.credential.to_string(),
+            credential_name: self.credential_name.to_string(),
+            credential_prefix: self.credential_prefix.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for McpServerView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.url.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.url) as u64;
+        }
+        if !self.credential.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.credential) as u64;
+        }
+        if !self.credential_name.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.credential_name) as u64;
+        }
+        if !self.credential_prefix.is_empty() {
+            size
+                += 1u64
+                    + ::buffa::types::string_encoded_len(&self.credential_prefix) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        if !self.credential.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.credential, buf);
+        }
+        if !self.credential_name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.credential_name, buf);
+        }
+        if !self.credential_prefix.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.credential_prefix, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for McpServerView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
+            __map.serialize_entry("url", self.url)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.credential) {
+            __map.serialize_entry("credential", self.credential)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.credential_name) {
+            __map.serialize_entry("credentialName", self.credential_name)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.credential_prefix) {
+            __map.serialize_entry("credentialPrefix", self.credential_prefix)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for McpServerView<'a> {
+    const PACKAGE: &'static str = "tilde.agent_event_ingress.v1";
+    const NAME: &'static str = "McpServer";
+    const FULL_NAME: &'static str = "tilde.agent_event_ingress.v1.McpServer";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.agent_event_ingress.v1.McpServer";
+}
+::buffa::impl_default_view_instance!(McpServerView);
+::buffa::impl_view_reborrow!(McpServerView);
+/** Self-contained, `'static` owned view of a `McpServer` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`McpServerView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`McpServerView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct McpServerOwnedView(::buffa::OwnedView<McpServerView<'static>>);
+impl McpServerOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::decode_with_options(bytes, opts)?),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::McpServer,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            McpServerOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`McpServerView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &McpServerView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::McpServer {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `url`
+    #[must_use]
+    pub fn url(&self) -> &'_ str {
+        self.0.reborrow().url
+    }
+    /// Field 2: `credential`
+    #[must_use]
+    pub fn credential(&self) -> &'_ str {
+        self.0.reborrow().credential
+    }
+    /// Field 3: `credential_name`
+    #[must_use]
+    pub fn credential_name(&self) -> &'_ str {
+        self.0.reborrow().credential_name
+    }
+    /// Field 4: `credential_prefix`
+    #[must_use]
+    pub fn credential_prefix(&self) -> &'_ str {
+        self.0.reborrow().credential_prefix
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<McpServerView<'static>>>
+for McpServerOwnedView {
+    fn from(inner: ::buffa::OwnedView<McpServerView<'static>>) -> Self {
+        McpServerOwnedView(inner)
+    }
+}
+impl ::core::convert::From<McpServerOwnedView>
+for ::buffa::OwnedView<McpServerView<'static>> {
+    fn from(wrapper: McpServerOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<McpServerView<'static>>>
+for McpServerOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<McpServerView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::McpServer {
+    type View<'a> = McpServerView<'a>;
+    type ViewHandle = McpServerOwnedView;
+}
+impl ::serde::Serialize for McpServerOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

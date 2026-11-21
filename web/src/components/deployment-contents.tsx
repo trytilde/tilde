@@ -114,7 +114,7 @@ export function DeploymentContents({
             <li key={prompt.version?.id ?? prompt.promptId} className="space-y-0.5 px-3 py-2">
               <span className="flex items-center gap-2">
                 <Link
-                  to="/agent/$agentId/prompts"
+                  to="/registry/agent/$agentId/prompts"
                   params={{ agentId }}
                   search={{ prompt: prompt.promptId }}
                   className="font-mono text-sm font-medium hover:underline"

@@ -1,0 +1,19 @@
+syntax = "proto3";
+package tilde.runtime.v1;
+import "tilde/types/v1/chat.proto";
+
+// The tools of a sidecar-hosted agent that only the gateway can run: tool hosts (which dial the
+// gateway), sandbox tools and other sources only the gateway reaches. The sidecar runs the agent's other tools itself from
+// its replicated configuration and relays the listing and calls of these here (through the
+// registry relay, which re-verifies the invocation token, the thread lease and the capability
+// ceiling). Agents call the tools through ChatService as everywhere else.
+service GatewayToolService {
+  rpc ListGatewayTools(ListGatewayToolsRequest) returns (ListGatewayToolsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  rpc InvokeGatewayTool(InvokeGatewayToolRequest) returns (InvokeGatewayToolResponse);
+}
+message ListGatewayToolsRequest {}
+// `deferred` are the tools of an agent in dynamic tool mode, found with tools.search.
+message ListGatewayToolsResponse { repeated tilde.types.v1.ToolDefinition tools = 1; repeated tilde.types.v1.ToolDefinition deferred = 2; }
+// `call_id` is the tool call's, which tool hosts and providers use for idempotency.
+message InvokeGatewayToolRequest { string name = 1; string input_json = 2; string call_id = 3; }
+message InvokeGatewayToolResponse { string output_json = 1; }

@@ -441,11 +441,19 @@ pub async fn personal_connections_all(
     db: &impl GenericClient,
     user: Uuid,
     root: Option<Uuid>,
+    agent: Uuid,
 ) -> DbResult<Vec<PersonalConnectionRow>> {
     Ok(q::personal_connections::run()
-        .bind(db, &user, &root)
+        .bind(db, &user, &root, &agent)
         .all()
         .await?)
+}
+pub async fn personal_call_execute(
+    db: &impl GenericClient,
+    call: Uuid,
+    connection: Uuid,
+) -> DbResult<u64> {
+    Ok(q::personal_call::run().bind(db, &connection, &call).await?)
 }
 pub async fn personal_owner_set_execute(
     db: &impl GenericClient,

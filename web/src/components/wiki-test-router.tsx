@@ -9,11 +9,11 @@ import {
 import { WikiPage, type WikiTab } from "./wiki";
 
 /** A wiki's page under a router whose `?page=` holds the open page, as the app's route does. */
-export function renderWiki(wikiId: string, tab: WikiTab, url = `/wikis/${wikiId}/pages`) {
+export function renderWiki(wikiId: string, tab: WikiTab, url = `/registry/wikis/${wikiId}/pages`) {
   const root = createRootRoute();
   const pages = createRoute({
     getParentRoute: () => root,
-    path: "/wikis/$wikiId/pages",
+    path: "/registry/wikis/$wikiId/pages",
     validateSearch: (search: Record<string, unknown>): { page?: string } => ({
       page: typeof search.page === "string" ? search.page : undefined,
     }),

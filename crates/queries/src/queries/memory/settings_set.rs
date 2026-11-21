@@ -75,7 +75,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO memory_settings(connection_id,model,dims,version) VALUES($1,$2,$3,nextval('memory_settings_version')) ON CONFLICT(singleton) DO UPDATE SET connection_id=EXCLUDED.connection_id,model=EXCLUDED.model,dims=EXCLUDED.dims,version=EXCLUDED.version RETURNING version",
+        "INSERT INTO memory_settings(connection_id,model,dims,version) VALUES($1,$2,$3,nextval('memory_settings_version')) ON CONFLICT ON CONSTRAINT memory_settings_pkey DO UPDATE SET connection_id=EXCLUDED.connection_id,model=EXCLUDED.model,dims=EXCLUDED.dims,version=EXCLUDED.version RETURNING version",
         None,
     )
 }
