@@ -181,6 +181,176 @@ impl ::buffa::Enumeration for AgentConcurrencyPolicy {
         ]
     }
 }
+/// Where a local agent runs. Tilde never runs or wakes a local agent: its harness reports
+/// sessions to Tilde and is given the agent's tools and skills.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum Harness {
+    HARNESS_UNSPECIFIED = 0i32,
+    HARNESS_CLAUDE_CODE = 1i32,
+    HARNESS_CODEX = 2i32,
+    HARNESS_CLAUDE_DESKTOP = 3i32,
+    HARNESS_CHATGPT_DESKTOP = 4i32,
+}
+impl Harness {
+    ///Idiomatic alias for [`Self::HARNESS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::HARNESS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::HARNESS_CLAUDE_CODE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaudeCode: Self = Self::HARNESS_CLAUDE_CODE;
+    ///Idiomatic alias for [`Self::HARNESS_CODEX`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Codex: Self = Self::HARNESS_CODEX;
+    ///Idiomatic alias for [`Self::HARNESS_CLAUDE_DESKTOP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaudeDesktop: Self = Self::HARNESS_CLAUDE_DESKTOP;
+    ///Idiomatic alias for [`Self::HARNESS_CHATGPT_DESKTOP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChatgptDesktop: Self = Self::HARNESS_CHATGPT_DESKTOP;
+}
+impl ::core::default::Default for Harness {
+    fn default() -> Self {
+        Self::HARNESS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for Harness {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for Harness {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = Harness;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(Harness)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<Harness, E> {
+                <Harness as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<Harness, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <Harness as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<Harness, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <Harness as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<Harness, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for Harness {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for Harness {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::HARNESS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::HARNESS_CLAUDE_CODE),
+            2i32 => ::core::option::Option::Some(Self::HARNESS_CODEX),
+            3i32 => ::core::option::Option::Some(Self::HARNESS_CLAUDE_DESKTOP),
+            4i32 => ::core::option::Option::Some(Self::HARNESS_CHATGPT_DESKTOP),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::HARNESS_UNSPECIFIED => "HARNESS_UNSPECIFIED",
+            Self::HARNESS_CLAUDE_CODE => "HARNESS_CLAUDE_CODE",
+            Self::HARNESS_CODEX => "HARNESS_CODEX",
+            Self::HARNESS_CLAUDE_DESKTOP => "HARNESS_CLAUDE_DESKTOP",
+            Self::HARNESS_CHATGPT_DESKTOP => "HARNESS_CHATGPT_DESKTOP",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "HARNESS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::HARNESS_UNSPECIFIED)
+            }
+            "HARNESS_CLAUDE_CODE" => {
+                ::core::option::Option::Some(Self::HARNESS_CLAUDE_CODE)
+            }
+            "HARNESS_CODEX" => ::core::option::Option::Some(Self::HARNESS_CODEX),
+            "HARNESS_CLAUDE_DESKTOP" => {
+                ::core::option::Option::Some(Self::HARNESS_CLAUDE_DESKTOP)
+            }
+            "HARNESS_CHATGPT_DESKTOP" => {
+                ::core::option::Option::Some(Self::HARNESS_CHATGPT_DESKTOP)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::HARNESS_UNSPECIFIED,
+            Self::HARNESS_CLAUDE_CODE,
+            Self::HARNESS_CODEX,
+            Self::HARNESS_CLAUDE_DESKTOP,
+            Self::HARNESS_CHATGPT_DESKTOP,
+        ]
+    }
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum AgentHealthStatus {
@@ -762,6 +932,14 @@ pub struct Agent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub capabilities: ::buffa::MessageField<Capabilities, ::buffa::Inline<Capabilities>>,
+    /// Set for a local agent: one that runs in a harness on a person's machine.
+    ///
+    /// Field 15: `local`
+    #[serde(
+        rename = "local",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub local: ::buffa::MessageField<LocalAgent, ::buffa::Inline<LocalAgent>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -780,6 +958,7 @@ impl ::core::fmt::Debug for Agent {
             .field("updated_at", &self.updated_at)
             .field("metrics", &self.metrics)
             .field("capabilities", &self.capabilities)
+            .field("local", &self.local)
             .finish()
     }
 }
@@ -878,6 +1057,14 @@ impl ::buffa::Message for Agent {
         if !self.description.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
         }
+        if self.local.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.local.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -943,6 +1130,14 @@ impl ::buffa::Message for Agent {
         }
         if !self.description.is_empty() {
             ::buffa::types::put_string_field(14u32, &self.description, buf);
+        }
+        if self.local.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.local.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1057,6 +1252,17 @@ impl ::buffa::Message for Agent {
                 )?;
                 ::buffa::types::merge_string(&mut self.description, buf)?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.local.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1076,6 +1282,7 @@ impl ::buffa::Message for Agent {
         self.avatar_url = ::core::option::Option::None;
         self.concurrency_policy = ::buffa::EnumValue::from(0);
         self.description.clear();
+        self.local = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1106,6 +1313,401 @@ pub const __AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type
     type_url: "type.googleapis.com/tilde.types.v1.Agent",
     to_json: ::buffa::type_registry::any_to_json::<Agent>,
     from_json: ::buffa::type_registry::any_from_json::<Agent>,
+    is_wkt: false,
+};
+/// What a harness's adapter supports. Nothing else of an agent applies to a local agent.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct HarnessFeatures {
+    /// Its conversations are reported to Tilde as threads.
+    ///
+    /// Field 1: `sessions`
+    #[serde(
+        rename = "sessions",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub sessions: bool,
+    /// Each reported turn is also a trace.
+    ///
+    /// Field 2: `traces`
+    #[serde(
+        rename = "traces",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub traces: bool,
+    /// Field 3: `logs`
+    #[serde(
+        rename = "logs",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub logs: bool,
+    /// The agent's tools are served to the harness over MCP.
+    ///
+    /// Field 4: `tools`
+    #[serde(
+        rename = "tools",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub tools: bool,
+    /// The agent's skills are installed into the harness's own skill folder.
+    ///
+    /// Field 5: `skills`
+    #[serde(
+        rename = "skills",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub skills: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for HarnessFeatures {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("HarnessFeatures")
+            .field("sessions", &self.sessions)
+            .field("traces", &self.traces)
+            .field("logs", &self.logs)
+            .field("tools", &self.tools)
+            .field("skills", &self.skills)
+            .finish()
+    }
+}
+impl HarnessFeatures {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.HarnessFeatures";
+}
+::buffa::impl_default_instance!(HarnessFeatures);
+impl ::buffa::MessageName for HarnessFeatures {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "HarnessFeatures";
+    const FULL_NAME: &'static str = "tilde.types.v1.HarnessFeatures";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.HarnessFeatures";
+}
+impl ::buffa::Message for HarnessFeatures {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.sessions {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.traces {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.logs {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.tools {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        if self.skills {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.sessions {
+            ::buffa::types::put_bool_field(1u32, self.sessions, buf);
+        }
+        if self.traces {
+            ::buffa::types::put_bool_field(2u32, self.traces, buf);
+        }
+        if self.logs {
+            ::buffa::types::put_bool_field(3u32, self.logs, buf);
+        }
+        if self.tools {
+            ::buffa::types::put_bool_field(4u32, self.tools, buf);
+        }
+        if self.skills {
+            ::buffa::types::put_bool_field(5u32, self.skills, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sessions = ::buffa::types::decode_bool(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.traces = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.logs = ::buffa::types::decode_bool(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.tools = ::buffa::types::decode_bool(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.skills = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.sessions = false;
+        self.traces = false;
+        self.logs = false;
+        self.tools = false;
+        self.skills = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for HarnessFeatures {
+    const PROTO_FQN: &'static str = "tilde.types.v1.HarnessFeatures";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for HarnessFeatures {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __HARNESS_FEATURES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.HarnessFeatures",
+    to_json: ::buffa::type_registry::any_to_json::<HarnessFeatures>,
+    from_json: ::buffa::type_registry::any_from_json::<HarnessFeatures>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LocalAgent {
+    /// Field 1: `harness`
+    #[serde(
+        rename = "harness",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub harness: ::buffa::EnumValue<Harness>,
+    /// Field 2: `features`
+    #[serde(
+        rename = "features",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub features: ::buffa::MessageField<
+        HarnessFeatures,
+        ::buffa::Inline<HarnessFeatures>,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LocalAgent {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LocalAgent")
+            .field("harness", &self.harness)
+            .field("features", &self.features)
+            .finish()
+    }
+}
+impl LocalAgent {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.LocalAgent";
+}
+::buffa::impl_default_instance!(LocalAgent);
+impl ::buffa::MessageName for LocalAgent {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "LocalAgent";
+    const FULL_NAME: &'static str = "tilde.types.v1.LocalAgent";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.LocalAgent";
+}
+impl ::buffa::Message for LocalAgent {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
+        if self.features.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.features.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.features.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.features.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.harness = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.features.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.harness = ::buffa::EnumValue::from(0);
+        self.features = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LocalAgent {
+    const PROTO_FQN: &'static str = "tilde.types.v1.LocalAgent";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LocalAgent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LOCAL_AGENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.types.v1.LocalAgent",
+    to_json: ::buffa::type_registry::any_to_json::<LocalAgent>,
+    from_json: ::buffa::type_registry::any_from_json::<LocalAgent>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

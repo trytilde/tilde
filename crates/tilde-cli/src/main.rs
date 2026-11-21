@@ -8,6 +8,7 @@ mod dev;
 mod discover;
 mod doctor;
 mod iac;
+mod local;
 mod project;
 mod registry;
 #[cfg(unix)]
@@ -20,7 +21,7 @@ use clap::{Parser, Subcommand};
     name = "tilde",
     bin_name = "tilde",
     version,
-    about = "Develop, deploy and inspect Tilde agents, and serve Tilde sandbox VMs",
+    about = "Develop, deploy and inspect Tilde agents, connect local agents, and serve Tilde sandbox VMs",
     propagate_version = true
 )]
 struct Args {
@@ -39,6 +40,8 @@ enum Command {
     Doctor(doctor::Doctor),
     /// Tools for `@trytilde/iac` specs.
     Iac(iac::Iac),
+    /// Connect a harness on this machine (Claude Code, Codex, Claude Desktop) to its local agent.
+    Local(local::Local),
     /// Inside a sandbox VM: serve the agent's operations, and call the sandbox's tools.
     #[cfg(unix)]
     Sandbox(sandbox::Sandbox),
@@ -52,6 +55,7 @@ async fn main() {
         Command::Deploy(args) => deploy::run(args).await,
         Command::Doctor(args) => doctor::run(args).await,
         Command::Iac(args) => iac::run(args).await,
+        Command::Local(args) => local::run(args).await,
         #[cfg(unix)]
         Command::Sandbox(args) => sandbox::run(args).await,
     };

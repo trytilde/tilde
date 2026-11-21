@@ -48,6 +48,15 @@ pub struct CreateAgentRequest {
     pub concurrency_policy: ::buffa::EnumValue<
         super::super::types::v1::AgentConcurrencyPolicy,
     >,
+    /// Set to register a local agent of this harness; it cannot be changed afterwards.
+    ///
+    /// Field 10: `harness`
+    #[serde(
+        rename = "harness",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub harness: ::buffa::EnumValue<super::super::types::v1::Harness>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -60,6 +69,7 @@ impl ::core::fmt::Debug for CreateAgentRequest {
             .field("description", &self.description)
             .field("capabilities", &self.capabilities)
             .field("concurrency_policy", &self.concurrency_policy)
+            .field("harness", &self.harness)
             .finish()
     }
 }
@@ -113,6 +123,12 @@ impl ::buffa::Message for CreateAgentRequest {
         if !self.description.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.description) as u64;
         }
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                size += 1u64 + ::buffa::types::int32_encoded_len(val) as u64;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -145,6 +161,12 @@ impl ::buffa::Message for CreateAgentRequest {
         }
         if !self.description.is_empty() {
             ::buffa::types::put_string_field(8u32, &self.description, buf);
+        }
+        {
+            let val = self.harness.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(10u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -200,6 +222,15 @@ impl ::buffa::Message for CreateAgentRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.description, buf)?;
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.harness = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -213,6 +244,7 @@ impl ::buffa::Message for CreateAgentRequest {
         self.capabilities = ::buffa::MessageField::none();
         self.concurrency_policy = ::buffa::EnumValue::from(0);
         self.description.clear();
+        self.harness = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
