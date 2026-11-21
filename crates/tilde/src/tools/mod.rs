@@ -258,8 +258,7 @@ pub(crate) struct Caller {
     pub call_id: Uuid,
     pub agent: Option<Uuid>,
     pub thread: Option<Uuid>,
-    /// The invocation's run; a sandbox's process has none. Only the ontology tool source (Tilde
-    /// Cloud) reads it.
+    /// The invocation's run; a sandbox's process has none.
     #[allow(dead_code)]
     pub run: Option<Uuid>,
     pub sandbox: Option<Uuid>,

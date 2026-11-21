@@ -120,16 +120,8 @@ pub async fn guard(State(boundary): State<Boundary>, request: Request, next: Nex
     cors_then(&boundary, request, next).await
 }
 
-/// Credentialed CORS for exactly the boundary's allowed browser origins, without its other checks:
-/// a listener of its own behind the same load balancer (the ontology control plane's), which the
-/// hosted app at trytilde.ai/app calls across origins too. Preflights are answered before any
-/// route or authentication.
-pub async fn cors(State(boundary): State<Boundary>, request: Request, next: Next) -> Response {
-    cors_then(&boundary, request, next).await
-}
-
-// An allowed browser origin on another host (the hosted app at trytilde.ai/app calling
-// api.trytilde.ai) reads responses with its cookies.
+// An allowed browser origin on another host (a web app served from another domain than the API)
+// reads responses with its cookies.
 async fn cors_then(boundary: &Boundary, request: Request, next: Next) -> Response {
     let cors = request
         .headers()

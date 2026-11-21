@@ -3088,11 +3088,6 @@ pub struct ProviderView<'a> {
     >,
     /// Field 10: `categories`
     pub categories: ::buffa::RepeatedView<'a, &'a str>,
-    /// Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
-    /// connections' request credentials may be sent to. Empty: they give none.
-    ///
-    /// Field 14: `api_hosts`
-    pub api_hosts: ::buffa::RepeatedView<'a, &'a str>,
     /// What sandboxes may reach through the gateway with its egress-capable connections.
     ///
     /// Field 15: `egress`
@@ -3218,17 +3213,6 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
                     ::buffa::__private::element_footprint(&__elem),
                 )?;
                 view.categories.push(__elem);
-            }
-            14u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let __elem = ::buffa::types::borrow_str(&mut cur)?;
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&__elem),
-                )?;
-                view.api_hosts.push(__elem);
             }
             7u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -3356,7 +3340,6 @@ impl<'a> ::buffa::MessageView<'a> for ProviderView<'a> {
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             categories: self.categories.iter().map(|s| s.to_string()).collect(),
-            api_hosts: self.api_hosts.iter().map(|s| s.to_string()).collect(),
             egress: match self.egress.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -3467,9 +3450,6 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         if let Some(ref v) = self.account_name_label {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        for v in &self.api_hosts {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
         if self.egress.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.egress.compute_size(__cache);
@@ -3543,9 +3523,6 @@ impl<'a> ::buffa::ViewEncode<'a> for ProviderView<'a> {
         if let Some(ref v) = self.account_name_label {
             ::buffa::types::put_string_field(13u32, v, buf);
         }
-        for v in &self.api_hosts {
-            ::buffa::types::put_string_field(14u32, v, buf);
-        }
         if self.egress.is_set() {
             ::buffa::types::put_len_delimited_header(
                 15u32,
@@ -3595,9 +3572,6 @@ impl<'__a> ::serde::Serialize for ProviderView<'__a> {
         }
         if !self.categories.is_empty() {
             __map.serialize_entry("categories", &*self.categories)?;
-        }
-        if !self.api_hosts.is_empty() {
-            __map.serialize_entry("apiHosts", &*self.api_hosts)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.egress.as_option() {
@@ -3747,14 +3721,6 @@ impl ProviderOwnedView {
     #[must_use]
     pub fn categories(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().categories
-    }
-    /// Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
-    /// connections' request credentials may be sent to. Empty: they give none.
-    ///
-    /// Field 14: `api_hosts`
-    #[must_use]
-    pub fn api_hosts(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
-        &self.0.reborrow().api_hosts
     }
     /// What sandboxes may reach through the gateway with its egress-capable connections.
     ///

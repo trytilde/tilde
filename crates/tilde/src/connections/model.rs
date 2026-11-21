@@ -387,10 +387,6 @@ pub struct Provider {
     pub kind: ProviderKind,
     pub categories: Vec<String>,
     pub connection_types: Vec<ConnectionType>,
-    /// The hosts its API answers at (`api.linear.app`, `*.sentry.io` for any subdomain), over
-    /// HTTPS: the only hosts a connection's request credentials may be sent to
-    /// (`connections::credentials`). Empty: its connections give no request credentials.
-    pub api_hosts: Vec<String>,
 }
 #[derive(Debug, Clone)]
 pub struct Connection {
@@ -537,21 +533,6 @@ pub fn identifier(id: &str) -> Result<(), Error> {
     }
     Ok(())
 }
-/// A lower-case DNS name of at least two labels, or `*.` and one (a wildcard over its subdomains).
-fn valid_api_host(host: &str) -> bool {
-    let name = host.strip_prefix("*.").unwrap_or(host);
-    name.len() <= 253
-        && name.contains('.')
-        && name.split('.').all(|label| {
-            !label.is_empty()
-                && label.len() <= 63
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label
-                    .bytes()
-                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        })
-}
 impl Provider {
     pub fn validate(&self) -> Result<(), Error> {
         if self
@@ -579,11 +560,6 @@ impl Provider {
         }
         if self.categories.is_empty() || self.categories.len() > 32 {
             return Err(invalid("Provider categories are required"));
-        }
-        if self.api_hosts.len() > 32 || !self.api_hosts.iter().all(|h| valid_api_host(h)) {
-            return Err(invalid(
-                "API hosts are DNS names, optionally `*.` for any subdomain, without scheme or port",
-            ));
         }
         let mut categories = BTreeSet::new();
         for category in &self.categories {

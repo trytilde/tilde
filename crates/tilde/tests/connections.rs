@@ -63,7 +63,6 @@ fn custom(id: &str, driver: Driver, oauth: Option<OAuth>) -> Provider {
         name: "Custom account".into(),
         kind: ProviderKind::Configured,
         categories: vec!["other".into()],
-        api_hosts: vec![],
         connection_types: vec![ConnectionType {
             mcp: None,
             id: "account".into(),

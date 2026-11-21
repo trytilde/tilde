@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run a command against a disposable database on a random loopback port.
-# WITH_PGBOUNCER=1 puts a transaction-pooling PgBouncer in front of it, configured as PlanetScale
-# runs one: TEST_DATABASE_URL (and DATABASE_URL) is then PgBouncer and TEST_DATABASE_DIRECT_URL
+# WITH_PGBOUNCER=1 puts a transaction-pooling PgBouncer in front of it, configured as hosted
+# poolers run one: TEST_DATABASE_URL (and DATABASE_URL) is then PgBouncer and TEST_DATABASE_DIRECT_URL
 # (and DATABASE_DIRECT_URL) the server.
 set -euo pipefail
 container="tilde-test-$(date +%s)-$$"
@@ -34,7 +34,7 @@ if [[ "${WITH_PGBOUNCER:-}" == 1 ]]; then
   docker network create "$network" >/dev/null
   network_args=(--network "$network")
   settings+=(-c max_connections=400)
-  # PostgreSQL 18 (PlanetScale's) reports search_path to clients, which is what lets PgBouncer
+  # PostgreSQL 18 reports search_path to clients, which is what lets PgBouncer
   # keep each test's schema with its client; on 16 a server session keeps an earlier client's.
   image=pgvector/pgvector:pg18
   data=/var/lib/postgresql

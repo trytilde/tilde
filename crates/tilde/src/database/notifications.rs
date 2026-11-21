@@ -5,8 +5,8 @@
 //! A process holds ONE listening session per server (`DATABASE_DIRECT_URL`: LISTEN needs a
 //! session, which PgBouncer's transaction pooling does not give), shared by every service and
 //! channel: the [`Hub`] task LISTENs on each channel as it is first subscribed and fans
-//! notifications out in-process. Direct connections are scarce (PlanetScale clusters allow 25),
-//! so the count must not grow with the number of services.
+//! notifications out in-process. Direct connections are scarce behind a hosted pooler (some
+//! allow a few dozen per cluster), so the count must not grow with the number of services.
 use super::{DbError, Pool};
 use futures::StreamExt;
 use std::collections::HashMap;

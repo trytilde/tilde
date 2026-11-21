@@ -3,7 +3,6 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: vec!["slack.com".into()],
         account_name_label: Some("Slack workspace".into()),
         icon_url: Some("/provider-icons/slack.svg".into()),
         instructions: Some(
@@ -26,9 +25,9 @@ pub fn definition() -> Provider {
     }
 }
 
-/// A person's own Slack user token (standard OAuth v2 with `user_scope`), read-only, so an
-/// ontology's `slack` ducktail pipeline can ingest the conversations that person sees: public
-/// and private channels, DMs and group DMs they are in, threads, and the workspace's users.
+/// A person's own Slack user token (standard OAuth v2 with `user_scope`), read-only, for
+/// ingesting the conversations that person sees: public and private channels, DMs and group DMs
+/// they are in, threads, and the workspace's users.
 /// It is a type of this provider, not a provider of its own: same workspace, API and hosts
 /// (`slack.com`), and request credentials are its bearer token. It has no capability: the bot
 /// app (`slack_app`) stays the agent's channel; this one only feeds ingestion. Slack returns

@@ -2993,17 +2993,6 @@ pub struct Provider {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub categories: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-    /// Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
-    /// connections' request credentials may be sent to. Empty: they give none.
-    ///
-    /// Field 14: `api_hosts`
-    #[serde(
-        rename = "apiHosts",
-        alias = "api_hosts",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
-        deserialize_with = "::buffa::json_helpers::null_as_default"
-    )]
-    pub api_hosts: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
     /// What sandboxes may reach through the gateway with its egress-capable connections.
     ///
     /// Field 15: `egress`
@@ -3031,7 +3020,6 @@ impl ::core::fmt::Debug for Provider {
             .field("name", &self.name)
             .field("connection_types", &self.connection_types)
             .field("categories", &self.categories)
-            .field("api_hosts", &self.api_hosts)
             .field("egress", &self.egress)
             .field("kind", &self.kind)
             .finish()
@@ -3150,9 +3138,6 @@ impl ::buffa::Message for Provider {
         if let Some(ref v) = self.account_name_label {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
-        for v in &self.api_hosts {
-            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
-        }
         if self.egress.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.egress.compute_size(__cache);
@@ -3224,9 +3209,6 @@ impl ::buffa::Message for Provider {
         }
         if let Some(ref v) = self.account_name_label {
             ::buffa::types::put_string_field(13u32, v, buf);
-        }
-        for v in &self.api_hosts {
-            ::buffa::types::put_string_field(14u32, v, buf);
         }
         if self.egress.is_set() {
             ::buffa::types::put_len_delimited_header(
@@ -3382,17 +3364,6 @@ impl ::buffa::Message for Provider {
                     buf,
                 )?;
             }
-            14u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                let __elem = ::buffa::types::decode_string(buf)?;
-                ctx.register_element_memory(
-                    ::buffa::__private::element_footprint(&__elem),
-                )?;
-                self.api_hosts.push(__elem);
-            }
             15u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -3420,7 +3391,6 @@ impl ::buffa::Message for Provider {
         self.icon_url = ::core::option::Option::None;
         self.instructions = ::core::option::Option::None;
         self.account_name_label = ::core::option::Option::None;
-        self.api_hosts.clear();
         self.egress = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
@@ -3466,9 +3436,6 @@ impl<'de> serde::Deserialize<'de> for Provider {
                     ::buffa::alloc::vec::Vec<ConnectionType>,
                 > = None;
                 let mut __f_categories: ::core::option::Option<
-                    ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-                > = None;
-                let mut __f_api_hosts: ::core::option::Option<
                     ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
                 > = None;
                 let mut __f_egress: ::core::option::Option<
@@ -3562,26 +3529,6 @@ impl<'de> serde::Deserialize<'de> for Provider {
                         }
                         "categories" => {
                             __f_categories = Some({
-                                struct _S;
-                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
-                                    type Value = ::buffa::alloc::vec::Vec<
-                                        ::buffa::alloc::string::String,
-                                    >;
-                                    fn deserialize<D: serde::Deserializer<'de>>(
-                                        self,
-                                        d: D,
-                                    ) -> ::core::result::Result<
-                                        ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
-                                        D::Error,
-                                    > {
-                                        ::buffa::json_helpers::null_as_default(d)
-                                    }
-                                }
-                                map.next_value_seed(_S)?
-                            });
-                        }
-                        "apiHosts" | "api_hosts" => {
-                            __f_api_hosts = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::vec::Vec<
@@ -3709,9 +3656,6 @@ impl<'de> serde::Deserialize<'de> for Provider {
                 }
                 if let ::core::option::Option::Some(v) = __f_categories {
                     __r.categories = v;
-                }
-                if let ::core::option::Option::Some(v) = __f_api_hosts {
-                    __r.api_hosts = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_egress {
                     __r.egress = v;

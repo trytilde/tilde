@@ -3,7 +3,6 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: Vec::new(),
         account_name_label: Some("Telnyx WhatsApp phone number".into()),
         icon_url: Some("https://telnyx.com/favicon.ico".into()),
         instructions: Some(

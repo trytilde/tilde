@@ -23,7 +23,6 @@ pub fn definition() -> model::Provider {
     oauth.client_auth = model::ClientAuth::Body;
     let webhook_secret = json!({"type":"string","title":"Webhook signing secret","description":WEBHOOK_SECRET,"writeOnly":true});
     model::Provider {
-        api_hosts: vec!["api.linear.app".into()],
         account_name_label: Some("Linear workspace".into()),
         icon_url: Some("/provider-icons/linear.svg".into()),
         instructions: Some(

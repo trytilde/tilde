@@ -3,7 +3,6 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: Vec::new(),
         account_name_label: Some("AgentMail email address".into()),
         icon_url: Some("https://www.agentmail.to/favicon.ico".into()),
         instructions: Some("Connect your AgentMail inbox to this agent.".into()),

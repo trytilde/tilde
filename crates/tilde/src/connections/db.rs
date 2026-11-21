@@ -358,11 +358,10 @@ pub async fn provider_insert_execute(
     p10: Option<&str>,
     p11: Option<&str>,
     p12: Option<uuid::Uuid>,
-    p13: &[String],
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::connections::provider_insert::run()
         .bind(
-            db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12, &p13,
+            db, &p1, &p2, &p3, &p4, &p5, &p6, &p7, &p8, &p9, &p10, &p11, &p12,
         )
         .await?)
 }

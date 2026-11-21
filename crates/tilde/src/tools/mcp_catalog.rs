@@ -392,7 +392,6 @@ pub fn extend(providers: &mut Vec<Provider>) {
                 provider.connection_types.push(typ);
             }
             None => providers.push(Provider {
-                api_hosts: Vec::new(),
                 account_name_label: None,
                 icon_url: Some(format!("/provider-icons/{}", server.icon)),
                 instructions: Some(server.description.into()),

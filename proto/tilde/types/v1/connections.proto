@@ -80,9 +80,6 @@ message Provider {
  string id = 1; string name = 3; repeated ConnectionType connection_types = 5; repeated string categories = 10;
  reserved 2,4,6;
  oneof kind { BuiltInProvider built_in = 7; ConfiguredProvider configured = 8; RemoteProvider remote = 9; }
- // Hosts its API answers at (`api.linear.app`, `*.sentry.io`), over HTTPS: the only hosts its
- // connections' request credentials may be sent to. Empty: they give none.
- repeated string api_hosts = 14;
  // What sandboxes may reach through the gateway with its egress-capable connections.
  optional EgressDescriptor egress = 15;
 }

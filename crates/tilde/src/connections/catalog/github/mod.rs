@@ -3,7 +3,6 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: vec!["api.github.com".into(), "uploads.github.com".into()],
         account_name_label: Some("GitHub account".into()),
         icon_url: Some("/provider-icons/github.svg".into()),
         instructions: Some("Connect a GitHub App installation to receive repository conversations and events and use GitHub tools, or a personal access token or OAuth app for tools only.".into()),

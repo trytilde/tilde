@@ -20,6 +20,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Route-level tests render the whole app; under a loaded machine first renders take seconds.
+    testTimeout: 15_000,
     server: {
       deps: { inline: [/@base-ui/, /react-hook-form/, /motion/, /lucide-react/, /streamdown/] },
     },

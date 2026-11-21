@@ -1,6 +1,6 @@
 //! `tilde iac types`: types for the organization's own connections. It reads every connection
-//! the caller can see (MCP servers, tool hosts' instances and ontology environments are
-//! connections too) and the tools each offers, and writes a `.d.ts` that augments
+//! the caller can see (MCP servers and tool hosts' instances are connections too) and the tools
+//! each offers, and writes a `.d.ts` that augments
 //! `@trytilde/iac`'s `Connections`, so `connection.ref("acme_mcp/prod")` takes that connection's
 //! type and tool names. Slugs it does not list keep taking plain strings.
 use crate::api::{Client, failed, options};

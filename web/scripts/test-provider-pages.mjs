@@ -70,32 +70,32 @@ try {
     await page.goto(`${origin}/${top}.html`);
     const host = top === "dialog" ? page.frameLocator("#dialog") : page;
     const frame = host.frameLocator("#provider");
-    await frame.getByLabel("GitHub account name").fill("faroai");
+    await frame.getByLabel("GitHub account name").fill("acmeai");
     await frame.getByRole("button", { name: "Create an app" }).click();
-    await frame.getByLabel("App name").fill("faroai");
+    await frame.getByLabel("App name").fill("acmeai");
     await frame.getByLabel("App owner").selectOption("organization");
     const organization = frame.getByRole("textbox", { name: "Organization" });
-    await organization.fill("faro engineering");
+    await organization.fill("acme engineering");
     await frame.getByRole("button", { name: "Continue" }).click();
     await frame
       .getByRole("alert")
       .getByText(/Organization/)
       .waitFor();
-    await organization.fill("faro-engineering");
+    await organization.fill("acme-engineering");
     await frame.getByRole("button", { name: "Continue" }).click();
     const post = frame.getByRole("button", { name: "Create app with provider" });
     await post.waitFor();
     assert.equal(
       await post.evaluate((button) => button.form.action),
-      "https://github.com/organizations/faro-engineering/settings/apps/new",
+      "https://github.com/organizations/acme-engineering/settings/apps/new",
       top,
     );
     const hostFrame = top === "dialog" ? page.frame({ url: /host\.html/ }) : page.mainFrame();
     const calls = await hostFrame.evaluate(() => window.calls);
     assert.deepEqual(calls.at(-1).fields, {
-      app_name: "faroai",
+      app_name: "acmeai",
       owner_type: "organization",
-      account: "faro-engineering",
+      account: "acme-engineering",
     });
     assert.deepEqual(errors, [], `${top} console errors`);
     console.log(`ok - GitHub App create continues to the manifest post (${top})`);

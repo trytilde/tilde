@@ -60,7 +60,6 @@ pub(super) fn provider_wire(provider: m::Provider) -> types::Provider {
             }
         }),
         categories: provider.categories,
-        api_hosts: provider.api_hosts,
         connection_types: provider
             .connection_types
             .into_iter()
@@ -327,7 +326,6 @@ pub(crate) fn provider_model(provider: types::Provider) -> Result<m::Provider, E
         },
         connection_types: types,
         categories: provider.categories,
-        api_hosts: provider.api_hosts,
     })
 }
 pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection {

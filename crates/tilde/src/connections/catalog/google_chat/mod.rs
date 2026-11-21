@@ -8,7 +8,6 @@ pub fn definition() -> Provider {
     let mut oauth = OAuth::standard("https://oauth2.googleapis.com/token");
     oauth.scopes = vec!["https://www.googleapis.com/auth/chat.bot".into()];
     Provider {
-        api_hosts: vec!["chat.googleapis.com".into()],
         account_name_label: Some("Chat app name".into()),
         icon_url: Some("/provider-icons/google_chat.svg".into()),
         instructions: Some(

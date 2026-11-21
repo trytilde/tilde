@@ -7,9 +7,6 @@
 //! credentials with `sts:AssumeRole`, the connection's `external_id` and the session name
 //! `tilde-<connection id>`. An account the connection lists no role for is refused.
 //!
-//! Clients outside the engine (`session`, for `connections::credentials`) get the same: the base
-//! session, or with an account the listed role's session, refused for any other account.
-//!
 //! Temporary credentials are cached per connection, base identity and role in the shared mint
 //! cache (`connections::mints`) until five minutes before they expire. `Credentials` zeroize on drop, STS responses are read into zeroizing
 //! buffers, and no credential is logged or returned in an error.
@@ -205,8 +202,7 @@ pub async fn credentials(
     }
 }
 
-/// Short-lived credentials for clients outside the engine (`connections::credentials`) and
-/// when they expire (`None`: unknown). In the connection's own account (`account` `None` or
+/// Short-lived credentials for clients outside the engine and when they expire (`None`: unknown). In the connection's own account (`account` `None` or
 /// its own): the web identity session (`oidc`), else a `GetSessionToken` session from the
 /// access keys; keys that already carry a session token are temporary and go as they are. In
 /// another account: the session of the role the connection lists there, chained from those.

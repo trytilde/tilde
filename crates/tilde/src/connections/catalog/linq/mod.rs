@@ -3,7 +3,6 @@ use crate::connections::model::*;
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: Vec::new(),
         account_name_label: Some("Linq phone number".into()),
         icon_url: Some("https://skywalker-next.linqapp.com/favicon.ico?v=4".into()),
         instructions: Some(

@@ -128,11 +128,10 @@ pub fn tls() -> DbResult<MakeRustlsConnect> {
 }
 /// A pool on `url`; sessions use `direct_url`, or `url` when it is the server itself.
 ///
-/// With `direct_url`, `url` is a transaction pooler. PlanetScale's PgBouncer refuses a
-/// `search_path` in the startup `options` (Tilde in a schema of its own:
-/// `options=-c search_path=tilde_cloud,public`), so the pooled URL's is taken off the
-/// connection and set per transaction instead (`SET LOCAL`); `direct_url` keeps its own for
-/// migrations.
+/// With `direct_url`, `url` is a transaction pooler. A PgBouncer may refuse a `search_path` in
+/// the startup `options` (Tilde in a schema of its own: `options=-c search_path=<schema>,public`),
+/// so the pooled URL's is taken off the connection and set per transaction instead
+/// (`SET LOCAL`); `direct_url` keeps its own for migrations.
 pub fn pool(url: &str, direct_url: Option<&str>, max_size: usize) -> Result<Pool, Error> {
     let invalid = || Error::Invalid("Invalid DATABASE_URL".into());
     let (url, search_path) = match direct_url {

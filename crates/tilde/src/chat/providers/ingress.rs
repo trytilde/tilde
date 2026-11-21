@@ -116,12 +116,13 @@ async fn receive(
     body: axum::body::Bytes,
 ) -> Response {
     // `Some` is a JSON body to answer with; `None` an empty acknowledgement.
+    // Webhooks of ingestion-only connections (Tilde Cloud) are answered 200 or 401.
+    #[allow(unused_mut)]
     let mut ingestion = false;
     let result: ToolResult<Option<Value>> = async {
         let row = s.connections.get(id).await?;
         let provider = adapter(&row.provider_id, &row.type_id);
         let source = crate::signals::source(&row.provider_id, &row.type_id);
-        ingestion = crate::connections::catalog::verifies_webhooks(&row.provider_id);
         if provider.is_none() && source.is_none() && !ingestion {
             return Err(ConnectError::not_found("Unknown channel"));
         }
@@ -139,17 +140,6 @@ async fn receive(
         #[allow(unused_variables)]
         let (result, forward) = match provider {
             Some(provider) => (provider.webhook(&access, &headers, &body).await?, true),
-            None if ingestion => {
-                let forward = crate::connections::catalog::verify_webhook(
-                    &s.connections,
-                    &row,
-                    &access,
-                    &headers,
-                    &body,
-                )
-                .await?;
-                (Webhook::Messages(vec![]), forward)
-            }
             None => {
                 crate::signals::verify(&row.provider_id, &access, &headers, &body).await?;
                 (Webhook::Messages(vec![]), true)

@@ -16,7 +16,6 @@ use serde_json::{Map, Value, json};
 
 pub fn definition() -> model::Provider {
     model::Provider {
-        api_hosts: Vec::new(),
         account_name_label: Some("Payload instance name".into()),
         icon_url: Some("/provider-icons/payload.svg".into()),
         instructions: Some(

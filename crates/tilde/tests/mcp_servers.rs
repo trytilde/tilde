@@ -117,7 +117,6 @@ async fn a_dynamically_registered_mcp_server_is_set_up_and_called_with_its_own_t
             name: "Wiki".into(),
             kind: ProviderKind::BuiltIn,
             categories: vec!["documents_and_files".into()],
-            api_hosts: vec![],
             connection_types: vec![ConnectionType {
                 id: "oauth".into(),
                 name: "Sign in with Wiki".into(),
@@ -295,7 +294,6 @@ async fn discovery_never_follows_a_server_to_a_private_address() {
             name: "Intranet".into(),
             kind: ProviderKind::BuiltIn,
             categories: vec!["developer_tools".into()],
-            api_hosts: vec![],
             connection_types: vec![ConnectionType {
                 id: "oauth".into(),
                 name: "Sign in".into(),

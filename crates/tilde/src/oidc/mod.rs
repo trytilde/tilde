@@ -33,8 +33,8 @@ pub const TOKEN_SECONDS: i64 = 300;
 /// How long a replica trusts its loaded keys before rereading (another replica may rotate).
 const RELOAD: Duration = Duration::from_secs(300);
 /// How stale the published key set may be. A verifier that meets an unknown key id fetches the
-/// set again, and another process (a replica, the ontology control plane) may have signed with
-/// a key it created a moment ago: the set is reread for a request unless it was read within
+/// set again, and another process (a replica, say) may have signed with a key it created a
+/// moment ago: the set is reread for a request unless it was read within
 /// this second (which bounds the reads, not the freshness a verifier's refetch gets).
 const PUBLISH_RELOAD: Duration = Duration::from_secs(1);
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::URL_SAFE_NO_PAD;

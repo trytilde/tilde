@@ -15,7 +15,6 @@ pub const KEY_FIELD: &str = "api_key";
 
 pub fn definition() -> Provider {
     Provider {
-        api_hosts: Vec::new(),
         account_name_label: None,
         icon_url: Some("/tilde-mark.svg".into()),
         instructions: None,

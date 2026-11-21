@@ -3,10 +3,10 @@
 //! `DATABASE_URL` may point at a transaction-pooling PgBouncer, where consecutive transactions
 //! of one client connection can run on different server sessions: a session `SET` would apply to
 //! whichever session ran it and leak into someone else's work. So per-checkout state is
-//! transaction-scoped instead. When the checkout carries one (`scope`: tenancy's `SET LOCAL ROLE`
-//! and `set_config(..., true)`), every statement run directly on the client runs in its own
-//! transaction that starts with it, and [`Client::transaction`] starts with it too. Without one,
-//! statements run as plain autocommit statements of the login role.
+//! transaction-scoped instead. When the checkout carries a `scope` (statements that set it with
+//! `SET LOCAL` and `set_config(..., true)`), every statement run directly on the client runs in
+//! its own transaction that starts with it, and [`Client::transaction`] starts with it too.
+//! Without one, statements run as plain autocommit statements of the login role.
 use super::Transaction;
 use futures::FutureExt;
 use tilde_queries::client::GenericClient;

@@ -118,16 +118,6 @@ update atomically, and builtin definitions reconcile at startup. In-use methods 
 be deleted through registration. Remote authorization has its own opaque encryption
 identity; the migration retains existing ciphertext bindings without versioned providers.
 
-A provider declares its API hosts (`api_hosts`: `api.linear.app`, `*.sentry.io` for any
-subdomain; registered providers declare theirs): the only HTTPS hosts its connections' request
-credentials (`connections::credentials`, served to ontology environments) may be sent to, listed
-in the credentials document as `origins`. A self-hosted Sentry connection's `base_url` replaces
-them (its tools use it too). A provider without API hosts gives no request credentials. An AWS
-connection's request credentials are for one account per request: its own by default, or, asked
-for another (`?account=<id>` on the credentials endpoint), the session of the role it lists
-there ("Roles in other accounts"), chained from its own with `sts:AssumeRole`. Unlisted accounts
-are refused, so a tenant's hub role plus listed spoke roles is the whole reach of a project that
-binds the connection (ducktail's multi-account `cloudwatch` pipeline asks per account).
 
 Capabilities are `channel`, `inference`, `tool`, `signal` and `egress` (granted by sandbox blueprints). A connection type declares which it offers;
 an assignment grants one capability of one connection to one agent. Chat keeps a single
@@ -163,46 +153,12 @@ choose a provider, then its methods of that capability); tools come from the Til
 a remote server. Each row lists the agents assigned the connection or using it as a tool
 source.
 
-### Ingestion connections (finance, accounting, Google, Slack messages)
-
-Connections whose job is to feed ontology environments' ducktail pipelines, not agents: they
-declare no capability, give request credentials, and some verify webhooks that start syncs.
-- Plaid (`catalog/plaid`): one connection is one Plaid Item, linked through Plaid Hosted Link
-  (the setup's redirect step; the callback reads the session's public token and exchanges it).
-  `link` uses Tilde's Plaid app (CLOUD ONLY, `TOOL_MANAGED_PROVIDER_PLAID[_SANDBOX]_OAUTH_*`),
-  `own_keys` a tenant's own keys; both store `client_id`, `secret`, `environment`, `access_token`,
-  `item_id`. An Item webhook saying the Item needs its holder puts the connection in
-  `requires_action`; Reconnect resumes at `plaid_update` (stored values copied) and re-links the
-  same Item in Link update mode. Reconnect resumes a provider's `resume_step` for a ready
-  connection and for one in `requires_action` that still has stored values.
-- QuickBooks Online and Xero: standard OAuth (own app, or Tilde's app CLOUD ONLY). QuickBooks'
-  `realmId` callback parameter becomes `realm_id`; Xero's tenant of the sign-in (from
-  `GET /connections`, matched on the access token's `authentication_event_id`) becomes
-  `tenant_id`. Refreshes keep both.
-- Google (`google`): one read-only grant over Gmail, Calendar and Contacts, so the `gmail`,
-  `google_calendar` and `google_contacts` pipelines share one slot. The per-product Google tool
-  providers stay separate (their write scopes serve agent tools).
-- Slack `user_oauth`: a person's user token (`user_scope`, token under `authed_user`) for the
-  `slack` messages pipeline; the bot app type remains the agent channel.
-- Request credentials: Plaid gives `plaid-client-id`/`plaid-secret` headers plus
-  `"plaid": {"access_token"}`; QuickBooks a bearer plus `"quickbooks": {"realm_id"}`; Xero a
-  bearer plus `xero-tenant-id`. Plaid and QuickBooks origins are the connection's environment
-  host only.
-- Webhooks (`catalog::verify_webhook`) arrive at `/connections/webhooks/{connection}`: Plaid's
-  `Plaid-Verification` ES256 JWT (key from `/webhook_verification_key/get`, `iat` within five
-  minutes, body SHA-256), Intuit's `intuit-signature` and Xero's `x-xero-signature` (base64
-  HMAC-SHA256 with the stored verifier token / webhook key). Valid deliveries are answered 200 and
-  invalid ones 401 (Xero's intent-to-receive check); only those concerning the connection's own
-  Item, realm or tenant are forwarded to environments, where a ducktail webhook pipeline's
-  `sync` list asks the polled pipelines to poll now. Tilde's own QuickBooks/Xero apps have no
-  per-connection webhook URL; their connections rely on polling.
 
 ### OIDC issuer
 
 The registry has one OpenID Connect issuer and one signing key set (`crate::oidc`), independent
 of any provider; components mint tokens from it for a relying party by subject and audience. Its
-consumers are workload federation from connections (subject `connection:<id>`) and, in Tilde
-Cloud, ontology gateways (see "Ontology tokens and the ontology tool source").
+consumer is workload federation from connections (subject `connection:<id>`).
 The issuer URL is `ENGINE_TOKEN_ISSUER_URL`, by default the event ingress origin plus `/oidc`;
 the ingress serves `/oidc/.well-known/openid-configuration` and `/oidc/jwks`, so a custom issuer
 must route to those paths over HTTPS. Tokens are RS256 JWTs valid for five minutes with `iss` the
@@ -1820,17 +1776,15 @@ transaction-pooling PgBouncer, which gives no session to LISTEN on.
 
 ## Connection pooling
 
-`DATABASE_URL` is the query pool's address and may be a transaction-pooling PgBouncer
-(PlanetScale's, port 6432); `DATABASE_DIRECT_URL` is the server itself (port 5432) and
-defaults to `DATABASE_URL`. Only work that needs a session uses it: LISTEN (one connection
-per listening service) and migrations (one, at startup). Nothing on a pooled connection may
-rely on session state: settings are `SET LOCAL`, advisory locks are transaction locks, and
-the tenancy scope is applied per transaction (`database::Client`). Prepared statements are
-fine (PgBouncer's `max_prepared_statements` re-prepares them on each server session).
-PlanetScale's PgBouncer rejects a `search_path` in the startup `options`, so a deployment
-that keeps Tilde in a schema of its own sets it on the login role
-(`ALTER ROLE <login> SET search_path = <schema>, public`), never in a pooled URL.
-`task test:pgbouncer` runs the Rust suites behind a local PgBouncer in transaction mode.
+`DATABASE_URL` is the query pool's address and may be a transaction-pooling PgBouncer;
+`DATABASE_DIRECT_URL` is the server itself and defaults to `DATABASE_URL`. Only work that
+needs a session uses it: LISTEN (one connection per listening service) and migrations (one, at
+startup). Nothing on a pooled connection may rely on session state: settings are `SET LOCAL`
+and advisory locks are transaction locks. Prepared statements are fine (PgBouncer's
+`max_prepared_statements` re-prepares them on each server session). A PgBouncer that rejects a
+`search_path` in the startup `options` needs a deployment that keeps Tilde in a schema of its
+own to set it on the login role (`ALTER ROLE <login> SET search_path = <schema>, public`),
+never in a pooled URL.
 The query pool has 4 connections behind a pooler (`DATABASE_DIRECT_URL` set) and 16 on the
 server itself.
 

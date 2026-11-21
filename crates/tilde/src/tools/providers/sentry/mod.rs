@@ -55,7 +55,6 @@ pub fn definition() -> model::Provider {
     .map(String::from)
     .to_vec();
     model::Provider {
-        api_hosts: vec!["sentry.io".into(), "*.sentry.io".into()],
         account_name_label: Some("Sentry connection name".into()),
         icon_url: Some("/provider-icons/sentry.svg".into()),
         instructions: Some(

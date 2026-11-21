@@ -190,7 +190,7 @@ async fn tool_calls_assume_listed_roles_in_other_accounts_and_connections_stay_a
                 "assume_role_arns",
                 "arn:aws:iam::222222222222:role/tilde-agent, arn:aws:iam::333333333333:role/ops/tilde",
             ),
-            ("external_id", "faro-external"),
+            ("external_id", "acme-external"),
         ],
     )
     .await;
@@ -268,7 +268,7 @@ async fn tool_calls_assume_listed_roles_in_other_accounts_and_connections_stay_a
         "arn:aws:iam::222222222222:role/tilde-agent"
     );
     assert_eq!(form["RoleSessionName"], format!("tilde-{prod}"));
-    assert_eq!(form["ExternalId"], "faro-external");
+    assert_eq!(form["ExternalId"], "acme-external");
     assert_eq!(signer.as_deref(), Some("AKIDBASE"));
     // An account it lists no role for is refused before anything is called.
     let refused = call(

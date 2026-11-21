@@ -47,7 +47,6 @@ pub fn definition() -> model::Provider {
     }).as_object().cloned().unwrap_or_default();
     oidc.extend(shared_fields());
     model::Provider {
-        api_hosts: vec!["*.amazonaws.com".into()],
         account_name_label: Some("AWS account or role".into()),
         icon_url: Some("/provider-icons/aws.svg".into()),
         instructions: Some(
