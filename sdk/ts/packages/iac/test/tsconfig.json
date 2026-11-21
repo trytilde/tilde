@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "noEmit": true, "rootDir": ".." },
-  "include": ["types.ts", "../src"]
+  "include": ["types.ts", "augmented.ts", "../src"]
 }

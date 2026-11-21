@@ -6,8 +6,8 @@ use anyhow::{Context, Result, bail};
 use connectrpc::client::{CallOptions, ClientConfig, HttpClient};
 use std::{sync::Arc, time::Duration};
 use tilde_contracts::services::tilde::management::v1::{
-    AgentAccessServiceClient, AgentServiceClient, ApplyServiceClient, DeploymentServiceClient,
-    TildeChatProviderServiceClient,
+    AgentAccessServiceClient, AgentServiceClient, ApplyServiceClient, ConnectionsServiceClient,
+    DeploymentServiceClient, TildeChatProviderServiceClient, ToolServiceClient,
 };
 
 pub struct Client {
@@ -17,6 +17,8 @@ pub struct Client {
     pub access: AgentAccessServiceClient<HttpClient>,
     pub chat: TildeChatProviderServiceClient<HttpClient>,
     pub apply: ApplyServiceClient<HttpClient>,
+    pub connections: ConnectionsServiceClient<HttpClient>,
+    pub tools: ToolServiceClient<HttpClient>,
 }
 
 /// Reject anything that could send a credential somewhere unintended before the first request.
@@ -81,7 +83,9 @@ impl Client {
             deployments: DeploymentServiceClient::new(transport.clone(), config.clone()),
             access: AgentAccessServiceClient::new(transport.clone(), config.clone()),
             chat: TildeChatProviderServiceClient::new(transport.clone(), config.clone()),
-            apply: ApplyServiceClient::new(transport, config),
+            apply: ApplyServiceClient::new(transport.clone(), config.clone()),
+            connections: ConnectionsServiceClient::new(transport.clone(), config.clone()),
+            tools: ToolServiceClient::new(transport, config),
             base,
         })
     }
