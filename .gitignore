@@ -41,6 +41,7 @@ log
 /sdk/py/packages/tilde/src/tilde/agent_event_ingress/
 /sdk/py/packages/tilde/src/tilde/agent_host/
 /sdk/py/packages/tilde/src/tilde/ingress/
+/sdk/py/packages/tilde/src/tilde/local/
 /sdk/py/packages/tilde/src/tilde/management/
 /sdk/py/packages/tilde/src/tilde/provider/
 /sdk/py/packages/tilde/src/tilde/run/
