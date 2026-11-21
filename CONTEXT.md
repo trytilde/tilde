@@ -1373,7 +1373,8 @@ on a cold build, which is why the CLI depends on it rather than the engine.
 
 Open-source Tilde only (`crates/tilde-cli`); Tilde Cloud's users install the same released CLI.
 
-`crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy` and `doctor`. The engine
+`crates/tilde-cli` is the user-facing `tilde` command: `dev`, `deploy`, `doctor` and `local`
+(connecting a harness on this machine to its local agent; see Local agents). The engine
 crate already owns the binary name `tilde` and two workspace packages producing one binary name
 silently overwrite each other in `target/`, so the in-repo target is `tilde-cli` and every
 distribution channel installs it as `tilde`. It calls the management API through the
