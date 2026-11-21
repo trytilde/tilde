@@ -1,0 +1,3 @@
+kind: Added
+body: "`@trytilde/iac`: `defineProject({ ontologies: { <name>: ontology({ dir, environments: { <env>: { slots, secrets } } }) } })` declares a project's ontologies (Tilde Cloud) and each environment's connection slot and secret bindings; `ontology<typeof slots>()` types a slot's binding by its provider (`ConnectionRef` now carries `provider`). `tilde deploy` deploys them before the agents: preflight with links for every missing project, environment, connection and secret, then a version per ontology from the repository at HEAD, the bindings, then the rollouts (`--only ontologies|agents`, `--ontology <name>`, `--allow-dirty`). A server without ontologies answers that they need Tilde Cloud."
+time: 2026-11-21T18:00:00+00:00

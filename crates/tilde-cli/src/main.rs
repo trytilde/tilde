@@ -9,6 +9,7 @@ mod discover;
 mod doctor;
 mod iac;
 mod local;
+mod ontology;
 mod project;
 mod registry;
 #[cfg(unix)]

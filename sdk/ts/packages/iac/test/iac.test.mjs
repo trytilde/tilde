@@ -16,6 +16,7 @@ import {
   egress,
   github,
   lambda,
+  ontology,
   openai,
   routine,
   secret,
@@ -174,4 +175,44 @@ test("a project carries its team and agents", () => {
   assert.equal(project[SPEC], "project");
   assert.equal(project.team, "acme");
   assert.equal(project.agents[0], a);
+});
+
+test("a project's ontologies carry each environment's bindings, by slug and secret name", () => {
+  const project = defineProject({
+    team: "factory",
+    ontologies: {
+      faro: ontology({
+        dir: "ontologies/faro",
+        environments: {
+          production: {
+            slots: { github: github.ref("faroai", { type: "github_app" }), linear },
+            secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
+          },
+          staging: {},
+        },
+      }),
+    },
+  });
+  assert.equal(project[SPEC], "project");
+  assert.deepEqual(project.agents, []);
+  assert.deepEqual(project.ontologies, {
+    faro: {
+      dir: "ontologies/faro",
+      environments: {
+        production: {
+          slots: {
+            github: { slug: "github/faroai", type: "github_app" },
+            linear: { slug: "linear/acme", type: "api_key" },
+          },
+          secrets: { PG_PASSWORD: "FARO_PG_PASSWORD" },
+        },
+        staging: { slots: {}, secrets: {} },
+      },
+    },
+  });
+  assert.equal(github.ref("faroai").provider, "github");
+  assert.throws(
+    () => defineProject({ ontologies: { Faro: ontology({ dir: "x", environments: {} }) } }),
+    /lowercase/,
+  );
 });

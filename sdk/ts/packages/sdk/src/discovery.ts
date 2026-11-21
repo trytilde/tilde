@@ -55,6 +55,8 @@ type CoreDiscovery = Discovery & {
   /** A `defineTeam` value's people, as `UserSpec`/`GroupSpec` protobuf JSON. */
   users?: unknown[];
   groups?: unknown[];
+  /** A `defineProject`'s ontologies by name: folder and per-environment bindings (Tilde Cloud). */
+  ontologies?: Record<string, unknown>;
 };
 /** `origin` locates the value, e.g. `dist/index.js#agent`; paths are relative to `projectDir`. */
 export type DiscoveryContext = { origin: string; projectDir: string };
@@ -86,6 +88,7 @@ export type Declarations = {
   team?: string;
   users: unknown[];
   groups: unknown[];
+  ontologies: Record<string, unknown>;
   prompts: (DiscoveredPrompt & { hash: string })[];
   skills: { name: string; files: SkillFile[]; origin: string }[];
   tools: DiscoveredTool[];
@@ -153,6 +156,7 @@ type IacValue = {
   agents?: IacValue[];
   users?: unknown[];
   groups?: unknown[];
+  ontologies?: Record<string, unknown>;
 };
 
 function core(value: unknown, origin: string): CoreDiscovery | undefined {
@@ -170,6 +174,7 @@ function core(value: unknown, origin: string): CoreDiscovery | undefined {
     const project = value as IacValue;
     return {
       team: project.team,
+      ontologies: project.ontologies ?? {},
       agents: (project.agents ?? []).map((agent) => ({
         key: agent.key!,
         json: agent.json,
@@ -280,6 +285,7 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
     agents: [],
     users: [],
     groups: [],
+    ontologies: {},
     prompts: [],
     skills: [],
     tools: [],
@@ -301,6 +307,12 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
     // The server merges people by email and name, so repeats are harmless.
     declarations.users.push(...(discovery.users ?? []));
     declarations.groups.push(...(discovery.groups ?? []));
+    for (const [name, ontology] of Object.entries(discovery.ontologies ?? {})) {
+      const previous = declarations.ontologies[name];
+      if (previous && canonicalJson(previous) !== canonicalJson(ontology))
+        throw new Error(`Ontology ${name} is declared twice differently (${origin})`);
+      declarations.ontologies[name] = ontology;
+    }
     // The same agent exported twice (alone and in a project) is kept once.
     for (const agent of discovery.agents ?? []) {
       const digest = canonicalJson(agent.json);

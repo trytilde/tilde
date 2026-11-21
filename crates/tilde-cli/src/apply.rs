@@ -233,6 +233,9 @@ mod tests {
             dry_run: false,
             team: None,
             json: false,
+            only: None,
+            ontology: Vec::new(),
+            allow_dirty: false,
             dir: ".".into(),
         }
     }
@@ -289,6 +292,7 @@ mod tests {
             team: Some("agents".into()),
             users: vec![json!({"email": "ada@acme.test", "name": "Ada", "login": true})],
             groups: vec![json!({"name": "eng", "members": [{"email": "ada@acme.test"}]})],
+            ontologies: Default::default(),
         };
         // SAFETY: tests in this binary do not read these variables concurrently.
         unsafe { std::env::remove_var("GITHUB_RUN_ID") };
@@ -328,6 +332,7 @@ mod tests {
             team: None,
             users: Vec::new(),
             groups: Vec::new(),
+            ontologies: Default::default(),
         };
         let error = super::request(
             &args("http://x".into()),

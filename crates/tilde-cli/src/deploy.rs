@@ -43,6 +43,15 @@ pub struct Deploy {
     /// Print the deployment id, token and creation status as JSON.
     #[arg(long)]
     pub json: bool,
+    /// Deploy only the project's ontologies, or only its agents (default: both, ontologies first).
+    #[arg(long, value_parser = ["ontologies", "agents"])]
+    pub only: Option<String>,
+    /// Deploy only this ontology of the project (repeatable).
+    #[arg(long)]
+    pub ontology: Vec<String>,
+    /// Build HEAD's ontologies though the working tree has uncommitted changes (not included).
+    #[arg(long)]
+    pub allow_dirty: bool,
     #[arg(long, default_value = ".", hide = true)]
     pub dir: PathBuf,
 }
@@ -81,6 +90,35 @@ pub async fn run(args: Deploy) -> Result<()> {
         None => project.entry()?,
     };
     let declarations = discover::declarations(&project, &entry, false, true).await?;
+    // The project's ontologies first (`ontology.rs`): build, bind, roll out; then its agents.
+    let only = args.only.as_deref();
+    if only != Some("agents") && !declarations.ontologies.is_empty() {
+        let actions = crate::ontology::run(&args, &declarations.ontologies).await?;
+        if !actions.is_empty() {
+            let base = args.url.as_deref().unwrap_or_default();
+            eprint!("{}", crate::ontology::render(&actions, base));
+            std::process::exit(2);
+        }
+    }
+    let nothing_else = declarations.agents.is_empty()
+        && declarations.users.is_empty()
+        && declarations.groups.is_empty()
+        && ["prompts", "skills", "tools"].iter().all(|k| {
+            declarations.value[k]
+                .as_array()
+                .is_none_or(|a| a.is_empty())
+        });
+    if !declarations.ontologies.is_empty() && nothing_else && only != Some("agents") {
+        return Ok(());
+    }
+    if only == Some("ontologies") {
+        if declarations.ontologies.is_empty() {
+            bail!(
+                "--only ontologies: the project declares no ontologies (defineProject({{ ontologies }}))"
+            );
+        }
+        return Ok(());
+    }
     // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
     // is registered, as before specs existed.
     if !declarations.agents.is_empty()
