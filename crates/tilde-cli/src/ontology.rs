@@ -464,12 +464,15 @@ fn git(dir: &Path, args: &[&str]) -> Result<String> {
 /// That the version declares every slot and secret the environment binds, and that each one it
 /// declares is bound (by the spec or already): checked for every environment before any binding.
 async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result<()> {
-    let secrets: Vec<&str> = version["secrets"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .collect();
+    let names = |field: &str, key: Option<&str>| -> Vec<String> {
+        version[field]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| key.map_or(v, |k| &v[k]).as_str().map(str::to_string))
+            .collect()
+    };
+    let (declared, secrets) = (names("slots", Some("name")), names("secrets", None));
     let mut problems = Vec::new();
     for env in &p.environments {
         let slots = client
@@ -490,18 +493,19 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let declared: Vec<&Value> = slots.iter().filter(|s| s["declared"] == true).collect();
         for (slot, _) in &env.slots {
-            if !declared.iter().any(|d| d["slot"] == slot.as_str()) {
+            if !declared.contains(slot) {
                 problems.push(format!(
                     "{}: the version declares no slot {slot}",
                     env.environment
                 ));
             }
         }
-        for d in &declared {
-            let slot = d["slot"].as_str().unwrap_or_default();
-            let bound = d["connectionId"].as_str().is_some_and(|c| !c.is_empty());
+        for slot in &declared {
+            let bound = slots.iter().any(|b| {
+                b["slot"] == slot.as_str()
+                    && b["connectionId"].as_str().is_some_and(|c| !c.is_empty())
+            });
             if !bound && !env.slots.iter().any(|(s, _)| s == slot) {
                 problems.push(format!(
                     "{}: slot {slot} is neither bound nor in the spec",
@@ -510,7 +514,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             }
         }
         for (name, _) in &env.secrets {
-            if !secrets.contains(&name.as_str()) {
+            if !secrets.contains(name) {
                 problems.push(format!(
                     "{}: the version declares no secret {name}",
                     env.environment
@@ -518,7 +522,9 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             }
         }
         for name in &secrets {
-            let already = set.iter().any(|s| s["name"] == *name && s["set"] == true);
+            let already = set
+                .iter()
+                .any(|s| s["name"] == name.as_str() && s["set"] == true);
             if !already && !env.secrets.iter().any(|(s, _)| s == name) {
                 problems.push(format!(
                     "{}: secret {name} is neither set nor in the spec",
@@ -537,14 +543,39 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
     Ok(())
 }
 
-/// Build, check, then bind and roll out one environment at a time. On a failure, says which
-/// environments run the new version, which are bound to it but not running it, and which are as
-/// they were.
+/// Build, check, then bind and roll out one environment at a time, ontology by ontology. On a
+/// failure, says which environments of that ontology run the new version, which is bound to it
+/// but not running it, and which are as they were; every rollout that completed before it, of any
+/// ontology; and that the agents were not applied.
 pub async fn execute(args: &Deploy, plan: Plan) -> Result<()> {
     use base64::Engine;
-    let client = &plan.client;
     let encoded = base64::engine::general_purpose::STANDARD.encode(&plan.archive);
+    let mut completed = Vec::new();
     for p in &plan.projects {
+        if let Err(e) = deploy_one(args, &plan, p, &encoded, &mut completed).await {
+            let before = if completed.is_empty() {
+                "none".to_string()
+            } else {
+                completed.join(", ")
+            };
+            return Err(e.context(format!(
+                "tilde deploy stopped at ontology {}; rollouts that completed: {before}; the agents were not applied",
+                p.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+async fn deploy_one(
+    args: &Deploy,
+    plan: &Plan,
+    p: &Project,
+    encoded: &str,
+    completed: &mut Vec<String>,
+) -> Result<()> {
+    let client = &plan.client;
+    {
         eprintln!(
             "Ontology {}: building {}",
             p.name,
@@ -656,6 +687,7 @@ pub async fn execute(args: &Deploy, plan: Plan) -> Result<()> {
                 p.name, env.environment
             );
             done.push(env.environment.as_str());
+            completed.push(format!("{}/{}", p.name, env.environment));
         }
     }
     Ok(())
@@ -720,7 +752,10 @@ mod tests {
                 "staging": {
                     "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
                     "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}},
-            "docs": {"environments": {}}}))
+            "warehouse": {"environments": {
+                "production": {
+                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}}}))
         .unwrap()
     }
 
@@ -735,10 +770,10 @@ mod tests {
         assert!(ok, "git {args:?}");
     }
 
-    /// A repository with `ontologies/shop/` and `ontologies/docs/` committed.
+    /// A repository with `ontologies/shop/` and `ontologies/warehouse/` committed.
     fn repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
-        for name in ["shop", "docs"] {
+        for name in ["shop", "warehouse"] {
             std::fs::create_dir_all(dir.path().join("ontologies").join(name)).unwrap();
             std::fs::write(
                 dir.path().join("ontologies").join(name).join("ontology.ts"),
@@ -813,17 +848,19 @@ mod tests {
                     calls.lock().unwrap().push((method.clone(), body.clone()));
                     let env = body["environmentId"].as_str().unwrap_or_default().to_string();
                     let answer = match method.as_str() {
-                        "ListProjects" => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}, {"id": "p2", "name": "docs", "teamId": "t1"}]}),
+                        "ListProjects" => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}, {"id": "p2", "name": "warehouse", "teamId": "t1"}]}),
                         "ListEnvironments" if body["projectId"] == "p1" => {
                             json!({"environments": [{"id": "e1", "name": "production"}, {"id": "e2", "name": "staging"}]})
                         }
-                        "ListEnvironments" => json!({"environments": []}),
+                        "ListEnvironments" => json!({"environments": [{"id": "e3", "name": "production"}]}),
                         "ListConnections" => world.connections.clone(),
                         "ListSecrets" => world.secrets.clone(),
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
-                        "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"]}}),
-                        "ListEnvironmentConnections" => json!({"connections": world.declared.as_array().unwrap().iter()
-                            .map(|slot| json!({"slot": slot, "declared": true})).collect::<Vec<_>>()}),
+                        "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"],
+                            "slots": world.declared.as_array().unwrap().iter().map(|slot| json!({"name": slot, "provider": slot})).collect::<Vec<_>>()}}),
+                        // What the environment has bound (nothing yet); the slots it lists are the
+                        // project's newest version's, which the CLI must not rely on.
+                        "ListEnvironmentConnections" => json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]}),
                         "ListEnvironmentSecrets" => json!({"secrets": [{"name": "PG_PASSWORD", "declared": true, "set": false}]}),
                         "Deploy" => json!({"deployment": {"id": format!("d-{env}"), "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
                         "ListDeployments" => {
@@ -1003,7 +1040,7 @@ mod tests {
         );
         let deploy = &calls.iter().find(|(m, _)| m == "Deploy").unwrap().1;
         assert_eq!(deploy["acceptRebuild"], json!(["orders"]));
-        // `--ontology shop`: docs was neither checked nor built.
+        // `--ontology shop`: warehouse was neither checked nor built.
         assert!(
             !calls
                 .iter()
@@ -1036,6 +1073,34 @@ mod tests {
         );
         assert!(error.contains("the rollout broke"), "{error}");
         assert_eq!(changes(&calls).last().unwrap(), "Deploy e2");
+    }
+
+    /// A later ontology failing names every rollout that completed before it, of every ontology,
+    /// and says the agents were not applied.
+    #[tokio::test]
+    async fn a_later_ontology_failing_reports_every_completed_rollout() {
+        let repo = repository();
+        let (url, _) = cloud(World {
+            failing: Some("e3"),
+            ..Default::default()
+        })
+        .await;
+        let a = args(url, repo.path());
+        let error = format!(
+            "{:#}",
+            crate::deploy::ontologies_first(&a, &declarations(true), true)
+                .await
+                .unwrap_err()
+        );
+        // Ontologies deploy in name order: shop's two environments, then warehouse's, which fails.
+        assert!(
+            error.contains("stopped at ontology warehouse; rollouts that completed: shop/production, shop/staging; the agents were not applied"),
+            "{error}"
+        );
+        assert!(
+            error.contains("the rollout to production failed"),
+            "{error}"
+        );
     }
 
     /// A version that does not declare what the spec binds stops before any binding.

@@ -182,7 +182,7 @@ export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gatew
   tools: [github.ref("acme").tools("github_get_issue")] });
 // The same agent again, inside its project, is kept once.
 export const project = defineProject({ team: "acme", agents: [triage], ontologies: { shop: ontology({
-  dir: "ontologies/shop", environments: { production: { slots: { github: github.ref("acme") } } } }) } });
+  environments: { production: { slots: { github: github.ref("acme") } } } }) } });
 export const people = defineTeam({ team: "acme", users: [user({ email: "ada@acme.test", login: true })] });
 export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Other" }) : undefined;
 `,
@@ -214,7 +214,6 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   // The project's ontologies, for `tilde deploy` to build, bind and roll out first.
   assert.deepEqual(found.ontologies, {
     shop: {
-      dir: "ontologies/shop",
       environments: { production: { slots: { github: { slug: "github/acme" } }, secrets: {} } },
     },
   });
