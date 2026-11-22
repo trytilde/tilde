@@ -96,6 +96,8 @@ pub struct Declarations {
     /// A `defineTeam`'s people (`UserSpec`/`GroupSpec` protobuf JSON).
     pub users: Vec<Value>,
     pub groups: Vec<Value>,
+    /// A `defineProject`'s ontologies (Tilde Cloud), by name.
+    pub ontologies: std::collections::BTreeMap<String, crate::ontology::OntologySpec>,
 }
 
 /// `allow_empty` is for `tilde dev`: an agent that declares no prompts, skills or tools is still
@@ -138,12 +140,17 @@ pub async fn declarations(
     let mut value: Value = serde_json::from_str(text.trim())
         .context("The declaration reader did not print declaration JSON")?;
     let (mut agents, mut team, mut users, mut groups) = (Vec::new(), None, Vec::new(), Vec::new());
+    let mut ontologies = Default::default();
     if specs && let Some(found) = value.get_mut("declarations").map(Value::take) {
         let list = |key: &str| value[key].as_array().cloned().unwrap_or_default();
         agents = list("agents");
         users = list("users");
         groups = list("groups");
         team = value["team"].as_str().map(str::to_owned);
+        if let Some(found) = value.get("ontologies").filter(|o| !o.is_null()) {
+            ontologies = serde_json::from_value(found.clone())
+                .context("The declaration reader printed ontologies that are not a project's")?;
+        }
         value = found;
     }
     Ok(Declarations {
@@ -153,6 +160,7 @@ pub async fn declarations(
         team,
         users,
         groups,
+        ontologies,
     })
 }
 

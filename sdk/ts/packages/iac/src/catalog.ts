@@ -34,17 +34,17 @@ export type AgentmailTool =
   | "update_message"
   | "update_thread";
 export type AgentmailType = "inbox" | "mcp_api_key";
-export const agentmail = catalogProvider<AgentmailTool, AgentmailType>("agentmail");
+export const agentmail = catalogProvider<AgentmailTool, AgentmailType, "agentmail">("agentmail");
 
 /** Anthropic: connections `anthropic/<name>`. */
 export type AnthropicTool = never;
 export type AnthropicType = "api";
-export const anthropic = catalogProvider<AnthropicTool, AnthropicType>("anthropic");
+export const anthropic = catalogProvider<AnthropicTool, AnthropicType, "anthropic">("anthropic");
 
 /** Apollo.io: connections `apollo/<name>`. */
 export type ApolloTool = never;
 export type ApolloType = "oauth";
-export const apollo = catalogProvider<ApolloTool, ApolloType>("apollo");
+export const apollo = catalogProvider<ApolloTool, ApolloType, "apollo">("apollo");
 
 /** AWS: connections `aws/<name>`. */
 export type AwsTool =
@@ -58,52 +58,58 @@ export type AwsTool =
   | "aws_run_script"
   | "aws_search_documentation";
 export type AwsType = "iam";
-export const aws = catalogProvider<AwsTool, AwsType>("aws");
+export const aws = catalogProvider<AwsTool, AwsType, "aws">("aws");
 
 /** AWS Knowledge: connections `aws-knowledge/<name>`. */
 export type AwsKnowledgeTool = never;
 export type AwsKnowledgeType = "public";
-export const awsKnowledge = catalogProvider<AwsKnowledgeTool, AwsKnowledgeType>("aws-knowledge");
+export const awsKnowledge = catalogProvider<AwsKnowledgeTool, AwsKnowledgeType, "aws-knowledge">(
+  "aws-knowledge",
+);
 
 /** Azure AI Foundry: connections `azure_ai/<name>`. */
 export type AzureAiTool = never;
 export type AzureAiType = "api";
-export const azureAi = catalogProvider<AzureAiTool, AzureAiType>("azure_ai");
+export const azureAi = catalogProvider<AzureAiTool, AzureAiType, "azure_ai">("azure_ai");
 
 /** Azure OpenAI: connections `azure_openai/<name>`. */
 export type AzureOpenaiTool = never;
 export type AzureOpenaiType = "api";
-export const azureOpenai = catalogProvider<AzureOpenaiTool, AzureOpenaiType>("azure_openai");
+export const azureOpenai = catalogProvider<AzureOpenaiTool, AzureOpenaiType, "azure_openai">(
+  "azure_openai",
+);
 
 /** Baseten: connections `baseten/<name>`. */
 export type BasetenTool = never;
 export type BasetenType = "api";
-export const baseten = catalogProvider<BasetenTool, BasetenType>("baseten");
+export const baseten = catalogProvider<BasetenTool, BasetenType, "baseten">("baseten");
 
 /** Amazon Bedrock: connections `bedrock/<name>`. */
 export type BedrockTool = never;
 export type BedrockType = "api";
-export const bedrock = catalogProvider<BedrockTool, BedrockType>("bedrock");
+export const bedrock = catalogProvider<BedrockTool, BedrockType, "bedrock">("bedrock");
 
 /** Browserbase: connections `browserbase/<name>`. */
 export type BrowserbaseTool = never;
 export type BrowserbaseType = "api_key";
-export const browserbase = catalogProvider<BrowserbaseTool, BrowserbaseType>("browserbase");
+export const browserbase = catalogProvider<BrowserbaseTool, BrowserbaseType, "browserbase">(
+  "browserbase",
+);
 
 /** Cerebras: connections `cerebras/<name>`. */
 export type CerebrasTool = never;
 export type CerebrasType = "api";
-export const cerebras = catalogProvider<CerebrasTool, CerebrasType>("cerebras");
+export const cerebras = catalogProvider<CerebrasTool, CerebrasType, "cerebras">("cerebras");
 
 /** Circle: connections `circle/<name>`. */
 export type CircleTool = never;
 export type CircleType = "public";
-export const circle = catalogProvider<CircleTool, CircleType>("circle");
+export const circle = catalogProvider<CircleTool, CircleType, "circle">("circle");
 
 /** Clay: connections `clay/<name>`. */
 export type ClayTool = never;
 export type ClayType = "oauth";
-export const clay = catalogProvider<ClayTool, ClayType>("clay");
+export const clay = catalogProvider<ClayTool, ClayType, "clay">("clay");
 
 /** Cloudflare Documentation: connections `cloudflare-docs/<name>`. */
 export type CloudflareDocsTool = never;
@@ -115,7 +121,7 @@ export const cloudflareDocs = catalogProvider<CloudflareDocsTool, CloudflareDocs
 /** Cohere: connections `cohere/<name>`. */
 export type CohereTool = never;
 export type CohereType = "api";
-export const cohere = catalogProvider<CohereTool, CohereType>("cohere");
+export const cohere = catalogProvider<CohereTool, CohereType, "cohere">("cohere");
 
 /** E2B: connections `e2b/<name>`. */
 export type E2bTool =
@@ -154,7 +160,7 @@ export type E2bTool =
   | "e2b_update_webhook"
   | "e2b_write_file";
 export type E2bType = "api";
-export const e2b = catalogProvider<E2bTool, E2bType>("e2b");
+export const e2b = catalogProvider<E2bTool, E2bType, "e2b">("e2b");
 
 /** Firecrawl: connections `firecrawl/<name>`. */
 export type FirecrawlTool =
@@ -185,7 +191,7 @@ export type FirecrawlTool =
   | "search"
   | "search_feedback";
 export type FirecrawlType = "api";
-export const firecrawl = catalogProvider<FirecrawlTool, FirecrawlType>("firecrawl");
+export const firecrawl = catalogProvider<FirecrawlTool, FirecrawlType, "firecrawl">("firecrawl");
 
 /** GitHub: connections `github/<name>`. */
 export type GithubTool =
@@ -268,12 +274,12 @@ export type GithubTool =
   | "github_update_ref"
   | "github_update_release";
 export type GithubType = "github_app" | "oauth" | "pat";
-export const github = catalogProvider<GithubTool, GithubType>("github");
+export const github = catalogProvider<GithubTool, GithubType, "github">("github");
 
 /** Google AI Studio: connections `google_ai/<name>`. */
 export type GoogleAiTool = never;
 export type GoogleAiType = "api";
-export const googleAi = catalogProvider<GoogleAiTool, GoogleAiType>("google_ai");
+export const googleAi = catalogProvider<GoogleAiTool, GoogleAiType, "google_ai">("google_ai");
 
 /** Google Analytics: connections `google_analytics/<name>`. */
 export type GoogleAnalyticsTool =
@@ -381,7 +387,9 @@ export type GoogleDocsTool =
   | "google_docs_insert_text"
   | "google_docs_replace_text";
 export type GoogleDocsType = "oauth";
-export const googleDocs = catalogProvider<GoogleDocsTool, GoogleDocsType>("google_docs");
+export const googleDocs = catalogProvider<GoogleDocsTool, GoogleDocsType, "google_docs">(
+  "google_docs",
+);
 
 /** Google Drive: connections `google_drive/<name>`. */
 export type GoogleDriveTool =
@@ -396,7 +404,9 @@ export type GoogleDriveTool =
   | "google_drive_share_file"
   | "google_drive_upload_file";
 export type GoogleDriveType = "oauth";
-export const googleDrive = catalogProvider<GoogleDriveTool, GoogleDriveType>("google_drive");
+export const googleDrive = catalogProvider<GoogleDriveTool, GoogleDriveType, "google_drive">(
+  "google_drive",
+);
 
 /** Google Mail: connections `google_mail/<name>`. */
 export type GoogleMailTool =
@@ -412,7 +422,9 @@ export type GoogleMailTool =
   | "google_mail_send_email"
   | "google_mail_trash_email";
 export type GoogleMailType = "oauth";
-export const googleMail = catalogProvider<GoogleMailTool, GoogleMailType>("google_mail");
+export const googleMail = catalogProvider<GoogleMailTool, GoogleMailType, "google_mail">(
+  "google_mail",
+);
 
 /** Google Search Console: connections `google_search_console/<name>`. */
 export type GoogleSearchConsoleTool =
@@ -454,27 +466,29 @@ export type GoogleSheetsTool =
   | "google_sheets_search_rows"
   | "google_sheets_write_range";
 export type GoogleSheetsType = "oauth";
-export const googleSheets = catalogProvider<GoogleSheetsTool, GoogleSheetsType>("google_sheets");
+export const googleSheets = catalogProvider<GoogleSheetsTool, GoogleSheetsType, "google_sheets">(
+  "google_sheets",
+);
 
 /** Granola: connections `granola/<name>`. */
 export type GranolaTool = never;
 export type GranolaType = "oauth";
-export const granola = catalogProvider<GranolaTool, GranolaType>("granola");
+export const granola = catalogProvider<GranolaTool, GranolaType, "granola">("granola");
 
 /** HubSpot: connections `hubspot/<name>`. */
 export type HubspotTool = never;
 export type HubspotType = "oauth_app";
-export const hubspot = catalogProvider<HubspotTool, HubspotType>("hubspot");
+export const hubspot = catalogProvider<HubspotTool, HubspotType, "hubspot">("hubspot");
 
 /** Intercom: connections `intercom/<name>`. */
 export type IntercomTool = never;
 export type IntercomType = "oauth";
-export const intercom = catalogProvider<IntercomTool, IntercomType>("intercom");
+export const intercom = catalogProvider<IntercomTool, IntercomType, "intercom">("intercom");
 
 /** Linear: connections `linear/<name>`. */
 export type LinearTool = never;
 export type LinearType = "oauth";
-export const linear = catalogProvider<LinearTool, LinearType>("linear");
+export const linear = catalogProvider<LinearTool, LinearType, "linear">("linear");
 
 /** Linq: connections `linq/<name>`. */
 export type LinqTool =
@@ -503,12 +517,14 @@ export type LinqTool =
   | "linq_update_contact_card"
   | "linq_vote_on_poll";
 export type LinqType = "account";
-export const linq = catalogProvider<LinqTool, LinqType>("linq");
+export const linq = catalogProvider<LinqTool, LinqType, "linq">("linq");
 
 /** Mintlify Documentation: connections `mintlify-docs/<name>`. */
 export type MintlifyDocsTool = never;
 export type MintlifyDocsType = "public";
-export const mintlifyDocs = catalogProvider<MintlifyDocsTool, MintlifyDocsType>("mintlify-docs");
+export const mintlifyDocs = catalogProvider<MintlifyDocsTool, MintlifyDocsType, "mintlify-docs">(
+  "mintlify-docs",
+);
 
 /** Modal: connections `modal/<name>`. */
 export type ModalTool =
@@ -523,22 +539,22 @@ export type ModalTool =
   | "terminate_sandbox"
   | "write_file";
 export type ModalType = "api";
-export const modal = catalogProvider<ModalTool, ModalType>("modal");
+export const modal = catalogProvider<ModalTool, ModalType, "modal">("modal");
 
 /** Neon: connections `neon/<name>`. */
 export type NeonTool = never;
 export type NeonType = "oauth";
-export const neon = catalogProvider<NeonTool, NeonType>("neon");
+export const neon = catalogProvider<NeonTool, NeonType, "neon">("neon");
 
 /** Notion: connections `notion/<name>`. */
 export type NotionTool = never;
 export type NotionType = "oauth";
-export const notion = catalogProvider<NotionTool, NotionType>("notion");
+export const notion = catalogProvider<NotionTool, NotionType, "notion">("notion");
 
 /** OpenAI: connections `openai/<name>`. */
 export type OpenaiTool = never;
 export type OpenaiType = "api";
-export const openai = catalogProvider<OpenaiTool, OpenaiType>("openai");
+export const openai = catalogProvider<OpenaiTool, OpenaiType, "openai">("openai");
 
 /** Parallel Search: connections `parallel-search/<name>`. */
 export type ParallelSearchTool = never;
@@ -550,7 +566,9 @@ export const parallelSearch = catalogProvider<ParallelSearchTool, ParallelSearch
 /** Parallel Task: connections `parallel-task/<name>`. */
 export type ParallelTaskTool = never;
 export type ParallelTaskType = "api_key";
-export const parallelTask = catalogProvider<ParallelTaskTool, ParallelTaskType>("parallel-task");
+export const parallelTask = catalogProvider<ParallelTaskTool, ParallelTaskType, "parallel-task">(
+  "parallel-task",
+);
 
 /** Payload CMS: connections `payload/<name>`. */
 export type PayloadTool =
@@ -562,7 +580,7 @@ export type PayloadTool =
   | "update_document"
   | "update_global";
 export type PayloadType = "api";
-export const payload = catalogProvider<PayloadTool, PayloadType>("payload");
+export const payload = catalogProvider<PayloadTool, PayloadType, "payload">("payload");
 
 /** PostHog: connections `posthog/<name>`. */
 export type PosthogTool =
@@ -633,12 +651,14 @@ export type PosthogTool =
   | "update_property_definition"
   | "update_survey";
 export type PosthogType = "api";
-export const posthog = catalogProvider<PosthogTool, PosthogType>("posthog");
+export const posthog = catalogProvider<PosthogTool, PosthogType, "posthog">("posthog");
 
 /** Salesforce: connections `salesforce/<name>`. */
 export type SalesforceTool = never;
 export type SalesforceType = "oauth_app";
-export const salesforce = catalogProvider<SalesforceTool, SalesforceType>("salesforce");
+export const salesforce = catalogProvider<SalesforceTool, SalesforceType, "salesforce">(
+  "salesforce",
+);
 
 /** Sentry: connections `sentry/<name>`. */
 export type SentryTool =
@@ -880,7 +900,7 @@ export type SentryTool =
   | "sentry_upload_project_release_file"
   | "sentry_whoami";
 export type SentryType = "oauth" | "token";
-export const sentry = catalogProvider<SentryTool, SentryType>("sentry");
+export const sentry = catalogProvider<SentryTool, SentryType, "sentry">("sentry");
 
 /** Slack: connections `slack/<name>`. */
 export type SlackTool =
@@ -953,7 +973,7 @@ export type SlackTool =
   | "slack_update_message"
   | "update_canvas";
 export type SlackType = "mcp_oauth_app" | "slack_app";
-export const slack = catalogProvider<SlackTool, SlackType>("slack");
+export const slack = catalogProvider<SlackTool, SlackType, "slack">("slack");
 
 /** Stripe: connections `stripe/<name>`. */
 export type StripeTool =
@@ -970,17 +990,19 @@ export type StripeTool =
   | "stripe_implementation_planner"
   | "stripe_report";
 export type StripeType = "api" | "mcp_oauth";
-export const stripe = catalogProvider<StripeTool, StripeType>("stripe");
+export const stripe = catalogProvider<StripeTool, StripeType, "stripe">("stripe");
 
 /** Svelte Documentation: connections `svelte-docs/<name>`. */
 export type SvelteDocsTool = never;
 export type SvelteDocsType = "public";
-export const svelteDocs = catalogProvider<SvelteDocsTool, SvelteDocsType>("svelte-docs");
+export const svelteDocs = catalogProvider<SvelteDocsTool, SvelteDocsType, "svelte-docs">(
+  "svelte-docs",
+);
 
 /** Tavily: connections `tavily/<name>`. */
 export type TavilyTool = "crawl" | "extract" | "map" | "research" | "search" | "usage";
 export type TavilyType = "api";
-export const tavily = catalogProvider<TavilyTool, TavilyType>("tavily");
+export const tavily = catalogProvider<TavilyTool, TavilyType, "tavily">("tavily");
 
 /** Telnyx WhatsApp: connections `telnyx/<name>`. */
 export type TelnyxTool =
@@ -993,22 +1015,24 @@ export type TelnyxTool =
   | "whatsapp_send_template"
   | "whatsapp_send_text";
 export type TelnyxType = "whatsapp";
-export const telnyx = catalogProvider<TelnyxTool, TelnyxType>("telnyx");
+export const telnyx = catalogProvider<TelnyxTool, TelnyxType, "telnyx">("telnyx");
 
 /** Tilde: connections `tilde/<name>`. */
 export type TildeTool = never;
 export type TildeType = "application";
-export const tilde = catalogProvider<TildeTool, TildeType>("tilde");
+export const tilde = catalogProvider<TildeTool, TildeType, "tilde">("tilde");
 
 /** Twilio Documentation: connections `twilio-docs/<name>`. */
 export type TwilioDocsTool = never;
 export type TwilioDocsType = "public";
-export const twilioDocs = catalogProvider<TwilioDocsTool, TwilioDocsType>("twilio-docs");
+export const twilioDocs = catalogProvider<TwilioDocsTool, TwilioDocsType, "twilio-docs">(
+  "twilio-docs",
+);
 
 /** Vercel: connections `vercel/<name>`. */
 export type VercelTool = never;
 export type VercelType = "oauth";
-export const vercel = catalogProvider<VercelTool, VercelType>("vercel");
+export const vercel = catalogProvider<VercelTool, VercelType, "vercel">("vercel");
 
 /** Vercel AI Gateway: connections `vercel_ai_gateway/<name>`. */
 export type VercelAiGatewayTool = never;
@@ -1020,7 +1044,7 @@ export const vercelAiGateway = catalogProvider<VercelAiGatewayTool, VercelAiGate
 /** Voyage AI: connections `voyage/<name>`. */
 export type VoyageTool = never;
 export type VoyageType = "api";
-export const voyage = catalogProvider<VoyageTool, VoyageType>("voyage");
+export const voyage = catalogProvider<VoyageTool, VoyageType, "voyage">("voyage");
 
 /** WhatsApp: connections `whatsapp/<name>`. */
 export type WhatsappTool =
@@ -1033,9 +1057,9 @@ export type WhatsappTool =
   | "whatsapp_send_template"
   | "whatsapp_send_text";
 export type WhatsappType = "meta";
-export const whatsapp = catalogProvider<WhatsappTool, WhatsappType>("whatsapp");
+export const whatsapp = catalogProvider<WhatsappTool, WhatsappType, "whatsapp">("whatsapp");
 
 /** Zoom: connections `zoom/<name>`. */
 export type ZoomTool = never;
 export type ZoomType = "oauth_app";
-export const zoom = catalogProvider<ZoomTool, ZoomType>("zoom");
+export const zoom = catalogProvider<ZoomTool, ZoomType, "zoom">("zoom");

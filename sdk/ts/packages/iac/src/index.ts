@@ -224,10 +224,54 @@ export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[
     groups: (spec.groups ?? []).map(groupJson),
   });
 }
+/**
+ * An ontology's connection slots, as its own `defineSlots` declares them (Tilde Cloud): each
+ * slot's connection provider. Pass the ontology's `slots` type to `ontology<...>()` so a binding
+ * to a connection of another provider does not compile:
+ * `ontology<typeof import("./ontologies/faro/slots.ts").slots>({ ... })` (a type-only import).
+ */
+export type OntologySlots = { readonly [slot: string]: { readonly provider: string } };
+/** What one environment of the ontology binds: slots to connections, secret names to secrets. */
+export type OntologyEnvironment<S extends OntologySlots = OntologySlots> = {
+  slots?: { readonly [K in keyof S]?: ConnectionRef<string, S[K]["provider"]> };
+  /** The ontology's secret name to a Tilde secret of the project's team (or the organization). */
+  secrets?: { readonly [name: string]: SecretRef };
+};
+/**
+ * An ontology of the project (Tilde Cloud), in the repository's `ontologies/<name>/`: per
+ * environment, its bindings. `tilde deploy` builds it into a version, binds each environment, rolls the
+ * version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
+ * its project's in Tilde.
+ */
+export type Ontology<S extends OntologySlots = OntologySlots> = {
+  environments: { readonly [environment: string]: OntologyEnvironment<S> };
+};
+export const ontology = <const S extends OntologySlots = OntologySlots>(
+  spec: Ontology<S>,
+): Ontology<S> => spec;
+const ontologyJson = (spec: Ontology) => ({
+  environments: Object.fromEntries(
+    Object.entries(spec.environments).map(([name, env]) => [
+      name,
+      {
+        slots: Object.fromEntries(
+          Object.entries(env.slots ?? {}).flatMap(([slot, connection]) =>
+            connection ? [[slot, ref(connection as ConnectionRef)]] : [],
+          ),
+        ),
+        secrets: Object.fromEntries(
+          Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
+        ),
+      },
+    ]),
+  ),
+});
+
 export type ProjectSpec = {
   readonly [SPEC]: "project";
   readonly team?: string;
   readonly agents: readonly AgentSpec[];
+  readonly ontologies: { readonly [name: string]: unknown };
 };
 
 const REUSE = {
@@ -330,7 +374,28 @@ export function defineAgent(spec: Agent): AgentSpec {
   return Object.freeze({ [SPEC]: "agent" as const, key: spec.key, json });
 }
 
-/** Several agents applied together in one transaction, and the team they belong to (Tilde Cloud). */
-export function defineProject(spec: { team?: string; agents: AgentSpec[] }): ProjectSpec {
-  return Object.freeze({ [SPEC]: "project" as const, team: spec.team, agents: spec.agents });
+/**
+ * Several agents applied together in one transaction, the team they belong to, and the project's
+ * ontologies (Tilde Cloud), which `tilde deploy` deploys first.
+ */
+export function defineProject(spec: {
+  team?: string;
+  agents?: AgentSpec[];
+  ontologies?: { readonly [name: string]: Ontology<any> };
+}): ProjectSpec {
+  const ontologies = Object.fromEntries(
+    Object.entries(spec.ontologies ?? {}).map(([name, o]) => {
+      if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(name))
+        throw new Error(
+          `Ontology ${name}: a name is lowercase letters, digits and dashes (its project's)`,
+        );
+      return [name, ontologyJson(o)];
+    }),
+  );
+  return Object.freeze({
+    [SPEC]: "project" as const,
+    team: spec.team,
+    agents: spec.agents ?? [],
+    ontologies,
+  });
 }

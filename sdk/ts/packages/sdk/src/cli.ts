@@ -135,7 +135,13 @@ async function read(argv: string[]) {
   const specs = process.env.TILDE_DISCOVERY_SPECS === "1";
   if (
     !values["allow-empty"] &&
-    !(specs && (found.agents.length || found.users.length || found.groups.length)) &&
+    !(
+      specs &&
+      (found.agents.length ||
+        found.users.length ||
+        found.groups.length ||
+        Object.keys(found.ontologies).length)
+    ) &&
     !found.prompts.length &&
     !found.skills.length &&
     !found.tools.length
@@ -160,6 +166,7 @@ async function read(argv: string[]) {
     team: found.team,
     users: found.users,
     groups: found.groups,
+    ontologies: found.ontologies,
   });
 }
 

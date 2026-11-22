@@ -13,3 +13,27 @@ github.ref("acme").tools("github_get_isue");
 github.ref("acme", { type: "api_key" });
 // @ts-expect-error also after untypedTools
 github.ref("acme").untypedTools("x").tools("github_get_isue");
+
+// An ontology's slots type its bindings: the slot's provider flows into the connection.
+import { defineProject, ontology, secret } from "../src/index.js";
+type Slots = { github: { provider: "github" }; linear: { provider: "linear" } };
+defineProject({
+  ontologies: {
+    faro: ontology<Slots>({
+      environments: {
+        production: {
+          slots: { github: github.ref("faroai"), linear: connection.ref("linear/faro") },
+          secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
+        },
+      },
+    }),
+  },
+});
+ontology<Slots>({
+  // @ts-expect-error a GitHub slot takes a GitHub connection, not a Linear one
+  environments: { production: { slots: { github: connection.ref("linear/faro") } } },
+});
+ontology<Slots>({
+  // @ts-expect-error no such slot
+  environments: { production: { slots: { gitlab: github.ref("faroai") } } },
+});

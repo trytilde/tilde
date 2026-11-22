@@ -93,7 +93,7 @@ try {
       `/** ${provider.name}: connections \`${provider.id}/<name>\`. */`,
       `export type ${name}Tool = ${union(tools)};`,
       `export type ${name}Type = ${union(types)};`,
-      `export const ${camel(provider.id)} = catalogProvider<${name}Tool, ${name}Type>(${JSON.stringify(provider.id)});`,
+      `export const ${camel(provider.id)} = catalogProvider<${name}Tool, ${name}Type, ${JSON.stringify(provider.id)}>(${JSON.stringify(provider.id)});`,
       "",
     );
   }

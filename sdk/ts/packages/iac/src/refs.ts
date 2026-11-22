@@ -20,8 +20,11 @@ export type ToolSelection<Tool extends string = string> = {
 /** `ref.tools({ delete: true })`: the agent stops using the connection's tools. */
 export type RemovedSource = { readonly connection: ConnectionRef<string>; readonly delete: true };
 
-export type ConnectionRef<Tool extends string = string> = {
+export type ConnectionRef<Tool extends string = string, Provider extends string = string> = {
   readonly slug: string;
+  /** The slug's provider (`github` of `github/acme`), typed on catalog refs: an ontology slot
+   * bound to it must be of that provider. */
+  readonly provider: Provider;
   /** The connection type preflight requires, such as `github_app`. */
   readonly type?: string;
   tools(remove: { delete: true }): RemovedSource;
@@ -41,16 +44,20 @@ function selection<Tool extends string>(
   });
 }
 
-function ref<Tool extends string>(slug: string, type?: string): ConnectionRef<Tool> {
+function ref<Tool extends string, Provider extends string = string>(
+  slug: string,
+  type?: string,
+): ConnectionRef<Tool, Provider> {
   if (!/^[^/\s]+\/[^/\s]+$/.test(slug))
     throw new Error(`Connection ${slug} is not a provider/name slug`);
-  const connection: ConnectionRef<Tool> = Object.freeze({
+  const connection: ConnectionRef<Tool, Provider> = Object.freeze({
     slug,
+    provider: slug.split("/")[0] as Provider,
     type,
     tools: ((...names: (Tool | All | { delete: true })[]) =>
       typeof names[0] === "object"
         ? Object.freeze({ connection, delete: true as const })
-        : selection(connection, names as (Tool | All)[])) as ConnectionRef<Tool>["tools"],
+        : selection(connection, names as (Tool | All)[])) as ConnectionRef<Tool, Provider>["tools"],
     untypedTools: (...names: string[]) => selection(connection, names),
   });
   return connection;
@@ -67,6 +74,9 @@ type ToolsOf<Slug extends string> =
   Known<Slug> extends { tools: infer Tool extends string } ? Tool : string;
 type TypeOf<Slug extends string> =
   Known<Slug> extends { type: infer Type extends string } ? Type : string;
+type ProviderOf<Slug extends string> = Slug extends `${infer Provider}/${string}`
+  ? Provider
+  : string;
 
 /**
  * Any connection by its full slug. A slug `tilde iac types` generated takes its own type and
@@ -76,13 +86,17 @@ export const connection = {
   ref: <Slug extends string>(
     slug: Slug,
     options: { type?: TypeOf<Slug> } = {},
-  ): ConnectionRef<ToolsOf<Slug>> => ref(slug, options.type),
+  ): ConnectionRef<ToolsOf<Slug>, ProviderOf<Slug>> => ref(slug, options.type),
 };
 
 /** A typed provider of the catalog: `github.ref("acme")` is the connection `github/acme`. */
-export function catalogProvider<Tool extends string, Type extends string>(provider: string) {
+export function catalogProvider<
+  Tool extends string,
+  Type extends string,
+  Provider extends string = string,
+>(provider: Provider) {
   return {
-    ref: (name: string, options: { type?: Type } = {}): ConnectionRef<Tool> =>
+    ref: (name: string, options: { type?: Type } = {}): ConnectionRef<Tool, Provider> =>
       ref(`${provider}/${name}`, options.type),
   };
 }

@@ -176,12 +176,13 @@ test("with TILDE_DISCOVERY_SPECS the reader adds the @trytilde/iac specs the ent
   await writeFile(
     join(dir, "index.mjs"),
     `import { definePrompt } from ${JSON.stringify(sdk)};
-import { defineAgent, defineProject, defineTeam, github, gateway, user } from ${JSON.stringify(iac)};
+import { defineAgent, defineProject, defineTeam, github, gateway, ontology, user } from ${JSON.stringify(iac)};
 export const respond = definePrompt("respond", { template: "Hi" });
 export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gateway(),
   tools: [github.ref("acme").tools("github_get_issue")] });
 // The same agent again, inside its project, is kept once.
-export const project = defineProject({ team: "acme", agents: [triage] });
+export const project = defineProject({ team: "acme", agents: [triage], ontologies: { shop: ontology({
+  environments: { production: { slots: { github: github.ref("acme") } } } }) } });
 export const people = defineTeam({ team: "acme", users: [user({ email: "ada@acme.test", login: true })] });
 export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Other" }) : undefined;
 `,
@@ -210,6 +211,12 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   assert.equal(found.agents.length, 1);
   assert.equal(found.agents[0].deployment.target, "DEPLOYMENT_TARGET_GATEWAY");
   assert.deepEqual(found.agents[0].tools[0].tools, ["github_get_issue"]);
+  // The project's ontologies, for `tilde deploy` to build, bind and roll out first.
+  assert.deepEqual(found.ontologies, {
+    shop: {
+      environments: { production: { slots: { github: { slug: "github/acme" } }, secrets: {} } },
+    },
+  });
 
   const clash = await run(dir, [], { TILDE_DISCOVERY_SPECS: "1", CLASH: "1" });
   assert.equal(clash.code, 1);
