@@ -1,3 +1,0 @@
-kind: Added
-body: "SDKs: `serve({ run })` (TypeScript) and `serve(run=...)` (Python) host an agent wherever its entry module runs: inside AWS Lambda it is the Lambda handler (`export const handler = serve({ run })`), with a deployment token it connects a dial-in host, and on a plain import (or while `tilde deploy` reads the module) it does nothing, replacing the Lambda-or-dial-in branch in entry modules."
-time: 2026-11-21T01:00:00+02:00

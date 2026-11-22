@@ -1,3 +1,0 @@
-kind: Added
-body: "Native chat: an application's user lists the providers an agent may use for them, connects their own account on Tilde's hosted setup page, and lists, reconnects or removes their connections (`ChatService` `ListConnectableProviders`, `StartConnection`, `ListConnections`, `ReconnectConnection`, `DeleteConnection`), for the agent's personal tools in their conversations. Owners choose which agents may use their personal connections (every agent granted `tools.personal` for the provider, the default, or only listed agents), enforced in the invocation catalog and on every call; personal tool calls record the connection they ran on."
-time: 2026-11-21T17:02:00+00:00

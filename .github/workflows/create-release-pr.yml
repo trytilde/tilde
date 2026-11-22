@@ -60,6 +60,7 @@ jobs:
             .changes/
             CHANGELOG.md
             VERSION
+            images/sandbox/Dockerfile
             Cargo.toml
             Cargo.lock
             sdk/ts/packages/*/package.json
