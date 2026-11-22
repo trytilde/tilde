@@ -96,15 +96,8 @@ const ENVIRONMENTS: &str = "tilde.ontology_control.v1.EnvironmentService";
 struct Resolved {
     environment: String,
     environment_id: String,
-    slots: Vec<SlotBinding>,
+    slots: Vec<(String, String)>,
     secrets: Vec<(String, String)>,
-}
-/// A slot the spec binds: the connection's id, its slug, and the slug bound now (empty: unbound).
-struct SlotBinding {
-    slot: String,
-    connection_id: String,
-    slug: String,
-    current: String,
 }
 struct Project {
     name: String,
@@ -203,19 +196,6 @@ async fn preflight(
                 });
                 continue;
             };
-            let environment_id = found["id"].as_str().unwrap_or_default().to_string();
-            let bound = match env.slots.is_empty() {
-                true => Vec::new(),
-                false => client
-                    .ok(
-                        &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
-                        json!({"environmentId": environment_id}),
-                    )
-                    .await?["connections"]
-                    .as_array()
-                    .cloned()
-                    .unwrap_or_default(),
-            };
             let mut slots = Vec::new();
             for (slot, connection) in &env.slots {
                 let (provider, connection_name) = connection
@@ -274,17 +254,10 @@ async fn preflight(
                     });
                     continue;
                 }
-                let current = bound
-                    .iter()
-                    .find(|b| b["slot"] == slot.as_str())
-                    .and_then(|b| b["connectionName"].as_str())
-                    .unwrap_or_default();
-                slots.push(SlotBinding {
-                    slot: slot.clone(),
-                    connection_id: row["id"].as_str().unwrap_or_default().to_string(),
-                    slug: connection.slug.clone(),
-                    current: current.to_string(),
-                });
+                slots.push((
+                    slot.clone(),
+                    row["id"].as_str().unwrap_or_default().to_string(),
+                ));
             }
             let mut bound = Vec::new();
             for (secret, tilde_name) in &env.secrets {
@@ -313,7 +286,7 @@ async fn preflight(
             }
             resolved.push(Resolved {
                 environment: env_name.clone(),
-                environment_id,
+                environment_id: found["id"].as_str().unwrap_or_default().to_string(),
                 slots,
                 secrets: bound,
             });
@@ -433,7 +406,7 @@ pub async fn prepare(
         return Ok((actions, None));
     }
     if args.dry_run {
-        eprint!("{}", plan_text(&projects));
+        eprint!("{}", plan_text(&client, &projects, &selected).await?);
         return Ok((Vec::new(), None));
     }
     let (archive, commit, branch) = archive(&dir, args.allow_dirty)?;
@@ -456,9 +429,13 @@ pub async fn prepare(
     ))
 }
 
-/// The dry run's plan: each slot whose binding changes as `slot: current → new`, a count of the
-/// unchanged ones.
-fn plan_text(projects: &[Project]) -> String {
+/// The dry run's plan: each slot whose binding changes as `slot: current → new` (from what the
+/// environment has bound now), and a count of the unchanged ones.
+async fn plan_text(
+    client: &Client,
+    projects: &[Project],
+    specs: &BTreeMap<String, &OntologySpec>,
+) -> Result<String> {
     let mut out = String::from("Plan (dry run, nothing deployed):\n");
     for p in projects {
         out.push_str(&format!(
@@ -467,21 +444,31 @@ fn plan_text(projects: &[Project]) -> String {
         ));
         for env in &p.environments {
             let e = &env.environment;
+            let bound = match env.slots.is_empty() {
+                true => Vec::new(),
+                false => client
+                    .ok(
+                        &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
+                        json!({"environmentId": env.environment_id}),
+                    )
+                    .await?["connections"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            };
             let mut unchanged = 0;
-            for s in &env.slots {
-                if s.current == s.slug {
+            for (slot, connection) in &env.slots {
+                let current = bound.iter().find(|b| b["slot"] == slot.as_str());
+                if current.is_some_and(|b| b["connectionId"] == connection.as_str()) {
                     unchanged += 1;
                     continue;
                 }
-                let current = if s.current.is_empty() {
-                    "unbound"
-                } else {
-                    &s.current
-                };
-                out.push_str(&format!(
-                    "    {e}: slot {}: {current} → {}\n",
-                    s.slot, s.slug
-                ));
+                let current = current
+                    .and_then(|b| b["connectionName"].as_str())
+                    .filter(|c| !c.is_empty())
+                    .unwrap_or("unbound");
+                let new = &specs[&p.name].environments[e].slots[slot].slug;
+                out.push_str(&format!("    {e}: slot {slot}: {current} → {new}\n"));
             }
             if unchanged > 0 {
                 let plural = if unchanged == 1 { "" } else { "s" };
@@ -493,7 +480,7 @@ fn plan_text(projects: &[Project]) -> String {
             out.push_str(&format!("    {e}: roll out\n"));
         }
     }
-    out
+    Ok(out)
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String> {
@@ -544,7 +531,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .as_array()
             .cloned()
             .unwrap_or_default();
-        for SlotBinding { slot, .. } in &env.slots {
+        for (slot, _) in &env.slots {
             if !declared.contains(slot) {
                 problems.push(format!(
                     "{}: the version declares no slot {slot}",
@@ -557,7 +544,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
                 b["slot"] == slot.as_str()
                     && b["connectionId"].as_str().is_some_and(|c| !c.is_empty())
             });
-            if !bound && !env.slots.iter().any(|s| &s.slot == slot) {
+            if !bound && !env.slots.iter().any(|(s, _)| s == slot) {
                 problems.push(format!(
                     "{}: slot {slot} is neither bound nor in the spec",
                     env.environment
@@ -686,9 +673,9 @@ async fn deploy_one(
                     }
                 )
             };
-            for s in &env.slots {
+            for (slot, connection) in &env.slots {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": s.slot, "connectionId": s.connection_id}))
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": slot, "connectionId": connection}))
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
@@ -1076,7 +1063,7 @@ mod tests {
         let mut actions = Vec::new();
         let projects = preflight(&client, &shop, &mut actions).await.unwrap();
         assert!(actions.is_empty());
-        let plan = plan_text(&projects);
+        let plan = plan_text(&client, &projects, &shop).await.unwrap();
         assert!(
             plan.contains("production: slot github: github/old → github/acme\n"),
             "{plan}"
