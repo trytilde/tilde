@@ -1,3 +1,0 @@
-kind: Changed
-body: "Registry pages live under `/registry` (agents, skills, tools, sandboxes, memory and wikis); `/` opens the registry. The Connections page splits connections by what they are for (Tools & chat, Inference & embedding, Sandboxes, and Other) above the source tabs, and adds inference and sandbox connections from their tab. Memory facts and wiki pages are edited in a rich Markdown editor."
-time: 2026-11-21T17:07:00+00:00

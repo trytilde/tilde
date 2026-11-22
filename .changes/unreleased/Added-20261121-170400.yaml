@@ -1,3 +1,0 @@
-kind: Added
-body: "Declarative apply on the server: `ApplyService.Apply` makes the registry match agent specs written in code (agent, inference aliases, tool sources, sandbox blueprint with environment and egress, routines and the already-deployed deployment) in one transaction, upserting by key and removing only entries marked `delete`; preflight lists every required action first and a dry run returns the plan. Secrets (Connections \u2192 Secrets, `SecretService`) keep named, write-only values that a sandbox blueprint's environment can reference, read when a sandbox process connects."
-time: 2026-11-21T17:04:00+00:00

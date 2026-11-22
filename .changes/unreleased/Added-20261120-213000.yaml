@@ -1,3 +1,0 @@
-kind: Added
-body: '`@trytilde/iac`: `secret.ref("NAME")` references a secret set in Tilde (Connections → Secrets) from a sandbox blueprint''s environment; the value never enters the spec, and `tilde deploy` prints a link that adds a missing one.'
-time: 2026-11-20T21:30:00+02:00

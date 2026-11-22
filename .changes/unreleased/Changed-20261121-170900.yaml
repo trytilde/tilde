@@ -1,3 +1,0 @@
-kind: Changed
-body: "Sidecar-hosted agents get their tool sources, not just channel tools. Agent heartbeats no longer queue behind other notifying commits on a busy Postgres. AWS SigV4 signing encodes the canonical path for every service but S3, so Lambda wakes are accepted. Web errors no longer start with the RPC code, and a missing agent links back to the registry."
-time: 2026-11-21T17:09:00+00:00
