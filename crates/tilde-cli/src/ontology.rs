@@ -96,8 +96,15 @@ const ENVIRONMENTS: &str = "tilde.ontology_control.v1.EnvironmentService";
 struct Resolved {
     environment: String,
     environment_id: String,
-    slots: Vec<(String, String)>,
+    slots: Vec<SlotBinding>,
     secrets: Vec<(String, String)>,
+}
+/// A slot the spec binds: the connection's id, its slug, and the slug bound now (empty: unbound).
+struct SlotBinding {
+    slot: String,
+    connection_id: String,
+    slug: String,
+    current: String,
 }
 struct Project {
     name: String,
@@ -196,6 +203,19 @@ async fn preflight(
                 });
                 continue;
             };
+            let environment_id = found["id"].as_str().unwrap_or_default().to_string();
+            let bound = match env.slots.is_empty() {
+                true => Vec::new(),
+                false => client
+                    .ok(
+                        &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
+                        json!({"environmentId": environment_id}),
+                    )
+                    .await?["connections"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            };
             let mut slots = Vec::new();
             for (slot, connection) in &env.slots {
                 let (provider, connection_name) = connection
@@ -254,10 +274,17 @@ async fn preflight(
                     });
                     continue;
                 }
-                slots.push((
-                    slot.clone(),
-                    row["id"].as_str().unwrap_or_default().to_string(),
-                ));
+                let current = bound
+                    .iter()
+                    .find(|b| b["slot"] == slot.as_str())
+                    .and_then(|b| b["connectionName"].as_str())
+                    .unwrap_or_default();
+                slots.push(SlotBinding {
+                    slot: slot.clone(),
+                    connection_id: row["id"].as_str().unwrap_or_default().to_string(),
+                    slug: connection.slug.clone(),
+                    current: current.to_string(),
+                });
             }
             let mut bound = Vec::new();
             for (secret, tilde_name) in &env.secrets {
@@ -286,7 +313,7 @@ async fn preflight(
             }
             resolved.push(Resolved {
                 environment: env_name.clone(),
-                environment_id: found["id"].as_str().unwrap_or_default().to_string(),
+                environment_id,
                 slots,
                 secrets: bound,
             });
@@ -406,7 +433,7 @@ pub async fn prepare(
         return Ok((actions, None));
     }
     if args.dry_run {
-        print_plan(&projects);
+        eprint!("{}", plan_text(&projects));
         return Ok((Vec::new(), None));
     }
     let (archive, commit, branch) = archive(&dir, args.allow_dirty)?;
@@ -429,20 +456,44 @@ pub async fn prepare(
     ))
 }
 
-fn print_plan(projects: &[Project]) {
-    eprintln!("Plan (dry run, nothing deployed):");
+/// The dry run's plan: each slot whose binding changes as `slot: current → new`, a count of the
+/// unchanged ones.
+fn plan_text(projects: &[Project]) -> String {
+    let mut out = String::from("Plan (dry run, nothing deployed):\n");
     for p in projects {
-        eprintln!("  ontology {}: build HEAD into a version", p.name);
+        out.push_str(&format!(
+            "  ontology {}: build HEAD into a version\n",
+            p.name
+        ));
         for env in &p.environments {
-            for (slot, _) in &env.slots {
-                eprintln!("    {}: bind slot {slot}", env.environment);
+            let e = &env.environment;
+            let mut unchanged = 0;
+            for s in &env.slots {
+                if s.current == s.slug {
+                    unchanged += 1;
+                    continue;
+                }
+                let current = if s.current.is_empty() {
+                    "unbound"
+                } else {
+                    &s.current
+                };
+                out.push_str(&format!(
+                    "    {e}: slot {}: {current} → {}\n",
+                    s.slot, s.slug
+                ));
+            }
+            if unchanged > 0 {
+                let plural = if unchanged == 1 { "" } else { "s" };
+                out.push_str(&format!("    {e}: {unchanged} slot{plural} unchanged\n"));
             }
             for (secret, _) in &env.secrets {
-                eprintln!("    {}: bind secret {secret}", env.environment);
+                out.push_str(&format!("    {e}: bind secret {secret}\n"));
             }
-            eprintln!("    {}: roll out", env.environment);
+            out.push_str(&format!("    {e}: roll out\n"));
         }
     }
+    out
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String> {
@@ -493,7 +544,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .as_array()
             .cloned()
             .unwrap_or_default();
-        for (slot, _) in &env.slots {
+        for SlotBinding { slot, .. } in &env.slots {
             if !declared.contains(slot) {
                 problems.push(format!(
                     "{}: the version declares no slot {slot}",
@@ -506,7 +557,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
                 b["slot"] == slot.as_str()
                     && b["connectionId"].as_str().is_some_and(|c| !c.is_empty())
             });
-            if !bound && !env.slots.iter().any(|(s, _)| s == slot) {
+            if !bound && !env.slots.iter().any(|s| &s.slot == slot) {
                 problems.push(format!(
                     "{}: slot {slot} is neither bound nor in the spec",
                     env.environment
@@ -635,9 +686,9 @@ async fn deploy_one(
                     }
                 )
             };
-            for (slot, connection) in &env.slots {
+            for s in &env.slots {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": slot, "connectionId": connection}))
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": s.slot, "connectionId": s.connection_id}))
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
@@ -797,6 +848,8 @@ mod tests {
         declared: Value,
         /// Whether a dry-run Apply of the agents comes back blocked.
         agents_blocked: bool,
+        /// Per environment id, what ListEnvironmentConnections answers.
+        bound: BTreeMap<&'static str, Value>,
     }
 
     impl Default for World {
@@ -810,6 +863,7 @@ mod tests {
                 failing: None,
                 declared: json!(["github", "linear"]),
                 agents_blocked: false,
+                bound: BTreeMap::new(),
             }
         }
     }
@@ -860,7 +914,9 @@ mod tests {
                             "slots": world.declared.as_array().unwrap().iter().map(|slot| json!({"name": slot, "provider": slot})).collect::<Vec<_>>()}}),
                         // What the environment has bound (nothing yet); the slots it lists are the
                         // project's newest version's, which the CLI must not rely on.
-                        "ListEnvironmentConnections" => json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]}),
+                        "ListEnvironmentConnections" => world.bound.get(env.as_str()).cloned().unwrap_or_else(|| {
+                            json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]})
+                        }),
                         "ListEnvironmentSecrets" => json!({"secrets": [{"name": "PG_PASSWORD", "declared": true, "set": false}]}),
                         "Deploy" => json!({"deployment": {"id": format!("d-{env}"), "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
                         "ListDeployments" => {
@@ -994,6 +1050,43 @@ mod tests {
             .unwrap();
         assert!(actions.is_empty());
         assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// The plan shows each slot binding that changes, from what the environment has bound now,
+    /// and counts the ones that stay.
+    #[tokio::test]
+    async fn the_plan_shows_slot_changes() {
+        let (url, _) = cloud(World {
+            bound: BTreeMap::from([(
+                "e1",
+                json!({"connections": [
+                    {"slot": "github", "connectionId": "c9", "connectionName": "github/old"},
+                    {"slot": "linear", "connectionId": "c2", "connectionName": "linear/acme"}]}),
+            )]),
+            ..Default::default()
+        })
+        .await;
+        let client = Client {
+            base: url,
+            http: reqwest::Client::new(),
+            key: None,
+        };
+        let specs = spec();
+        let shop = BTreeMap::from([("shop".to_string(), &specs["shop"])]);
+        let mut actions = Vec::new();
+        let projects = preflight(&client, &shop, &mut actions).await.unwrap();
+        assert!(actions.is_empty());
+        let plan = plan_text(&projects);
+        assert!(
+            plan.contains("production: slot github: github/old → github/acme\n"),
+            "{plan}"
+        );
+        assert!(plan.contains("production: 1 slot unchanged\n"), "{plan}");
+        assert!(!plan.contains("production: slot linear"), "{plan}");
+        assert!(
+            plan.contains("staging: slot linear: unbound → linear/acme\n"),
+            "{plan}"
+        );
     }
 
     /// One version per ontology from the archive, then each environment bound and rolled out in
