@@ -20,7 +20,6 @@ type Slots = { github: { provider: "github" }; linear: { provider: "linear" } };
 defineProject({
   ontologies: {
     faro: ontology<Slots>({
-      dir: "ontologies/faro",
       environments: {
         production: {
           slots: { github: github.ref("faroai"), linear: connection.ref("linear/faro") },
@@ -31,12 +30,10 @@ defineProject({
   },
 });
 ontology<Slots>({
-  dir: "ontologies/faro",
   // @ts-expect-error a GitHub slot takes a GitHub connection, not a Linear one
   environments: { production: { slots: { github: connection.ref("linear/faro") } } },
 });
 ontology<Slots>({
-  dir: "ontologies/faro",
   // @ts-expect-error no such slot
   environments: { production: { slots: { gitlab: github.ref("faroai") } } },
 });

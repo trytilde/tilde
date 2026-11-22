@@ -52,6 +52,10 @@ pub struct Deploy {
     /// Build HEAD's ontologies though the working tree has uncommitted changes (not included).
     #[arg(long)]
     pub allow_dirty: bool,
+    /// An ontology model whose rebuild the rollout accepts (repeatable): a rollout that would
+    /// rebuild a deployed model fails, naming the models, unless each is accepted.
+    #[arg(long)]
+    pub accept_rebuild: Vec<String>,
     #[arg(long, default_value = ".", hide = true)]
     pub dir: PathBuf,
 }
@@ -83,6 +87,26 @@ pub fn ci_metadata() -> wire::RegisterDeploymentRequest {
     }
 }
 
+/// Check everything before changing anything (the ontologies' preflight and, when agents follow,
+/// a dry-run Apply), then deploy the ontologies. The actions that blocked it, if any, in which
+/// case nothing changed.
+pub async fn ontologies_first(
+    args: &Deploy,
+    declarations: &discover::Declarations,
+    specs: bool,
+) -> Result<Vec<crate::ontology::Action>> {
+    let (mut actions, plan) = crate::ontology::prepare(args, &declarations.ontologies).await?;
+    if specs && args.only.is_none() && !args.dry_run {
+        actions.extend(crate::apply::preflight(args, declarations).await?);
+    }
+    if actions.is_empty()
+        && let Some(plan) = plan
+    {
+        crate::ontology::execute(args, plan).await?;
+    }
+    Ok(actions)
+}
+
 pub async fn run(args: Deploy) -> Result<()> {
     let project = Project::find(&args.dir)?;
     let entry = match &args.entry {
@@ -92,8 +116,11 @@ pub async fn run(args: Deploy) -> Result<()> {
     let declarations = discover::declarations(&project, &entry, false, true).await?;
     // The project's ontologies first (`ontology.rs`): build, bind, roll out; then its agents.
     let only = args.only.as_deref();
+    let specs = !declarations.agents.is_empty()
+        || !declarations.users.is_empty()
+        || !declarations.groups.is_empty();
     if only != Some("agents") && !declarations.ontologies.is_empty() {
-        let actions = crate::ontology::run(&args, &declarations.ontologies).await?;
+        let actions = ontologies_first(&args, &declarations, specs).await?;
         if !actions.is_empty() {
             let base = args.url.as_deref().unwrap_or_default();
             eprint!("{}", crate::ontology::render(&actions, base));
@@ -121,10 +148,7 @@ pub async fn run(args: Deploy) -> Result<()> {
     }
     // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
     // is registered, as before specs existed.
-    if !declarations.agents.is_empty()
-        || !declarations.users.is_empty()
-        || !declarations.groups.is_empty()
-    {
+    if specs {
         return crate::apply::run(&args, &declarations).await;
     }
     let target = args.target.as_deref().unwrap_or("gateway");

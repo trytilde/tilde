@@ -1869,19 +1869,24 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   the union of their tools, different types (or unknown tools) leave that part plain strings. A
   generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
   plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
-- Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({ dir:
-  "ontologies/<name>", environments: { <env>: { slots, secrets } } }) } })`. A project is a pnpm
+- Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
+  environments: { <env>: { slots, secrets } } }) } })`, each in the repository's
+  `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
   workspace with one root lockfile and at most one root `tilde.toml`; each ontology is the Tilde
   project of its name. `ontology<typeof slots>()` takes the ontology's own `defineSlots` type (a
   type-only import), so a slot bound to a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
   `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`). `tilde deploy` deploys
-  them before the agents (`tilde-cli` `ontology.rs`): preflight (projects, environments,
-  connections and secrets exist; each missing one is a required action with its link, the
-  secret's naming the project's team; a server without the ontology control plane answers
-  "Ontologies need Tilde Cloud"), then a version per ontology from the repository at HEAD
-  (`VersionService.CreateVersion`, uncommitted changes refused without `--allow-dirty`), then
-  each environment's slot and secret bindings, then the rollouts. `--only ontologies|agents` and
+  them before the agents (`tilde-cli` `ontology.rs`). Nothing changes until everything is
+  checked: the ontologies' preflight (projects, environments, connections and secrets exist;
+  each missing one is a required action with its link, the secret's naming the project's team; a
+  server without the ontology control plane answers "Ontologies need Tilde Cloud") and the
+  agents' dry-run `Apply`, reported together (exit 2). Then the repository at HEAD is archived
+  once (uncommitted changes refused without `--allow-dirty`; over 32 MiB refused) and, per
+  ontology: a version (`VersionService.CreateVersion`), a check that it declares exactly the
+  slots and secrets the spec binds (else nothing is bound), then each environment bound and
+  rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
+  names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a

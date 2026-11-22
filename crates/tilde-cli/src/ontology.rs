@@ -1,11 +1,12 @@
 //! `tilde deploy` for a project's ontologies (Tilde Cloud): `defineProject({ ontologies })`.
 //!
 //! Each ontology is the Tilde project of its name, built from `ontologies/<name>/` of the
-//! repository at HEAD. The order is fixed: preflight (every project, environment, connection and
-//! secret the specs name exists, nothing changed yet; each missing one is a required action with
-//! a link), then a version per ontology (the repository archive, `VersionService.CreateVersion`),
-//! then each environment's slot and secret bindings (which name the slots and secrets of the
-//! version just built), then the rollouts. Agents are applied after (`apply.rs`).
+//! repository at HEAD (`tilde deploy` runs at the repository's root). `prepare` changes nothing:
+//! it checks every project, environment, connection and secret the specs name (each missing one
+//! is a required action with a link, reported with the agents' own before anything changes) and
+//! archives the repository once. `execute` then, per ontology: builds the archive into a version
+//! (`VersionService.CreateVersion`), checks that the version declares exactly what the spec binds,
+//! and binds and rolls out one environment at a time. Agents are applied after (`apply.rs`).
 //!
 //! The ontology control plane is Tilde Cloud's: its RPCs are called as Connect JSON (this CLI
 //! does not depend on its contract), and a server without them answers 404, which becomes a
@@ -21,7 +22,6 @@ use std::time::Duration;
 /// An ontology as `@trytilde/iac`'s `defineProject` writes it.
 #[derive(Debug, Deserialize)]
 pub struct OntologySpec {
-    pub dir: String,
     #[serde(default)]
     pub environments: BTreeMap<String, EnvironmentSpec>,
 }
@@ -42,6 +42,7 @@ pub struct ConnectionSpec {
 }
 
 /// Something a person must do before anything is deployed, with where to do it.
+#[derive(Debug)]
 pub struct Action {
     pub subject: String,
     pub message: String,
@@ -101,8 +102,19 @@ struct Resolved {
 struct Project {
     name: String,
     id: String,
-    dir: String,
     environments: Vec<Resolved>,
+}
+
+/// The largest source archive Tilde Cloud takes (its `versions::MAX_ARCHIVE`).
+const MAX_ARCHIVE: usize = 32 * 1024 * 1024;
+
+/// What `prepare` found, for `execute`: every project resolved, the repository archived once.
+pub struct Plan {
+    client: Client,
+    projects: Vec<Project>,
+    archive: Vec<u8>,
+    commit: String,
+    branch: String,
 }
 
 fn encode(value: &str) -> String {
@@ -282,7 +294,6 @@ async fn preflight(
         out.push(Project {
             name: name.clone(),
             id,
-            dir: spec.dir.clone(),
             environments: resolved,
         });
     }
@@ -291,23 +302,7 @@ async fn preflight(
 
 /// `git archive` of the repository at HEAD, with the commit and branch.
 fn archive(dir: &Path, allow_dirty: bool) -> Result<(Vec<u8>, String, String)> {
-    let git = |args: &[&str]| -> Result<String> {
-        let out = std::process::Command::new("git")
-            .args(args)
-            .current_dir(dir)
-            .output()
-            .context("running git")?;
-        if !out.status.success() {
-            bail!(
-                "git {}: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&out.stderr).trim()
-            );
-        }
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-    };
-    let root = git(&["rev-parse", "--show-toplevel"])?;
-    if !git(&["status", "--porcelain"])?.is_empty() {
+    if !git(dir, &["status", "--porcelain"])?.is_empty() {
         if !allow_dirty {
             bail!(
                 "the working tree has uncommitted changes; commit them, or pass --allow-dirty to deploy HEAD without them"
@@ -315,11 +310,11 @@ fn archive(dir: &Path, allow_dirty: bool) -> Result<(Vec<u8>, String, String)> {
         }
         eprintln!("warning: uncommitted changes are not included; deploying HEAD");
     }
-    let commit = git(&["rev-parse", "HEAD"])?;
-    let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
+    let commit = git(dir, &["rev-parse", "HEAD"])?;
+    let branch = git(dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
     let out = std::process::Command::new("git")
         .args(["archive", "--format=tar", "HEAD"])
-        .current_dir(&root)
+        .current_dir(dir)
         .output()
         .context("running git archive")?;
     if !out.status.success() {
@@ -360,35 +355,41 @@ async fn poll(
     }
 }
 
-/// Deploy the ontologies (all, or `--ontology`'s). Returns the actions that block it; when there
-/// are any, nothing was changed.
-pub async fn run(
+/// Check and resolve the ontologies (all, or `--ontology`'s) and archive the repository, changing
+/// nothing: the actions that block a deploy, else the plan (none when there is nothing to do or
+/// it is a dry run).
+pub async fn prepare(
     args: &Deploy,
     ontologies: &BTreeMap<String, OntologySpec>,
-) -> Result<Vec<Action>> {
+) -> Result<(Vec<Action>, Option<Plan>)> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
     };
+    if let Some(unknown) = args.ontology.iter().find(|n| !ontologies.contains_key(*n)) {
+        bail!("--ontology {unknown}: the project declares no such ontology");
+    }
     let selected: BTreeMap<String, &OntologySpec> = ontologies
         .iter()
         .filter(|(name, _)| args.ontology.is_empty() || args.ontology.contains(name))
         .map(|(name, spec)| (name.clone(), spec))
         .collect();
-    if let Some(unknown) = args.ontology.iter().find(|n| !ontologies.contains_key(*n)) {
-        bail!("--ontology {unknown}: the project declares no such ontology");
-    }
     if selected.is_empty() {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), None));
     }
-    let dir = &args.dir;
-    for (name, spec) in &selected {
-        if !dir.join(&spec.dir).join("ontology.ts").is_file() {
-            bail!("ontology {name}: {}/ontology.ts does not exist", spec.dir);
+    // The control plane builds `ontologies/<name>/` of the archive, which is the repository root.
+    let dir = args.dir.canonicalize().context("the project directory")?;
+    let root = git(&dir, &["rev-parse", "--show-toplevel"])?;
+    if Path::new(&root).canonicalize().ok().as_deref() != Some(dir.as_path()) {
+        bail!("a project with ontologies deploys from its repository's root ({root})");
+    }
+    for name in selected.keys() {
+        let folder = dir.join("ontologies").join(name);
+        if !folder.join("ontology.ts").is_file() {
+            bail!("ontology {name}: ontologies/{name}/ontology.ts does not exist");
         }
-        if dir.join(&spec.dir).join("tilde.toml").is_file() {
+        if folder.join("tilde.toml").is_file() {
             bail!(
-                "ontology {name}: {}/tilde.toml: a repository has at most one tilde.toml, at its root",
-                spec.dir
+                "ontology {name}: ontologies/{name}/tilde.toml: a repository has at most one tilde.toml, at its root"
             );
         }
     }
@@ -402,41 +403,157 @@ pub async fn run(
     let mut actions = Vec::new();
     let projects = preflight(&client, &selected, &mut actions).await?;
     if !actions.is_empty() {
-        return Ok(actions);
+        return Ok((actions, None));
     }
     if args.dry_run {
-        eprintln!("Plan (dry run, nothing deployed):");
-        for p in &projects {
-            eprintln!(
-                "  ontology {} ({}): build HEAD into a version",
-                p.name, p.dir
-            );
-            for env in &p.environments {
-                for (slot, _) in &env.slots {
-                    eprintln!("    {}: bind slot {slot}", env.environment);
-                }
-                for (secret, _) in &env.secrets {
-                    eprintln!("    {}: bind secret {secret}", env.environment);
-                }
-                eprintln!("    {}: roll out", env.environment);
+        print_plan(&projects);
+        return Ok((Vec::new(), None));
+    }
+    let (archive, commit, branch) = archive(&dir, args.allow_dirty)?;
+    if archive.len() > MAX_ARCHIVE {
+        bail!(
+            "the repository archive is {} MiB, over Tilde's {} MiB: move large files out of the repository (or into .gitattributes export-ignore)",
+            archive.len() / (1024 * 1024),
+            MAX_ARCHIVE / (1024 * 1024)
+        );
+    }
+    Ok((
+        Vec::new(),
+        Some(Plan {
+            client,
+            projects,
+            archive,
+            commit,
+            branch,
+        }),
+    ))
+}
+
+fn print_plan(projects: &[Project]) {
+    eprintln!("Plan (dry run, nothing deployed):");
+    for p in projects {
+        eprintln!("  ontology {}: build HEAD into a version", p.name);
+        for env in &p.environments {
+            for (slot, _) in &env.slots {
+                eprintln!("    {}: bind slot {slot}", env.environment);
+            }
+            for (secret, _) in &env.secrets {
+                eprintln!("    {}: bind secret {secret}", env.environment);
+            }
+            eprintln!("    {}: roll out", env.environment);
+        }
+    }
+}
+
+fn git(dir: &Path, args: &[&str]) -> Result<String> {
+    let out = std::process::Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .context("running git")?;
+    if !out.status.success() {
+        bail!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// That the version declares every slot and secret the environment binds, and that each one it
+/// declares is bound (by the spec or already): checked for every environment before any binding.
+async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result<()> {
+    let secrets: Vec<&str> = version["secrets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    let mut problems = Vec::new();
+    for env in &p.environments {
+        let slots = client
+            .ok(
+                &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
+                json!({"environmentId": env.environment_id}),
+            )
+            .await?["connections"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let set = client
+            .ok(
+                &format!("{ENVIRONMENTS}/ListEnvironmentSecrets"),
+                json!({"environmentId": env.environment_id}),
+            )
+            .await?["secrets"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let declared: Vec<&Value> = slots.iter().filter(|s| s["declared"] == true).collect();
+        for (slot, _) in &env.slots {
+            if !declared.iter().any(|d| d["slot"] == slot.as_str()) {
+                problems.push(format!(
+                    "{}: the version declares no slot {slot}",
+                    env.environment
+                ));
             }
         }
-        return Ok(Vec::new());
+        for d in &declared {
+            let slot = d["slot"].as_str().unwrap_or_default();
+            let bound = d["connectionId"].as_str().is_some_and(|c| !c.is_empty());
+            if !bound && !env.slots.iter().any(|(s, _)| s == slot) {
+                problems.push(format!(
+                    "{}: slot {slot} is neither bound nor in the spec",
+                    env.environment
+                ));
+            }
+        }
+        for (name, _) in &env.secrets {
+            if !secrets.contains(&name.as_str()) {
+                problems.push(format!(
+                    "{}: the version declares no secret {name}",
+                    env.environment
+                ));
+            }
+        }
+        for name in &secrets {
+            let already = set.iter().any(|s| s["name"] == *name && s["set"] == true);
+            if !already && !env.secrets.iter().any(|(s, _)| s == name) {
+                problems.push(format!(
+                    "{}: secret {name} is neither set nor in the spec",
+                    env.environment
+                ));
+            }
+        }
     }
-    let (archive, commit, branch) = archive(dir, args.allow_dirty)?;
-    use base64::Engine;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&archive);
-    for p in &projects {
-        eprintln!(
-            "Ontology {}: building {} at {}",
+    if !problems.is_empty() {
+        bail!(
+            "ontology {}: the version and the spec disagree; nothing was bound:\n  {}",
             p.name,
-            p.dir,
-            &commit[..commit.len().min(12)]
+            problems.join("\n  ")
+        );
+    }
+    Ok(())
+}
+
+/// Build, check, then bind and roll out one environment at a time. On a failure, says which
+/// environments run the new version, which are bound to it but not running it, and which are as
+/// they were.
+pub async fn execute(args: &Deploy, plan: Plan) -> Result<()> {
+    use base64::Engine;
+    let client = &plan.client;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&plan.archive);
+    for p in &plan.projects {
+        eprintln!(
+            "Ontology {}: building {}",
+            p.name,
+            &plan.commit[..plan.commit.len().min(12)]
         );
         let created = client
             .ok(
                 &format!("{VERSIONS}/CreateVersion"),
-                json!({"projectId": p.id, "commitSha": commit, "ref": branch, "archive": encoded}),
+                json!({"projectId": p.id, "commitSha": plan.commit, "ref": plan.branch, "archive": encoded}),
             )
             .await?;
         let version_id = created["version"]["id"]
@@ -444,7 +561,7 @@ pub async fn run(
             .unwrap_or_default()
             .to_string();
         let version = poll(
-            &client,
+            client,
             &format!("{VERSIONS}/GetVersion"),
             json!({"id": version_id}),
             |v| v["version"].clone(),
@@ -458,37 +575,60 @@ pub async fn run(
                 version["error"].as_str().unwrap_or("no detail")
             );
         }
+        check_declared(client, p, &version).await?;
+        let mut done: Vec<&str> = Vec::new();
         for env in &p.environments {
+            let state = |bound: bool| {
+                let untouched: Vec<&str> = p
+                    .environments
+                    .iter()
+                    .map(|e| e.environment.as_str())
+                    .filter(|e| !done.contains(e) && *e != env.environment)
+                    .collect();
+                format!(
+                    "running version {version_id}: {}; {}; as they were: {}",
+                    if done.is_empty() {
+                        "none".into()
+                    } else {
+                        done.join(", ")
+                    },
+                    if bound {
+                        format!("bound to it but not running it: {}", env.environment)
+                    } else {
+                        format!("{} partly bound", env.environment)
+                    },
+                    if untouched.is_empty() {
+                        "none".into()
+                    } else {
+                        untouched.join(", ")
+                    }
+                )
+            };
             for (slot, connection) in &env.slots {
                 client
-                    .ok(
-                        &format!("{ENVIRONMENTS}/SetEnvironmentConnection"),
-                        json!({"environmentId": env.environment_id, "slot": slot, "connectionId": connection}),
-                    )
-                    .await?;
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": slot, "connectionId": connection}))
+                    .await
+                    .map_err(|e| e.context(state(false)))?;
             }
             for (name, secret) in &env.secrets {
                 client
-                    .ok(
-                        &format!("{ENVIRONMENTS}/SetEnvironmentSecretBinding"),
-                        json!({"environmentId": env.environment_id, "name": name, "secretId": secret}),
-                    )
-                    .await?;
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentSecretBinding"), json!({"environmentId": env.environment_id, "name": name, "secretId": secret}))
+                    .await
+                    .map_err(|e| e.context(state(false)))?;
             }
-        }
-        for env in &p.environments {
             let started = client
                 .ok(
                     &format!("{ENVIRONMENTS}/Deploy"),
-                    json!({"environmentId": env.environment_id, "versionId": version_id}),
+                    json!({"environmentId": env.environment_id, "versionId": version_id, "acceptRebuild": args.accept_rebuild}),
                 )
-                .await?;
+                .await
+                .map_err(|e| e.context(state(true)))?;
             let deployment = started["deployment"]["id"]
                 .as_str()
                 .unwrap_or_default()
                 .to_string();
-            let done = poll(
-                &client,
+            let finished = poll(
+                client,
                 &format!("{ENVIRONMENTS}/ListDeployments"),
                 json!({"environmentId": env.environment_id}),
                 |listed| {
@@ -502,21 +642,23 @@ pub async fn run(
                 "DEPLOYMENT_STATUS_DEPLOYING",
             )
             .await?;
-            if done["status"] != "DEPLOYMENT_STATUS_SUCCEEDED" {
+            if finished["status"] != "DEPLOYMENT_STATUS_SUCCEEDED" {
                 bail!(
-                    "ontology {}: the rollout to {} failed:\n{}",
+                    "ontology {}: the rollout to {} failed ({}):\n{}",
                     p.name,
                     env.environment,
-                    done["log"].as_str().unwrap_or("no log")
+                    state(true),
+                    finished["log"].as_str().unwrap_or("no log")
                 );
             }
             eprintln!(
                 "Ontology {}: {} runs version {version_id}",
                 p.name, env.environment
             );
+            done.push(env.environment.as_str());
         }
     }
-    Ok(Vec::new())
+    Ok(())
 }
 
 /// The actions for people, with links joined to the server's URL when relative.
@@ -540,8 +682,13 @@ pub fn render(actions: &[Action], base: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{Json, Router, extract::Path as Route, routing::post};
+    use axum::{
+        Router, body::Bytes, extract::Path as Route, http::header, response::IntoResponse,
+        routing::post,
+    };
+    use buffa::Message;
     use std::sync::{Arc, Mutex};
+    use tilde_contracts::proto::tilde::management::v1 as wire;
 
     fn args(url: String, dir: &Path) -> Deploy {
         Deploy {
@@ -559,76 +706,133 @@ mod tests {
             only: None,
             ontology: Vec::new(),
             allow_dirty: false,
+            accept_rebuild: Vec::new(),
             dir: dir.to_path_buf(),
         }
     }
 
     fn spec() -> BTreeMap<String, OntologySpec> {
-        serde_json::from_value(json!({"shop": {"dir": "ontologies/shop", "environments": {"production": {
-            "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
-            "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}}}))
+        serde_json::from_value(json!({
+            "shop": {"environments": {
+                "production": {
+                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}},
+                "staging": {
+                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}},
+            "docs": {"environments": {}}}))
         .unwrap()
     }
 
-    /// A repository with `ontologies/shop/` committed.
+    fn git(dir: &Path, args: &[&str]) {
+        let ok = std::process::Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "git {args:?}");
+    }
+
+    /// A repository with `ontologies/shop/` and `ontologies/docs/` committed.
     fn repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("ontologies/shop")).unwrap();
-        std::fs::write(
-            dir.path().join("ontologies/shop/ontology.ts"),
-            "export default {};\n",
-        )
-        .unwrap();
-        for args in [
-            vec!["init", "-q", "-b", "main"],
-            vec!["add", "-A"],
-            vec![
-                "-c",
-                "user.name=t",
-                "-c",
-                "user.email=t@t",
-                "commit",
-                "-q",
-                "-m",
-                "shop",
-            ],
-        ] {
-            assert!(
-                std::process::Command::new("git")
-                    .args(&args)
-                    .current_dir(dir.path())
-                    .status()
-                    .unwrap()
-                    .success()
-            );
+        for name in ["shop", "docs"] {
+            std::fs::create_dir_all(dir.path().join("ontologies").join(name)).unwrap();
+            std::fs::write(
+                dir.path().join("ontologies").join(name).join("ontology.ts"),
+                "export default {};\n",
+            )
+            .unwrap();
         }
+        git(dir.path(), &["init", "-q", "-b", "main"]);
+        git(dir.path(), &["add", "-A"]);
+        git(dir.path(), &["commit", "-q", "-m", "ontologies"]);
         dir
     }
 
-    /// A stand-in Tilde Cloud: it records every call and answers as the control plane would.
-    async fn cloud(
+    /// What the stand-in Tilde Cloud holds.
+    struct World {
         connections: Value,
         secrets: Value,
-    ) -> (String, Arc<Mutex<Vec<(String, Value)>>>) {
-        let calls: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        /// The environment whose rollout fails.
+        failing: Option<&'static str>,
+        /// Slots the built version declares.
+        declared: Value,
+        /// Whether a dry-run Apply of the agents comes back blocked.
+        agents_blocked: bool,
+    }
+
+    impl Default for World {
+        fn default() -> Self {
+            World {
+                connections: json!({"connections": [
+                    {"id": "c1", "slug": "github/acme", "typeId": "github_app", "status": "ready"},
+                    {"id": "c2", "slug": "linear/acme", "typeId": "api_key", "status": "ready"}]}),
+                secrets: json!({"secrets": [{"id": "s-org", "name": "SHOP_PG_PASSWORD", "organization": true},
+                                            {"id": "s-team", "name": "SHOP_PG_PASSWORD"}]}),
+                failing: None,
+                declared: json!(["github", "linear"]),
+                agents_blocked: false,
+            }
+        }
+    }
+
+    type Calls = Arc<Mutex<Vec<(String, Value)>>>;
+
+    /// A stand-in Tilde Cloud: it records every call and answers as the control plane would.
+    async fn cloud(world: World) -> (String, Calls) {
+        let calls: Calls = Arc::default();
+        let world = Arc::new(world);
         let app = Router::new().route(
             "/{service}/{method}",
             post({
                 let calls = calls.clone();
-                move |Route((service, method)): Route<(String, String)>, Json(body): Json<Value>| async move {
+                move |Route((service, method)): Route<(String, String)>, body: Bytes| async move {
+                    if service.ends_with("ApplyService") {
+                        let request = wire::ApplyRequest::decode_from_slice(&body).unwrap();
+                        calls.lock().unwrap().push((format!("Apply dryRun={}", request.dry_run), Value::Null));
+                        let response = wire::ApplyResponse {
+                            outcome: if world.agents_blocked { wire::ApplyOutcome::Blocked } else { wire::ApplyOutcome::Planned }.into(),
+                            required_actions: if world.agents_blocked {
+                                vec![wire::RequiredAction {
+                                    subject: "triage/tools/linear/acme".into(),
+                                    message: "Connection linear/other does not exist".into(),
+                                    url: "/registry/tools/catalog/linear".into(),
+                                    ..Default::default()
+                                }]
+                            } else {
+                                Vec::new()
+                            },
+                            ..Default::default()
+                        };
+                        return ([(header::CONTENT_TYPE, "application/proto")], response.encode_to_vec()).into_response();
+                    }
+                    let body: Value = serde_json::from_slice(&body).unwrap();
                     calls.lock().unwrap().push((method.clone(), body.clone()));
-                    let answer = match (service.as_str(), method.as_str()) {
-                        (_, "ListProjects") => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}]}),
-                        (_, "ListEnvironments") => json!({"environments": [{"id": "e1", "name": "production"}]}),
-                        (_, "ListConnections") => connections.clone(),
-                        (_, "ListSecrets") => secrets.clone(),
-                        (_, "CreateVersion") => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
-                        (_, "GetVersion") => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY"}}),
-                        (_, "Deploy") => json!({"deployment": {"id": "d1", "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
-                        (_, "ListDeployments") => json!({"deployments": [{"id": "d1", "status": "DEPLOYMENT_STATUS_SUCCEEDED"}]}),
+                    let env = body["environmentId"].as_str().unwrap_or_default().to_string();
+                    let answer = match method.as_str() {
+                        "ListProjects" => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}, {"id": "p2", "name": "docs", "teamId": "t1"}]}),
+                        "ListEnvironments" if body["projectId"] == "p1" => {
+                            json!({"environments": [{"id": "e1", "name": "production"}, {"id": "e2", "name": "staging"}]})
+                        }
+                        "ListEnvironments" => json!({"environments": []}),
+                        "ListConnections" => world.connections.clone(),
+                        "ListSecrets" => world.secrets.clone(),
+                        "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
+                        "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"]}}),
+                        "ListEnvironmentConnections" => json!({"connections": world.declared.as_array().unwrap().iter()
+                            .map(|slot| json!({"slot": slot, "declared": true})).collect::<Vec<_>>()}),
+                        "ListEnvironmentSecrets" => json!({"secrets": [{"name": "PG_PASSWORD", "declared": true, "set": false}]}),
+                        "Deploy" => json!({"deployment": {"id": format!("d-{env}"), "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
+                        "ListDeployments" => {
+                            let status = if world.failing == Some(env.as_str()) { "DEPLOYMENT_STATUS_FAILED" } else { "DEPLOYMENT_STATUS_SUCCEEDED" };
+                            json!({"deployments": [{"id": format!("d-{env}"), "status": status, "log": "the rollout broke"}]})
+                        }
                         _ => json!({}),
                     };
-                    Json(answer)
+                    axum::Json(answer).into_response()
                 }
             }),
         );
@@ -640,17 +844,58 @@ mod tests {
         (url, calls)
     }
 
-    /// Missing connections and secrets block before anything changes, each with its link; with
-    /// them all there, the version is built, the environment bound, then rolled out.
+    fn declarations(agents: bool) -> crate::discover::Declarations {
+        crate::discover::Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            digest: "test".into(),
+            agents: if agents {
+                vec![json!({"key": "triage", "name": "Triage"})]
+            } else {
+                Vec::new()
+            },
+            team: None,
+            users: Vec::new(),
+            groups: Vec::new(),
+            ontologies: spec(),
+        }
+    }
+
+    /// The calls that change something, in order.
+    fn changes(calls: &Calls) -> Vec<String> {
+        calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, _)| {
+                m.starts_with("Create")
+                    || m.starts_with("Set")
+                    || m == "Deploy"
+                    || m == "Apply dryRun=false"
+            })
+            .map(|(m, body)| match body["environmentId"].as_str() {
+                Some(env) => format!("{m} {env}"),
+                None => m.clone(),
+            })
+            .collect()
+    }
+
+    /// Missing connections and secrets block before anything changes, each with its link.
     #[tokio::test]
-    async fn preflight_blocks_with_links_then_builds_binds_and_rolls_out() {
+    async fn preflight_blocks_with_links_and_changes_nothing() {
         let repo = repository();
-        let (url, calls) = cloud(
-            json!({"connections": [{"id": "c1", "slug": "github/acme", "typeId": "github_app", "status": "ready"}]}),
-            json!({"secrets": []}),
-        )
+        let (url, calls) = cloud(World {
+            connections: json!({"connections": [{"id": "c1", "slug": "github/acme", "typeId": "github_app", "status": "ready"}]}),
+            secrets: json!({"secrets": []}),
+            ..Default::default()
+        })
         .await;
-        let actions = run(&args(url.clone(), repo.path()), &spec()).await.unwrap();
+        let actions = crate::deploy::ontologies_first(
+            &args(url.clone(), repo.path()),
+            &declarations(false),
+            false,
+        )
+        .await
+        .unwrap();
         let rendered = render(&actions, &url);
         assert!(
             rendered.contains("Connection linear/acme does not exist"),
@@ -668,57 +913,85 @@ mod tests {
             )),
             "{rendered}"
         );
-        let methods: Vec<String> = calls
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(m, _)| m.clone())
-            .collect();
-        assert!(
-            !methods
-                .iter()
-                .any(|m| m.starts_with("Create") || m.starts_with("Set") || m == "Deploy"),
-            "{methods:?}"
-        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
 
-        let (url, calls) = cloud(
-            json!({"connections": [
-                {"id": "c1", "slug": "github/acme", "typeId": "github_app", "status": "ready"},
-                {"id": "c2", "slug": "linear/acme", "typeId": "api_key", "status": "ready"}]}),
-            json!({"secrets": [{"id": "s-org", "name": "SHOP_PG_PASSWORD", "organization": true},
-                               {"id": "s-team", "name": "SHOP_PG_PASSWORD"}]}),
-        )
+    /// Agents blocked while the ontologies are fine: both are reported, and nothing changed (the
+    /// ontologies are not built ahead of agents that cannot be applied).
+    #[tokio::test]
+    async fn blocked_agents_leave_the_ontologies_untouched() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            agents_blocked: true,
+            ..Default::default()
+        })
         .await;
-        let actions = run(&args(url, repo.path()), &spec()).await.unwrap();
+        let actions = crate::deploy::ontologies_first(
+            &args(url.clone(), repo.path()),
+            &declarations(true),
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(actions.len(), 1, "{}", render(&actions, &url));
+        assert!(actions[0].message.contains("linear/other"));
+        assert!(
+            calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(m, _)| m == "Apply dryRun=true")
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// A dry run reads only.
+    #[tokio::test]
+    async fn a_dry_run_changes_nothing() {
+        let repo = repository();
+        let (url, calls) = cloud(World::default()).await;
+        let mut dry = args(url, repo.path());
+        dry.dry_run = true;
+        let actions = crate::deploy::ontologies_first(&dry, &declarations(true), true)
+            .await
+            .unwrap();
         assert!(actions.is_empty());
-        let calls = calls.lock().unwrap().clone();
-        let order: Vec<&str> = calls
-            .iter()
-            .map(|(m, _)| m.as_str())
-            .filter(|m| {
-                [
-                    "CreateVersion",
-                    "SetEnvironmentConnection",
-                    "SetEnvironmentSecretBinding",
-                    "Deploy",
-                ]
-                .contains(m)
-            })
-            .collect();
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// One version per ontology from the archive, then each environment bound and rolled out in
+    /// turn (accepted rebuilds passed along), the team's secret before the organization's.
+    #[tokio::test]
+    async fn builds_then_binds_and_rolls_out_one_environment_at_a_time() {
+        let repo = repository();
+        let (url, calls) = cloud(World::default()).await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        a.accept_rebuild = vec!["orders".into()];
+        assert!(
+            crate::deploy::ontologies_first(&a, &declarations(false), false)
+                .await
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(
-            order,
+            changes(&calls),
             [
                 "CreateVersion",
-                "SetEnvironmentConnection",
-                "SetEnvironmentConnection",
-                "SetEnvironmentSecretBinding",
-                "Deploy"
+                "SetEnvironmentConnection e1",
+                "SetEnvironmentConnection e1",
+                "SetEnvironmentSecretBinding e1",
+                "Deploy e1",
+                "SetEnvironmentConnection e2",
+                "SetEnvironmentConnection e2",
+                "SetEnvironmentSecretBinding e2",
+                "Deploy e2",
             ]
         );
+        let calls = calls.lock().unwrap().clone();
         let created = &calls.iter().find(|(m, _)| m == "CreateVersion").unwrap().1;
         assert_eq!(created["projectId"], "p1");
         assert!(!created["archive"].as_str().unwrap().is_empty());
-        // The team's own secret before the organization's of the same name.
         let secret = &calls
             .iter()
             .find(|(m, _)| m == "SetEnvironmentSecretBinding")
@@ -728,19 +1001,107 @@ mod tests {
             (secret["name"].as_str(), secret["secretId"].as_str()),
             (Some("PG_PASSWORD"), Some("s-team"))
         );
+        let deploy = &calls.iter().find(|(m, _)| m == "Deploy").unwrap().1;
+        assert_eq!(deploy["acceptRebuild"], json!(["orders"]));
+        // `--ontology shop`: docs was neither checked nor built.
+        assert!(
+            !calls
+                .iter()
+                .any(|(m, b)| m == "ListEnvironments" && b["projectId"] == "p2")
+        );
+    }
+
+    /// A failed rollout stops there and says what runs the new version and what does not.
+    #[tokio::test]
+    async fn a_failed_rollout_stops_and_reports_each_environment() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            failing: Some("e2"),
+            ..Default::default()
+        })
+        .await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        let error = format!(
+            "{:#}",
+            crate::deploy::ontologies_first(&a, &declarations(false), false)
+                .await
+                .unwrap_err()
+        );
+        assert!(error.contains("the rollout to staging failed"), "{error}");
+        assert!(error.contains("running version v1: production"), "{error}");
+        assert!(
+            error.contains("bound to it but not running it: staging"),
+            "{error}"
+        );
+        assert!(error.contains("the rollout broke"), "{error}");
+        assert_eq!(changes(&calls).last().unwrap(), "Deploy e2");
+    }
+
+    /// A version that does not declare what the spec binds stops before any binding.
+    #[tokio::test]
+    async fn a_version_without_the_specs_slots_binds_nothing() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            declared: json!(["github"]),
+            ..Default::default()
+        })
+        .await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        let error = format!(
+            "{:#}",
+            crate::deploy::ontologies_first(&a, &declarations(false), false)
+                .await
+                .unwrap_err()
+        );
+        assert!(
+            error.contains("production: the version declares no slot linear"),
+            "{error}"
+        );
+        assert_eq!(changes(&calls), ["CreateVersion"]);
+    }
+
+    /// Uncommitted changes refuse the deploy (before any version), unless allowed; an unknown
+    /// `--ontology` is refused.
+    #[tokio::test]
+    async fn a_dirty_tree_and_an_unknown_ontology_are_refused() {
+        let repo = repository();
+        std::fs::write(
+            repo.path().join("ontologies/shop/ontology.ts"),
+            "export default { changed: true };\n",
+        )
+        .unwrap();
+        let (url, calls) = cloud(World::default()).await;
+        let mut a = args(url, repo.path());
+        let error = crate::deploy::ontologies_first(&a, &declarations(false), false)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("uncommitted changes"), "{error}");
+        assert!(changes(&calls).is_empty());
+        a.ontology = vec!["nope".into()];
+        let error = crate::deploy::ontologies_first(&a, &declarations(false), false)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("--ontology nope"), "{error}");
+        a.ontology = vec!["shop".into()];
+        a.allow_dirty = true;
+        crate::deploy::ontologies_first(&a, &declarations(false), false)
+            .await
+            .unwrap();
     }
 
     /// A server without the ontology control plane (open-source Tilde) needs Tilde Cloud.
     #[tokio::test]
     async fn a_server_without_ontologies_needs_tilde_cloud() {
         let repo = repository();
-        let app = Router::new();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         tokio::spawn(async move {
-            let _ = axum::serve(listener, app).await;
+            let _ = axum::serve(listener, Router::new()).await;
         });
-        let actions = run(&args(url, repo.path()), &spec()).await.unwrap();
+        let (actions, plan) = prepare(&args(url, repo.path()), &spec()).await.unwrap();
+        assert!(plan.is_none());
         assert_eq!(actions.len(), 1);
         assert!(
             actions[0].message.contains("need Tilde Cloud"),

@@ -101,14 +101,10 @@ fn digest(value: &Value) -> String {
     hex::encode(&Sha256::digest(serde_json::to_vec(value).expect("JSON re-serialises"))[..16])
 }
 
-pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
-    let Some(url) = &args.url else {
-        bail!("--url (or TILDE_URL) is required");
-    };
-    let client = Client::new(url, args.api_key.clone())?;
-    let response = client
+async fn apply(client: &Client, request: wire::ApplyRequest) -> Result<wire::ApplyResponse> {
+    Ok(client
         .apply
-        .apply_with_options(request(args, declarations)?, crate::api::options())
+        .apply_with_options(request, crate::api::options())
         .await
         .map_err(|error| match error.code {
             connectrpc::ErrorCode::Unimplemented => anyhow::anyhow!(
@@ -116,7 +112,39 @@ pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
             ),
             _ => crate::api::failed("Apply", error),
         })?
-        .into_owned();
+        .into_owned())
+}
+
+/// The actions that would block applying the specs, from a dry run: `tilde deploy` asks before
+/// it changes anything (its ontologies included), so a blocked deploy changed nothing.
+pub async fn preflight(
+    args: &Deploy,
+    declarations: &Declarations,
+) -> Result<Vec<crate::ontology::Action>> {
+    let Some(url) = &args.url else {
+        bail!("--url (or TILDE_URL) is required");
+    };
+    let client = Client::new(url, args.api_key.clone())?;
+    let mut request = request(args, declarations)?;
+    request.dry_run = true;
+    let response = apply(&client, request).await?;
+    Ok(response
+        .required_actions
+        .into_iter()
+        .map(|a| crate::ontology::Action {
+            subject: a.subject,
+            message: a.message,
+            url: a.url,
+        })
+        .collect())
+}
+
+pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
+    let Some(url) = &args.url else {
+        bail!("--url (or TILDE_URL) is required");
+    };
+    let client = Client::new(url, args.api_key.clone())?;
+    let response = apply(&client, request(args, declarations)?).await?;
     if args.json {
         println!("{}", serde_json::to_string(&response)?);
     } else {
@@ -236,6 +264,7 @@ mod tests {
             only: None,
             ontology: Vec::new(),
             allow_dirty: false,
+            accept_rebuild: Vec::new(),
             dir: ".".into(),
         }
     }

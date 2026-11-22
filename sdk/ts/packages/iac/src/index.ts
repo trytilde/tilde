@@ -238,20 +238,18 @@ export type OntologyEnvironment<S extends OntologySlots = OntologySlots> = {
   secrets?: { readonly [name: string]: SecretRef };
 };
 /**
- * An ontology of the project (Tilde Cloud): its folder (`ontologies/<name>`) and, per environment,
- * its bindings. `tilde deploy` builds it into a version, binds each environment, rolls the
+ * An ontology of the project (Tilde Cloud), in the repository's `ontologies/<name>/`: per
+ * environment, its bindings. `tilde deploy` builds it into a version, binds each environment, rolls the
  * version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
  * its project's in Tilde.
  */
 export type Ontology<S extends OntologySlots = OntologySlots> = {
-  dir: string;
   environments: { readonly [environment: string]: OntologyEnvironment<S> };
 };
 export const ontology = <const S extends OntologySlots = OntologySlots>(
   spec: Ontology<S>,
 ): Ontology<S> => spec;
 const ontologyJson = (spec: Ontology) => ({
-  dir: spec.dir,
   environments: Object.fromEntries(
     Object.entries(spec.environments).map(([name, env]) => [
       name,

@@ -182,7 +182,6 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
     team: "factory",
     ontologies: {
       faro: ontology({
-        dir: "ontologies/faro",
         environments: {
           production: {
             slots: { github: github.ref("faroai", { type: "github_app" }), linear },
@@ -197,7 +196,6 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
   assert.deepEqual(project.agents, []);
   assert.deepEqual(project.ontologies, {
     faro: {
-      dir: "ontologies/faro",
       environments: {
         production: {
           slots: {
@@ -212,7 +210,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
   });
   assert.equal(github.ref("faroai").provider, "github");
   assert.throws(
-    () => defineProject({ ontologies: { Faro: ontology({ dir: "x", environments: {} }) } }),
+    () => defineProject({ ontologies: { Faro: ontology({ environments: {} }) } }),
     /lowercase/,
   );
 });
