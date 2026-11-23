@@ -1,5 +1,6 @@
 syntax = "proto3";
 package tilde.management.v1;
+import "tilde/types/v1/access.proto";
 import "tilde/types/v1/agent.proto";
 import "tilde/types/v1/deployment.proto";
 import "tilde/management/v1/deployments.proto";
@@ -60,6 +61,17 @@ message AgentSpec {
   repeated GroupSpec groups = 14;
   // Who may see or own the agent.
   repeated GrantSpec access = 15;
+  // The chat channels the agent answers on, and who may talk to it on each. Channels not named
+  // stay as they are; a channel is removed only by its own `delete`.
+  repeated ChannelSpec channels = 16;
+}
+// One chat channel: a channel connection assigned to the agent (it has one agent), or without
+// `connection` the agent's own Tilde chat, which every agent has and which cannot be deleted.
+message ChannelSpec {
+  optional ConnectionRef connection = 1;
+  // Absent keeps the channel's mode (a new assignment starts private).
+  optional tilde.types.v1.ChannelAccessMode access = 2;
+  bool delete = 3;
 }
 message InferenceAliasSpec { string alias = 1; ConnectionRef connection = 2; bool delete = 3; }
 // The agent's tools from one connection: exactly `tools` (a kept source's other tools are dropped).

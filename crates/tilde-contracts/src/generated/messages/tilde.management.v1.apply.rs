@@ -1666,6 +1666,16 @@ pub struct AgentSpec {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub access: ::buffa::alloc::vec::Vec<GrantSpec>,
+    /// The chat channels the agent answers on, and who may talk to it on each. Channels not named
+    /// stay as they are; a channel is removed only by its own `delete`.
+    ///
+    /// Field 16: `channels`
+    #[serde(
+        rename = "channels",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub channels: ::buffa::alloc::vec::Vec<ChannelSpec>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1688,6 +1698,7 @@ impl ::core::fmt::Debug for AgentSpec {
             .field("users", &self.users)
             .field("groups", &self.groups)
             .field("access", &self.access)
+            .field("channels", &self.channels)
             .finish()
     }
 }
@@ -1839,6 +1850,14 @@ impl ::buffa::Message for AgentSpec {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.channels {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1934,6 +1953,14 @@ impl ::buffa::Message for AgentSpec {
         for v in &self.access {
             ::buffa::types::put_len_delimited_header(
                 15u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.channels {
+            ::buffa::types::put_len_delimited_header(
+                16u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -2106,6 +2133,18 @@ impl ::buffa::Message for AgentSpec {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.access.push(elem);
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.channels.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2129,6 +2168,7 @@ impl ::buffa::Message for AgentSpec {
         self.users.clear();
         self.groups.clear();
         self.access.clear();
+        self.channels.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2159,6 +2199,209 @@ pub const __AGENT_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa:
     type_url: "type.googleapis.com/tilde.management.v1.AgentSpec",
     to_json: ::buffa::type_registry::any_to_json::<AgentSpec>,
     from_json: ::buffa::type_registry::any_from_json::<AgentSpec>,
+    is_wkt: false,
+};
+/// One chat channel: a channel connection assigned to the agent (it has one agent), or without
+/// `connection` the agent's own Tilde chat, which every agent has and which cannot be deleted.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChannelSpec {
+    /// Field 1: `connection`
+    #[serde(
+        rename = "connection",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub connection: ::buffa::MessageField<ConnectionRef, ::buffa::Inline<ConnectionRef>>,
+    /// Absent keeps the channel's mode (a new assignment starts private).
+    ///
+    /// Field 2: `access`
+    #[serde(
+        rename = "access",
+        with = "::buffa::json_helpers::opt_enum",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub access: ::core::option::Option<
+        ::buffa::EnumValue<super::super::types::v1::ChannelAccessMode>,
+    >,
+    /// Field 3: `delete`
+    #[serde(
+        rename = "delete",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delete: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChannelSpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChannelSpec")
+            .field("connection", &self.connection)
+            .field("access", &self.access)
+            .field("delete", &self.delete)
+            .finish()
+    }
+}
+impl ChannelSpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ChannelSpec";
+}
+impl ChannelSpec {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::access`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_access(
+        mut self,
+        value: impl Into<::buffa::EnumValue<super::super::types::v1::ChannelAccessMode>>,
+    ) -> Self {
+        self.access = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(ChannelSpec);
+impl ::buffa::MessageName for ChannelSpec {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "ChannelSpec";
+    const FULL_NAME: &'static str = "tilde.management.v1.ChannelSpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.ChannelSpec";
+}
+impl ::buffa::Message for ChannelSpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.connection.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.connection.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        if let Some(ref v) = self.access {
+            size += 1u64 + ::buffa::types::int32_encoded_len(v.to_i32()) as u64;
+        }
+        if self.delete {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.connection.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.connection.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.access {
+            ::buffa::types::put_int32_field(2u32, v.to_i32(), buf);
+        }
+        if self.delete {
+            ::buffa::types::put_bool_field(3u32, self.delete, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.connection.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.access = ::core::option::Option::Some(
+                    ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delete = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connection = ::buffa::MessageField::none();
+        self.access = ::core::option::Option::None;
+        self.delete = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChannelSpec {
+    const PROTO_FQN: &'static str = "tilde.management.v1.ChannelSpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChannelSpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANNEL_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.ChannelSpec",
+    to_json: ::buffa::type_registry::any_to_json::<ChannelSpec>,
+    from_json: ::buffa::type_registry::any_from_json::<ChannelSpec>,
     is_wkt: false,
 };
 #[derive(Clone, PartialEq, Default)]

@@ -26,6 +26,8 @@ enum Use {
     Sandbox,
     Egress(String),
     Signal(String),
+    /// A channel of the agent (by key): one agent per channel connection.
+    Channel(String),
 }
 struct Usage<'a> {
     reference: &'a m::ConnectionRef,
@@ -151,6 +153,28 @@ fn shape(request: &m::ApplyRequest, found: &mut Found) {
                 );
             }
         }
+        let mut channels = HashSet::new();
+        for channel in &agent.channels {
+            let slug = channel
+                .connection
+                .as_option()
+                .map_or("tilde", |c| c.slug.as_str());
+            let subject = format!("{key}/channels/{slug}");
+            if !channels.insert(slug) {
+                found.invalid(&subject, "The agent declares this channel twice");
+            }
+            if channel.delete && channel.connection.as_option().is_none() {
+                found.invalid(
+                    &subject,
+                    "Every agent has its Tilde chat; set its access to disabled instead",
+                );
+            }
+            if channel.access.is_some_and(|a| {
+                a.as_known() == Some(crate::proto::tilde::types::v1::ChannelAccessMode::Unspecified)
+            }) {
+                found.invalid(&subject, "Channel access is private, public or disabled");
+            }
+        }
         let mut routines = HashSet::new();
         for routine in &agent.routines {
             if !routines.insert(routine.name.trim()) {
@@ -232,6 +256,18 @@ fn usages(request: &m::ApplyRequest) -> Vec<Usage<'_>> {
                     subject: format!("sandbox {}/egress/{}", blueprint.name, egress.slug),
                     usage: Use::Egress(egress.config_json.clone()),
                     owner: Owner::Blueprint(&blueprint.name),
+                    team: None,
+                });
+            }
+        }
+        // A deleted channel still names its connection, which must resolve to unassign it.
+        for channel in &agent.channels {
+            if let Some(reference) = channel.connection.as_option() {
+                out.push(Usage {
+                    reference,
+                    subject: format!("{key}/channels/{}", reference.slug),
+                    usage: Use::Channel(key.clone()),
+                    owner: Owner::Agent(key),
                     team: None,
                 });
             }
@@ -451,6 +487,28 @@ pub(super) async fn check(
                             missing("trigger routines"),
                             catalog_url.clone(),
                         ),
+                    }
+                }
+                Use::Channel(_) if !details.channel_capable => found.push(
+                    Code::CapabilityMissing,
+                    subject,
+                    missing("be a chat channel"),
+                    catalog_url.clone(),
+                ),
+                Use::Channel(key) => {
+                    // A channel connection has one agent: another agent's stays theirs.
+                    let ours = existing.get(key.as_str()).map(|row| row.id);
+                    if let Some(other) = details.associated_agents.0.iter().find(|a| {
+                        a.capability == crate::connections::model::Capability::Channel
+                            && Some(a.id) != ours
+                    }) {
+                        found.invalid(
+                            subject,
+                            format!(
+                                "Connection {slug} is agent {}'s channel; a channel has one agent",
+                                other.name
+                            ),
+                        );
                     }
                 }
                 Use::Tools(_) if !details.tool_capable => found.push(

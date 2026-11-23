@@ -1831,8 +1831,8 @@ focused.
 
 An agent's registry configuration can be written in code (`@trytilde/iac` in open-source Tilde's
 SDK) and applied by `tilde deploy` through `ApplyService.Apply`, in every edition. A request
-carries agent specs: the agent's own fields, inference aliases, tool sources, a sandbox blueprint
-(environment and egress grants), routines and the deployment the customer already deployed (a
+carries agent specs: the agent's own fields, inference aliases, tool sources, chat channels, a
+sandbox blueprint (environment and egress grants), routines and the deployment the customer already deployed (a
 Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::apply` runs it:
 
 - Preflight reads only and lists every required action before anything is written, each with a
@@ -1840,6 +1840,11 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   that is not ready, of the wrong type or lacking a capability for its use, a tool or signal the
   connection does not offer (with the nearest name as a suggestion), an invalid spec, and
   missing permissions.
+- Channels (`chat::access::apply`): each names a channel connection, assigned to the agent (a
+  channel connection has one agent, so another agent's is refused in preflight), or without a
+  connection the agent's own Tilde chat, and optionally its access mode (`SetChannelAccess`'s
+  private, public or disabled; a new assignment starts private). A channel left out stays;
+  `delete` unassigns a connection, never the Tilde chat.
 - Then one transaction for every agent of the request, in dependency order: blueprints, then per
   agent its fields, aliases, tool sources, sandbox link, routines and deployment. A dry run runs
   the same writes and rolls back, so the plan is what an apply does.

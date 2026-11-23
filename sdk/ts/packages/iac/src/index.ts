@@ -91,6 +91,19 @@ export type Routine = {
 };
 export const routine = (spec: Routine): Routine => spec;
 
+/**
+ * A chat channel the agent answers on: a channel connection (`googleChat.ref("support")`), or
+ * without `connection` the agent's own Tilde chat, which every agent has. `access` is who may
+ * talk to it there: `private` (identities it allows), `public` (anyone the channel delivers) or
+ * `disabled`; absent keeps the channel's own (a new one starts private). Channels not named stay
+ * as they are; `delete: true` unassigns a connection.
+ */
+export type Channel = {
+  connection?: ConnectionRef;
+  access?: "private" | "public" | "disabled";
+  delete?: boolean;
+};
+
 /** A deployment the customer already deployed: Tilde registers it, it does not host it. */
 export type Deploy = { target: "gateway" | "sidecar" } | { target: "lambda"; functionArn: string };
 /** A Lambda function; a version-qualified ARN keeps the deployment fixed. */
@@ -116,6 +129,7 @@ export type Agent = {
   tools?: (ToolSelection | RemovedSource)[];
   sandbox?: Blueprint;
   routines?: Routine[];
+  channels?: Channel[];
   deploy?: Deploy;
   /**
    * Where the code `deploy` releases is, from the project's directory: an entry module, or a
@@ -370,6 +384,11 @@ export function defineAgent(spec: Agent): AgentSpec {
     ),
     ...(spec.sandbox ? { sandbox: blueprintJson(spec.sandbox) } : {}),
     routines: (spec.routines ?? []).map(routineJson),
+    channels: (spec.channels ?? []).map((channel) => ({
+      ...(channel.connection ? { connection: ref(channel.connection) } : {}),
+      ...(channel.access ? { access: `CHANNEL_ACCESS_MODE_${channel.access.toUpperCase()}` } : {}),
+      delete: channel.delete ?? false,
+    })),
     users: (spec.users ?? []).map(userJson),
     groups: (spec.groups ?? []).map(groupJson),
     access: (spec.access ?? []).map(grantJson),

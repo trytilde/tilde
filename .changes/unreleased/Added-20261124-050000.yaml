@@ -1,0 +1,3 @@
+kind: Added
+body: "Declarative apply sets an agent's chat channels: an agent spec's `channels` assigns channel connections (Slack, Google Chat and the rest) and sets each channel's access mode, the agent's own Tilde chat included. Preflight lists a missing channel connection with a link, and refuses one another agent has. A channel the spec leaves out stays; `delete` unassigns one."
+time: 2026-11-24T05:00:00+00:00

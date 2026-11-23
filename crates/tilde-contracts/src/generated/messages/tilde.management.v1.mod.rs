@@ -216,6 +216,7 @@ pub mod __buffa {
         reg.register_json_any(super::__APPLY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_REF_JSON_ANY);
         reg.register_json_any(super::__AGENT_SPEC_JSON_ANY);
+        reg.register_json_any(super::__CHANNEL_SPEC_JSON_ANY);
         reg.register_json_any(super::__INFERENCE_ALIAS_SPEC_JSON_ANY);
         reg.register_json_any(super::__TOOL_SOURCE_SPEC_JSON_ANY);
         reg.register_json_any(super::__BLUEPRINT_SPEC_JSON_ANY);
@@ -1072,6 +1073,10 @@ pub use self::__buffa::view::ConnectionRefOwnedView;
 pub use self::__buffa::view::AgentSpecView;
 #[doc(inline)]
 pub use self::__buffa::view::AgentSpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelSpecView;
+#[doc(inline)]
+pub use self::__buffa::view::ChannelSpecOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::InferenceAliasSpecView;
 #[doc(inline)]
