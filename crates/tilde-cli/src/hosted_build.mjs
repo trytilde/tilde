@@ -1,6 +1,8 @@
-// `tilde deploy`'s bundle of a Hosted agent (crates/tilde-cli/src/hosted.rs): esbuild's API with
-// text imports (`import prompt from "./x.md" with { type: "text" }`, which esbuild's own loaders
-// refuse) inlined as strings. Prints the bundle's exports as JSON.
+// Bundles a module with esbuild's API, text imports (`import prompt from "./x.md" with { type:
+// "text" }`, which esbuild's own loaders refuse) inlined as strings, and prints the bundle's
+// exports as JSON. `node hosted_build.mjs <esbuild main.js> <entry> <outfile> <banner>`: a Hosted
+// agent's bundle (crates/tilde-cli/src/hosted.rs); an empty outfile writes nothing and only reads
+// the module's exports.
 const [esbuildPath, entry, outfile, banner] = process.argv.slice(2);
 const { build } = await import(esbuildPath);
 const { readFile } = await import("node:fs/promises");
@@ -25,7 +27,8 @@ const result = await build({
   platform: "node",
   target: "node22",
   format: "esm",
-  outfile,
+  outfile: outfile || undefined,
+  write: Boolean(outfile),
   banner: { js: banner },
   metafile: true,
   logLevel: "warning",

@@ -722,6 +722,11 @@ mod tests {
             inside.releases["triage"]["prompts"][0]["name"],
             "triage:index.js"
         );
+        // A Hosted deployment is bundled from that folder and its code entry.
+        assert_eq!(
+            inside.sources["triage"],
+            (triage_dir.dir.clone(), "index.js".to_string())
+        );
 
         // A config-only repo declaring one remote agent, with a package whose `main` is missing:
         // not the agent's folder, so its spec is applied without a release (the reader is never

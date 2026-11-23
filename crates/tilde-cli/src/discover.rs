@@ -288,6 +288,9 @@ pub async fn releases(
         eprintln!("Agent {key}: reading its code in {}", project.dir.display());
         let read = self::declarations(project, &code_entry, false, false).await?;
         declarations.releases.insert(key.clone(), read.value);
+        declarations
+            .sources
+            .insert(key.clone(), (project.dir.clone(), code_entry));
         elsewhere.clear();
     }
     for key in elsewhere {
