@@ -454,11 +454,14 @@ mod tests {
             )
             .unwrap();
         }
-        // A stand-in declaration reader: each agent's prompt is named after its folder.
+        // An agent folder may hold its own tilde.config.ts: its code is still the package's.
+        std::fs::write(root.path().join("agents/triage/tilde.config.ts"), "").unwrap();
+        // A stand-in declaration reader: each agent's prompt is named after its folder and the
+        // module it read.
         let reader = root.path().join("reader.sh");
         std::fs::write(
             &reader,
-            "#!/bin/sh\necho '{\"prompts\": [{\"name\": \"'\"$(basename \"$PWD\")\"'\"}], \"skills\": [], \"tools\": []}'\n",
+            "#!/bin/sh\necho '{\"prompts\": [{\"name\": \"'\"$(basename \"$PWD\"):$1\"'\"}], \"skills\": [], \"tools\": []}'\n",
         )
         .unwrap();
         std::fs::set_permissions(&reader, std::os::unix::fs::PermissionsExt::from_mode(0o755))
@@ -487,8 +490,8 @@ mod tests {
         unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
         let request = super::request(&args("http://x".into()), &declarations).unwrap();
         let released = |i: usize| request.agents[i].deployment.as_option().unwrap().clone();
-        assert_eq!(released(0).declarations.prompts[0].name, "triage");
-        assert_eq!(released(1).declarations.prompts[0].name, "helper");
+        assert_eq!(released(0).declarations.prompts[0].name, "triage:index.js");
+        assert_eq!(released(1).declarations.prompts[0].name, "helper:index.js");
         assert_ne!(released(0).external_id, released(1).external_id);
         assert!(request.agents[2].deployment.as_option().is_none());
         assert!(request.agents[3].deployment.as_option().is_none());
