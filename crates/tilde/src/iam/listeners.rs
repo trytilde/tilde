@@ -104,6 +104,7 @@ pub fn management_router(
             agents.clone(),
             tools.clone(),
             deployments.clone(),
+            access.clone(),
             links,
         )))
         .merge({

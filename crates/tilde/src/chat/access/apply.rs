@@ -1,6 +1,7 @@
 //! Declarative apply of an agent's chat channels (see `crate::apply`): each spec assigns a channel
 //! connection to the agent, or names the agent's own Tilde chat, and sets who may talk to it
-//! there. A channel the spec does not name stays as it is; `delete` unassigns one.
+//! there. A channel the spec does not name stays as it is; `delete` unassigns one. Preflight has
+//! checked each mode against its provider and that no other agent has the connection.
 use crate::apply::{Change, Refs};
 use crate::connections::model::{Assignment, Capability};
 use crate::connections::service::Connections;
@@ -17,8 +18,11 @@ pub(crate) async fn channels(
     agent_key: &str,
     refs: &Refs,
     specs: &[m::ChannelSpec],
-) -> Result<Vec<Change>, Error> {
+) -> Result<(Vec<Change>, Vec<Uuid>), Error> {
     let mut changes = Vec::new();
+    // Connections whose access this apply tightened: their runs from identities no longer
+    // allowed are stopped once it commits (`Apply::apply`).
+    let mut tightened = Vec::new();
     for spec in specs {
         let (connection, slug) = match spec.connection.as_option() {
             Some(reference) => {
@@ -63,35 +67,39 @@ pub(crate) async fn channels(
                 change
             }
         };
-        // A new assignment starts private (the column's default).
-        let current = route.as_ref().map_or("private", |r| r.access_mode.as_str());
-        if let Some(mode) = spec.access.and_then(|mode| mode.as_known()) {
-            let wanted = match mode {
-                types::ChannelAccessMode::Private => "private",
-                types::ChannelAccessMode::Public => "public",
-                types::ChannelAccessMode::Disabled => "disabled",
-                types::ChannelAccessMode::Unspecified => {
-                    return Err(Error::Invalid(format!(
-                        "Channel {slug}: access is private, public or disabled"
-                    )));
-                }
-            };
-            if wanted != current {
-                let row = crate::connections::db::connection_get_one(tx, connection).await?;
-                let (provider, typ) = (row.provider_id, row.type_id);
-                if wanted == "private"
-                    && !crate::chat::providers::adapter(&provider, &typ)
-                        .is_some_and(|p| p.verification_supported() || p.attests_identities())
-                {
-                    return Err(Error::Invalid(format!(
-                        "Channel {slug}: {provider} supports public or disabled access only"
-                    )));
-                }
-                super::db::policy_execute(tx, connection, agent, wanted).await?;
-                change.field("access", current, wanted);
+        // A new assignment starts in its provider's default mode (GitHub's is disabled).
+        let current = match route {
+            Some(route) => route.access_mode,
+            None => {
+                super::db::route_opt(tx, connection, agent)
+                    .await?
+                    .ok_or(Error::Missing("Channel"))?
+                    .access_mode
+            }
+        };
+        let wanted = spec.access.and_then(|mode| match mode.as_known() {
+            Some(types::ChannelAccessMode::Private) => Some("private"),
+            Some(types::ChannelAccessMode::Public) => Some("public"),
+            Some(types::ChannelAccessMode::Disabled) => Some("disabled"),
+            _ => None,
+        });
+        if let Some(wanted) = wanted.filter(|wanted| *wanted != current) {
+            super::db::policy_execute(tx, connection, agent, wanted).await?;
+            change.field("access", &current, wanted);
+            if rank(wanted) < rank(&current) {
+                tightened.push(connection);
             }
         }
         changes.push(change);
     }
-    Ok(changes)
+    Ok((changes, tightened))
+}
+
+/// How open a mode is: moving to a lower rank tightens access.
+fn rank(mode: &str) -> u8 {
+    match mode {
+        "public" => 2,
+        "private" => 1,
+        _ => 0,
+    }
 }
