@@ -69,7 +69,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT COALESCE(SUM(cost_micros),0)::BIGINT AS cost_micros FROM inference_requests WHERE agent_id IS NULL AND memory_bank_id IS NOT DISTINCT FROM $1 AND created_at >= date_trunc('month', NOW())",
+        "SELECT COALESCE(SUM(cost_micros),0)::BIGINT AS cost_micros FROM inference_requests WHERE agent_id IS NULL AND memory_bank_id = $1 AND created_at >= date_trunc('month', NOW())",
         None,
     )
 }
@@ -84,7 +84,7 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient>(
         &'s self,
         client: &'c C,
-        bank: &'a Option<uuid::Uuid>,
+        bank: &'a uuid::Uuid,
     ) -> I64Query<'c, 'a, 's, C, i64, 1> {
         I64Query {
             client,

@@ -328,7 +328,10 @@ pub async fn memory_people_all(db: &impl GenericClient, bank: Uuid) -> DbResult<
     Ok(q::memory_people::run().bind(db, &bank).all().await?)
 }
 pub async fn spend_month_one(db: &impl GenericClient, bank: Option<Uuid>) -> DbResult<i64> {
-    Ok(q::spend_month::run().bind(db, &bank).one().await?)
+    Ok(match bank {
+        Some(bank) => q::spend_bank::run().bind(db, &bank).one().await?,
+        None => q::spend_embedding::run().bind(db).one().await?,
+    })
 }
 pub async fn settings_get_opt(db: &impl GenericClient) -> DbResult<Option<SettingsRow>> {
     Ok(q::settings_get::run().bind(db).opt().await?)

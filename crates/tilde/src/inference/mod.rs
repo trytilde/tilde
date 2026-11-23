@@ -174,13 +174,6 @@ pub enum Payer<'a> {
     Bank(Uuid),
     Organization,
 }
-async fn record_own(
-    pool: &crate::database::Pool,
-    record: &audit::Record,
-) -> Result<(), crate::database::DbError> {
-    db::requests_insert_execute(&pool.get().await?, &[record]).await?;
-    Ok(())
-}
 /// Where a call Tilde makes itself is recorded, and who pays for it.
 #[derive(Clone, Copy)]
 pub struct Bill<'a> {
@@ -280,7 +273,11 @@ impl Upstream {
         };
         let record = audit::Record::own(call, bill.payer, status.as_u16(), started, &text);
         // Best effort, like the gateway's accounting: a lost record never fails the call.
-        if let Err(error) = record_own(bill.pool, &record).await {
+        let recorded = async {
+            let db = bill.pool.get().await?;
+            db::requests_insert_execute(&db, &[&record]).await
+        };
+        if let Err(error) = recorded.await {
             tracing::warn!(%error, "Usage of an inference call Tilde made was not recorded");
         }
         if !status.is_success() {
