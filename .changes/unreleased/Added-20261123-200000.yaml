@@ -1,3 +1,0 @@
-kind: Added
-body: "`tilde deploy --check` builds a project's ontologies as a deploy would (evaluates each, has Tilde compile it, bundles its handler module and builds its spaces against the returned contract) and stops: nothing is uploaded or changed, and the working tree may be dirty. It needs only the npm packages and Tilde's compile RPC, so a project's CI can check its ontology without any server-side binary."
-time: 2026-11-23T20:00:00+00:00
