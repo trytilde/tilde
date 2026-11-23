@@ -530,12 +530,20 @@ pub async fn prepare(
         eprint!("{}", plan_text(&client, &projects, &selected).await?);
         return Ok((Vec::new(), None));
     }
-    let (commit, branch) = head(&dir, args.allow_dirty)?;
+    // A check uploads nothing, so it builds the working tree as it is.
+    let (commit, branch) = match args.check {
+        true => Default::default(),
+        false => head(&dir, args.allow_dirty)?,
+    };
     let mut artifacts = BTreeMap::new();
     for p in &projects {
         eprintln!("Ontology {}: building", p.name);
         let folder = dir.join("ontologies").join(&p.name);
         artifacts.insert(p.name.clone(), build(&client, p, &folder).await?);
+    }
+    if args.check {
+        eprintln!("Checked (nothing deployed): each ontology compiles and builds");
+        return Ok((Vec::new(), None));
     }
     Ok((
         Vec::new(),
@@ -891,6 +899,7 @@ mod tests {
             external_id: None,
             label: None,
             dry_run: false,
+            check: false,
             team: None,
             json: false,
             only: None,
@@ -1184,6 +1193,38 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             .unwrap();
         assert!(actions.is_empty());
         assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// A check builds each ontology as a deploy would, compiling it on the server, from a dirty
+    /// tree, and changes nothing.
+    #[tokio::test]
+    async fn a_check_compiles_and_changes_nothing() {
+        let repo = repository();
+        std::fs::write(
+            repo.path().join("ontologies/shop/notes.ts"),
+            "// not committed\n",
+        )
+        .unwrap();
+        let (url, calls) = cloud(World::default()).await;
+        let mut check = args(url, repo.path());
+        check.check = true;
+        let actions = crate::deploy::ontologies_first(&check, &declarations(false), false)
+            .await
+            .unwrap();
+        assert!(actions.is_empty());
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+        let compiled = calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, _)| m == "CompileOntology")
+            .count();
+        assert_eq!(compiled, 2, "both ontologies compile");
+        assert!(
+            repo.path()
+                .join("ontologies/shop/.tilde/build/worker.js")
+                .is_file()
+        );
     }
 
     /// The plan shows each slot binding that changes, from what the environment has bound now,

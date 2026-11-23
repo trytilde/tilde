@@ -259,6 +259,7 @@ mod tests {
             external_id: None,
             label: None,
             dry_run: false,
+            check: false,
             team: None,
             json: false,
             only: None,
