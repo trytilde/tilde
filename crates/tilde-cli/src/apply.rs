@@ -115,44 +115,47 @@ async fn apply(client: &Client, request: wire::ApplyRequest) -> Result<wire::App
         .into_owned())
 }
 
-/// The server lists an ontology connection's tools from the running ontology, so before the
-/// project's ontologies roll out (a new environment's first above all) it can't say which a
-/// spec may name: for a project with ontologies those findings give way to `ontology_tools`,
-/// which checks the names against the compiled handlers.
-fn without_ontology_tools(actions: Vec<wire::RequiredAction>) -> Vec<wire::RequiredAction> {
-    actions
-        .into_iter()
-        .filter(|a| {
-            a.code.as_known() != Some(wire::RequiredActionCode::ToolNotOffered)
-                || !a.subject.contains("/tools/tilde_ontology/")
-        })
-        .collect()
-}
-
-/// Every tool an agent spec names on an ontology's connection (`tilde_ontology/...`) that the
-/// project's compiled ontologies don't serve. Nothing to check against without them (an
-/// ontology that does not compile, or `--ontology` choosing some).
-pub fn ontology_tools(
+/// The server lists an ontology connection's tools from the running ontology, so before this
+/// project's ontologies roll out (a new environment's first above all) it reports the tools it
+/// can't find there. With the project's compiled handlers at hand (`served`, from
+/// `ontology::prepare`), each such finding on a `tilde_ontology/...` connection gives way to a
+/// check of that source's tools against them. A connection whose tools the server did list (say,
+/// another project's running ontology) keeps the server's word. Without handlers (`--only
+/// agents`, `--ontology` choosing some, an ontology that does not compile) the server's findings
+/// stand as they are.
+pub(crate) fn with_ontology_tools(
+    actions: Vec<wire::RequiredAction>,
     declarations: &Declarations,
     served: &std::collections::BTreeSet<String>,
 ) -> Vec<wire::RequiredAction> {
     if served.is_empty() {
-        return Vec::new();
+        return actions;
     }
-    let mut found = Vec::new();
+    let unlisted = |a: &wire::RequiredAction| {
+        a.code.as_known() == Some(wire::RequiredActionCode::ToolNotOffered)
+            && a.subject.contains("/tools/tilde_ontology/")
+    };
+    let subjects: std::collections::BTreeSet<String> = actions
+        .iter()
+        .filter(|a| unlisted(a))
+        .map(|a| a.subject.clone())
+        .collect();
+    let mut kept: Vec<wire::RequiredAction> =
+        actions.into_iter().filter(|a| !unlisted(a)).collect();
     for agent in &declarations.agents {
         let key = agent["key"].as_str().unwrap_or_default();
         for source in agent["tools"].as_array().into_iter().flatten() {
             let slug = source["connection"]["slug"].as_str().unwrap_or_default();
-            if !slug.starts_with("tilde_ontology/") || source["delete"] == true {
+            let subject = format!("{key}/tools/{slug}");
+            if !subjects.contains(&subject) {
                 continue;
             }
             for name in source["tools"].as_array().into_iter().flatten() {
                 let name = name.as_str().unwrap_or_default();
                 if name != "*" && !served.contains(name) {
-                    found.push(wire::RequiredAction {
+                    kept.push(wire::RequiredAction {
                         code: wire::RequiredActionCode::ToolNotOffered.into(),
-                        subject: format!("{key}/tools/{slug}"),
+                        subject: subject.clone(),
                         message: format!("The project's ontologies serve no tool {name}"),
                         ..Default::default()
                     });
@@ -160,7 +163,7 @@ pub fn ontology_tools(
             }
         }
     }
-    found
+    kept
 }
 
 /// The actions that would block applying the specs, from a dry run: `tilde deploy` asks before
@@ -178,16 +181,16 @@ pub async fn preflight(
     let mut request = request(args, declarations)?;
     request.dry_run = true;
     let response = apply(&client, request).await?;
-    let mut actions = without_ontology_tools(response.required_actions);
-    actions.extend(ontology_tools(declarations, served));
-    Ok(actions
-        .into_iter()
-        .map(|a| crate::ontology::Action {
-            subject: a.subject,
-            message: a.message,
-            url: a.url,
-        })
-        .collect())
+    Ok(
+        with_ontology_tools(response.required_actions, declarations, served)
+            .into_iter()
+            .map(|a| crate::ontology::Action {
+                subject: a.subject,
+                message: a.message,
+                url: a.url,
+            })
+            .collect(),
+    )
 }
 
 /// Apply the specs. A dry run's plan checks the tools on the project's ontology connections
@@ -202,9 +205,8 @@ pub async fn run(
     };
     let client = Client::new(url, args.api_key.clone())?;
     let mut response = apply(&client, request(args, declarations)?).await?;
-    if args.dry_run && !declarations.ontologies.is_empty() {
-        let mut actions = without_ontology_tools(response.required_actions);
-        actions.extend(ontology_tools(declarations, served));
+    if args.dry_run && !served.is_empty() {
+        let actions = with_ontology_tools(response.required_actions, declarations, served);
         response.outcome = if actions.is_empty() {
             wire::ApplyOutcome::Planned
         } else {

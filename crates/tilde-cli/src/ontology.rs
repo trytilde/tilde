@@ -391,8 +391,9 @@ async fn compile(
     Ok((cli, runtime, ir, compiled))
 }
 
-/// The handlers of a compiled ontology (its contract's `contract.json`): the tools its
-/// `tilde_ontology` connection serves once it runs.
+/// The handlers of a compiled ontology (its contract's `contract.json`) that are tools: the ones
+/// its `tilde_ontology` connection serves once it runs (reads and actions; realtime views are
+/// not tools).
 fn handlers(compiled: &Value) -> Result<BTreeSet<String>> {
     let contract: Value = serde_json::from_str(
         compiled["contract"]["contract.json"]
@@ -403,6 +404,7 @@ fn handlers(compiled: &Value) -> Result<BTreeSet<String>> {
         .as_array()
         .into_iter()
         .flatten()
+        .filter(|h| h["kind"] != "realtime")
         .filter_map(|h| h["handler"].as_str().map(str::to_owned))
         .collect())
 }
@@ -1107,7 +1109,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                         "ListSecrets" => world.secrets.clone(),
                         "CompileOntology" => match &world.compile_errors {
                             Some(errors) => json!({"errors": errors}),
-                            None => json!({"errors": [], "contract": {"contract.json": r#"{"handlers": [{"handler": "listOrders", "kind": "read"}]}"#}}),
+                            None => json!({"errors": [], "contract": {"contract.json": r#"{"handlers": [{"handler": "listOrders", "kind": "read"}, {"handler": "watchOrders", "kind": "realtime"}]}"#}}),
                         },
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
                         "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"],
@@ -1138,7 +1140,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
     }
 
     /// A project whose agent `triage` uses `tools` of the shop ontology's connection.
-    fn with_ontology_tools(tools: &[&str]) -> crate::discover::Declarations {
+    fn agent_using(tools: &[&str]) -> crate::discover::Declarations {
         let mut d = declarations(true);
         d.agents = vec![json!({"key": "triage", "name": "Triage",
             "tools": [{"connection": {"slug": "tilde_ontology/shop"}, "tools": tools}]})];
@@ -1274,7 +1276,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         .await;
         let a = args(url, repo.path());
         let (actions, served) =
-            crate::deploy::ontologies_first(&a, &with_ontology_tools(&["listOrders"]), true)
+            crate::deploy::ontologies_first(&a, &agent_using(&["listOrders"]), true)
                 .await
                 .unwrap();
         assert!(actions.is_empty(), "{actions:?}");
@@ -1293,7 +1295,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         .await;
         let (actions, _) = crate::deploy::ontologies_first(
             &args(url, repo.path()),
-            &with_ontology_tools(&["listOrders", "listOrderz"]),
+            &agent_using(&["listOrders", "listOrderz"]),
             true,
         )
         .await
@@ -1304,6 +1306,79 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             "{actions:?}"
         );
         assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// The server's findings on ontology connections give way only where there are compiled
+    /// handlers to check against, and only for the connections it could not list: `--only agents
+    /// --dry-run` (no handlers) keeps them, a misspelling included; a connection whose tools the
+    /// server listed (another project's running ontology) is not checked here; a realtime view is
+    /// not a tool.
+    #[test]
+    fn ontology_tools_are_checked_only_against_what_was_compiled() {
+        let finding = |slug: &str| wire::RequiredAction {
+            code: wire::RequiredActionCode::ToolNotOffered.into(),
+            subject: format!("triage/tools/{slug}"),
+            message: format!("Connection {slug} offers no tool listOrderz"),
+            ..Default::default()
+        };
+        let mut declarations = agent_using(&["listOrderz"]);
+        let kept = crate::apply::with_ontology_tools(
+            vec![finding("tilde_ontology/shop")],
+            &declarations,
+            &BTreeSet::new(),
+        );
+        assert_eq!(kept.len(), 1);
+        assert!(
+            kept[0].message.contains("offers no tool listOrderz"),
+            "{kept:?}"
+        );
+
+        let served: BTreeSet<String> = ["listOrders".to_string()].into();
+        declarations.agents[0]["tools"] = json!([
+            {"connection": {"slug": "tilde_ontology/shop"}, "tools": ["listOrders", "watchOrders"]},
+            {"connection": {"slug": "tilde_ontology/other"}, "tools": ["theirTool"]},
+        ]);
+        let found = crate::apply::with_ontology_tools(
+            vec![finding("tilde_ontology/shop")],
+            &declarations,
+            &served,
+        );
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].subject, "triage/tools/tilde_ontology/shop");
+        assert!(
+            found[0].message.contains("serve no tool watchOrders"),
+            "{found:?}"
+        );
+    }
+
+    /// `--check` runs the agents' dry-run Apply too (with the compiled handlers), and changes
+    /// nothing.
+    #[tokio::test]
+    async fn a_check_runs_the_agents_dry_run_apply() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            ontology_unserved: true,
+            ..World::default()
+        })
+        .await;
+        let mut check = args(url, repo.path());
+        check.check = true;
+        let (actions, served) =
+            crate::deploy::ontologies_first(&check, &agent_using(&["listOrders"]), true)
+                .await
+                .unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(served.contains("listOrders") && !served.contains("watchOrders"));
+        let calls = calls.lock().unwrap().clone();
+        assert!(
+            calls.iter().any(|(m, _)| m == "Apply dryRun=true"),
+            "{calls:?}"
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|(m, _)| m == "Apply dryRun=false" || m == "Deploy" || m == "CreateVersion")
+        );
     }
 
     /// A check builds each ontology as a deploy would, compiling it on the server, from a dirty
