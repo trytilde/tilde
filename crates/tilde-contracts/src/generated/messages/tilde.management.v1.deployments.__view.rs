@@ -4991,6 +4991,621 @@ impl ::serde::Serialize for UploadDeploymentFileResponseOwnedView {
     }
 }
 #[derive(Clone, Debug, Default)]
+pub struct PublishHostedDeploymentRequestView<'a> {
+    /// Field 1: `agent_id`
+    pub agent_id: &'a str,
+    /// Field 2: `deployment_id`
+    pub deployment_id: &'a str,
+    /// Field 3: `bundle`
+    pub bundle: &'a [u8],
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for PublishHostedDeploymentRequestView<'a> {
+    type Owned = super::super::PublishHostedDeploymentRequest;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.agent_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.deployment_id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.bundle = ::buffa::types::borrow_bytes(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::PublishHostedDeploymentRequest,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::PublishHostedDeploymentRequest,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::PublishHostedDeploymentRequest {
+            agent_id: self.agent_id.to_string(),
+            deployment_id: self.deployment_id.to_string(),
+            bundle: (self.bundle).to_vec(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for PublishHostedDeploymentRequestView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.agent_id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.agent_id) as u64;
+        }
+        if !self.deployment_id.is_empty() {
+            size
+                += 1u64 + ::buffa::types::string_encoded_len(&self.deployment_id) as u64;
+        }
+        if !self.bundle.is_empty() {
+            size += 1u64 + ::buffa::types::bytes_encoded_len(&self.bundle) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.agent_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.agent_id, buf);
+        }
+        if !self.deployment_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.deployment_id, buf);
+        }
+        if !self.bundle.is_empty() {
+            ::buffa::types::put_shared_bytes_field(3u32, &self.bundle, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for PublishHostedDeploymentRequestView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.agent_id) {
+            __map.serialize_entry("agentId", self.agent_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.deployment_id) {
+            __map.serialize_entry("deploymentId", self.deployment_id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_bytes(self.bundle) {
+            __map
+                .serialize_entry(
+                    "bundle",
+                    &::buffa::json_helpers::BytesJson(self.bundle),
+                )?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for PublishHostedDeploymentRequestView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "PublishHostedDeploymentRequest";
+    const FULL_NAME: &'static str = "tilde.management.v1.PublishHostedDeploymentRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PublishHostedDeploymentRequest";
+}
+::buffa::impl_default_view_instance!(PublishHostedDeploymentRequestView);
+::buffa::impl_view_reborrow!(PublishHostedDeploymentRequestView);
+/** Self-contained, `'static` owned view of a `PublishHostedDeploymentRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishHostedDeploymentRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishHostedDeploymentRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct PublishHostedDeploymentRequestOwnedView(
+    ::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>>,
+);
+impl PublishHostedDeploymentRequestOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentRequestOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::PublishHostedDeploymentRequest,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`PublishHostedDeploymentRequestView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &PublishHostedDeploymentRequestView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::PublishHostedDeploymentRequest {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `agent_id`
+    #[must_use]
+    pub fn agent_id(&self) -> &'_ str {
+        self.0.reborrow().agent_id
+    }
+    /// Field 2: `deployment_id`
+    #[must_use]
+    pub fn deployment_id(&self) -> &'_ str {
+        self.0.reborrow().deployment_id
+    }
+    /// Field 3: `bundle`
+    #[must_use]
+    pub fn bundle(&self) -> &'_ [u8] {
+        self.0.reborrow().bundle
+    }
+}
+impl ::core::convert::From<
+    ::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>>,
+> for PublishHostedDeploymentRequestOwnedView {
+    fn from(
+        inner: ::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>>,
+    ) -> Self {
+        PublishHostedDeploymentRequestOwnedView(inner)
+    }
+}
+impl ::core::convert::From<PublishHostedDeploymentRequestOwnedView>
+for ::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>> {
+    fn from(wrapper: PublishHostedDeploymentRequestOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<
+    ::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>>,
+> for PublishHostedDeploymentRequestOwnedView {
+    fn as_ref(
+        &self,
+    ) -> &::buffa::OwnedView<PublishHostedDeploymentRequestView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::PublishHostedDeploymentRequest {
+    type View<'a> = PublishHostedDeploymentRequestView<'a>;
+    type ViewHandle = PublishHostedDeploymentRequestOwnedView;
+}
+impl ::serde::Serialize for PublishHostedDeploymentRequestOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub struct PublishHostedDeploymentResponseView<'a> {
+    /// Field 1: `deployment`
+    pub deployment: ::buffa::MessageFieldView<
+        super::super::super::super::types::v1::__buffa::view::AgentDeploymentView<'a>,
+    >,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for PublishHostedDeploymentResponseView<'a> {
+    type Owned = super::super::PublishHostedDeploymentResponse;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.deployment.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.deployment = ::buffa::MessageFieldView::set(
+                            <super::super::super::super::types::v1::__buffa::view::AgentDeploymentView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<
+        super::super::PublishHostedDeploymentResponse,
+        ::buffa::DecodeError,
+    > {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<
+        super::super::PublishHostedDeploymentResponse,
+        ::buffa::DecodeError,
+    > {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::PublishHostedDeploymentResponse {
+            deployment: match self.deployment.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::super::super::types::v1::AgentDeployment,
+                        ::buffa::Inline<
+                            super::super::super::super::types::v1::AgentDeployment,
+                        >,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for PublishHostedDeploymentResponseView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if self.deployment.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.deployment.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.deployment.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                1u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.deployment.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for PublishHostedDeploymentResponseView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        {
+            if let ::core::option::Option::Some(__v) = self.deployment.as_option() {
+                __map.serialize_entry("deployment", __v)?;
+            }
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for PublishHostedDeploymentResponseView<'a> {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "PublishHostedDeploymentResponse";
+    const FULL_NAME: &'static str = "tilde.management.v1.PublishHostedDeploymentResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.PublishHostedDeploymentResponse";
+}
+::buffa::impl_default_view_instance!(PublishHostedDeploymentResponseView);
+::buffa::impl_view_reborrow!(PublishHostedDeploymentResponseView);
+/** Self-contained, `'static` owned view of a `PublishHostedDeploymentResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PublishHostedDeploymentResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PublishHostedDeploymentResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct PublishHostedDeploymentResponseOwnedView(
+    ::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>>,
+);
+impl PublishHostedDeploymentResponseOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentResponseOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::PublishHostedDeploymentResponse,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            PublishHostedDeploymentResponseOwnedView(
+                ::buffa::OwnedView::from_owned(msg)?,
+            ),
+        )
+    }
+    /// Borrow the full [`PublishHostedDeploymentResponseView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &PublishHostedDeploymentResponseView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::PublishHostedDeploymentResponse {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `deployment`
+    #[must_use]
+    pub fn deployment(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::super::super::types::v1::__buffa::view::AgentDeploymentView<'_>,
+    > {
+        &self.0.reborrow().deployment
+    }
+}
+impl ::core::convert::From<
+    ::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>>,
+> for PublishHostedDeploymentResponseOwnedView {
+    fn from(
+        inner: ::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>>,
+    ) -> Self {
+        PublishHostedDeploymentResponseOwnedView(inner)
+    }
+}
+impl ::core::convert::From<PublishHostedDeploymentResponseOwnedView>
+for ::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>> {
+    fn from(wrapper: PublishHostedDeploymentResponseOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<
+    ::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>>,
+> for PublishHostedDeploymentResponseOwnedView {
+    fn as_ref(
+        &self,
+    ) -> &::buffa::OwnedView<PublishHostedDeploymentResponseView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::PublishHostedDeploymentResponse {
+    type View<'a> = PublishHostedDeploymentResponseView<'a>;
+    type ViewHandle = PublishHostedDeploymentResponseOwnedView;
+}
+impl ::serde::Serialize for PublishHostedDeploymentResponseOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+#[derive(Clone, Debug, Default)]
 pub struct GetDeploymentContentsRequestView<'a> {
     /// Field 1: `agent_id`
     pub agent_id: &'a str,

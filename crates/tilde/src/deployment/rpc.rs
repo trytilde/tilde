@@ -25,6 +25,22 @@ pub fn sidecar_router(service: Deployments) -> axum::Router {
     )
 }
 impl DeploymentService for Rpc {
+    async fn publish_hosted_deployment<'a>(
+        &'a self,
+        _ctx: RequestContext,
+        r: ServiceRequest<'_, management::PublishHostedDeploymentRequest>,
+    ) -> ServiceResult<
+        impl connectrpc::Encodable<management::PublishHostedDeploymentResponse> + Send + use<'a>,
+    > {
+        let deployment = self
+            .0
+            .publish_hosted(id(r.agent_id)?, id(r.deployment_id)?, r.bundle)
+            .await?;
+        Response::ok(management::PublishHostedDeploymentResponse {
+            deployment: deployment.into(),
+            ..Default::default()
+        })
+    }
     async fn missing_deployment_files<'a>(
         &'a self,
         _ctx: RequestContext,

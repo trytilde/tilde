@@ -21,6 +21,11 @@ service DeploymentService {
   rpc UploadDeploymentFile(UploadDeploymentFileRequest) returns (UploadDeploymentFileResponse);
   // The prompt and skill versions and the bundled tools a deployment shipped.
   rpc GetDeploymentContents(GetDeploymentContentsRequest) returns (GetDeploymentContentsResponse) { option idempotency_level = NO_SIDE_EFFECTS; }
+  // Tilde Cloud only: publish a registered Hosted deployment's code. The bundle is a zip with
+  // `dist/index.mjs` exporting `handler` and the files the code reads beside it (`prompts/`,
+  // `skills/`). Tilde creates or updates the agent's function, publishes a version and routes the
+  // deployment to it. Publishing an already published deployment returns it unchanged.
+  rpc PublishHostedDeployment(PublishHostedDeploymentRequest) returns (PublishHostedDeploymentResponse);
 }
 message GetDeploymentRequest { string agent_id = 1; }
 message GetDeploymentResponse { tilde.types.v1.Deployment deployment = 1; repeated tilde.types.v1.AgentInstance instances = 2; repeated tilde.types.v1.AgentDeployment deployments = 3; }
@@ -60,6 +65,8 @@ message MissingDeploymentFilesRequest { string agent_id = 1; repeated string sha
 message MissingDeploymentFilesResponse { repeated string sha256 = 1; }
 message UploadDeploymentFileRequest { string agent_id = 1; bytes data = 2; }
 message UploadDeploymentFileResponse { string sha256 = 1; }
+message PublishHostedDeploymentRequest { string agent_id = 1; string deployment_id = 2; bytes bundle = 3; }
+message PublishHostedDeploymentResponse { tilde.types.v1.AgentDeployment deployment = 1; }
 message GetDeploymentContentsRequest { string agent_id = 1; string deployment_id = 2; }
 message DeploymentPrompt { string prompt_id = 1; string name = 2; tilde.types.v1.PromptVersion version = 3; }
 message DeploymentSkill { string skill_id = 1; string name = 2; string version_id = 3; uint32 number = 4; string description = 5; string origin = 6; }

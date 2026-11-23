@@ -126,6 +126,18 @@ pub type OwnedGetDeploymentContentsResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<PublishHostedDeploymentRequestView<'static>>`.
+pub type OwnedPublishHostedDeploymentRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PublishHostedDeploymentResponseView<'static>>`.
+pub type OwnedPublishHostedDeploymentResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::tilde::management::v1::GetDeploymentResponse>
 for crate::proto::tilde::management::v1::__buffa::view::GetDeploymentResponseView<'_> {
     fn encode(
@@ -576,6 +588,48 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::PublishHostedDeploymentResponse,
+>
+for crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::tilde::management::v1::PublishHostedDeploymentResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const DEPLOYMENT_SERVICE_SERVICE_NAME: &str = "tilde.management.v1.DeploymentService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -644,6 +698,12 @@ pub const DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the `PublishHostedDeployment` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const DEPLOYMENT_SERVICE_PUBLISH_HOSTED_DEPLOYMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.management.v1.DeploymentService/PublishHostedDeployment",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Server trait for DeploymentService.
 ///
 /// # Implementing handlers
@@ -947,6 +1007,32 @@ pub trait DeploymentService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Tilde Cloud only: publish a registered Hosted deployment's code. The bundle is a zip with
+    /// `dist/index.mjs` exporting `handler` and the files the code reads beside it (`prompts/`,
+    /// `skills/`). Tilde creates or updates the agent's function, publishes a version and routes the
+    /// deployment to it. Publishing an already published deployment returns it unchanged.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn publish_hosted_deployment<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::management::v1::PublishHostedDeploymentResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1301,6 +1387,35 @@ impl<S: DeploymentService> DeploymentServiceExt for S {
                 },
             )
             .with_spec(DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC)
+            .route_view(
+                DEPLOYMENT_SERVICE_SERVICE_NAME,
+                "PublishHostedDeployment",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.publish_hosted_deployment(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::management::v1::PublishHostedDeploymentResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DEPLOYMENT_SERVICE_PUBLISH_HOSTED_DEPLOYMENT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1419,6 +1534,12 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC),
+                )
+            }
+            "PublishHostedDeployment" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DEPLOYMENT_SERVICE_PUBLISH_HOSTED_DEPLOYMENT_SPEC),
                 )
             }
             _ => None,
@@ -1676,6 +1797,28 @@ impl<T: DeploymentService> ::connectrpc::Dispatcher for DeploymentServiceServer<
                         .await?
                         .encode::<
                             crate::proto::tilde::management::v1::GetDeploymentContentsResponse,
+                        >(format)
+                })
+            }
+            "PublishHostedDeployment" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+                    >::from_parts(&req, &body);
+                    svc.publish_hosted_deployment(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::management::v1::PublishHostedDeploymentResponse,
                         >(format)
                 })
             }
@@ -2299,6 +2442,51 @@ where
                 &self.transport,
                 &self.config,
                 DEPLOYMENT_SERVICE_GET_DEPLOYMENT_CONTENTS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the PublishHostedDeployment RPC. Sends a request to /tilde.management.v1.DeploymentService/PublishHostedDeployment.
+    pub async fn publish_hosted_deployment(
+        &self,
+        request: crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.publish_hosted_deployment_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PublishHostedDeployment RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn publish_hosted_deployment_with_options(
+        &self,
+        request: crate::proto::tilde::management::v1::PublishHostedDeploymentRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::management::v1::__buffa::view::PublishHostedDeploymentResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DEPLOYMENT_SERVICE_PUBLISH_HOSTED_DEPLOYMENT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

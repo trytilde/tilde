@@ -104,6 +104,9 @@ pub struct Declarations {
     pub code: std::collections::BTreeMap<String, String>,
     /// The declarations of each deploying agent's own code (`releases`), by key.
     pub releases: std::collections::BTreeMap<String, Value>,
+    /// Where each released agent's code is: its folder and entry module, by key. A Hosted
+    /// deployment's bundle is built from it.
+    pub sources: std::collections::BTreeMap<String, (std::path::PathBuf, String)>,
 }
 
 /// `allow_empty` is for `tilde dev`: an agent that declares no prompts, skills or tools is still
@@ -173,6 +176,7 @@ pub async fn declarations(
         ontologies,
         code,
         releases: Default::default(),
+        sources: Default::default(),
     })
 }
 
@@ -231,6 +235,9 @@ pub async fn releases(
         eprintln!("Agent {key}: reading its code in {}", code.dir.display());
         let read = self::declarations(&code, &entry, false, false).await?;
         declarations.releases.insert(key.clone(), read.value);
+        declarations
+            .sources
+            .insert(key.clone(), (code.dir.clone(), entry));
     }
     let entry_is_code = std::path::Path::new(entry).file_name() != Some("tilde.config.ts".as_ref());
     if entry_is_code {
@@ -250,6 +257,9 @@ pub async fn releases(
                 declarations
                     .releases
                     .insert(key.clone(), declarations.value.clone());
+                declarations
+                    .sources
+                    .insert(key.clone(), (project.dir.clone(), entry.to_owned()));
                 elsewhere.clear();
             }
             keys => bail!(
@@ -278,6 +288,9 @@ pub async fn releases(
         eprintln!("Agent {key}: reading its code in {}", project.dir.display());
         let read = self::declarations(project, &code_entry, false, false).await?;
         declarations.releases.insert(key.clone(), read.value);
+        declarations
+            .sources
+            .insert(key.clone(), (project.dir.clone(), code_entry));
         elsewhere.clear();
     }
     for key in elsewhere {

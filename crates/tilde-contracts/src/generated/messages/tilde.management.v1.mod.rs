@@ -110,6 +110,8 @@ pub mod __buffa {
         reg.register_json_any(super::__MISSING_DEPLOYMENT_FILES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPLOAD_DEPLOYMENT_FILE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPLOAD_DEPLOYMENT_FILE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_HOSTED_DEPLOYMENT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__PUBLISH_HOSTED_DEPLOYMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_DEPLOYMENT_CONTENTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__DEPLOYMENT_PROMPT_JSON_ANY);
         reg.register_json_any(super::__DEPLOYMENT_SKILL_JSON_ANY);
@@ -649,6 +651,14 @@ pub use self::__buffa::view::UploadDeploymentFileRequestOwnedView;
 pub use self::__buffa::view::UploadDeploymentFileResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::UploadDeploymentFileResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishHostedDeploymentRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishHostedDeploymentRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishHostedDeploymentResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PublishHostedDeploymentResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetDeploymentContentsRequestView;
 #[doc(inline)]

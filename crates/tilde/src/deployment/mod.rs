@@ -482,6 +482,18 @@ impl Deployments {
         }
         Ok(Registered::Created(id, token))
     }
+    /// Publish a registered Hosted deployment's code bundle (Tilde Cloud).
+    pub async fn publish_hosted(
+        &self,
+        agent: Uuid,
+        deployment: Uuid,
+        bundle: &[u8],
+    ) -> Result<types::AgentDeployment, Error> {
+        let _ = (agent, deployment, bundle);
+        Err(Error::Invalid(
+            "Hosted deployments need Tilde Cloud and a code bundle".into(),
+        ))
+    }
     /// The prompt and skill versions and the bundled tools a deployment shipped.
     pub async fn contents(
         &self,

@@ -2839,10 +2839,11 @@ impl ::serde::Serialize for ToolSourceSpecOwnedView {
 pub struct BlueprintSpecView<'a> {
     /// Field 1: `name`
     pub name: &'a str,
-    /// An E2B or Modal connection.
+    /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
-    /// Field 2: `provider`
-    pub provider: ::buffa::MessageFieldView<
+    /// Field 2: `connection`
+    pub connection: ::buffa::MessageFieldView<
         super::super::__buffa::view::ConnectionRefView<'a>,
     >,
     /// Field 3: `template`
@@ -2908,12 +2909,12 @@ impl<'a> ::buffa::MessageView<'a> for BlueprintSpecView<'a> {
                 )?;
                 let __sub_ctx = ctx.descend()?;
                 let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                match view.provider.as_mut() {
+                match view.connection.as_mut() {
                     Some(existing) => {
                         ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
                     }
                     None => {
-                        view.provider = ::buffa::MessageFieldView::set(
+                        view.connection = ::buffa::MessageFieldView::set(
                             <super::super::__buffa::view::ConnectionRefView as ::buffa::MessageView>::decode_view_ctx(
                                 sub,
                                 __sub_ctx,
@@ -3046,7 +3047,7 @@ impl<'a> ::buffa::MessageView<'a> for BlueprintSpecView<'a> {
         let _ = __buffa_src;
         ::core::result::Result::Ok(super::super::BlueprintSpec {
             name: self.name.to_string(),
-            provider: match self.provider.as_option() {
+            connection: match self.connection.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
                         super::super::ConnectionRef,
@@ -3095,9 +3096,9 @@ impl<'a> ::buffa::ViewEncode<'a> for BlueprintSpecView<'a> {
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
         }
-        if self.provider.is_set() {
+        if self.connection.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.provider.compute_size(__cache);
+            let inner_size = self.connection.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -3154,13 +3155,13 @@ impl<'a> ::buffa::ViewEncode<'a> for BlueprintSpecView<'a> {
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.name, buf);
         }
-        if self.provider.is_set() {
+        if self.connection.is_set() {
             ::buffa::types::put_len_delimited_header(
                 2u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.provider.write_to(__cache, buf);
+            self.connection.write_to(__cache, buf);
         }
         if !self.template.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.template, buf);
@@ -3238,8 +3239,8 @@ impl<'__a> ::serde::Serialize for BlueprintSpecView<'__a> {
             __map.serialize_entry("name", self.name)?;
         }
         {
-            if let ::core::option::Option::Some(__v) = self.provider.as_option() {
-                __map.serialize_entry("provider", __v)?;
+            if let ::core::option::Option::Some(__v) = self.connection.as_option() {
+                __map.serialize_entry("connection", __v)?;
             }
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.template) {
@@ -3376,14 +3377,15 @@ impl BlueprintSpecOwnedView {
     pub fn name(&self) -> &'_ str {
         self.0.reborrow().name
     }
-    /// An E2B or Modal connection.
+    /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
-    /// Field 2: `provider`
+    /// Field 2: `connection`
     #[must_use]
-    pub fn provider(
+    pub fn connection(
         &self,
     ) -> &::buffa::MessageFieldView<super::super::__buffa::view::ConnectionRefView<'_>> {
-        &self.0.reborrow().provider
+        &self.0.reborrow().connection
     }
     /// Field 3: `template`
     #[must_use]

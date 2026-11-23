@@ -2790,14 +2790,15 @@ pub struct BlueprintSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
-    /// An E2B or Modal connection.
+    /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
-    /// Field 2: `provider`
+    /// Field 2: `connection`
     #[serde(
-        rename = "provider",
+        rename = "connection",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
-    pub provider: ::buffa::MessageField<ConnectionRef, ::buffa::Inline<ConnectionRef>>,
+    pub connection: ::buffa::MessageField<ConnectionRef, ::buffa::Inline<ConnectionRef>>,
     /// Field 3: `template`
     #[serde(
         rename = "template",
@@ -2840,7 +2841,7 @@ impl ::core::fmt::Debug for BlueprintSpec {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("BlueprintSpec")
             .field("name", &self.name)
-            .field("provider", &self.provider)
+            .field("connection", &self.connection)
             .field("template", &self.template)
             .field("reuse", &self.reuse)
             .field("timings", &self.timings)
@@ -2879,9 +2880,9 @@ impl ::buffa::Message for BlueprintSpec {
         if !self.name.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
         }
-        if self.provider.is_set() {
+        if self.connection.is_set() {
             let __slot = __cache.reserve();
-            let inner_size = self.provider.compute_size(__cache);
+            let inner_size = self.connection.compute_size(__cache);
             __cache.set(__slot, inner_size);
             size
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
@@ -2931,13 +2932,13 @@ impl ::buffa::Message for BlueprintSpec {
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.name, buf);
         }
-        if self.provider.is_set() {
+        if self.connection.is_set() {
             ::buffa::types::put_len_delimited_header(
                 2u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
-            self.provider.write_to(__cache, buf);
+            self.connection.write_to(__cache, buf);
         }
         if !self.template.is_empty() {
             ::buffa::types::put_string_field(3u32, &self.template, buf);
@@ -2995,7 +2996,7 @@ impl ::buffa::Message for BlueprintSpec {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::Message::merge_length_delimited(
-                    self.provider.get_or_insert_default(),
+                    self.connection.get_or_insert_default(),
                     buf,
                     ctx,
                 )?;
@@ -3059,7 +3060,7 @@ impl ::buffa::Message for BlueprintSpec {
     }
     fn clear(&mut self) {
         self.name.clear();
-        self.provider = ::buffa::MessageField::none();
+        self.connection = ::buffa::MessageField::none();
         self.template.clear();
         self.reuse = ::buffa::EnumValue::from(0);
         self.timings = ::buffa::MessageField::none();

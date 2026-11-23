@@ -458,7 +458,9 @@ impl ::buffa::Enumeration for DeploymentSource {
         ]
     }
 }
-/// Gateway agent servers and sidecars dial in. Lambda requires a function ARN.
+/// Gateway agent servers and sidecars dial in. Lambda requires a function ARN. Hosted (Tilde Cloud
+/// only) runs the agent's code on Tilde's own Lambda: registered first, then routable once
+/// `PublishHostedDeployment` has published its bundle as a function version (`target_reference`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum DeploymentTarget {
@@ -466,6 +468,7 @@ pub enum DeploymentTarget {
     DEPLOYMENT_TARGET_GATEWAY = 1i32,
     DEPLOYMENT_TARGET_SIDECAR = 2i32,
     DEPLOYMENT_TARGET_LAMBDA = 3i32,
+    DEPLOYMENT_TARGET_HOSTED = 4i32,
 }
 impl DeploymentTarget {
     ///Idiomatic alias for [`Self::DEPLOYMENT_TARGET_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -480,6 +483,9 @@ impl DeploymentTarget {
     ///Idiomatic alias for [`Self::DEPLOYMENT_TARGET_LAMBDA`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Lambda: Self = Self::DEPLOYMENT_TARGET_LAMBDA;
+    ///Idiomatic alias for [`Self::DEPLOYMENT_TARGET_HOSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Hosted: Self = Self::DEPLOYMENT_TARGET_HOSTED;
 }
 impl ::core::default::Default for DeploymentTarget {
     fn default() -> Self {
@@ -581,6 +587,7 @@ impl ::buffa::Enumeration for DeploymentTarget {
             1i32 => ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_GATEWAY),
             2i32 => ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_SIDECAR),
             3i32 => ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_LAMBDA),
+            4i32 => ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_HOSTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -593,6 +600,7 @@ impl ::buffa::Enumeration for DeploymentTarget {
             Self::DEPLOYMENT_TARGET_GATEWAY => "DEPLOYMENT_TARGET_GATEWAY",
             Self::DEPLOYMENT_TARGET_SIDECAR => "DEPLOYMENT_TARGET_SIDECAR",
             Self::DEPLOYMENT_TARGET_LAMBDA => "DEPLOYMENT_TARGET_LAMBDA",
+            Self::DEPLOYMENT_TARGET_HOSTED => "DEPLOYMENT_TARGET_HOSTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -609,6 +617,9 @@ impl ::buffa::Enumeration for DeploymentTarget {
             "DEPLOYMENT_TARGET_LAMBDA" => {
                 ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_LAMBDA)
             }
+            "DEPLOYMENT_TARGET_HOSTED" => {
+                ::core::option::Option::Some(Self::DEPLOYMENT_TARGET_HOSTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -618,6 +629,7 @@ impl ::buffa::Enumeration for DeploymentTarget {
             Self::DEPLOYMENT_TARGET_GATEWAY,
             Self::DEPLOYMENT_TARGET_SIDECAR,
             Self::DEPLOYMENT_TARGET_LAMBDA,
+            Self::DEPLOYMENT_TARGET_HOSTED,
         ]
     }
 }
@@ -1137,7 +1149,7 @@ pub struct AgentDeployment {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub traffic_weight: u32,
-    /// Registered Lambda, or a live/ready Gateway or Sidecar connection chain.
+    /// Registered Lambda, published Hosted, or a live/ready Gateway or Sidecar connection chain.
     ///
     /// Field 20: `routable`
     #[serde(
