@@ -1,3 +1,0 @@
-kind: Changed
-body: "`@trytilde/iac` connection refs accept names with spaces (`google_chat/Google Chat`), as the app lets people name connections; a name still cannot start or end with one."
-time: 2026-11-24T06:00:00+00:00
