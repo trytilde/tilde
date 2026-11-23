@@ -224,7 +224,7 @@ pub async fn releases(
         }
         let entry = match entry {
             Some(file) => file.to_string_lossy().into_owned(),
-            None => code.entry()?,
+            None => code.code_entry()?,
         };
         eprintln!("Agent {key}: reading its code in {}", code.dir.display());
         let read = self::declarations(&code, &entry, false, false).await?;

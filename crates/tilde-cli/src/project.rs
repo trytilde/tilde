@@ -59,12 +59,18 @@ impl Project {
     /// The module `tilde deploy` reads declarations from, relative to the project: its
     /// `tilde.config.ts`, else its package's entry.
     pub fn entry(&self) -> Result<String> {
+        if self.runtime == Runtime::Node && self.dir.join("tilde.config.ts").is_file() {
+            return Ok("tilde.config.ts".into());
+        }
+        self.code_entry()
+    }
+
+    /// The module the agent's code declares its prompts, skills and tools in: the package's
+    /// conventions, never its `tilde.config.ts` (an agent folder may hold both).
+    pub fn code_entry(&self) -> Result<String> {
         match self.runtime {
             // Mirrors the TypeScript CLI's own default order.
             Runtime::Node => {
-                if self.dir.join("tilde.config.ts").is_file() {
-                    return Ok("tilde.config.ts".into());
-                }
                 if let Some(main) = manifest_json(&self.dir)?
                     .get("main")
                     .and_then(Value::as_str)
