@@ -497,6 +497,24 @@ mod tests {
         assert!(request.agents[3].deployment.as_option().is_none());
         assert_eq!(request.agents[3].name, "Remote");
 
+        // From inside an agent's folder: its tilde.config.ts declares only it, and the folder's
+        // package is its code.
+        let triage_dir = crate::project::Project::find(&root.path().join("agents/triage")).unwrap();
+        let mut inside = Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            agents: vec![json!({"key": "triage", "name": "Triage", "deployment": gateway})],
+            ..Default::default()
+        };
+        unsafe { std::env::set_var("TILDE_DECLARATIONS", &reader) };
+        crate::discover::releases(&triage_dir, "tilde.config.ts", &mut inside)
+            .await
+            .unwrap();
+        unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
+        assert_eq!(
+            inside.releases["triage"]["prompts"][0]["name"],
+            "triage:index.js"
+        );
+
         // From the agent's own folder its entry is the release of the one agent without code.
         let mut own = Declarations {
             value: json!({"prompts": [{"name": "entry"}], "skills": [], "tools": []}),

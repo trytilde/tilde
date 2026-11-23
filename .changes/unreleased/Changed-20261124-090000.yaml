@@ -1,0 +1,3 @@
+kind: Changed
+body: "`tilde deploy` from an agent's own folder releases that agent's code: when the folder's `tilde.config.ts` declares only that agent, the folder's package is its code. `tilde dev`'s fallback command runs the package's code, never its `tilde.config.ts`."
+time: 2026-11-24T09:00:00+00:00
