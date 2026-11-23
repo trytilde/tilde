@@ -178,15 +178,22 @@ pub async fn declarations(
 
 /// Read each deploying agent's own code (`releases`): its `code` (an entry module, or a folder
 /// with its own package.json or pyproject.toml), else `agents/<key>/` when the project has that
-/// folder, from the project's directory. An agent with neither releases the entry's own
-/// declarations, the way `tilde deploy` from one agent's folder does (`apply::request`).
-pub async fn releases(project: &Project, declarations: &mut Declarations) -> Result<()> {
+/// folder, from the project's directory. When the entry is code rather than the project's
+/// `tilde.config.ts` (`tilde deploy` from one agent's folder), the one deploying agent with
+/// neither releases the entry's own declarations. Any other agent with neither has its code in
+/// another repository: its spec is applied, and its release is that repository's to register.
+pub async fn releases(
+    project: &Project,
+    entry: &str,
+    declarations: &mut Declarations,
+) -> Result<()> {
     let deploying: Vec<String> = declarations
         .agents
         .iter()
         .filter(|agent| agent.get("deployment").is_some())
         .filter_map(|agent| agent["key"].as_str().map(str::to_owned))
         .collect();
+    let mut elsewhere = Vec::new();
     for key in &deploying {
         let (path, explicit) = match declarations.code.get(key) {
             Some(code) => (project.dir.join(code), true),
@@ -196,6 +203,7 @@ pub async fn releases(project: &Project, declarations: &mut Declarations) -> Res
             if explicit {
                 bail!("Agent {key}: its code, {}, does not exist", path.display());
             }
+            elsewhere.push(key.clone());
             continue;
         }
         let (dir, entry) = match path.is_dir() {
@@ -221,6 +229,39 @@ pub async fn releases(project: &Project, declarations: &mut Declarations) -> Res
         eprintln!("Agent {key}: reading its code in {}", code.dir.display());
         let read = self::declarations(&code, &entry, false, false).await?;
         declarations.releases.insert(key.clone(), read.value);
+    }
+    let entry_is_code = std::path::Path::new(entry).file_name() != Some("tilde.config.ts".as_ref());
+    if entry_is_code {
+        let declares = ["prompts", "skills", "tools"].iter().any(|kind| {
+            declarations.value[kind]
+                .as_array()
+                .is_some_and(|items| !items.is_empty())
+        });
+        match &elsewhere[..] {
+            [] if declares => bail!(
+                "This entry declares prompts, skills or tools, but no exported agent declares \
+                 deploy without code of its own: add `deploy: gateway()` (or `lambda(arn)`, \
+                 `sidecar()`) to the agent whose code this is"
+            ),
+            [] => {}
+            [key] => {
+                declarations
+                    .releases
+                    .insert(key.clone(), declarations.value.clone());
+                elsewhere.clear();
+            }
+            keys => bail!(
+                "Agents {} declare deploy but have no code of their own, and this entry can be the \
+                 code of only one: put each in agents/<key>/, or name it with defineAgent({{ code }})",
+                keys.join(", ")
+            ),
+        }
+    }
+    for key in elsewhere {
+        eprintln!(
+            "Agent {key}: no code here (no agents/{key}/, no code), so its spec is applied and its \
+             release is registered from its own repository"
+        );
     }
     Ok(())
 }

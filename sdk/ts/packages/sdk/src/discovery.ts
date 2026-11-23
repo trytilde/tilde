@@ -316,9 +316,9 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
         throw new Error(`Ontology ${name} is declared twice differently (${origin})`);
       declarations.ontologies[name] = ontology;
     }
-    // The same agent exported twice (alone and in a project) is kept once.
+    // The same agent exported twice (alone and in a project) is kept once; its `code` counts.
     for (const agent of discovery.agents ?? []) {
-      const digest = canonicalJson(agent.json);
+      const digest = canonicalJson({ json: agent.json, code: agent.code ?? null });
       const previous = agents.get(agent.key);
       if (previous && previous.digest !== digest)
         throw new Error(

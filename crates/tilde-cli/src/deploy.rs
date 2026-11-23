@@ -140,10 +140,11 @@ pub async fn run(args: Deploy) -> Result<()> {
     };
     let mut declarations = discover::declarations(&project, &entry, false, true).await?;
     // The project's ontologies first (`ontology.rs`): build, bind, roll out; then its agents,
-    // each releasing its own code (`discover::releases`).
+    // each releasing its own code (`discover::releases`). `--check` registers no release, so it
+    // reads no agent's code: its dry-run Apply checks the specs.
     let only = args.only.as_deref();
-    if only != Some("ontologies") {
-        discover::releases(&project, &mut declarations).await?;
+    if only != Some("ontologies") && !args.check {
+        discover::releases(&project, &entry, &mut declarations).await?;
     }
     let specs = !declarations.agents.is_empty()
         || !declarations.users.is_empty()

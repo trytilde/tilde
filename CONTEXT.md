@@ -1908,11 +1908,14 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   (`code`, an entry module or a folder with its own manifest, else `agents/<key>/` from the
   project's directory) for its declarations (skill files inline), and the deployment gets an
   external ID (`--external-id`, the GitHub run, else a digest of what it deploys, so an unchanged
-  rerun registers nothing). One deploying agent without code of its own releases the entry's
-  declarations (`tilde deploy` from that agent's folder); two are refused. `--team`/`TILDE_TEAM`
+  rerun registers nothing). An agent with no code here (neither) has its code in another
+  repository: its spec is applied without a deployment, with a note. From an agent's folder (the
+  entry is code, not `tilde.config.ts`) the one deploying agent without code of its own releases
+  the entry's declarations; two are refused. `--check` reads no agent's code. `--team`/`TILDE_TEAM`
   overrides the project's team; `--dry-run` asks for the plan. It prints the plan or every
   required action with its link (relative links joined to the server URL) on stderr, a newly
-  registered dial-in deployment's token on stdout (several: a `<key> <token>` line each), or with
+  registered dial-in deployment's token on stdout (alone when the request has one deploying
+  agent, else a `<key> <token>` line each, however many were issued), or with
   `--json` the response. Exit codes: 0 applied or planned, 1 error, 2 blocked. Without agents it
   registers the deployment as before.
 - The response lists one `Change` per resource (create, update with before and after per field,

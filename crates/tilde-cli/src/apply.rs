@@ -30,52 +30,23 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
         bail!("--team {flag} differs from the team the code declares ({declared})");
     }
     let mut agents = declarations.agents.clone();
-    let deploying: Vec<usize> = agents
-        .iter()
-        .enumerate()
-        .filter(|(_, agent)| agent.get("deployment").is_some())
-        .map(|(i, _)| i)
-        .collect();
-    let declares = ["prompts", "skills", "tools"].iter().any(|kind| {
-        declarations.value[kind]
-            .as_array()
-            .is_some_and(|items| !items.is_empty())
-    });
-    // Each deploying agent releases its own code's declarations (`discover::releases`); the one
-    // without code of its own releases the entry's (`tilde deploy` from that agent's folder).
-    let without: Vec<usize> = deploying
-        .iter()
-        .copied()
-        .filter(|&i| {
-            !declarations
-                .releases
-                .contains_key(agents[i]["key"].as_str().unwrap_or_default())
-        })
-        .collect();
-    if without.len() > 1 {
-        let keys: Vec<&str> = without
-            .iter()
-            .map(|&i| agents[i]["key"].as_str().unwrap_or_default())
-            .collect();
-        bail!(
-            "Agents {} declare deploy but have no code of their own: put each in agents/<key>/, or name it with defineAgent({{ code }})",
-            keys.join(", ")
-        );
-    }
-    if declares && without.is_empty() {
-        bail!(
-            "This entry declares prompts, skills or tools, but no exported agent declares deploy \
-             without code of its own: add `deploy: gateway()` (or `lambda(arn)`, `sidecar()`) to \
-             the agent whose code this is"
-        );
+    // Each deploying agent releases its code's declarations (`discover::releases`); one without
+    // a release has its code elsewhere (or `--check` read none), so its spec is applied without
+    // a deployment rather than with an empty one.
+    let mut deploying = Vec::new();
+    for (i, agent) in agents.iter_mut().enumerate() {
+        let released = agent["key"]
+            .as_str()
+            .is_some_and(|key| declarations.releases.contains_key(key));
+        if released && agent.get("deployment").is_some() {
+            deploying.push(i);
+        } else if let Some(agent) = agent.as_object_mut() {
+            agent.remove("deployment");
+        }
     }
     for &i in &deploying {
         let key = agents[i]["key"].as_str().unwrap_or_default().to_owned();
-        let released = declarations
-            .releases
-            .get(&key)
-            .unwrap_or(&declarations.value)
-            .clone();
+        let released = declarations.releases[&key].clone();
         let deployment = agents[i]["deployment"]
             .as_object_mut()
             .context("deployment is an object")?;
@@ -227,7 +198,13 @@ pub async fn run(
         bail!("--url (or TILDE_URL) is required");
     };
     let client = Client::new(url, args.api_key.clone())?;
-    let mut response = apply(&client, request(args, declarations)?).await?;
+    let request = request(args, declarations)?;
+    let deploying = request
+        .agents
+        .iter()
+        .filter(|a| a.deployment.is_set())
+        .count();
+    let mut response = apply(&client, request).await?;
     if args.dry_run && !served.is_empty() {
         let actions = with_ontology_tools(response.required_actions, declarations, served);
         response.outcome = if actions.is_empty() {
@@ -247,19 +224,17 @@ pub async fn run(
         }) {
             eprintln!("Deployment {} already registered (no token)", change.key);
         }
-        // The dial-in deployments registered just now: one prints its token alone
-        // (`TOKEN=$(tilde deploy)`), several a `<key> <token>` line each (`--json` has them too).
-        let tokens: Vec<_> = response
+        // The dial-in deployments registered just now. A request with one deploying agent prints
+        // its token alone (`TOKEN=$(tilde deploy)`); with several, a `<key> <token>` line each,
+        // however many were issued this run (`--json` has them too).
+        for agent in response
             .agents
             .iter()
             .filter(|a| !a.deployment_token.is_empty())
-            .collect();
-        match &tokens[..] {
-            [one] => println!("{}", one.deployment_token),
-            several => {
-                for agent in several {
-                    println!("{} {}", agent.key, agent.deployment_token);
-                }
+        {
+            match deploying {
+                1 => println!("{}", agent.deployment_token),
+                _ => println!("{} {}", agent.key, agent.deployment_token),
             }
         }
     }
@@ -368,8 +343,7 @@ mod tests {
         }
     }
 
-    /// The one agent that deploys the entry carries its declarations and a content-derived
-    /// external ID, the project's team is sent, and the plan comes back rendered.
+    /// The deploying agent carries its release's declarations and a content-derived external ID, the project's team is sent, and the plan comes back rendered.
     #[tokio::test]
     async fn applies_discovered_specs_with_the_entrys_declarations() {
         let received: Arc<Mutex<Option<wire::ApplyRequest>>> = Arc::new(Mutex::new(None));
@@ -421,6 +395,11 @@ mod tests {
             users: vec![json!({"email": "ada@acme.test", "name": "Ada", "login": true})],
             groups: vec![json!({"name": "eng", "members": [{"email": "ada@acme.test"}]})],
             ontologies: Default::default(),
+            releases: [(
+                "triage".to_string(),
+                json!({"prompts": [], "skills": [], "tools": []}),
+            )]
+            .into(),
             ..Default::default()
         };
         // SAFETY: tests in this binary do not read these variables concurrently.
@@ -456,13 +435,15 @@ mod tests {
 
     /// A root `tilde deploy` releases every deploying agent's own code: each reads its folder
     /// (`agents/<key>/`, or its `code`), and each deployment carries those declarations and an
-    /// external ID of its own; two deploying agents without code of their own are refused.
+    /// external ID of its own. An agent with no code here keeps its spec and gets no deployment.
+    /// From one agent's folder (a code entry) the entry is that agent's release, and can be only
+    /// one agent's.
     #[tokio::test]
     async fn a_root_deploy_releases_each_agents_own_code() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(
             root.path().join("package.json"),
-            r#"{"name": "project", "main": "tilde.config.js"}"#,
+            r#"{"name": "project", "main": "index.js"}"#,
         )
         .unwrap();
         for dir in ["agents/triage", "code/helper"] {
@@ -494,12 +475,13 @@ mod tests {
                 json!({"key": "triage", "name": "Triage", "deployment": gateway}),
                 json!({"key": "helper", "name": "Helper", "deployment": gateway}),
                 json!({"key": "quiet", "name": "Quiet"}),
+                json!({"key": "remote", "name": "Remote", "deployment": gateway}),
             ],
             code: [("helper".to_string(), "code/helper".to_string())].into(),
             ..Default::default()
         };
         let project = crate::project::Project::find(root.path()).unwrap();
-        crate::discover::releases(&project, &mut declarations)
+        crate::discover::releases(&project, "tilde.config.ts", &mut declarations)
             .await
             .unwrap();
         unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
@@ -509,19 +491,45 @@ mod tests {
         assert_eq!(released(1).declarations.prompts[0].name, "helper");
         assert_ne!(released(0).external_id, released(1).external_id);
         assert!(request.agents[2].deployment.as_option().is_none());
+        assert!(request.agents[3].deployment.as_option().is_none());
+        assert_eq!(request.agents[3].name, "Remote");
 
-        declarations.releases.clear();
-        let error = super::request(&args("http://x".into()), &declarations).unwrap_err();
+        // From the agent's own folder its entry is the release of the one agent without code.
+        let mut own = Declarations {
+            value: json!({"prompts": [{"name": "entry"}], "skills": [], "tools": []}),
+            agents: vec![json!({"key": "remote", "name": "Remote", "deployment": gateway})],
+            ..Default::default()
+        };
+        crate::discover::releases(&project, "index.js", &mut own)
+            .await
+            .unwrap();
+        assert_eq!(own.releases["remote"]["prompts"][0]["name"], "entry");
+        own.agents
+            .push(json!({"key": "other", "name": "Other", "deployment": gateway}));
+        own.releases.clear();
+        let error = crate::discover::releases(&project, "index.js", &mut own)
+            .await
+            .unwrap_err();
         assert!(
             error
                 .to_string()
-                .contains("Agents triage, helper declare deploy"),
+                .contains("Agents remote, other declare deploy"),
+            "{error}"
+        );
+        own.agents.clear();
+        let error = crate::discover::releases(&project, "index.js", &mut own)
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("no exported agent declares deploy"),
             "{error}"
         );
     }
 
     #[test]
-    fn code_without_a_deploying_agent_and_flags_the_spec_owns_are_refused() {
+    fn flags_the_spec_owns_and_a_different_team_are_refused() {
         let declarations = |prompts: Value| Declarations {
             value: json!({"prompts": prompts, "skills": [], "tools": []}),
             digest: "test".into(),
@@ -532,17 +540,6 @@ mod tests {
             ontologies: Default::default(),
             ..Default::default()
         };
-        let error = super::request(
-            &args("http://x".into()),
-            &declarations(json!([{"name": "p"}])),
-        )
-        .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("no exported agent declares deploy"),
-            "{error}"
-        );
         // Specs without code declarations configure agents only.
         super::request(&args("http://x".into()), &declarations(json!([]))).unwrap();
         let mut other_team = args("http://x".into());
