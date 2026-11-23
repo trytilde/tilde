@@ -67,7 +67,10 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
       { connection: connection.ref("google_chat/support"), access: "private" },
       { connection: connection.ref("slack/old"), delete: true },
     ],
-    deploy: lambda("arn:aws:lambda:us-east-1:1:function:triage:3", "arn:aws:iam::1:role/tilde-invoke"),
+    deploy: lambda(
+      "arn:aws:lambda:us-east-1:1:function:triage:3",
+      "arn:aws:iam::1:role/tilde-invoke",
+    ),
   });
   assert.equal(agent[SPEC], "agent");
   // The server's own contract parses it: field names and enum values are right.
