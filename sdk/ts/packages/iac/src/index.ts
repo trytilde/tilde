@@ -51,7 +51,7 @@ export type Blueprint = {
   name: string;
   /**
    * The sandbox connection it launches through, like any connection: an E2B or Modal one, or on
-   * Tilde Cloud the team's own Tilde sandbox connection, `connection.ref("tilde_sandbox/tilde")`.
+   * Tilde Cloud the team's own Tilde sandbox connection, `connection.ref("tilde_sandbox/sandbox")`.
    */
   connection: ConnectionRef;
   /** The connection's template or image; on the Tilde sandbox connection one of {@link TildeSandboxImage}. */

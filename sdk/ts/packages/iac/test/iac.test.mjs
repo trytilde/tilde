@@ -238,7 +238,7 @@ test("a hosted agent on Tilde sandboxes is a spec the server accepts", () => {
     name: "Fixer",
     sandbox: blueprint({
       name: "fixer",
-      connection: connection.ref("tilde_sandbox/tilde"),
+      connection: connection.ref("tilde_sandbox/sandbox"),
       template: "debian-full",
     }),
     deploy: { target: "hosted" },
@@ -246,5 +246,5 @@ test("a hosted agent on Tilde sandboxes is a spec the server accepts", () => {
   const spec = fromJson(AgentSpecSchema, agent.json);
   assert.equal(spec.deployment?.target, 4);
   assert.equal(spec.deployment?.targetReference, undefined);
-  assert.equal(spec.sandbox?.connection?.slug, "tilde_sandbox/tilde");
+  assert.equal(spec.sandbox?.connection?.slug, "tilde_sandbox/sandbox");
 });

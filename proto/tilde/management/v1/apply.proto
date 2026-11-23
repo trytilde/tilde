@@ -83,7 +83,7 @@ message ToolSourceSpec { ConnectionRef connection = 1; repeated string tools = 2
 message BlueprintSpec {
   string name = 1;
   // The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
-  // sandbox connection `tilde_sandbox/tilde`.
+  // sandbox connection `tilde_sandbox/sandbox`.
   ConnectionRef connection = 2;
   string template = 3;
   SandboxReuse reuse = 4;

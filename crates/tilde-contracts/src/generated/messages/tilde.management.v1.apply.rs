@@ -2791,7 +2791,7 @@ pub struct BlueprintSpec {
     )]
     pub name: ::buffa::alloc::string::String,
     /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
-    /// sandbox connection `tilde_sandbox/tilde`.
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
     /// Field 2: `connection`
     #[serde(

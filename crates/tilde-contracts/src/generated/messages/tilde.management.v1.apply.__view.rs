@@ -2840,7 +2840,7 @@ pub struct BlueprintSpecView<'a> {
     /// Field 1: `name`
     pub name: &'a str,
     /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
-    /// sandbox connection `tilde_sandbox/tilde`.
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
     /// Field 2: `connection`
     pub connection: ::buffa::MessageFieldView<
@@ -3378,7 +3378,7 @@ impl BlueprintSpecOwnedView {
         self.0.reborrow().name
     }
     /// The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
-    /// sandbox connection `tilde_sandbox/tilde`.
+    /// sandbox connection `tilde_sandbox/sandbox`.
     ///
     /// Field 2: `connection`
     #[must_use]
