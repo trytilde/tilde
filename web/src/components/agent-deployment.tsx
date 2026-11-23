@@ -76,6 +76,7 @@ const targetLabels: Record<DeploymentTarget, string> = {
   [DeploymentTarget.GATEWAY]: "Gateway",
   [DeploymentTarget.SIDECAR]: "Sidecar",
   [DeploymentTarget.LAMBDA]: "Lambda",
+  [DeploymentTarget.HOSTED]: "Hosted by Tilde",
 };
 
 function shortCommit(sha: string, rows: RegisteredDeployment[] = []) {
