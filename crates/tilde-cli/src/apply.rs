@@ -243,6 +243,7 @@ pub async fn run(
         .iter()
         .filter(|a| a.deployment.is_set())
         .count();
+    let dial_in = dial_in(&request);
     let mut response = apply(&client, request).await?;
     if args.dry_run && !served.is_empty() {
         let actions = with_ontology_tools(response.required_actions, declarations, served);
@@ -256,7 +257,6 @@ pub async fn run(
     }
     // Each Hosted deployment serves once its code is published: Tilde makes it a version of the
     // agent's function. Publishing one that already serves changes nothing.
-    let hosted: std::collections::BTreeSet<String> = bundles.keys().cloned().collect();
     if response.outcome.as_known() == Some(wire::ApplyOutcome::Applied) {
         for agent in &response.agents {
             let Some(bundle) = bundles.remove(&agent.key) else {
@@ -289,7 +289,7 @@ pub async fn run(
         for agent in response
             .agents
             .iter()
-            .filter(|a| !a.deployment_token.is_empty() && !hosted.contains(&a.key))
+            .filter(|a| !a.deployment_token.is_empty() && dial_in.contains(&a.key))
         {
             match deploying {
                 1 => println!("{}", agent.deployment_token),
@@ -301,6 +301,22 @@ pub async fn run(
         std::process::exit(2);
     }
     Ok(())
+}
+
+/// The agents whose deployment is a dial-in host (gateway, sidecar): only they present a
+/// deployment token, so a Lambda or Hosted deployment's token is never printed.
+fn dial_in(request: &wire::ApplyRequest) -> std::collections::BTreeSet<String> {
+    use tilde_contracts::proto::tilde::types::v1::DeploymentTarget as T;
+    request
+        .agents
+        .iter()
+        .filter(|a| {
+            a.deployment
+                .as_option()
+                .is_some_and(|d| matches!(d.target.as_known(), Some(T::Gateway | T::Sidecar)))
+        })
+        .map(|a| a.key.clone())
+        .collect()
 }
 
 /// The plan for people: every create, update and removal with its fields, unchanged resources
@@ -818,6 +834,22 @@ mod tests {
         flagged.agent_id = Some("11111111-2222-4333-8444-555555555555".into());
         let error = super::request(&flagged, &declarations(json!([]))).unwrap_err();
         assert!(error.to_string().contains("--agent-id"), "{error}");
+    }
+
+    #[test]
+    fn only_dial_in_deployments_print_a_token() {
+        let request: wire::ApplyRequest = serde_json::from_value(json!({"agents": [
+            {"key": "chat", "name": "Chat", "deployment": {"target": "DEPLOYMENT_TARGET_GATEWAY"}},
+            {"key": "side", "name": "Side", "deployment": {"target": "DEPLOYMENT_TARGET_SIDECAR"}},
+            {"key": "fn", "name": "Fn", "deployment": {"target": "DEPLOYMENT_TARGET_LAMBDA", "targetReference": "arn:aws:lambda:us-east-1:1:function:f"}},
+            {"key": "hosted", "name": "Hosted", "deployment": {"target": "DEPLOYMENT_TARGET_HOSTED"}},
+            {"key": "spec", "name": "Spec"}
+        ]}))
+        .unwrap();
+        assert_eq!(
+            dial_in(&request).into_iter().collect::<Vec<_>>(),
+            ["chat", "side"]
+        );
     }
 
     #[test]
