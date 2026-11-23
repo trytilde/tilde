@@ -55,7 +55,8 @@ pub struct Deploy {
     /// Deploy only this ontology of the project (repeatable).
     #[arg(long)]
     pub ontology: Vec<String>,
-    /// Build HEAD's ontologies though the working tree has uncommitted changes (not included).
+    /// Deploy the ontologies though the working tree has uncommitted changes: they are built as
+    /// they are, and the version records HEAD's commit.
     #[arg(long)]
     pub allow_dirty: bool,
     /// An ontology model whose rebuild the rollout accepts (repeatable): a rollout that would
