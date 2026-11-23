@@ -1,0 +1,3 @@
+kind: Changed
+body: "`tilde deploy` bundles a Hosted agent's linked prompt and skill files with their content, and refuses a linked folder (or names a broken link) in `prompts/` or `skills/` with a clear message."
+time: 2026-11-24T14:17:00+00:00

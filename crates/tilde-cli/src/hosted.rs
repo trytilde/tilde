@@ -73,9 +73,19 @@ fn walk(root: &Path, prefix: &str) -> Result<Vec<(String, PathBuf)>> {
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
         let name = format!("{prefix}/{}", entry.file_name().to_string_lossy());
-        if entry.file_type()?.is_dir() {
+        let kind = entry.file_type()?;
+        if kind.is_symlink()
+            && std::fs::metadata(entry.path())
+                .with_context(|| format!("{name} is a broken link"))?
+                .is_dir()
+        {
+            // A linked folder could loop back on itself.
+            bail!("{name} links to a folder; a Hosted bundle takes linked files only");
+        }
+        if kind.is_dir() {
             files.extend(walk(&entry.path(), &name)?);
         } else {
+            // A linked file is bundled with the content it points to.
             files.push((name, entry.path()));
         }
     }

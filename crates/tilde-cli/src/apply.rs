@@ -517,6 +517,13 @@ mod tests {
         let code = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(code.path().join("prompts")).unwrap();
         std::fs::write(code.path().join("prompts/system.md"), "Fix bugs.").unwrap();
+        // A linked prompt is bundled with its content.
+        std::fs::write(code.path().join("shared.md"), "Be brief.").unwrap();
+        std::os::unix::fs::symlink(
+            code.path().join("shared.md"),
+            code.path().join("prompts/shared.md"),
+        )
+        .unwrap();
         std::fs::write(code.path().join("index.js"), "export const handler = 1;").unwrap();
         std::fs::create_dir_all(code.path().join("node_modules/@trytilde/sdk")).unwrap();
         std::fs::write(
@@ -648,8 +655,17 @@ mod tests {
         names.sort();
         assert_eq!(
             names,
-            ["dist/index.mjs", "package.json", "prompts/system.md"]
+            [
+                "dist/index.mjs",
+                "package.json",
+                "prompts/shared.md",
+                "prompts/system.md"
+            ]
         );
+        let mut shared = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name("prompts/shared.md").unwrap(), &mut shared)
+            .unwrap();
+        assert_eq!(shared, "Be brief.");
         let mut manifest = String::new();
         std::io::Read::read_to_string(&mut zip.by_name("package.json").unwrap(), &mut manifest)
             .unwrap();
