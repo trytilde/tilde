@@ -292,19 +292,24 @@ export const ontology = <const C extends OntologyConnections = OntologyConnectio
 ): Ontology<C> => spec;
 const ontologyJson = (spec: Ontology) => ({
   environments: Object.fromEntries(
-    Object.entries(spec.environments).map(([name, env]) => [
-      name,
-      {
-        connections: Object.fromEntries(
-          Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
-            connection ? [[name, ref(connection as ConnectionRef)]] : [],
+    Object.entries(spec.environments).map(([name, env]) => {
+      // A config loaded without type checking may still say `slots`: refuse it rather than drop it.
+      if ("slots" in env)
+        throw new Error(`ontology environment ${name}: "slots" is now "connections"`);
+      return [
+        name,
+        {
+          connections: Object.fromEntries(
+            Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
+              connection ? [[name, ref(connection as ConnectionRef)]] : [],
+            ),
           ),
-        ),
-        secrets: Object.fromEntries(
-          Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
-        ),
-      },
-    ]),
+          secrets: Object.fromEntries(
+            Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
+          ),
+        },
+      ];
+    }),
   ),
 });
 
