@@ -36,6 +36,11 @@ pub struct Deploy {
     /// them: ask the server for the plan and apply nothing.
     #[arg(long)]
     pub dry_run: bool,
+    /// Build the project's ontologies as a deploy would (evaluate each, compile it on the server,
+    /// bundle its handler module, build its spaces) and stop: nothing is uploaded or changed, and
+    /// the working tree may be dirty. The spaces' contract is left in their `node_modules`.
+    #[arg(long, conflicts_with = "dry_run")]
+    pub check: bool,
     /// The team new agents and blueprints belong to (Tilde Cloud). It must match the team the
     /// code declares (`defineProject`, `defineTeam`), if any.
     #[arg(long, env = "TILDE_TEAM")]
@@ -96,7 +101,7 @@ pub async fn ontologies_first(
     specs: bool,
 ) -> Result<Vec<crate::ontology::Action>> {
     let (mut actions, plan) = crate::ontology::prepare(args, &declarations.ontologies).await?;
-    if specs && args.only.is_none() && !args.dry_run {
+    if specs && args.only.is_none() && !args.dry_run && !args.check {
         actions.extend(crate::apply::preflight(args, declarations).await?);
     }
     if actions.is_empty()
@@ -119,6 +124,11 @@ pub async fn run(args: Deploy) -> Result<()> {
     let specs = !declarations.agents.is_empty()
         || !declarations.users.is_empty()
         || !declarations.groups.is_empty();
+    if args.check && declarations.ontologies.is_empty() {
+        bail!(
+            "--check builds a project's ontologies, and this one declares none (defineProject({{ ontologies }}))"
+        );
+    }
     if only != Some("agents") && !declarations.ontologies.is_empty() {
         let actions = ontologies_first(&args, &declarations, specs).await?;
         if !actions.is_empty() {
@@ -126,6 +136,9 @@ pub async fn run(args: Deploy) -> Result<()> {
             eprint!("{}", crate::ontology::render(&actions, base));
             std::process::exit(2);
         }
+    }
+    if args.check {
+        return Ok(());
     }
     let nothing_else = declarations.agents.is_empty()
         && declarations.users.is_empty()
