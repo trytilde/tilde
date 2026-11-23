@@ -74,7 +74,11 @@ fn walk(root: &Path, prefix: &str) -> Result<Vec<(String, PathBuf)>> {
         let entry = entry?;
         let name = format!("{prefix}/{}", entry.file_name().to_string_lossy());
         let kind = entry.file_type()?;
-        if kind.is_symlink() && std::fs::metadata(entry.path())?.is_dir() {
+        if kind.is_symlink()
+            && std::fs::metadata(entry.path())
+                .with_context(|| format!("{name} is a broken link"))?
+                .is_dir()
+        {
             // A linked folder could loop back on itself.
             bail!("{name} links to a folder; a Hosted bundle takes linked files only");
         }
