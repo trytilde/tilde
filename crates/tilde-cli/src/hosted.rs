@@ -2,11 +2,12 @@
 //! deploy` builds from an agent's code and publishes once the deployment is registered.
 //!
 //! The bundle is the layout the SDK's Lambda handler runs from: the entry module bundled by
-//! esbuild into one ES module at `dist/index.mjs` (which must export `handler`, as
-//! `export const handler = serve({ run })` does), `prompts/` and `skills/` copied beside it as
-//! the code reads them, and a `package.json` carrying the SDK's version, which the SDK reads from
-//! beside its module. esbuild is the project's own (`node_modules/.bin/esbuild`), else a pinned
-//! one through npx. Node.js code only.
+//! esbuild into one ES module at `dist/index.mjs`, which must export `handler`
+//! (`export const handler = createLambdaHandler({ run })`), with text imports of prompts inlined
+//! and imports of the project's own files (`../../connections.ts`) followed wherever they are;
+//! `prompts/` and `skills/` copied beside it for code that reads them from disk; and a
+//! `package.json` carrying the SDK's version, which the SDK reads from beside its module. esbuild
+//! is the project's own, else a pinned one installed for the build. Node.js code only.
 use crate::api::Client;
 use anyhow::{Context, Result, bail};
 use std::io::Write;
@@ -15,6 +16,7 @@ use std::process::Command;
 use tilde_contracts::proto::tilde::{management::v1 as wire, types::v1 as types};
 
 const ESBUILD: &str = "esbuild@0.25.12";
+const BUILD: &str = include_str!("hosted_build.mjs");
 /// What Tilde Cloud takes in one publish.
 const MAX_BUNDLE_BYTES: usize = 30 * 1024 * 1024;
 /// CommonJS dependencies inside an ES module bundle need `require`.
@@ -27,31 +29,29 @@ pub fn bundle(dir: &Path, entry: &str) -> Result<Vec<u8>> {
     }
     let out = tempfile::tempdir().context("A scratch directory for the bundle")?;
     let module = out.path().join("dist/index.mjs");
-    let esbuild = local_bin(dir, "esbuild");
-    let mut command = match &esbuild {
-        Some(path) => Command::new(path),
-        None => {
-            let mut npx = Command::new("npx");
-            npx.args(["--yes", ESBUILD]);
-            npx
-        }
-    };
-    let status = command
+    let esbuild = esbuild(dir, out.path())?;
+    let script = out.path().join("build.mjs");
+    std::fs::write(&script, BUILD)?;
+    let output = Command::new("node")
         .current_dir(dir)
+        .arg(&script)
+        .arg(&esbuild)
         .arg(entry)
-        .args([
-            "--bundle",
-            "--platform=node",
-            "--target=node22",
-            "--format=esm",
-            "--log-level=warning",
-        ])
-        .arg(format!("--outfile={}", module.display()))
-        .arg(format!("--banner:js={BANNER}"))
-        .status()
-        .context("Running esbuild (install it in the project, or Node.js for npx)")?;
-    if !status.success() {
+        .arg(&module)
+        .arg(BANNER)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .context("Running esbuild needs Node.js")?;
+    if !output.status.success() {
         bail!("esbuild could not bundle {entry}");
+    }
+    let exports: Vec<String> =
+        serde_json::from_slice(&output.stdout).context("esbuild reported no exports")?;
+    if !exports.iter().any(|name| name == "handler") {
+        bail!(
+            "{entry} exports no `handler`: a Hosted agent's module exports \
+             `export const handler = createLambdaHandler({{ run }})`"
+        );
     }
     let mut files = vec![("dist/index.mjs".to_owned(), module)];
     for folder in ["prompts", "skills"] {
@@ -102,11 +102,26 @@ fn zip(files: &[(String, PathBuf)]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// `node_modules/.bin/<name>` in `dir` or the nearest folder above it that has one.
-fn local_bin(dir: &Path, name: &str) -> Option<PathBuf> {
-    dir.ancestors()
-        .map(|d| d.join("node_modules/.bin").join(name))
-        .find(|p| p.is_file())
+/// esbuild's API module: the project's own (`node_modules/esbuild` in `dir` or above, as Node
+/// would resolve it), else a pinned one installed into `scratch`.
+fn esbuild(dir: &Path, scratch: &Path) -> Result<PathBuf> {
+    let main = |root: &Path| root.join("node_modules/esbuild/lib/main.js");
+    if let Some(found) = dir.ancestors().map(main).find(|p| p.is_file()) {
+        return Ok(found);
+    }
+    let prefix = scratch.join("esbuild");
+    std::fs::create_dir_all(&prefix)?;
+    std::fs::write(prefix.join("package.json"), "{\"private\":true}")?;
+    let status = Command::new("npm")
+        .args(["install", "--silent", "--no-audit", "--no-fund", "--prefix"])
+        .arg(&prefix)
+        .arg(ESBUILD)
+        .status()
+        .context("Installing esbuild needs npm (or add esbuild to the project)")?;
+    if !status.success() || !main(&prefix).is_file() {
+        bail!("Could not install {ESBUILD}");
+    }
+    Ok(main(&prefix))
 }
 /// The installed `@trytilde/sdk`'s version, as Node would resolve it from `dir`.
 fn sdk_version(dir: &Path) -> Option<String> {

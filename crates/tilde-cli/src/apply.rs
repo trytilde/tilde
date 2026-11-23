@@ -498,7 +498,6 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn a_hosted_agent_is_bundled_and_published_after_apply() {
-        use std::os::unix::fs::PermissionsExt;
         let code = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(code.path().join("prompts")).unwrap();
         std::fs::write(code.path().join("prompts/system.md"), "Fix bugs.").unwrap();
@@ -509,17 +508,17 @@ mod tests {
             r#"{"name": "@trytilde/sdk", "version": "9.9.9"}"#,
         )
         .unwrap();
-        // A stand-in esbuild: the "bundle" is the entry as it is.
-        let bin = code.path().join("node_modules/.bin");
-        std::fs::create_dir_all(&bin).unwrap();
+        // A stand-in esbuild API: the "bundle" is the entry as it is, exporting `handler`.
+        let esbuild = code.path().join("node_modules/esbuild/lib");
+        std::fs::create_dir_all(&esbuild).unwrap();
         std::fs::write(
-            bin.join("esbuild"),
-            "#!/bin/sh\nfor a in \"$@\"; do case $a in --outfile=*) out=${a#--outfile=};; --*) ;; *) in=$a;; esac; done\nmkdir -p \"$(dirname \"$out\")\" && cp \"$in\" \"$out\"\n",
+            esbuild.join("main.js"),
+            "import { cpSync, mkdirSync } from 'node:fs'; import { dirname } from 'node:path';\n\
+             export async function build(o) { mkdirSync(dirname(o.outfile), { recursive: true }); \
+             cpSync(o.entryPoints[0], o.outfile); \
+             return { metafile: { outputs: { [o.outfile]: { exports: ['handler'] } } } }; }\n",
         )
         .unwrap();
-        std::fs::set_permissions(bin.join("esbuild"), std::fs::Permissions::from_mode(0o755))
-            .unwrap();
-
         let applied: Arc<Mutex<Option<wire::ApplyRequest>>> = Arc::default();
         let published: Arc<Mutex<Option<wire::PublishHostedDeploymentRequest>>> = Arc::default();
         let proto = |message: Vec<u8>| ([(header::CONTENT_TYPE, "application/proto")], message);

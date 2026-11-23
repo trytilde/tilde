@@ -1359,8 +1359,9 @@ agent that declares nothing, while `deploy` still refuses an empty release.
 
 A Hosted deployment (`deploy: { target: "hosted" }`, or `--target hosted`; Tilde Cloud only) is code
 Tilde runs itself. `tilde deploy` bundles the agent's code with esbuild into the layout the SDK's
-Lambda handler runs from (`dist/index.mjs` exporting `handler`, `prompts/` and `skills/` beside it, a
-`package.json` with the SDK's version), folds the bundle's digest into the external ID so changed
+Lambda handler runs from (`dist/index.mjs`, which must export `handler = createLambdaHandler(...)`,
+with text imports of prompts inlined and the project's own files followed; `prompts/` and
+`skills/` beside it; a `package.json` with the SDK's version), folds the bundle's digest into the external ID so changed
 code is a new deployment, and once the deployment is registered publishes the bundle
 (`PublishHostedDeployment`). An open-source Tilde server refuses to publish.
 
