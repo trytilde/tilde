@@ -15,6 +15,7 @@ import { connections, memory } from "@/client";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { AgentStack, useAgentRegistry } from "./agent-stack";
 import { OwnerLink } from "./linked-agents";
+import { dollars } from "./inference-usage-chart";
 import { CatalogSearchField } from "./tool-catalog";
 import { message } from "./tool-connections";
 import { Button } from "@/components/ui/button";
@@ -352,6 +353,7 @@ type SettingsValues = { connectionId: string; model: string; dimensions: string 
  */
 function EmbeddingSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [current, setCurrent] = useState<EmbeddingSettings | null>();
+  const [spent, setSpent] = useState(0n);
   const [available, setAvailable] = useState<Connection[]>([]);
   const [models, setModels] = useState<EmbeddingModel[]>([]);
   const [error, setError] = useState("");
@@ -367,8 +369,9 @@ function EmbeddingSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
       memory.getEmbeddingSettings({}, { signal: abort.signal }),
       inferenceConnections(abort.signal),
     ])
-      .then(([{ settings }, found]) => {
+      .then(([{ settings, monthCostMicros }, found]) => {
         setCurrent(settings ?? null);
+        setSpent(monthCostMicros);
         setAvailable(found);
         form.reset({
           connectionId: settings?.connectionId ?? found[0]?.id ?? "",
@@ -418,7 +421,7 @@ function EmbeddingSettingsDialog({ open, onClose }: { open: boolean; onClose: ()
           {current === undefined
             ? "Loading…"
             : current
-              ? `Embedding with ${current.model} (${current.dimensions} dimensions) through ${named(current.connectionId)}.`
+              ? `Embedding with ${current.model} (${current.dimensions} dimensions) through ${named(current.connectionId)}. ${dollars(spent)} this month.`
               : "No embedding model: memories are recalled by their words only."}
         </p>
         <form

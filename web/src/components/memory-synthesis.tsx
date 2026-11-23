@@ -16,6 +16,7 @@ import {
 } from "@trytilde/contracts/tilde/management/v1/memory_pb.js";
 import type { Wiki } from "@trytilde/contracts/tilde/management/v1/wikis_pb.js";
 import { memory, wikis as wikiClient } from "@/client";
+import { dollars } from "./inference-usage-chart";
 import { inferenceConnections } from "./memory";
 import { RemoveButton } from "./remove-button";
 import { message } from "./tool-connections";
@@ -125,7 +126,7 @@ export function BankSynthesis({
               : state.lastRunAt
                 ? `Last ran ${formatDistanceToNow(timestampDate(state.lastRunAt), { addSuffix: true })}.`
                 : "Waiting for its sources."
-        } ${state.pendingConversations} conversations, ${state.pendingPages} pages waiting.`}
+        } ${state.pendingConversations} conversations, ${state.pendingPages} pages waiting. ${dollars(state.monthCostMicros)} this month.`}
       </p>
       <form
         className="grid gap-4"

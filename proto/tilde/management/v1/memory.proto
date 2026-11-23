@@ -237,7 +237,12 @@ message EmbeddingSettings {
 }
 message GetEmbeddingSettingsRequest {}
 // Without settings, memories are recalled by full text only.
-message GetEmbeddingSettingsResponse { optional EmbeddingSettings settings = 1; }
+message GetEmbeddingSettingsResponse {
+  optional EmbeddingSettings settings = 1;
+  // Priced spend this calendar month (UTC) on embedding memories and on recall outside agents.
+  // A recall an agent's memory tool runs is that agent's usage.
+  int64 month_cost_micros = 2;
+}
 message SetEmbeddingSettingsRequest { EmbeddingSettings settings = 1; }
 message SetEmbeddingSettingsResponse { EmbeddingSettings settings = 1; }
 message ClearEmbeddingSettingsRequest {}
@@ -269,6 +274,8 @@ message GetMemorySynthesisResponse {
   optional google.protobuf.Timestamp last_run_at = 6;
   // Conversations and pages waiting to be synthesized, also while synthesis is off.
   uint32 pending_conversations = 7; uint32 pending_pages = 8;
+  // Priced spend this calendar month (UTC) on the bank's synthesis calls.
+  int64 month_cost_micros = 9;
 }
 message SetMemorySynthesisRequest { string bank_id = 1; MemorySynthesis synthesis = 2; }
 message SetMemorySynthesisResponse { MemorySynthesis synthesis = 1; }

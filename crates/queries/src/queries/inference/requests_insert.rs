@@ -31,6 +31,7 @@ pub struct RunParams<
     T27: crate::StringSql,
     T28: crate::ArraySql<Item = T27>,
     T29: crate::ArraySql<Item = i64>,
+    T30: crate::ArraySql<Item = uuid::Uuid>,
 > {
     pub p1: T1,
     pub p2: T2,
@@ -56,13 +57,14 @@ pub struct RunParams<
     pub p22: T26,
     pub p23: T28,
     pub p24: T29,
+    pub p25: T30,
 }
 use crate::client::async_::GenericClient;
 use futures::{self, StreamExt, TryStreamExt};
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "INSERT INTO inference_requests(id,created_at,agent_id,connection_id,invocation_id,thread_id,run_id,participant_id,provider_id,kind,path,model,status,latency_ms,first_byte_ms,request_bytes,response_bytes,input_tokens,output_tokens,cached_input_tokens,cache_write_tokens,units,usage,cost_micros) SELECT u.id,u.created_at,u.agent_id,u.connection_id,u.invocation_id,u.thread_id,u.run_id,u.participant_id,u.provider_id,u.kind,u.path,NULLIF(u.model,''),u.status,u.latency_ms,NULLIF(u.first_byte_ms,-1),u.request_bytes,u.response_bytes,NULLIF(u.input_tokens,-1),NULLIF(u.output_tokens,-1),NULLIF(u.cached_input_tokens,-1),NULLIF(u.cache_write_tokens,-1),NULLIF(u.units,-1),u.usage, NULLIF(u.cost_micros,-1) FROM UNNEST($1::UUID[],$2::TIMESTAMPTZ[],$3::UUID[],$4::UUID[],$5::UUID[],$6::UUID[],$7::UUID[],$8::UUID[],$9::TEXT[],$10::TEXT[],$11::TEXT[],$12::TEXT[],$13::INTEGER[],$14::INTEGER[],$15::INTEGER[],$16::BIGINT[],$17::BIGINT[],$18::BIGINT[],$19::BIGINT[],$20::BIGINT[],$21::BIGINT[],$22::BIGINT[],$23::TEXT[],$24::BIGINT[]) AS u(id,created_at,agent_id,connection_id,invocation_id,thread_id,run_id,participant_id,provider_id,kind,path,model,status,latency_ms,first_byte_ms,request_bytes,response_bytes,input_tokens,output_tokens,cached_input_tokens,cache_write_tokens,units,usage,cost_micros) ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO inference_requests(id,created_at,agent_id,connection_id,invocation_id,thread_id,run_id,participant_id,provider_id,kind,path,model,status,latency_ms,first_byte_ms,request_bytes,response_bytes,input_tokens,output_tokens,cached_input_tokens,cache_write_tokens,units,usage,cost_micros,memory_bank_id) SELECT u.id,u.created_at,NULLIF(u.agent_id,'00000000-0000-0000-0000-000000000000'),u.connection_id,NULLIF(u.invocation_id,'00000000-0000-0000-0000-000000000000'),NULLIF(u.thread_id,'00000000-0000-0000-0000-000000000000'),NULLIF(u.run_id,'00000000-0000-0000-0000-000000000000'),NULLIF(u.participant_id,'00000000-0000-0000-0000-000000000000'),u.provider_id,u.kind,u.path,NULLIF(u.model,''),u.status,u.latency_ms,NULLIF(u.first_byte_ms,-1),u.request_bytes,u.response_bytes,NULLIF(u.input_tokens,-1),NULLIF(u.output_tokens,-1),NULLIF(u.cached_input_tokens,-1),NULLIF(u.cache_write_tokens,-1),NULLIF(u.units,-1),u.usage, NULLIF(u.cost_micros,-1),NULLIF(u.memory_bank_id,'00000000-0000-0000-0000-000000000000') FROM UNNEST($1::UUID[],$2::TIMESTAMPTZ[],$3::UUID[],$4::UUID[],$5::UUID[],$6::UUID[],$7::UUID[],$8::UUID[],$9::TEXT[],$10::TEXT[],$11::TEXT[],$12::TEXT[],$13::INTEGER[],$14::INTEGER[],$15::INTEGER[],$16::BIGINT[],$17::BIGINT[],$18::BIGINT[],$19::BIGINT[],$20::BIGINT[],$21::BIGINT[],$22::BIGINT[],$23::TEXT[],$24::BIGINT[],$25::UUID[]) AS u(id,created_at,agent_id,connection_id,invocation_id,thread_id,run_id,participant_id,provider_id,kind,path,model,status,latency_ms,first_byte_ms,request_bytes,response_bytes,input_tokens,output_tokens,cached_input_tokens,cache_write_tokens,units,usage,cost_micros,memory_bank_id) ON CONFLICT (id) DO NOTHING",
         None,
     )
 }
@@ -108,6 +110,7 @@ impl RunStmt {
         T27: crate::StringSql,
         T28: crate::ArraySql<Item = T27>,
         T29: crate::ArraySql<Item = i64>,
+        T30: crate::ArraySql<Item = uuid::Uuid>,
     >(
         &'s self,
         client: &'c C,
@@ -135,13 +138,14 @@ impl RunStmt {
         p22: &'a T26,
         p23: &'a T28,
         p24: &'a T29,
+        p25: &'a T30,
     ) -> Result<u64, tokio_postgres::Error> {
         client
             .execute(
                 self.0,
                 &[
                     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17,
-                    p18, p19, p20, p21, p22, p23, p24,
+                    p18, p19, p20, p21, p22, p23, p24, p25,
                 ],
             )
             .await
@@ -179,6 +183,7 @@ impl<
     T27: crate::StringSql,
     T28: crate::ArraySql<Item = T27>,
     T29: crate::ArraySql<Item = i64>,
+    T30: crate::ArraySql<Item = uuid::Uuid>,
 >
     crate::client::async_::Params<
         'a,
@@ -214,6 +219,7 @@ impl<
             T27,
             T28,
             T29,
+            T30,
         >,
         std::pin::Pin<
             Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
@@ -254,6 +260,7 @@ impl<
             T27,
             T28,
             T29,
+            T30,
         >,
     ) -> std::pin::Pin<
         Box<dyn futures::Future<Output = Result<u64, tokio_postgres::Error>> + Send + 'a>,
@@ -284,6 +291,7 @@ impl<
             &params.p22,
             &params.p23,
             &params.p24,
+            &params.p25,
         ))
     }
 }

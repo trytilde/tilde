@@ -21,14 +21,14 @@
 //! only forgets synthesized memories derived from the page it is reading. In a per-person bank a
 //! conversation feeds only its verified person's memories, from that person's messages. A deleted
 //! page's synthesized memories, when it was their only source, are forgotten without a model call.
-//! Calls are not recorded in `inference_requests`, which needs an invocation.
+//! Every call, the probe included, is recorded as the bank's spend (`inference::Payer::Bank`).
 use super::{
     Actor, Draft, Filter, Memory, Person, Source, backoff, db, insert, kind_guide, replaceable,
     text,
 };
 use crate::connections::model::invalid;
 use crate::error::Error;
-use crate::inference::{PostError, Provider, Upstream};
+use crate::inference::{Bill, Payer, PostError, Provider, Upstream};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -147,6 +147,7 @@ async fn complete(
     model: &str,
     system: &str,
     user: &str,
+    bill: Bill<'_>,
 ) -> Result<String, PostError> {
     let cut = || {
         PostError::content(Error::Invalid(
@@ -161,6 +162,7 @@ async fn complete(
                 &json!({"model": model, "max_tokens": OUTPUT_TOKENS, "system": system,
                     "messages": [{"role": "user", "content": user}]}),
                 CALL,
+                bill,
             )
             .await?;
         if response["stop_reason"] == "max_tokens" {
@@ -194,7 +196,7 @@ async fn complete(
         Provider::AzureOpenAi => "v1/chat/completions",
         _ => "chat/completions",
     };
-    let response = upstream.post_json(path, &body, CALL).await?;
+    let response = upstream.post_json(path, &body, CALL, bill).await?;
     let choice = &response["choices"][0];
     if choice["finish_reason"] == "length" {
         return Err(cut());
@@ -296,6 +298,7 @@ impl Memory {
             &model,
             "Answer with JSON only.",
             r#"Reply with exactly {"operations": []}"#,
+            self.bill(Payer::Bank(bank)),
         )
         .await
         .map_err(|e| e.error)?;
@@ -525,7 +528,14 @@ impl Memory {
         let (related, from_page) = self.related(claim, batch).await?;
         let upstream = self.chat_upstream(claim.connection_id).await?;
         let user = prompt(claim, batch, &related, &from_page);
-        let answer = complete(&upstream, &claim.model, SYSTEM, &user).await?;
+        let answer = complete(
+            &upstream,
+            &claim.model,
+            SYSTEM,
+            &user,
+            self.bill(Payer::Bank(batch.bank)),
+        )
+        .await?;
         let ops = operations(&answer)?;
         Ok(self
             .apply(batch, &related, &from_page, &ops, "applied")
@@ -560,6 +570,7 @@ impl Memory {
                     &Filter::default(),
                     person,
                     RELATED,
+                    Payer::Bank(batch.bank),
                 )
                 .await?;
             for (m, _) in found {

@@ -6,6 +6,7 @@ use common::invocation::{Fixture, all_tools};
 use secrecy::SecretString;
 use serde_json::{Value, json};
 use tilde::connections::service::Connections;
+use tilde::inference::Payer;
 use tilde::memory::{Actor, Draft, Filter, Memory, Person, Source};
 use uuid::Uuid;
 
@@ -428,6 +429,7 @@ async fn a_per_person_bank_keeps_each_persons_memories_apart() {
             &Filter::default(),
             Person::Everyone,
             10,
+            Payer::Organization,
         )
         .await
         .unwrap();
@@ -482,7 +484,7 @@ async fn a_per_person_bank_keeps_each_persons_memories_apart() {
 }
 
 /// An OpenAI-compatible embeddings endpoint that places texts by topic, so similarity follows
-/// meaning rather than shared words.
+/// meaning rather than shared words, and bills 100,000 tokens a text.
 async fn embeddings() -> String {
     let app = axum::Router::new().route(
         "/v1/embeddings",
@@ -507,7 +509,9 @@ async fn embeddings() -> String {
                     json!({"embedding": vector})
                 })
                 .collect();
-            axum::Json(json!({"data": data}))
+            let tokens = data.len() * 100_000;
+            axum::Json(json!({"data": data,
+                "usage": {"prompt_tokens": tokens, "total_tokens": tokens}}))
         }),
     );
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -552,9 +556,33 @@ async fn openai(connections: &Connections, base_url: &str) -> Uuid {
     id
 }
 
+/// Recorded embedding calls by payer: (agent, invocations, calls, tokens, cost in micro-dollars).
+async fn embedding_usage(fx: &Fixture) -> Vec<(Option<Uuid>, i64, i64, i64, i64)> {
+    fx.db
+        .pool
+        .get()
+        .await
+        .unwrap()
+        .query(
+            "SELECT agent_id, count(invocation_id), count(*), sum(input_tokens)::BIGINT,
+                sum(cost_micros)::BIGINT
+             FROM inference_requests WHERE kind = 'embeddings' AND memory_bank_id IS NULL
+             GROUP BY 1 ORDER BY 1 NULLS FIRST",
+            &[],
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3), r.get(4)))
+        .collect()
+}
+
 #[tokio::test]
 async fn recall_finds_memories_by_meaning_once_the_worker_has_embedded_them() {
     let fx = Fixture::new(94, Default::default(), all_tools()).await;
+    tilde::inference::prices::reconcile(&fx.db.pool)
+        .await
+        .unwrap();
     let memory = memory(&fx);
     let own = bank(&memory, "operator", "shared", Some(fx.agent)).await;
     for (title, content) in [
@@ -604,6 +632,17 @@ async fn recall_finds_memories_by_meaning_once_the_worker_has_embedded_them() {
         .output("memory.recall", json!({"query":"billing schedule"}))
         .await;
     assert_eq!(titles(&recalled)[0], "Acme terms");
+    // Both probes and the worker's batch are the installation's own spend; each recall query is
+    // the agent's, in its invocation, so it counts toward the agent's usage and budgets. The
+    // model costs $0.02 a million tokens.
+    assert_eq!(
+        embedding_usage(&fx).await,
+        [
+            (None, 0, 3, 400_000, 8_000),
+            (Some(fx.agent), 2, 2, 200_000, 4_000)
+        ]
+    );
+    assert_eq!(memory.spend_month(None).await.unwrap(), 8_000);
 
     // New settings ask for every embedding again; full text still answers meanwhile.
     memory

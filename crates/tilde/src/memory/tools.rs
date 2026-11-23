@@ -8,6 +8,7 @@ use super::{
 use crate::chat::Scope;
 use crate::chat::tools::{Context, InputStream, Provider, ToolResult};
 use crate::error::Error;
+use crate::inference::Payer;
 use crate::proto::tilde::types::v1 as types;
 use crate::tools::providers::rest::{Hints, definition};
 use chrono::{DateTime, Utc};
@@ -306,6 +307,7 @@ impl MemoryTools {
                         &Self::filter(&input)?,
                         Person::Only(self.person(scope).await?),
                         input["limit"].as_i64().unwrap_or(8),
+                        Payer::Invocation(scope),
                     )
                     .await?;
                 // A memory derived from a wiki page names it, so the agent can read the page, while

@@ -23,7 +23,7 @@ pub use synthesis::Evidence;
 
 use crate::connections::{model::invalid, service::Connections};
 use crate::error::Error;
-use crate::inference::{Provider, Upstream};
+use crate::inference::{Bill, Payer, Provider, Upstream};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -590,7 +590,8 @@ impl Memory {
     }
 
     /// Memories in `banks` best matching `query`, at most `limit`, each with how it was found
-    /// (`keywords`, `meaning`); without a query, the newest, found by neither.
+    /// (`keywords`, `meaning`); without a query, the newest, found by neither. `payer` pays for
+    /// embedding the query.
     pub async fn recall(
         &self,
         banks: &[Uuid],
@@ -598,6 +599,7 @@ impl Memory {
         filter: &Filter,
         person: Person,
         limit: i64,
+        payer: Payer<'_>,
     ) -> Result<Vec<(db::MemoryRow, Vec<&'static str>)>, Error> {
         if let (Some(from), Some(to)) = (filter.from, filter.to)
             && from > to
@@ -622,7 +624,7 @@ impl Memory {
         drop(client);
         if let Some(settings) = settings {
             // Recall still answers from full text when the embedding provider fails.
-            match self.query_vector(&settings, query).await {
+            match self.query_vector(&settings, query, payer).await {
                 Ok(vector) => {
                     let mut client = self.client().await?;
                     let tx = client.transaction().await?;
@@ -717,6 +719,11 @@ impl Memory {
         })
     }
 
+    /// This month's priced spend on calls made for `bank`'s synthesis, or without a bank, on
+    /// background embedding.
+    pub async fn spend_month(&self, bank: Option<Uuid>) -> Result<i64, Error> {
+        Ok(db::spend_month_one(&self.client().await?, bank).await?)
+    }
     pub async fn settings(&self) -> Result<Option<db::SettingsRow>, Error> {
         Ok(db::settings_get_opt(&self.client().await?).await?)
     }
@@ -739,6 +746,7 @@ impl Memory {
             dims as usize,
             &["Tilde memory".to_owned()],
             false,
+            self.bill(Payer::Organization),
         )
         .await
         .map_err(|e| e.error)?;
@@ -826,7 +834,19 @@ impl Memory {
         let checked = self.embedding_connection(connection).await?;
         self.client_for(connection, checked).await
     }
-    async fn query_vector(&self, settings: &db::SettingsRow, query: &str) -> Result<String, Error> {
+    /// Who pays for and records a call made for `payer`.
+    pub(crate) fn bill<'a>(&'a self, payer: Payer<'a>) -> Bill<'a> {
+        Bill {
+            pool: &self.connections.pool,
+            payer,
+        }
+    }
+    async fn query_vector(
+        &self,
+        settings: &db::SettingsRow,
+        query: &str,
+        payer: Payer<'_>,
+    ) -> Result<String, Error> {
         let upstream = self.upstream(settings.connection_id).await?;
         let vectors = embed::embed(
             &upstream,
@@ -834,6 +854,7 @@ impl Memory {
             settings.dims as usize,
             &[query.to_owned()],
             true,
+            self.bill(payer),
         )
         .await
         .map_err(|e| e.error)?;
@@ -875,6 +896,7 @@ impl Memory {
                 settings.dims as usize,
                 &texts,
                 false,
+                self.bill(Payer::Organization),
             )
             .await
         };

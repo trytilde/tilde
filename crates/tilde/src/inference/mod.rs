@@ -165,6 +165,28 @@ const CONTENT_ERRORS: [&str; 7] = [
     "string_above_max_length",
     "too many tokens",
 ];
+/// Who a call Tilde makes itself is billed to: the invocation whose tool asked for it (it then
+/// counts toward that agent's usage and budgets), the memory bank whose synthesis made it, or,
+/// for background work no bank or agent owns, the organization.
+#[derive(Clone, Copy)]
+pub enum Payer<'a> {
+    Invocation(&'a crate::chat::Scope),
+    Bank(Uuid),
+    Organization,
+}
+async fn record_own(
+    pool: &crate::database::Pool,
+    record: &audit::Record,
+) -> Result<(), crate::database::DbError> {
+    db::requests_insert_execute(&pool.get().await?, &[record]).await?;
+    Ok(())
+}
+/// Where a call Tilde makes itself is recorded, and who pays for it.
+#[derive(Clone, Copy)]
+pub struct Bill<'a> {
+    pub pool: &'a crate::database::Pool,
+    pub payer: Payer<'a>,
+}
 /// One ready inference connection with a warm connection pool to its provider.
 pub struct Upstream {
     pub connection: Uuid,
@@ -209,13 +231,14 @@ impl Upstream {
             client,
         })
     }
-    /// A JSON POST Tilde makes itself (memory embeddings and synthesis), to `path` below the base. Such calls
-    /// belong to no invocation, so they are not recorded in `inference_requests`.
+    /// A JSON POST Tilde makes itself (memory embeddings and synthesis), to `path` below the
+    /// base. Every answer, success or not, is recorded in `inference_requests` for `bill`.
     pub(crate) async fn post_json(
         &self,
         path: &str,
         body: &serde_json::Value,
         timeout: Duration,
+        bill: Bill<'_>,
     ) -> Result<serde_json::Value, PostError> {
         let failed = |error: Error| PostError::from(error);
         let url = format!("{}/{path}", self.base.as_str().trim_end_matches('/'));
@@ -241,6 +264,7 @@ impl Upstream {
                 self.provider.name()
             )))
         };
+        let started = std::time::Instant::now();
         let response = self
             .client
             .execute(request)
@@ -248,6 +272,17 @@ impl Upstream {
             .map_err(|_| unreachable())?;
         let status = response.status();
         let text = response.text().await.map_err(|_| unreachable())?;
+        let call = audit::Own {
+            connection: self.connection,
+            provider: self.provider,
+            path,
+            request: &body,
+        };
+        let record = audit::Record::own(call, bill.payer, status.as_u16(), started, &text);
+        // Best effort, like the gateway's accounting: a lost record never fails the call.
+        if let Err(error) = record_own(bill.pool, &record).await {
+            tracing::warn!(%error, "Usage of an inference call Tilde made was not recorded");
+        }
         if !status.is_success() {
             let detail: String = text.chars().take(300).collect();
             let lower = text.to_lowercase();

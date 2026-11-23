@@ -3,7 +3,7 @@
 //! Voyage and Cohere have their own. Documents and queries are embedded differently where the
 //! provider distinguishes them.
 use crate::error::Error;
-use crate::inference::{PostError, Provider, Upstream};
+use crate::inference::{Bill, PostError, Provider, Upstream};
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -27,6 +27,7 @@ pub(crate) async fn embed(
     dims: usize,
     texts: &[String],
     query: bool,
+    bill: Bill<'_>,
 ) -> Result<Vec<Vec<f32>>, PostError> {
     // A query is embedded while recall waits; documents in the background.
     let timeout = Duration::from_secs(if query { 10 } else { 30 });
@@ -44,7 +45,7 @@ pub(crate) async fn embed(
         Provider::AzureOpenAi => ("v1/embeddings", openai(model, dims, texts)),
         _ => ("embeddings", openai(model, dims, texts)),
     };
-    let response = upstream.post_json(path, &body, timeout).await?;
+    let response = upstream.post_json(path, &body, timeout, bill).await?;
     let vectors: Vec<&Value> = match upstream.provider {
         Provider::Cohere => response["embeddings"]["float"]
             .as_array()

@@ -76,12 +76,16 @@ impl Usage {
 pub struct Record {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
-    pub agent_id: Uuid,
+    /// The invocation's ids, all set or all missing: a call Tilde makes itself outside an
+    /// invocation has none (see [`super::Payer`]).
+    pub agent_id: Option<Uuid>,
     pub connection_id: Uuid,
-    pub invocation_id: Uuid,
-    pub thread_id: Uuid,
-    pub run_id: Uuid,
-    pub participant_id: Uuid,
+    pub invocation_id: Option<Uuid>,
+    pub thread_id: Option<Uuid>,
+    pub run_id: Option<Uuid>,
+    pub participant_id: Option<Uuid>,
+    /// The memory bank whose synthesis made the call.
+    pub memory_bank_id: Option<Uuid>,
     pub provider_id: String,
     pub kind: String,
     pub path: String,
@@ -133,12 +137,13 @@ impl Record {
         Self {
             id: Uuid::new_v4(),
             created_at: Utc::now() - chrono::Duration::from_std(latency).unwrap_or_default(),
-            agent_id: raw.scope.agent_id,
+            agent_id: Some(raw.scope.agent_id),
             connection_id: raw.connection,
-            invocation_id: raw.scope.id,
-            thread_id: raw.scope.thread_id,
-            run_id: raw.scope.run_id,
-            participant_id: raw.scope.participant_id,
+            invocation_id: Some(raw.scope.id),
+            thread_id: Some(raw.scope.thread_id),
+            run_id: Some(raw.scope.run_id),
+            participant_id: Some(raw.scope.participant_id),
+            memory_bank_id: None,
             provider_id: raw.provider.id().into(),
             kind: raw.kind.as_str().into(),
             path: raw.path,
@@ -163,10 +168,10 @@ impl Record {
         wire::InferenceUsage {
             id: self.id.to_string(),
             created_at: self.created_at.timestamp_millis(),
-            invocation_id: self.invocation_id.to_string(),
-            thread_id: self.thread_id.to_string(),
-            run_id: self.run_id.to_string(),
-            participant_id: self.participant_id.to_string(),
+            invocation_id: text(self.invocation_id),
+            thread_id: text(self.thread_id),
+            run_id: text(self.run_id),
+            participant_id: text(self.participant_id),
             connection_id: self.connection_id.to_string(),
             provider_id: self.provider_id.clone(),
             kind: self.kind.clone(),
@@ -221,12 +226,13 @@ impl Record {
         Ok(Self {
             id: id(&w.id)?,
             created_at: DateTime::from_timestamp_millis(w.created_at).unwrap_or_else(Utc::now),
-            agent_id: agent,
+            agent_id: Some(agent),
             connection_id: id(&w.connection_id)?,
-            invocation_id: id(&w.invocation_id)?,
-            thread_id: id(&w.thread_id)?,
-            run_id: id(&w.run_id)?,
-            participant_id: id(&w.participant_id)?,
+            invocation_id: Some(id(&w.invocation_id)?),
+            thread_id: Some(id(&w.thread_id)?),
+            run_id: Some(id(&w.run_id)?),
+            participant_id: Some(id(&w.participant_id)?),
+            memory_bank_id: None,
             provider_id: w.provider_id,
             kind: w.kind,
             path: w.path,
@@ -245,6 +251,71 @@ impl Record {
             prompts: prompt_stamps(&w.prompts.join(",")),
         })
     }
+    /// A call Tilde made itself through `Upstream::post_json`, billed to `payer`. Its JSON answer
+    /// is read whole, so usage is parsed or missing, never truncated.
+    pub(crate) fn own(
+        call: Own<'_>,
+        payer: super::Payer<'_>,
+        status: u16,
+        started: Instant,
+        response: &str,
+    ) -> Self {
+        let latency = started.elapsed();
+        let tokens = (status < 400)
+            .then(|| serde_json::from_str::<Value>(response).ok())
+            .flatten()
+            .map(|v| tokens_in(&v));
+        let usage = match tokens {
+            _ if status >= 400 => Usage::Error,
+            Some(t) if t.found() => Usage::Parsed,
+            _ => Usage::Missing,
+        };
+        let tokens = tokens.unwrap_or_default();
+        let scope = match payer {
+            super::Payer::Invocation(scope) => Some(scope),
+            _ => None,
+        };
+        Self {
+            id: Uuid::new_v4(),
+            created_at: Utc::now() - chrono::Duration::from_std(latency).unwrap_or_default(),
+            agent_id: scope.map(|s| s.agent_id),
+            connection_id: call.connection,
+            invocation_id: scope.map(|s| s.id),
+            thread_id: scope.map(|s| s.thread_id),
+            run_id: scope.map(|s| s.run_id),
+            participant_id: scope.map(|s| s.participant_id),
+            memory_bank_id: match payer {
+                super::Payer::Bank(bank) => Some(bank),
+                _ => None,
+            },
+            provider_id: call.provider.id().into(),
+            kind: Kind::of(call.path).unwrap_or(Kind::Chat).as_str().into(),
+            path: call.path.into(),
+            model: model_of(call.provider, call.path, call.request),
+            status: i32::from(status),
+            latency_ms: latency.as_millis().min(i32::MAX as u128) as i32,
+            first_byte_ms: None,
+            request_bytes: call.request.len() as i64,
+            response_bytes: response.len() as i64,
+            input_tokens: tokens.input,
+            output_tokens: tokens.output,
+            cached_input_tokens: tokens.cached,
+            cache_write_tokens: tokens.cache_write,
+            units: None,
+            usage,
+            prompts: Vec::new(),
+        }
+    }
+}
+/// The request half of a call Tilde made itself.
+pub(crate) struct Own<'a> {
+    pub connection: Uuid,
+    pub provider: Provider,
+    pub path: &'a str,
+    pub request: &'a [u8],
+}
+fn text(id: Option<Uuid>) -> String {
+    id.map(|id| id.to_string()).unwrap_or_default()
 }
 
 /// Google and Bedrock name the model in the path; everyone else in the JSON body.
@@ -599,12 +670,14 @@ pub(crate) async fn link_prompts(
 ) {
     let calls: Vec<matching::Call<'_>> = records
         .iter()
-        .map(|(r, body)| matching::Call {
-            request: r.id,
-            agent: r.agent_id,
-            invocation: r.invocation_id,
-            stamps: &r.prompts,
-            body: *body,
+        .filter_map(|(r, body)| {
+            Some(matching::Call {
+                request: r.id,
+                agent: r.agent_id?,
+                invocation: r.invocation_id?,
+                stamps: &r.prompts,
+                body: *body,
+            })
         })
         .collect();
     if let Err(error) = linker.link(db, &calls).await {
