@@ -220,7 +220,9 @@ export const moved = process.env.MOVED ? defineAgent({ ...spec, code: "agents/ot
   // The project's ontologies, for `tilde deploy` to build, bind and roll out first.
   assert.deepEqual(found.ontologies, {
     shop: {
-      environments: { production: { connections: { github: { slug: "github/acme" } }, secrets: {} } },
+      environments: {
+        production: { connections: { github: { slug: "github/acme" } }, secrets: {} },
+      },
     },
   });
 
