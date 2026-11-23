@@ -55,9 +55,10 @@ const IDENTITY: &str = "dev";
 
 pub async fn run(args: Dev) -> Result<()> {
     let project = Project::find(&args.dir)?;
+    // The agent's code, beside any tilde.config.ts in its folder.
     let entry = match &args.entry {
         Some(entry) => entry.clone(),
-        None => project.entry()?,
+        None => project.code_entry()?,
     };
     let run_command = project.run_command()?;
     let client = Client::new(&args.url, args.api_key.clone())?;
