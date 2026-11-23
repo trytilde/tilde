@@ -259,10 +259,21 @@ pub async fn releases(
             ),
         }
     }
-    // `tilde deploy` from an agent's own folder: its tilde.config.ts declares only that agent, and
-    // the folder's package is its code.
+    // `tilde deploy` from an agent's own folder (named after its key, or under `agents/`): its
+    // tilde.config.ts declares only that agent, and the folder's package is its code. A
+    // config-only repo declaring one remote agent is not its folder, whatever package it has.
+    let own_folder = |key: &str| {
+        project.dir.file_name().is_some_and(|name| name == key)
+            || project
+                .dir
+                .parent()
+                .and_then(|parent| parent.file_name())
+                .is_some_and(|name| name == "agents")
+    };
     if let ([key], 1) = (&elsewhere[..], declarations.agents.len())
+        && own_folder(key)
         && let Ok(code_entry) = project.code_entry()
+        && project.dir.join(&code_entry).is_file()
     {
         eprintln!("Agent {key}: reading its code in {}", project.dir.display());
         let read = self::declarations(project, &code_entry, false, false).await?;

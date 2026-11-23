@@ -1,3 +1,3 @@
 kind: Changed
-body: "`tilde deploy` from an agent's own folder releases that agent's code: when the folder's `tilde.config.ts` declares only that agent, the folder's package is its code. `tilde dev`'s fallback command runs the package's code, never its `tilde.config.ts`."
+body: "`tilde deploy` from an agent's own folder releases that agent's code: when the folder is the agent's own (named after its key, or under `agents/`), its `tilde.config.ts` declares only that agent and its package's code entry exists, that package is its code. A config-only repo declaring one remote agent still applies its spec without a release. `tilde dev`'s fallback command runs the package's code, never its `tilde.config.ts`."
 time: 2026-11-24T09:00:00+00:00
