@@ -106,8 +106,13 @@ pub async fn ontologies_first(
     let agents = specs && args.only.is_none();
     let (mut actions, plan, mut served) =
         crate::ontology::prepare(args, &declarations.ontologies, agents).await?;
-    // Only all of the project's ontologies say which tools their connections serve.
-    if !args.ontology.is_empty() {
+    // Only all of the project's ontologies say which tools their connections serve: a selection
+    // that leaves some out has nothing to check against.
+    if declarations
+        .ontologies
+        .keys()
+        .any(|name| !args.ontology.is_empty() && !args.ontology.contains(name))
+    {
         served.clear();
     }
     // A dry run's Apply comes after (`apply::run`), with these handlers.
