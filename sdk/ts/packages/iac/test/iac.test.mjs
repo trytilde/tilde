@@ -120,6 +120,9 @@ test("ALL is the star and both selection methods accumulate in any order", () =>
 
 test("refs and routines refuse what the server would", () => {
   assert.throws(() => connection.ref("acme"), /provider\/name/);
+  assert.throws(() => connection.ref("slack/ trailing "), /provider\/name/);
+  // Connection names may hold spaces, as people name them in the app.
+  assert.equal(connection.ref("google_chat/Google Chat").provider, "google_chat");
   assert.throws(() => secret.ref("npm-token"), /not a valid name/);
   assert.throws(
     () => defineAgent({ key: "a", name: "A", routines: [routine({ name: "R", prompt: "P" })] }),

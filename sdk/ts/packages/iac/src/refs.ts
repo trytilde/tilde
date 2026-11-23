@@ -48,7 +48,8 @@ function ref<Tool extends string, Provider extends string = string>(
   slug: string,
   type?: string,
 ): ConnectionRef<Tool, Provider> {
-  if (!/^[^/\s]+\/[^/\s]+$/.test(slug))
+  // A name may hold spaces (`google_chat/Google Chat`), not at its ends.
+  if (!/^[^/\s]+\/[^/\s](?:[^/]*[^/\s])?$/.test(slug))
     throw new Error(`Connection ${slug} is not a provider/name slug`);
   const connection: ConnectionRef<Tool, Provider> = Object.freeze({
     slug,
