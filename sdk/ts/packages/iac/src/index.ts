@@ -386,9 +386,7 @@ export function defineAgent(spec: Agent): AgentSpec {
     routines: (spec.routines ?? []).map(routineJson),
     channels: (spec.channels ?? []).map((channel) => ({
       ...(channel.connection ? { connection: ref(channel.connection) } : {}),
-      ...(channel.access
-        ? { access: `CHANNEL_ACCESS_MODE_${channel.access.toUpperCase()}` }
-        : {}),
+      ...(channel.access ? { access: `CHANNEL_ACCESS_MODE_${channel.access.toUpperCase()}` } : {}),
       delete: channel.delete ?? false,
     })),
     users: (spec.users ?? []).map(userJson),
