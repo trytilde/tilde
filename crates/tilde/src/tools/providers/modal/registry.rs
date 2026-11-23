@@ -8,6 +8,9 @@ use crate::chat::providers::files::public_client;
 use std::time::Duration;
 
 const TIMEOUT: Duration = Duration::from_secs(5);
+/// All of a resolution (the lookup, the token, the manifest): what a slow registry adds to a
+/// launch at most.
+const DEADLINE: Duration = Duration::from_secs(8);
 const MANIFESTS: &str = "application/vnd.oci.image.index.v1+json, \
     application/vnd.docker.distribution.manifest.list.v2+json, \
     application/vnd.oci.image.manifest.v1+json, \
@@ -19,7 +22,10 @@ pub async fn pinned(image: &str) -> String {
     let Some(reference) = Reference::parse(image) else {
         return image.to_owned();
     };
-    match digest(&reference).await {
+    let resolved = tokio::time::timeout(DEADLINE, digest(&reference))
+        .await
+        .unwrap_or_else(|_| Err("the registry took too long".into()));
+    match resolved {
         Ok(digest) => format!("{}@{digest}", reference.name),
         Err(error) => {
             tracing::warn!(%image, %error, "the image's digest is unknown; Modal builds from its tag");
@@ -63,10 +69,14 @@ impl Reference {
             _ if name.contains('/') => ("registry-1.docker.io".to_owned(), name.to_owned()),
             _ => ("registry-1.docker.io".to_owned(), format!("library/{name}")),
         };
-        let host = if host == "docker.io" {
-            "registry-1.docker.io".to_owned()
-        } else {
-            host
+        // Docker Hub by its name: its API host, and `library/` for an official image.
+        let (host, repository) = match host.as_str() {
+            "docker.io" | "index.docker.io" if !repository.contains('/') => (
+                "registry-1.docker.io".to_owned(),
+                format!("library/{repository}"),
+            ),
+            "docker.io" | "index.docker.io" => ("registry-1.docker.io".to_owned(), repository),
+            _ => (host, repository),
         };
         Some(Self {
             host,
@@ -180,6 +190,15 @@ mod tests {
         assert_eq!(
             parsed("python"),
             r("registry-1.docker.io", "library/python", "latest", "python")
+        );
+        assert_eq!(
+            parsed("docker.io/python:3.13"),
+            r(
+                "registry-1.docker.io",
+                "library/python",
+                "3.13",
+                "docker.io/python"
+            )
         );
         assert_eq!(
             parsed("docker.io/acme/tools:1.2"),
