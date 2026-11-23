@@ -1,3 +1,0 @@
-kind: Removed
-body: "`ChatService.InvokeTool`, `SandboxService.InvokeTool` and `SidecarService.Relay`, which SDKs, CLIs and sidecars of 5.2 and later no longer call (`InvokeToolStream` and `RelayStream` replace them); `tilde sandbox call` no longer falls back to `InvokeTool`."
-time: 2026-11-23T12:00:00+00:00
