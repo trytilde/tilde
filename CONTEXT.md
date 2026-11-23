@@ -661,8 +661,10 @@ templates and filters name paths of a signal's context: its data below plus
   decrypted connection (cached per credential version) and stores the vector only if the job was
   not requested again meanwhile. When the provider refuses a batch's content (400, 413, 422) each
   memory is tried alone and only those it refuses back off; otherwise (network, timeouts, 401,
-  403, 404, 429, 5xx) the whole batch backs off, exponentially up to an hour. These calls belong to no invocation and
-  are not in `inference_requests`.
+  403, 404, 429, 5xx) the whole batch backs off, exponentially up to an hour. These calls, the
+  settings probe and recall from the console are the organization's own spend in
+  `inference_requests` (no agent, no bank); a recall query an agent's memory tool embeds is
+  recorded in that invocation, so it is the agent's usage and counts toward its budgets.
 
 - Synthesis: a bank's own chat model turning its sources into memories (`memory_synthesis`, on
   while the row exists: an OpenAI-compatible or Anthropic inference connection, a model,
@@ -720,7 +722,8 @@ templates and filters name paths of a signal's context: its data below plus
   watermark moves past it and the bank carries on, its failure count kept. Anything else (a connection not ready, network
   errors and timeouts, 401, 403, 404, 408, 429, 5xx, other 400s, recall or embedding failures)
   backs the bank off exponentially (`memory::backoff`, shared with embeddings) and passes over
-  nothing, so an outage loses no conversation. Synthesis calls are not in `inference_requests`.
+  nothing, so an outage loses no conversation. Synthesis calls (and the recall they run) are
+  recorded in `inference_requests` with the bank's `memory_bank_id` and no agent.
 - Memory evidence: what a synthesized memory was derived from and in which batch
   (`memory_evidence`): exactly one of a message of a conversation or a page revision (kept by page
   id, since revisions outlive their page). Memories agents write keep their conversation on
@@ -817,7 +820,10 @@ so unassignment and future budget exhaustion apply within one renewal without a
 per-request lookup. Usage is accounted off the request path: the capture is parsed by a
 worker (model from path or body, tokens from the provider's usage object, including SSE
 streams) into `inference_requests`; a sidecar ships records through its outbox as
-`InferenceUsage` frames, shed first under backpressure.
+`InferenceUsage` frames, shed first under backpressure. Calls Tilde makes itself
+(`Upstream::post_json`, for memory) are recorded as they answer, billed to an
+`inference::Payer`: an invocation, a memory bank, or the organization, so their rows may have
+no agent or invocation.
 
 Cost is priced by Postgres at insert time from `inference_prices`, in micro-dollars per
 million tokens: cached input is a subset of input for OpenAI-style usage and additive for

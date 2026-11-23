@@ -9381,6 +9381,17 @@ pub struct GetEmbeddingSettingsResponse {
         EmbeddingSettings,
         ::buffa::Inline<EmbeddingSettings>,
     >,
+    /// Priced spend this calendar month (UTC) on embedding memories and on recall outside agents.
+    /// A recall an agent's memory tool runs is that agent's usage.
+    ///
+    /// Field 2: `month_cost_micros`
+    #[serde(
+        rename = "monthCostMicros",
+        alias = "month_cost_micros",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub month_cost_micros: i64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9389,6 +9400,7 @@ impl ::core::fmt::Debug for GetEmbeddingSettingsResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("GetEmbeddingSettingsResponse")
             .field("settings", &self.settings)
+            .field("month_cost_micros", &self.month_cost_micros)
             .finish()
     }
 }
@@ -9427,6 +9439,11 @@ impl ::buffa::Message for GetEmbeddingSettingsResponse {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.month_cost_micros != 0i64 {
+            size
+                += 1u64
+                    + ::buffa::types::int64_encoded_len(self.month_cost_micros) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -9444,6 +9461,9 @@ impl ::buffa::Message for GetEmbeddingSettingsResponse {
                 buf,
             );
             self.settings.write_to(__cache, buf);
+        }
+        if self.month_cost_micros != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.month_cost_micros, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9469,6 +9489,13 @@ impl ::buffa::Message for GetEmbeddingSettingsResponse {
                     ctx,
                 )?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.month_cost_micros = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9478,6 +9505,7 @@ impl ::buffa::Message for GetEmbeddingSettingsResponse {
     }
     fn clear(&mut self) {
         self.settings = ::buffa::MessageField::none();
+        self.month_cost_micros = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10948,6 +10976,16 @@ pub struct GetMemorySynthesisResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub pending_pages: u32,
+    /// Priced spend this calendar month (UTC) on the bank's synthesis calls.
+    ///
+    /// Field 9: `month_cost_micros`
+    #[serde(
+        rename = "monthCostMicros",
+        alias = "month_cost_micros",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub month_cost_micros: i64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -10963,6 +11001,7 @@ impl ::core::fmt::Debug for GetMemorySynthesisResponse {
             .field("last_run_at", &self.last_run_at)
             .field("pending_conversations", &self.pending_conversations)
             .field("pending_pages", &self.pending_pages)
+            .field("month_cost_micros", &self.month_cost_micros)
             .finish()
     }
 }
@@ -11035,6 +11074,11 @@ impl ::buffa::Message for GetMemorySynthesisResponse {
         if self.pending_pages != 0u32 {
             size += 1u64 + ::buffa::types::uint32_encoded_len(self.pending_pages) as u64;
         }
+        if self.month_cost_micros != 0i64 {
+            size
+                += 1u64
+                    + ::buffa::types::int64_encoded_len(self.month_cost_micros) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -11083,6 +11127,9 @@ impl ::buffa::Message for GetMemorySynthesisResponse {
         }
         if self.pending_pages != 0u32 {
             ::buffa::types::put_uint32_field(8u32, self.pending_pages, buf);
+        }
+        if self.month_cost_micros != 0i64 {
+            ::buffa::types::put_int64_field(9u32, self.month_cost_micros, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11170,6 +11217,13 @@ impl ::buffa::Message for GetMemorySynthesisResponse {
                 )?;
                 self.pending_pages = ::buffa::types::decode_uint32(buf)?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.month_cost_micros = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -11186,6 +11240,7 @@ impl ::buffa::Message for GetMemorySynthesisResponse {
         self.last_run_at = ::buffa::MessageField::none();
         self.pending_conversations = 0u32;
         self.pending_pages = 0u32;
+        self.month_cost_micros = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }

@@ -39,12 +39,17 @@ pub async fn requests_insert_execute(
 ) -> DbResult<u64> {
     let ids: Vec<_> = records.iter().map(|r| r.id).collect();
     let created: Vec<_> = records.iter().map(|r| r.created_at).collect();
-    let agents: Vec<_> = records.iter().map(|r| r.agent_id).collect();
+    // The nil UUID is the query's stand-in for a missing id.
+    let ids_of = |id: fn(&super::audit::Record) -> Option<uuid::Uuid>| -> Vec<uuid::Uuid> {
+        records.iter().map(|r| id(r).unwrap_or_default()).collect()
+    };
+    let agents = ids_of(|r| r.agent_id);
     let connections: Vec<_> = records.iter().map(|r| r.connection_id).collect();
-    let invocations: Vec<_> = records.iter().map(|r| r.invocation_id).collect();
-    let threads: Vec<_> = records.iter().map(|r| r.thread_id).collect();
-    let runs: Vec<_> = records.iter().map(|r| r.run_id).collect();
-    let participants: Vec<_> = records.iter().map(|r| r.participant_id).collect();
+    let invocations = ids_of(|r| r.invocation_id);
+    let threads = ids_of(|r| r.thread_id);
+    let runs = ids_of(|r| r.run_id);
+    let participants = ids_of(|r| r.participant_id);
+    let banks = ids_of(|r| r.memory_bank_id);
     let providers: Vec<&str> = records.iter().map(|r| r.provider_id.as_str()).collect();
     let kinds: Vec<&str> = records.iter().map(|r| r.kind.as_str()).collect();
     let paths: Vec<&str> = records.iter().map(|r| r.path.as_str()).collect();
@@ -132,6 +137,7 @@ pub async fn requests_insert_execute(
             &units,
             &usages,
             &costs,
+            &banks,
         )
         .await?)
 }

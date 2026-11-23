@@ -20,7 +20,7 @@ async fn bank(memory: &Memory, name: &str, scope: &str) -> Uuid {
 }
 /// An OpenAI-compatible chat endpoint answering a probe with no operations and everything else
 /// with the next scripted answer (`HTTP <status> <code>` answers with that status and error
-/// code); it keeps the prompts it was sent.
+/// code), each billed a million tokens in and 100,000 out; it keeps the prompts it was sent.
 struct Model {
     url: String,
     answers: Arc<Mutex<VecDeque<String>>>,
@@ -52,7 +52,8 @@ async fn model() -> Model {
                 }
                 (
                     axum::http::StatusCode::OK,
-                    axum::Json(json!({"choices": [{"message": {"content": answer}}]})),
+                    axum::Json(json!({"choices": [{"message": {"content": answer}}],
+                        "usage": {"prompt_tokens": 1_000_000, "completion_tokens": 100_000}})),
                 )
             }
         }),
@@ -235,6 +236,25 @@ async fn pending(memory: &Memory, bank: Uuid) -> (i64, i64) {
             None => (c + r.count, p),
         })
 }
+/// Recorded chat calls by bank: (bank, calls, tokens in, tokens out, cost in micro-dollars).
+async fn synthesis_usage(fx: &Fixture) -> Vec<(Option<Uuid>, i64, i64, i64, i64)> {
+    fx.db
+        .pool
+        .get()
+        .await
+        .unwrap()
+        .query(
+            "SELECT memory_bank_id, count(*), sum(input_tokens)::BIGINT, sum(output_tokens)::BIGINT,
+                sum(cost_micros)::BIGINT
+             FROM inference_requests WHERE kind = 'chat' AND agent_id IS NULL GROUP BY 1",
+            &[],
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3), r.get(4)))
+        .collect()
+}
 async fn run(memory: &Memory, bank: Uuid) {
     memory.run_synthesis_now(bank).await.unwrap();
     assert!(memory.synthesize_pending().await.unwrap());
@@ -243,6 +263,9 @@ async fn run(memory: &Memory, bank: Uuid) {
 #[tokio::test]
 async fn a_conversation_becomes_memories_once_and_never_touches_peoples_facts() {
     let fx = Fixture::new(95, Default::default(), all_tools()).await;
+    tilde::inference::prices::reconcile(&fx.db.pool)
+        .await
+        .unwrap();
     let memory = memory(&fx);
     let team = bank(&memory, "team", "shared").await;
     let user = fx.user_id.clone();
@@ -266,7 +289,7 @@ async fn a_conversation_becomes_memories_once_and_never_touches_peoples_facts() 
     let model = model().await;
     let connection = openai(&fx.connections, &model.url).await;
     memory
-        .set_synthesis(team, connection, "gpt-test", "Keep what people prefer.")
+        .set_synthesis(team, connection, "gpt-4o-mini", "Keep what people prefer.")
         .await
         .unwrap();
     // Nothing waits yet: the bank is claimed and released.
@@ -382,6 +405,13 @@ async fn a_conversation_becomes_memories_once_and_never_touches_peoples_facts() 
         .unwrap();
     run(&memory, team).await;
     assert_eq!(memory.batches(team).await.unwrap().0.len(), 1);
+    // The probe and the one batch's call are the bank's spend, outside any agent's usage, at
+    // $0.15 a million tokens in and $0.60 out.
+    assert_eq!(
+        synthesis_usage(&fx).await,
+        [(Some(team), 2, 2_000_000, 200_000, 420_000)]
+    );
+    assert_eq!(memory.spend_month(Some(team)).await.unwrap(), 420_000);
 
     // Turning synthesis off stops it; the watermarks stay.
     memory.clear_synthesis(team).await.unwrap();
@@ -623,6 +653,7 @@ async fn wiki_pages_feed_a_bank_by_what_changed_and_their_deletion_forgets_what_
             &Default::default(),
             Person::Everyone,
             5,
+            tilde::inference::Payer::Organization,
         )
         .await
         .unwrap();

@@ -2,6 +2,7 @@
 use super::{Actor, Change, Draft, Filter, Memory, Person, Source, db};
 use crate::chat::audit::timestamp;
 use crate::error::Error;
+use crate::inference::Payer;
 use crate::proto::tilde::management::v1 as management;
 use crate::services::tilde::management::v1::MemoryService;
 use buffa_types::google::protobuf::Timestamp;
@@ -414,7 +415,14 @@ impl MemoryService for Management {
         if let Some(query) = r.query.as_deref().filter(|q| !q.trim().is_empty()) {
             let memories = self
                 .0
-                .recall(&[bank], Some(query), &filter, Person::Everyone, limit)
+                .recall(
+                    &[bank],
+                    Some(query),
+                    &filter,
+                    Person::Everyone,
+                    limit,
+                    Payer::Organization,
+                )
                 .await?;
             return Response::ok(management::ListMemoriesResponse {
                 memories: self.wire(&_ctx, memories).await?,
@@ -603,6 +611,7 @@ impl MemoryService for Management {
     {
         Response::ok(management::GetEmbeddingSettingsResponse {
             settings: self.0.settings().await?.map(settings_wire).into(),
+            month_cost_micros: self.0.spend_month(None).await?,
             ..Default::default()
         })
     }
@@ -669,6 +678,7 @@ impl MemoryService for Management {
         let retaining = self.0.retaining(bank).await?;
         let wikis = self.0.bank_wikis(bank).await?;
         let pending = self.0.synthesis_pending(bank).await?;
+        let month_cost_micros = self.0.spend_month(Some(bank)).await?;
         let count = |pages: bool| -> u32 {
             pending
                 .iter()
@@ -689,6 +699,7 @@ impl MemoryService for Management {
                 .into(),
             pending_conversations: count(false),
             pending_pages: count(true),
+            month_cost_micros,
             synthesis: synthesis.map(synthesis_wire).into(),
             retaining_agent_ids: retaining.iter().map(Uuid::to_string).collect(),
             wikis: wikis
