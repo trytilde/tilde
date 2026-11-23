@@ -34,8 +34,9 @@ struct Args {
 enum Command {
     /// Run this project's agent against a gateway and chat with it locally.
     Dev(dev::Dev),
-    /// Apply the `@trytilde/iac` specs the code exports, or register a release carrying the
-    /// prompts, skills and tools it declares.
+    /// Apply the `@trytilde/iac` specs the code exports (the project's ontologies first, then its
+    /// agents, each deploying one releasing its own code from `agents/<key>/` or its `code`), or
+    /// register a release carrying the prompts, skills and tools the entry declares.
     Deploy(deploy::Deploy),
     /// Check this project, its SDK and the gateway.
     Doctor(doctor::Doctor),

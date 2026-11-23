@@ -178,13 +178,16 @@ test("with TILDE_DISCOVERY_SPECS the reader adds the @trytilde/iac specs the ent
     `import { definePrompt } from ${JSON.stringify(sdk)};
 import { defineAgent, defineProject, defineTeam, github, gateway, ontology, user } from ${JSON.stringify(iac)};
 export const respond = definePrompt("respond", { template: "Hi" });
-export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gateway(),
-  tools: [github.ref("acme").tools("github_get_issue")] });
+const spec = { key: "triage", name: "Triage", deploy: gateway(),
+  code: "services/triage", tools: [github.ref("acme").tools("github_get_issue")] };
+export const triage = defineAgent(spec);
 // The same agent again, inside its project, is kept once.
 export const project = defineProject({ team: "acme", agents: [triage], ontologies: { shop: ontology({
   environments: { production: { slots: { github: github.ref("acme") } } } }) } });
 export const people = defineTeam({ team: "acme", users: [user({ email: "ada@acme.test", login: true })] });
 export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Other" }) : undefined;
+// The same spec with its code somewhere else is a different agent too.
+export const moved = process.env.MOVED ? defineAgent({ ...spec, code: "agents/other" }) : undefined;
 `,
   );
   const plain = await run(dir, []);
@@ -211,6 +214,9 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   assert.equal(found.agents.length, 1);
   assert.equal(found.agents[0].deployment.target, "DEPLOYMENT_TARGET_GATEWAY");
   assert.deepEqual(found.agents[0].tools[0].tools, ["github_get_issue"]);
+  // Where its code is, beside the spec (which has no such field) for `tilde deploy` to read.
+  assert.deepEqual(found.code, { triage: "services/triage" });
+  assert.equal(found.agents[0].code, undefined);
   // The project's ontologies, for `tilde deploy` to build, bind and roll out first.
   assert.deepEqual(found.ontologies, {
     shop: {
@@ -221,4 +227,7 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   const clash = await run(dir, [], { TILDE_DISCOVERY_SPECS: "1", CLASH: "1" });
   assert.equal(clash.code, 1);
   assert.match(clash.stderr, /Agent triage is defined twice differently/);
+  const moved = await run(dir, [], { TILDE_DISCOVERY_SPECS: "1", MOVED: "1" });
+  assert.equal(moved.code, 1);
+  assert.match(moved.stderr, /Agent triage is defined twice differently/);
 });

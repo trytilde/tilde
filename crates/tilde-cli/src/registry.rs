@@ -372,6 +372,7 @@ mod tests {
                     ],
                 }],
             }),
+            ..Default::default()
         };
 
         let client = Client::new(&format!("http://{address}"), Some("api-key".into())).unwrap();

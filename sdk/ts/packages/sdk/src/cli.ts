@@ -9,8 +9,9 @@
  * uploading skill files and registering the deployment, once, for every language.
  *
  * With `TILDE_DISCOVERY_SPECS=1` (set by `tilde deploy`) it prints
- * `{ "declarations": …, "agents": [AgentSpec…], "team": …, "users": […], "groups": […] }` instead, adding the
- * `@trytilde/iac` specs the entry exports; readers that predate specs ignore the variable.
+ * `{ "declarations": …, "agents": [AgentSpec…], "code": {key: path}, "team": …, "users": […], "groups": […] }`
+ * instead, adding the `@trytilde/iac` specs the entry exports (and each agent's `code`, which
+ * specs don't carry); readers that predate specs ignore the variable.
  *
  * The entry is normally built JavaScript (`dist/index.js`); a `.ts` entry relies on Node's own
  * type stripping.
@@ -163,6 +164,9 @@ async function read(argv: string[]) {
   return JSON.stringify({
     declarations: JSON.parse(declarations),
     agents,
+    code: Object.fromEntries(
+      found.agents.filter((agent) => agent.code).map((agent) => [agent.key, agent.code]),
+    ),
     team: found.team,
     users: found.users,
     groups: found.groups,

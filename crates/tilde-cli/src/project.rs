@@ -1,7 +1,7 @@
 //! Reading an agent project: which language runtime hosts it, what to call it in the registry,
-//! which module declares its prompts and skills, and how to start it.
+//! which module declares its prompts and skills, and how to start it. There is no project file
+//! of Tilde's own: a project's `tilde.config.ts` and its package's conventions say it all.
 use anyhow::{Context, Result, bail};
-use serde::Deserialize;
 use serde_json::Value;
 use std::{
     fs,
@@ -23,21 +23,11 @@ impl Runtime {
     }
 }
 
-/// `tilde.toml`, committed with the project. Every field is optional: a project that follows
-/// its ecosystem's conventions needs no file at all.
-#[derive(Default, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct Manifest {
-    pub name: Option<String>,
-    pub entry: Option<String>,
-    pub run: Option<String>,
-}
-
 pub struct Project {
     pub dir: PathBuf,
     pub runtime: Runtime,
+    /// The package's own name, unscoped: `tilde dev`'s default agent name.
     pub name: String,
-    pub manifest: Manifest,
 }
 
 impl Project {
@@ -54,19 +44,10 @@ impl Project {
             } else {
                 continue;
             };
-            let manifest = match fs::read_to_string(dir.join("tilde.toml")) {
-                Ok(text) => toml::from_str(&text).context("tilde.toml could not be read")?,
-                Err(_) => Manifest::default(),
-            };
-            let name = match &manifest.name {
-                Some(name) => name.clone(),
-                None => package_name(dir, runtime)?,
-            };
             return Ok(Self {
                 dir: dir.to_path_buf(),
                 runtime,
-                name,
-                manifest,
+                name: package_name(dir, runtime)?,
             });
         }
         bail!(
@@ -75,14 +56,15 @@ impl Project {
         )
     }
 
-    /// The module `tilde deploy` reads declarations from, relative to the project.
+    /// The module `tilde deploy` reads declarations from, relative to the project: its
+    /// `tilde.config.ts`, else its package's entry.
     pub fn entry(&self) -> Result<String> {
-        if let Some(entry) = &self.manifest.entry {
-            return Ok(entry.clone());
-        }
         match self.runtime {
             // Mirrors the TypeScript CLI's own default order.
             Runtime::Node => {
+                if self.dir.join("tilde.config.ts").is_file() {
+                    return Ok("tilde.config.ts".into());
+                }
                 if let Some(main) = manifest_json(&self.dir)?
                     .get("main")
                     .and_then(Value::as_str)
@@ -95,7 +77,7 @@ impl Project {
                     }
                 }
                 bail!(
-                    "Could not find this project's entry module. Build it first, or set entry in tilde.toml"
+                    "Could not find this project's entry module: add a tilde.config.ts, build it, or pass --entry"
                 )
             }
             Runtime::Python => {
@@ -104,20 +86,13 @@ impl Project {
                         return Ok(candidate.to_string());
                     }
                 }
-                bail!("Could not find this project's entry module. Set entry in tilde.toml")
+                bail!("Could not find this project's entry module: pass --entry")
             }
         }
     }
 
     /// The command `tilde dev` runs to start the agent, as program plus arguments.
     pub fn run_command(&self) -> Result<Vec<String>> {
-        if let Some(run) = &self.manifest.run {
-            let parts: Vec<String> = run.split_whitespace().map(str::to_string).collect();
-            if parts.is_empty() {
-                bail!("run in tilde.toml is empty");
-            }
-            return Ok(parts);
-        }
         match self.runtime {
             Runtime::Node => {
                 let scripts = manifest_json(&self.dir)?;
@@ -196,5 +171,5 @@ fn package_name(dir: &Path, runtime: Runtime) -> Result<String> {
                 .and_then(|name| name.to_str())
                 .map(str::to_string)
         })
-        .context("Could not name this project; set name in tilde.toml")
+        .context("Could not name this project: give its package a name")
 }

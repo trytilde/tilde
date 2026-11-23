@@ -117,13 +117,25 @@ export type Agent = {
   sandbox?: Blueprint;
   routines?: Routine[];
   deploy?: Deploy;
+  /**
+   * Where the code `deploy` releases is, from the project's directory: an entry module, or a
+   * folder with its own package.json or pyproject.toml. Default `agents/<key>/`; without either,
+   * the entry module exporting this spec is the code (`tilde deploy` from the agent's folder).
+   */
+  code?: string;
   /** People declared beside the agent (monorepos); merged with `defineTeam`'s by email and name. */
   users?: User[];
   groups?: Group[];
   /** Who may see (`visibility`) or change (`ownership`) the agent: `grant(group("eng"), "ownership")`. */
   access?: Grant[];
 };
-export type AgentSpec = { readonly [SPEC]: "agent"; readonly key: string; readonly json: unknown };
+export type AgentSpec = {
+  readonly [SPEC]: "agent";
+  readonly key: string;
+  readonly json: unknown;
+  /** The agent's `code`: read by `tilde deploy`, never sent. */
+  readonly code?: string;
+};
 
 /**
  * People (Tilde Cloud). A user is found by email and upserted: a changed `name` updates them (an
@@ -371,7 +383,7 @@ export function defineAgent(spec: Agent): AgentSpec {
         }
       : {}),
   };
-  return Object.freeze({ [SPEC]: "agent" as const, key: spec.key, json });
+  return Object.freeze({ [SPEC]: "agent" as const, key: spec.key, json, code: spec.code });
 }
 
 /**

@@ -40,7 +40,8 @@ export type DiscoveredTool = {
   origin: string;
 };
 /** An `@trytilde/iac` agent spec: its key and `AgentSpec` protobuf JSON. */
-export type DiscoveredAgent = { key: string; json: unknown; origin: string };
+/** `code` is where the agent's code is (`@trytilde/iac`'s `defineAgent({ code })`). */
+export type DiscoveredAgent = { key: string; json: unknown; origin: string; code?: string };
 export type Discovery = {
   prompts?: DiscoveredPrompt[];
   skills?: DiscoveredSkill[];
@@ -152,6 +153,7 @@ const IAC = Symbol.for("tilde.iac");
 type IacValue = {
   key?: string;
   json?: unknown;
+  code?: string;
   team?: string;
   agents?: IacValue[];
   users?: unknown[];
@@ -164,7 +166,7 @@ function core(value: unknown, origin: string): CoreDiscovery | undefined {
   const iac = (value as Record<symbol, unknown>)[IAC];
   if (iac === "agent") {
     const agent = value as IacValue;
-    return { agents: [{ key: agent.key!, json: agent.json, origin }] };
+    return { agents: [{ key: agent.key!, json: agent.json, origin, code: agent.code }] };
   }
   if (iac === "team") {
     const team = value as IacValue;
@@ -179,6 +181,7 @@ function core(value: unknown, origin: string): CoreDiscovery | undefined {
         key: agent.key!,
         json: agent.json,
         origin,
+        code: agent.code,
       })),
     };
   }
@@ -313,9 +316,9 @@ export async function discover(entry: string, projectDir: string): Promise<Decla
         throw new Error(`Ontology ${name} is declared twice differently (${origin})`);
       declarations.ontologies[name] = ontology;
     }
-    // The same agent exported twice (alone and in a project) is kept once.
+    // The same agent exported twice (alone and in a project) is kept once; its `code` counts.
     for (const agent of discovery.agents ?? []) {
-      const digest = canonicalJson(agent.json);
+      const digest = canonicalJson({ json: agent.json, code: agent.code ?? null });
       const previous = agents.get(agent.key);
       if (previous && previous.digest !== digest)
         throw new Error(

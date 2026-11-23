@@ -1877,7 +1877,7 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
 - Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
   environments: { <env>: { slots, secrets } } }) } })`, each in the repository's
   `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
-  workspace with one root lockfile and at most one root `tilde.toml`; each ontology is the Tilde
+  workspace with one root lockfile and no `tilde.toml` (the root `tilde.config.ts` is the project); each ontology is the Tilde
   project of its name. `ontology<typeof slots>()` takes the ontology's own `defineSlots` type (a
   type-only import), so a slot bound to a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
@@ -1901,13 +1901,21 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
-  reader that knows specs prints `{declarations, agents, team}` (validating each agent against
-  `AgentSpec`), older readers ignore the variable. With agents, the CLI sends one `Apply`: the
-  one agent declaring `deploy` gets the entry's declarations (skill files inline) and an external
-  ID (`--external-id`, the GitHub run, else a digest of what is deployed, so an unchanged rerun
-  registers nothing); `--team`/`TILDE_TEAM` overrides the project's team; `--dry-run` asks for
-  the plan. It prints the plan or every required action with its link (relative links joined to
-  the server URL) on stderr, a newly registered dial-in deployment's token on stdout, or with
+  reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
+  `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't
+  carry), older readers ignore the variable. With agents, the CLI sends one `Apply`, in which
+  every agent declaring `deploy` releases its own code: the reader runs once in that code
+  (`code`, an entry module or a folder with its own manifest, else `agents/<key>/` from the
+  project's directory) for its declarations (skill files inline), and the deployment gets an
+  external ID (`--external-id`, the GitHub run, else a digest of what it deploys, so an unchanged
+  rerun registers nothing). An agent with no code here (neither) has its code in another
+  repository: its spec is applied without a deployment, with a note. From an agent's folder (the
+  entry is code, not `tilde.config.ts`) the one deploying agent without code of its own releases
+  the entry's declarations; two are refused. `--check` reads no agent's code. `--team`/`TILDE_TEAM`
+  overrides the project's team; `--dry-run` asks for the plan. It prints the plan or every
+  required action with its link (relative links joined to the server URL) on stderr, a newly
+  registered dial-in deployment's token on stdout (alone when the request has one deploying
+  agent, else a `<key> <token>` line each, however many were issued), or with
   `--json` the response. Exit codes: 0 applied or planned, 1 error, 2 blocked. Without agents it
   registers the deployment as before.
 - The response lists one `Change` per resource (create, update with before and after per field,
