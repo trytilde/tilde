@@ -30,9 +30,10 @@ pub struct OntologySpec {
 }
 #[derive(Debug, Default, Deserialize)]
 pub struct EnvironmentSpec {
-    /// Slot -> the connection it binds.
-    #[serde(default)]
-    pub slots: BTreeMap<String, ConnectionSpec>,
+    /// The ontology's connection -> the organization's connection it binds. A spec from
+    /// `@trytilde/iac` before the rename says `slots`.
+    #[serde(default, alias = "slots")]
+    pub connections: BTreeMap<String, ConnectionSpec>,
     /// The ontology's secret name -> the Tilde secret's name.
     #[serde(default)]
     pub secrets: BTreeMap<String, String>,
@@ -99,7 +100,7 @@ const ENVIRONMENTS: &str = "tilde.ontology_control.v1.EnvironmentService";
 struct Resolved {
     environment: String,
     environment_id: String,
-    slots: Vec<(String, String)>,
+    connections: Vec<(String, String)>,
     secrets: Vec<(String, String)>,
 }
 struct Project {
@@ -200,8 +201,8 @@ async fn preflight(
                 });
                 continue;
             };
-            let mut slots = Vec::new();
-            for (slot, connection) in &env.slots {
+            let mut bindings = Vec::new();
+            for (name, connection) in &env.connections {
                 let (provider, connection_name) = connection
                     .slug
                     .split_once('/')
@@ -216,7 +217,7 @@ async fn preflight(
                         .map(|t| format!("&type={}", encode(t)))
                         .unwrap_or_default()
                 );
-                let subject = format!("{subject} slot {slot}");
+                let subject = format!("{subject} connection {name}");
                 let Some(row) = connections
                     .iter()
                     .find(|c| c["slug"] == connection.slug.as_str())
@@ -258,8 +259,8 @@ async fn preflight(
                     });
                     continue;
                 }
-                slots.push((
-                    slot.clone(),
+                bindings.push((
+                    name.clone(),
                     row["id"].as_str().unwrap_or_default().to_string(),
                 ));
             }
@@ -291,7 +292,7 @@ async fn preflight(
             resolved.push(Resolved {
                 environment: env_name.clone(),
                 environment_id: found["id"].as_str().unwrap_or_default().to_string(),
-                slots,
+                connections: bindings,
                 secrets: bound,
             });
         }
@@ -600,8 +601,17 @@ pub async fn prepare(
     ))
 }
 
-/// The dry run's plan: each slot whose binding changes as `slot: current → new` (from what the
-/// environment has bound now), and a count of the unchanged ones.
+/// A binding's connection name: `name`, or `slot` from servers before the rename.
+fn binding_name(binding: &Value) -> &str {
+    binding["name"]
+        .as_str()
+        .filter(|n| !n.is_empty())
+        .or_else(|| binding["slot"].as_str())
+        .unwrap_or_default()
+}
+
+/// The dry run's plan: each connection whose binding changes as `connection name: current → new`
+/// (from what the environment has bound now), and a count of the unchanged ones.
 async fn plan_text(
     client: &Client,
     projects: &[Project],
@@ -615,7 +625,7 @@ async fn plan_text(
         ));
         for env in &p.environments {
             let e = &env.environment;
-            let bound = match env.slots.is_empty() {
+            let bound = match env.connections.is_empty() {
                 true => Vec::new(),
                 false => client
                     .ok(
@@ -628,8 +638,8 @@ async fn plan_text(
                     .unwrap_or_default(),
             };
             let mut unchanged = 0;
-            for (slot, connection) in &env.slots {
-                let current = bound.iter().find(|b| b["slot"] == slot.as_str());
+            for (name, connection) in &env.connections {
+                let current = bound.iter().find(|b| binding_name(b) == name.as_str());
                 if current.is_some_and(|b| b["connectionId"] == connection.as_str()) {
                     unchanged += 1;
                     continue;
@@ -638,12 +648,14 @@ async fn plan_text(
                     .and_then(|b| b["connectionName"].as_str())
                     .filter(|c| !c.is_empty())
                     .unwrap_or("unbound");
-                let new = &specs[&p.name].environments[e].slots[slot].slug;
-                out.push_str(&format!("    {e}: slot {slot}: {current} → {new}\n"));
+                let new = &specs[&p.name].environments[e].connections[name].slug;
+                out.push_str(&format!("    {e}: connection {name}: {current} → {new}\n"));
             }
             if unchanged > 0 {
                 let plural = if unchanged == 1 { "" } else { "s" };
-                out.push_str(&format!("    {e}: {unchanged} slot{plural} unchanged\n"));
+                out.push_str(&format!(
+                    "    {e}: {unchanged} connection{plural} unchanged\n"
+                ));
             }
             for (secret, _) in &env.secrets {
                 out.push_str(&format!("    {e}: bind secret {secret}\n"));
@@ -670,7 +682,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// That the version declares every slot and secret the environment binds, and that each one it
+/// That the version declares every connection and secret the environment binds, and that each one it
 /// declares is bound (by the spec or already): checked for every environment before any binding.
 async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result<()> {
     let names = |field: &str, key: Option<&str>| -> Vec<String> {
@@ -681,10 +693,15 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .filter_map(|v| key.map_or(v, |k| &v[k]).as_str().map(str::to_string))
             .collect()
     };
-    let (declared, secrets) = (names("slots", Some("name")), names("secrets", None));
+    // Servers before the rename list them as `slots`.
+    let declared = match version.get("connections").is_some_and(|c| c.is_array()) {
+        true => names("connections", Some("name")),
+        false => names("slots", Some("name")),
+    };
+    let secrets = names("secrets", None);
     let mut problems = Vec::new();
     for env in &p.environments {
-        let slots = client
+        let bindings = client
             .ok(
                 &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
                 json!({"environmentId": env.environment_id}),
@@ -702,22 +719,22 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .as_array()
             .cloned()
             .unwrap_or_default();
-        for (slot, _) in &env.slots {
-            if !declared.contains(slot) {
+        for (name, _) in &env.connections {
+            if !declared.contains(name) {
                 problems.push(format!(
-                    "{}: the version declares no slot {slot}",
+                    "{}: the version declares no connection {name}",
                     env.environment
                 ));
             }
         }
-        for slot in &declared {
-            let bound = slots.iter().any(|b| {
-                b["slot"] == slot.as_str()
+        for name in &declared {
+            let bound = bindings.iter().any(|b| {
+                binding_name(b) == name.as_str()
                     && b["connectionId"].as_str().is_some_and(|c| !c.is_empty())
             });
-            if !bound && !env.slots.iter().any(|(s, _)| s == slot) {
+            if !bound && !env.connections.iter().any(|(n, _)| n == name) {
                 problems.push(format!(
-                    "{}: slot {slot} is neither bound nor in the spec",
+                    "{}: connection {name} is neither bound nor in the spec",
                     env.environment
                 ));
             }
@@ -844,9 +861,9 @@ async fn deploy_one(
                     }
                 )
             };
-            for (slot, connection) in &env.slots {
+            for (name, connection) in &env.connections {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "slot": slot, "connectionId": connection}))
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "name": name, "slot": name, "connectionId": connection}))
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
@@ -957,14 +974,14 @@ mod tests {
         serde_json::from_value(json!({
             "shop": {"environments": {
                 "production": {
-                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "connections": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
                     "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}},
                 "staging": {
-                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "connections": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
                     "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}},
             "warehouse": {"environments": {
                 "production": {
-                    "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+                    "connections": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
                     "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}}}))
         .unwrap()
     }
@@ -1033,6 +1050,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         compile_errors: Option<Value>,
         /// Whether a dry-run Apply finds the ontology's tools unserved, as on a new environment.
         ontology_unserved: bool,
+        /// A server before the rename: `slots`/`slot` fields, and binding requires `slot`.
+        old_server: bool,
     }
 
     impl Default for World {
@@ -1049,6 +1068,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 bound: BTreeMap::new(),
                 compile_errors: None,
                 ontology_unserved: false,
+                old_server: false,
             }
         }
     }
@@ -1107,12 +1127,19 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                             None => json!({"errors": [], "contract": {"contract.json": r#"{"handlers": [{"handler": "listOrders", "kind": "read"}, {"handler": "watchOrders", "kind": "realtime"}]}"#}}),
                         },
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
-                        "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"],
-                            "slots": world.declared.as_array().unwrap().iter().map(|slot| json!({"name": slot, "provider": slot})).collect::<Vec<_>>()}}),
-                        // What the environment has bound (nothing yet); the slots it lists are the
+                        "GetVersion" => {
+                            let declared: Vec<Value> = world.declared.as_array().unwrap().iter().map(|name| json!({"name": name, "provider": name})).collect();
+                            let field = if world.old_server { "slots" } else { "connections" };
+                            json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"], field: declared}})
+                        }
+                        "SetEnvironmentConnection" if body["slot"].as_str().unwrap_or_default().is_empty() => {
+                            return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"code": "invalid_argument", "message": "slot is required"}))).into_response();
+                        }
+                        // What the environment has bound (nothing yet); the connections it lists are the
                         // project's newest version's, which the CLI must not rely on.
-                        "ListEnvironmentConnections" => world.bound.get(env.as_str()).cloned().unwrap_or_else(|| {
-                            json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]})
+                        "ListEnvironmentConnections" => world.bound.get(env.as_str()).cloned().unwrap_or_else(|| match world.old_server {
+                            true => json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]}),
+                            false => json!({"connections": [{"name": "github", "declared": true}, {"name": "linear", "declared": true}]}),
                         }),
                         "ListEnvironmentSecrets" => json!({"secrets": [{"name": "PG_PASSWORD", "declared": true, "set": false}]}),
                         "Deploy" => json!({"deployment": {"id": format!("d-{env}"), "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
@@ -1427,10 +1454,11 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         );
     }
 
-    /// The plan shows each slot binding that changes, from what the environment has bound now,
+    /// The plan shows each connection binding that changes, from what the environment has bound
+    /// now (listed by an older server as `slot`, which still reads),
     /// and counts the ones that stay.
     #[tokio::test]
-    async fn the_plan_shows_slot_changes() {
+    async fn the_plan_shows_connection_changes() {
         let (url, _) = cloud(World {
             bound: BTreeMap::from([(
                 "e1",
@@ -1453,15 +1481,54 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         assert!(actions.is_empty());
         let plan = plan_text(&client, &projects, &shop).await.unwrap();
         assert!(
-            plan.contains("production: slot github: github/old → github/acme\n"),
+            plan.contains("production: connection github: github/old → github/acme\n"),
             "{plan}"
         );
-        assert!(plan.contains("production: 1 slot unchanged\n"), "{plan}");
-        assert!(!plan.contains("production: slot linear"), "{plan}");
         assert!(
-            plan.contains("staging: slot linear: unbound → linear/acme\n"),
+            plan.contains("production: 1 connection unchanged\n"),
             "{plan}"
         );
+        assert!(!plan.contains("production: connection linear"), "{plan}");
+        assert!(
+            plan.contains("staging: connection linear: unbound → linear/acme\n"),
+            "{plan}"
+        );
+    }
+
+    /// A server before the rename (`slots`/`slot` fields, binding refused without `slot`) and a
+    /// spec from `@trytilde/iac` before it (`slots`): the deploy still binds by name and rolls
+    /// out, so this CLI works before and after Tilde Cloud ships the rename.
+    #[tokio::test]
+    async fn an_old_server_and_an_old_spec_still_deploy() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            old_server: true,
+            ..World::default()
+        })
+        .await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        let mut d = declarations(false);
+        d.ontologies = serde_json::from_value(json!({"shop": {"environments": {"production": {
+            "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
+            "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}}}))
+        .unwrap();
+        assert!(
+            crate::deploy::ontologies_first(&a, &d, false)
+                .await
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        let calls = calls.lock().unwrap().clone();
+        let bound: Vec<&Value> = calls
+            .iter()
+            .filter(|(m, _)| m == "SetEnvironmentConnection")
+            .map(|(_, body)| body)
+            .collect();
+        assert_eq!(bound.len(), 2, "{calls:?}");
+        assert!(bound.iter().all(|b| b["name"] == b["slot"]), "{bound:?}");
+        assert!(calls.iter().any(|(m, _)| m == "Deploy"), "{calls:?}");
     }
 
     /// One version per ontology from the archive, then each environment bound and rolled out in
@@ -1619,7 +1686,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
 
     /// A version that does not declare what the spec binds stops before any binding.
     #[tokio::test]
-    async fn a_version_without_the_specs_slots_binds_nothing() {
+    async fn a_version_without_the_specs_connections_binds_nothing() {
         let repo = repository();
         let (url, calls) = cloud(World {
             declared: json!(["github"]),
@@ -1635,7 +1702,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 .unwrap_err()
         );
         assert!(
-            error.contains("production: the version declares no slot linear"),
+            error.contains("production: the version declares no connection linear"),
             "{error}"
         );
         assert_eq!(changes(&calls), ["CreateVersion"]);
