@@ -12,6 +12,15 @@ use tilde_contracts::proto::tilde::management::v1 as wire;
 /// The request for `declarations`: its agents as discovered, the code's declarations and the
 /// external ID on the one agent that deploys this entry, and the CI's commit details.
 pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::ApplyRequest> {
+    request_with(args, declarations, &Default::default())
+}
+/// The request with each Hosted agent's bundle (by key) in its external ID's digest, so changed
+/// code is a new deployment even when its declarations are not.
+fn request_with(
+    args: &Deploy,
+    declarations: &Declarations,
+    bundles: &Bundles,
+) -> Result<wire::ApplyRequest> {
     // The spec owns the agent and its deploy target.
     for (set, flag) in [
         (args.agent_id.is_some(), "--agent-id (TILDE_AGENT_ID)"),
@@ -60,7 +69,8 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
                     digest(&json!([
                         released,
                         deployment.clone(),
-                        variable("GITHUB_SHA")
+                        variable("GITHUB_SHA"),
+                        bundles.get(&key).map(|b| bundle_digest(b)),
                     ]))
                 ),
             }
@@ -85,6 +95,30 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
     request.commit_sha = ci.commit_sha;
     request.branch = ci.branch;
     Ok(request)
+}
+
+/// Hosted agents' bundles, by key.
+type Bundles = std::collections::BTreeMap<String, Vec<u8>>;
+const HOSTED: &str = "DEPLOYMENT_TARGET_HOSTED";
+fn bundle_digest(bundle: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(bundle))
+}
+/// Build the bundle of every Hosted agent whose code this deploy releases.
+fn bundles(declarations: &Declarations) -> Result<Bundles> {
+    let mut bundles = Bundles::new();
+    for agent in &declarations.agents {
+        let key = agent["key"].as_str().unwrap_or_default();
+        if agent["deployment"]["target"] != HOSTED {
+            continue;
+        }
+        let Some((dir, entry)) = declarations.sources.get(key) else {
+            continue;
+        };
+        eprintln!("Agent {key}: bundling {entry} for Tilde to host");
+        bundles.insert(key.to_owned(), crate::hosted::bundle(dir, entry)?);
+    }
+    Ok(bundles)
 }
 
 fn variable(name: &str) -> Option<String> {
@@ -198,7 +232,12 @@ pub async fn run(
         bail!("--url (or TILDE_URL) is required");
     };
     let client = Client::new(url, args.api_key.clone())?;
-    let request = request(args, declarations)?;
+    let mut bundles = if args.dry_run {
+        Bundles::new()
+    } else {
+        bundles(declarations)?
+    };
+    let request = request_with(args, declarations, &bundles)?;
     let deploying = request
         .agents
         .iter()
@@ -215,6 +254,26 @@ pub async fn run(
         .into();
         response.required_actions = actions;
     }
+    // Each Hosted deployment serves once its code is published: Tilde makes it a version of the
+    // agent's function. Publishing one that already serves changes nothing.
+    let hosted: std::collections::BTreeSet<String> = bundles.keys().cloned().collect();
+    if response.outcome.as_known() == Some(wire::ApplyOutcome::Applied) {
+        for agent in &response.agents {
+            let Some(bundle) = bundles.remove(&agent.key) else {
+                continue;
+            };
+            if agent.deployment_id.is_empty() {
+                continue;
+            }
+            let published =
+                crate::hosted::publish(&client, &agent.id, &agent.deployment_id, bundle).await?;
+            eprintln!(
+                "Agent {}: hosted by Tilde, function version {}",
+                agent.key,
+                crate::hosted::version(&published)
+            );
+        }
+    }
     if args.json {
         println!("{}", serde_json::to_string(&response)?);
     } else {
@@ -230,7 +289,7 @@ pub async fn run(
         for agent in response
             .agents
             .iter()
-            .filter(|a| !a.deployment_token.is_empty())
+            .filter(|a| !a.deployment_token.is_empty() && !hosted.contains(&a.key))
         {
             match deploying {
                 1 => println!("{}", agent.deployment_token),
@@ -431,6 +490,155 @@ mod tests {
             again.agents[0].deployment.as_option().unwrap().external_id,
             deployment.external_id
         );
+    }
+
+    /// A Hosted agent's code is bundled (esbuild's module at `dist/index.mjs`, its prompts beside
+    /// it and the SDK's version), its digest is in the external ID, and once Apply registers the
+    /// deployment the bundle is published; Tilde runs it, so no token is printed for it.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_hosted_agent_is_bundled_and_published_after_apply() {
+        use std::os::unix::fs::PermissionsExt;
+        let code = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(code.path().join("prompts")).unwrap();
+        std::fs::write(code.path().join("prompts/system.md"), "Fix bugs.").unwrap();
+        std::fs::write(code.path().join("index.js"), "export const handler = 1;").unwrap();
+        std::fs::create_dir_all(code.path().join("node_modules/@trytilde/sdk")).unwrap();
+        std::fs::write(
+            code.path().join("node_modules/@trytilde/sdk/package.json"),
+            r#"{"name": "@trytilde/sdk", "version": "9.9.9"}"#,
+        )
+        .unwrap();
+        // A stand-in esbuild: the "bundle" is the entry as it is.
+        let bin = code.path().join("node_modules/.bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(
+            bin.join("esbuild"),
+            "#!/bin/sh\nfor a in \"$@\"; do case $a in --outfile=*) out=${a#--outfile=};; --*) ;; *) in=$a;; esac; done\nmkdir -p \"$(dirname \"$out\")\" && cp \"$in\" \"$out\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(bin.join("esbuild"), std::fs::Permissions::from_mode(0o755))
+            .unwrap();
+
+        let applied: Arc<Mutex<Option<wire::ApplyRequest>>> = Arc::default();
+        let published: Arc<Mutex<Option<wire::PublishHostedDeploymentRequest>>> = Arc::default();
+        let proto = |message: Vec<u8>| ([(header::CONTENT_TYPE, "application/proto")], message);
+        let app = Router::new()
+            .route(
+                "/tilde.management.v1.ApplyService/Apply",
+                post({
+                    let applied = applied.clone();
+                    move |body: Bytes| async move {
+                        *applied.lock().unwrap() =
+                            Some(wire::ApplyRequest::decode_from_slice(&body).unwrap());
+                        proto(
+                            wire::ApplyResponse {
+                                outcome: wire::ApplyOutcome::Applied.into(),
+                                agents: vec![wire::AppliedAgent {
+                                    key: "fixer".into(),
+                                    id: "a1".into(),
+                                    deployment_id: "d1".into(),
+                                    deployment_token: "unused".into(),
+                                    ..Default::default()
+                                }],
+                                ..Default::default()
+                            }
+                            .encode_to_vec(),
+                        )
+                        .into_response()
+                    }
+                }),
+            )
+            .route(
+                "/tilde.management.v1.DeploymentService/PublishHostedDeployment",
+                post({
+                    let published = published.clone();
+                    move |body: Bytes| async move {
+                        *published.lock().unwrap() = Some(
+                            wire::PublishHostedDeploymentRequest::decode_from_slice(&body).unwrap(),
+                        );
+                        proto(
+                            wire::PublishHostedDeploymentResponse {
+                                deployment:
+                                    tilde_contracts::proto::tilde::types::v1::AgentDeployment {
+                                        id: "d1".into(),
+                                        target_reference:
+                                            "arn:aws:lambda:us-east-1:1:function:tilde-hosted-a1:7"
+                                                .into(),
+                                        ..Default::default()
+                                    }
+                                    .into(),
+                                ..Default::default()
+                            }
+                            .encode_to_vec(),
+                        )
+                        .into_response()
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        let declarations = Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            agents: vec![
+                json!({"key": "fixer", "name": "Fixer", "deployment": {"target": "DEPLOYMENT_TARGET_HOSTED"}}),
+            ],
+            releases: [(
+                "fixer".to_string(),
+                json!({"prompts": [], "skills": [], "tools": []}),
+            )]
+            .into(),
+            sources: [(
+                "fixer".to_string(),
+                (code.path().to_path_buf(), "index.js".to_string()),
+            )]
+            .into(),
+            ..Default::default()
+        };
+        // SAFETY: tests in this binary do not read these variables concurrently.
+        unsafe { std::env::remove_var("GITHUB_RUN_ID") };
+        run(&args(url), &declarations, &Default::default())
+            .await
+            .unwrap();
+        let applied = applied.lock().unwrap().take().unwrap();
+        let external = &applied.agents[0]
+            .deployment
+            .as_option()
+            .unwrap()
+            .external_id;
+        // Changed code alone is a new deployment.
+        assert_ne!(
+            external,
+            &super::request(&args("http://x".into()), &declarations)
+                .unwrap()
+                .agents[0]
+                .deployment
+                .as_option()
+                .unwrap()
+                .external_id
+        );
+        let published = published.lock().unwrap().take().unwrap();
+        assert_eq!(
+            (
+                published.agent_id.as_str(),
+                published.deployment_id.as_str()
+            ),
+            ("a1", "d1")
+        );
+        let mut zip = zip::ZipArchive::new(std::io::Cursor::new(published.bundle)).unwrap();
+        let mut names: Vec<String> = zip.file_names().map(str::to_owned).collect();
+        names.sort();
+        assert_eq!(
+            names,
+            ["dist/index.mjs", "package.json", "prompts/system.md"]
+        );
+        let mut manifest = String::new();
+        std::io::Read::read_to_string(&mut zip.by_name("package.json").unwrap(), &mut manifest)
+            .unwrap();
+        assert!(manifest.contains("9.9.9"), "{manifest}");
     }
 
     /// A root `tilde deploy` releases every deploying agent's own code: each reads its folder

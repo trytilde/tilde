@@ -5,8 +5,10 @@ enum SidecarFailureMode { SIDECAR_FAILURE_MODE_UNSPECIFIED = 0; SIDECAR_FAILURE_
 // Which deployment new threads go to: the most recently registered one automatically, or a weighted split across active deployments.
 enum DeploymentRouting { DEPLOYMENT_ROUTING_UNSPECIFIED = 0; DEPLOYMENT_ROUTING_LATEST = 1; DEPLOYMENT_ROUTING_WEIGHTED = 2; }
 enum DeploymentSource { DEPLOYMENT_SOURCE_UNSPECIFIED = 0; DEPLOYMENT_SOURCE_CI = 1; DEPLOYMENT_SOURCE_MANUAL = 2; }
-// Gateway agent servers and sidecars dial in. Lambda requires a function ARN.
-enum DeploymentTarget { DEPLOYMENT_TARGET_UNSPECIFIED = 0; DEPLOYMENT_TARGET_GATEWAY = 1; DEPLOYMENT_TARGET_SIDECAR = 2; DEPLOYMENT_TARGET_LAMBDA = 3; }
+// Gateway agent servers and sidecars dial in. Lambda requires a function ARN. Hosted (Tilde Cloud
+// only) runs the agent's code on Tilde's own Lambda: registered first, then routable once
+// `PublishHostedDeployment` has published its bundle as a function version (`target_reference`).
+enum DeploymentTarget { DEPLOYMENT_TARGET_UNSPECIFIED = 0; DEPLOYMENT_TARGET_GATEWAY = 1; DEPLOYMENT_TARGET_SIDECAR = 2; DEPLOYMENT_TARGET_LAMBDA = 3; DEPLOYMENT_TARGET_HOSTED = 4; }
 enum DeploymentStatus { DEPLOYMENT_STATUS_UNSPECIFIED = 0; DEPLOYMENT_STATUS_REGISTERED = 1; DEPLOYMENT_STATUS_RETIRED = 2; }
 // Agent-level deployment settings.
 message Deployment { string agent_id = 1; SidecarFailureMode failure_mode = 4; DeploymentRouting routing = 6; string serving_deployment_id = 7; reserved 2, 3, 5; }
@@ -20,7 +22,7 @@ message AgentDeployment {
   string commit_message = 16; string branch = 17; string commit_author = 18;
   // Whole percentage of new conversations in weighted routing.
   uint32 traffic_weight = 19;
-  // Registered Lambda, or a live/ready Gateway or Sidecar connection chain.
+  // Registered Lambda, published Hosted, or a live/ready Gateway or Sidecar connection chain.
   bool routable = 20;
 }
 // One process incarnation that dialed in with a deployment's token.

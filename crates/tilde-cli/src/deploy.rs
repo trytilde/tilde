@@ -24,7 +24,8 @@ pub struct Deploy {
     #[arg(long, env = "TILDE_API_KEY", hide_env_values = true)]
     pub api_key: Option<String>,
     /// Without specs; default gateway. A spec's `deploy` names its own target.
-    #[arg(long, value_parser = ["gateway", "sidecar", "lambda"])]
+    /// `hosted` (Tilde Cloud): Tilde bundles and runs the code itself.
+    #[arg(long, value_parser = ["gateway", "sidecar", "lambda", "hosted"])]
     pub target: Option<String>,
     /// Required for, and only for, a Lambda target.
     #[arg(long)]
@@ -76,6 +77,7 @@ pub fn target_of(target: &str) -> types::DeploymentTarget {
     match target {
         "sidecar" => types::DeploymentTarget::Sidecar,
         "lambda" => types::DeploymentTarget::Lambda,
+        "hosted" => types::DeploymentTarget::Hosted,
         _ => types::DeploymentTarget::Gateway,
     }
 }
@@ -222,7 +224,21 @@ pub async fn run(args: Deploy) -> Result<()> {
         ))
     });
 
-    let deployment = registry::register(&client, agent_id, &declarations, request).await?;
+    let bundle = match target {
+        "hosted" => Some(crate::hosted::bundle(&project.dir, &entry)?),
+        _ => None,
+    };
+    let mut deployment = registry::register(&client, agent_id, &declarations, request).await?;
+    if let Some(bundle) = bundle {
+        let published = crate::hosted::publish(&client, agent_id, &deployment.id, bundle).await?;
+        eprintln!(
+            "Deployment {}: hosted by Tilde, function version {}",
+            deployment.id,
+            crate::hosted::version(&published)
+        );
+        // Tilde runs it: there is nothing to dial in with.
+        deployment.token.clear();
+    }
     eprintln!(
         "Deployment {} {}",
         deployment.id,

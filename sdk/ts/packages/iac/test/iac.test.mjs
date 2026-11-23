@@ -20,6 +20,7 @@ import {
   openai,
   routine,
   secret,
+  tildeSandbox,
   defineTeam,
   grant,
   group,
@@ -230,4 +231,17 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
     () => defineProject({ ontologies: { Faro: ontology({ environments: {} }) } }),
     /lowercase/,
   );
+});
+
+test("a hosted agent on Tilde sandboxes is a spec the server accepts", () => {
+  const agent = defineAgent({
+    key: "fixer",
+    name: "Fixer",
+    sandbox: blueprint({ name: "fixer", provider: tildeSandbox, template: "debian-full" }),
+    deploy: { target: "hosted" },
+  });
+  const spec = fromJson(AgentSpecSchema, agent.json);
+  assert.equal(spec.deployment?.target, 4);
+  assert.equal(spec.deployment?.targetReference, undefined);
+  assert.equal(spec.sandbox?.provider?.slug, "tilde_sandbox/tilde");
 });

@@ -383,7 +383,7 @@ pub struct AgentDeploymentView<'a> {
     ///
     /// Field 19: `traffic_weight`
     pub traffic_weight: u32,
-    /// Registered Lambda, or a live/ready Gateway or Sidecar connection chain.
+    /// Registered Lambda, published Hosted, or a live/ready Gateway or Sidecar connection chain.
     ///
     /// Field 20: `routable`
     pub routable: bool,
@@ -1102,7 +1102,7 @@ impl AgentDeploymentOwnedView {
     pub fn traffic_weight(&self) -> u32 {
         self.0.reborrow().traffic_weight
     }
-    /// Registered Lambda, or a live/ready Gateway or Sidecar connection chain.
+    /// Registered Lambda, published Hosted, or a live/ready Gateway or Sidecar connection chain.
     ///
     /// Field 20: `routable`
     #[must_use]

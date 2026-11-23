@@ -7,6 +7,7 @@ mod deploy;
 mod dev;
 mod discover;
 mod doctor;
+mod hosted;
 mod iac;
 mod local;
 mod ontology;

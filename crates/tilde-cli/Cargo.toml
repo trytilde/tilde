@@ -50,6 +50,9 @@ toml = "0.9"
 url.workspace = true
 zeroize.workspace = true
 webpki-roots = "0.26"
+# A Hosted deployment's bundle (Tilde Cloud): built in a scratch directory and zipped.
+tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(unix)'.dependencies]
 # Killing a sandbox command's whole process group at its timeout.
@@ -58,5 +61,4 @@ libc = "0.2"
 [dev-dependencies]
 # Encoding and decoding contract messages in the stand-in gateway the deploy test drives.
 buffa.workspace = true
-tempfile = "3"
 tokio-stream = "0.1"

@@ -9,7 +9,12 @@
  * Nothing is removed because it is missing from a spec: an entry with `delete: true` removes it.
  * The JSON built here is the `AgentSpec` protobuf JSON the server takes.
  */
-import type { ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
+import {
+  catalogProvider,
+  type ConnectionRef,
+  type RemovedSource,
+  type ToolSelection,
+} from "./refs.js";
 
 export { ALL, connection, catalogProvider } from "./refs.js";
 export type { All, ConnectionRef, Connections, RemovedSource, ToolSelection } from "./refs.js";
@@ -49,8 +54,9 @@ export type Reuse = "thread" | "agent" | "agent_identity" | "global" | "global_i
 export type Blueprint = {
   /** The blueprint's key: agents declaring the same name share it and must agree on it. */
   name: string;
-  /** An E2B or Modal connection. */
+  /** An E2B or Modal connection, or `tildeSandbox` (Tilde Cloud). */
   provider: ConnectionRef;
+  /** The provider's template or image; for `tildeSandbox` one of {@link TildeSandboxImage}. */
   template: string;
   reuse?: Reuse;
   timings?: {
@@ -66,6 +72,16 @@ export type Blueprint = {
   egress?: Egress[];
 };
 export const blueprint = (spec: Blueprint): Blueprint => spec;
+
+/**
+ * Sandboxes Tilde runs itself (Tilde Cloud), paid from the organization's credits: every team has
+ * this connection, so it needs no setup. Its blueprints run one of {@link TildeSandboxImage}.
+ */
+export const tildeSandbox = catalogProvider<never, "managed", "tilde_sandbox">("tilde_sandbox").ref(
+  "tilde",
+);
+/** Debian images with the Tilde CLI: Node.js, Python, or both with Docker Engine and Compose. */
+export type TildeSandboxImage = "debian-node" | "debian-python" | "debian-full";
 
 /** A secret set in the app (Connections → Secrets), referenced by name; its value never enters a spec. */
 export type SecretRef = { readonly secret: string };
@@ -104,8 +120,15 @@ export type Channel = {
   delete?: boolean;
 };
 
-/** A deployment the customer already deployed: Tilde registers it, it does not host it. */
-export type Deploy = { target: "gateway" | "sidecar" } | { target: "lambda"; functionArn: string };
+/**
+ * Where the agent's code runs. `gateway`, `sidecar` and `lambda` are deployed by the customer and
+ * registered by Tilde. `hosted` (Tilde Cloud) is run by Tilde: `tilde deploy` bundles the agent's
+ * code (its entry module exports `handler = createLambdaHandler({ run })`) and Tilde runs it on its
+ * own Lambda, paid from the organization's credits: `deploy: { target: "hosted" }`.
+ */
+export type Deploy =
+  | { target: "gateway" | "sidecar" | "hosted" }
+  | { target: "lambda"; functionArn: string };
 /** A Lambda function; a version-qualified ARN keeps the deployment fixed. */
 export const lambda = (functionArn: string): Deploy => ({ target: "lambda", functionArn });
 /** A host that dials in to Tilde's gateway with its deployment token. */
