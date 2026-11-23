@@ -1,3 +1,0 @@
-kind: Changed
-body: "An existing `agents/<key>/` folder without its own package.json or pyproject.toml now fails `tilde deploy` with an error naming the folder, instead of being read as part of the project around it."
-time: 2026-11-24T04:00:00+00:00
