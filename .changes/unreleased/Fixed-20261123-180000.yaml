@@ -1,0 +1,3 @@
+kind: Fixed
+body: "Modal blueprint sandboxes pick up a moved image tag. The launcher resolves the blueprint image's tag to its digest at the registry and builds `FROM <image>@sha256:…`, so Modal's image cache, which keys on the `FROM` line, builds again when `:latest` moves instead of running whatever it built first. If the registry can't be reached, it builds from the tag and logs a warning. E2B blueprints launch a template's latest build already."
+time: 2026-11-23T18:00:00+00:00

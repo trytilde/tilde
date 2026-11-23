@@ -4,6 +4,7 @@
 //! base64 inside the command line, which bounds a single write to what one argument can carry
 //! (about 96 KiB). Each call looks up the sandbox's task and router access afresh.
 mod grpc;
+mod registry;
 use super::sandbox_patch as patch;
 
 use super::{
@@ -444,7 +445,9 @@ pub async fn launch(access: &Access, image: &str, command: Vec<String>) -> ToolR
     let image_id = if image.starts_with("im-") {
         image.to_owned()
     } else {
-        self::image(&mut api, &app, vec![format!("FROM {image}")]).await?
+        // Pinned to its digest: Modal caches on the `FROM` line, so a moved tag needs a new one.
+        let pinned = registry::pinned(image).await;
+        self::image(&mut api, &app, vec![format!("FROM {pinned}")]).await?
     };
     let created: SandboxCreateV2Response = api
         .unary(

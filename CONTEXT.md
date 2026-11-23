@@ -2371,4 +2371,4 @@ frame repeating the cursor) and the other server streams' pings. A non-streamed 
 still silent after 20 s is answered `200` at once with JSON whitespace every heartbeat until the
 provider's body follows. Management RPCs that wait on outside work give up after 45 s
 (`rpc::INLINE_LIMIT`) with their own error, or let it finish in the background (skill source
-syncs, BuildVersion's repository fetch).
+syncs).
