@@ -1,0 +1,3 @@
+kind: Changed
+body: "`tilde deploy` prints deployment tokens only for dial-in hosts (gateway, sidecar): a Lambda or Hosted deployment's token is never printed."
+time: 2026-11-24T14:00:00+00:00
