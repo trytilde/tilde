@@ -1,0 +1,3 @@
+kind: Changed
+body: "A new project deploys its ontologies and agents in one `tilde deploy`. Before the ontologies first roll out, Tilde lists none of their tools, so the agents' preflight used to block on every tool named on an ontology's connection (`tilde_ontology/...`) and the first deploy needed `--only ontologies`. Those tools are now checked against the compiled contract (what CompileOntology returns), in `tilde deploy`, `--dry-run` and `--check` alike: a tool the ontologies don't serve still blocks before anything changes. The Apply after the rollout checks them against the running ontology as before."
+time: 2026-11-23T23:00:00+00:00

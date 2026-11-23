@@ -115,11 +115,64 @@ async fn apply(client: &Client, request: wire::ApplyRequest) -> Result<wire::App
         .into_owned())
 }
 
+/// The server lists an ontology connection's tools from the running ontology, so before this
+/// project's ontologies roll out (a new environment's first above all) it reports the tools it
+/// can't find there. With the project's compiled handlers at hand (`served`, from
+/// `ontology::prepare`), each such finding on a `tilde_ontology/...` connection gives way to a
+/// check of that source's tools against them. A connection whose tools the server did list (say,
+/// another project's running ontology) keeps the server's word. Without handlers (`--only
+/// agents`, `--ontology` choosing some, an ontology that does not compile) the server's findings
+/// stand as they are.
+pub(crate) fn with_ontology_tools(
+    actions: Vec<wire::RequiredAction>,
+    declarations: &Declarations,
+    served: &std::collections::BTreeSet<String>,
+) -> Vec<wire::RequiredAction> {
+    if served.is_empty() {
+        return actions;
+    }
+    let unlisted = |a: &wire::RequiredAction| {
+        a.code.as_known() == Some(wire::RequiredActionCode::ToolNotOffered)
+            && a.subject.contains("/tools/tilde_ontology/")
+    };
+    let subjects: std::collections::BTreeSet<String> = actions
+        .iter()
+        .filter(|a| unlisted(a))
+        .map(|a| a.subject.clone())
+        .collect();
+    let mut kept: Vec<wire::RequiredAction> =
+        actions.into_iter().filter(|a| !unlisted(a)).collect();
+    for agent in &declarations.agents {
+        let key = agent["key"].as_str().unwrap_or_default();
+        for source in agent["tools"].as_array().into_iter().flatten() {
+            let slug = source["connection"]["slug"].as_str().unwrap_or_default();
+            let subject = format!("{key}/tools/{slug}");
+            if !subjects.contains(&subject) {
+                continue;
+            }
+            for name in source["tools"].as_array().into_iter().flatten() {
+                let name = name.as_str().unwrap_or_default();
+                if name != "*" && !served.contains(name) {
+                    kept.push(wire::RequiredAction {
+                        code: wire::RequiredActionCode::ToolNotOffered.into(),
+                        subject: subject.clone(),
+                        message: format!("The project's ontologies serve no tool {name}"),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+    }
+    kept
+}
+
 /// The actions that would block applying the specs, from a dry run: `tilde deploy` asks before
-/// it changes anything (its ontologies included), so a blocked deploy changed nothing.
+/// it changes anything (its ontologies included), so a blocked deploy changed nothing. Tools on
+/// the project's ontology connections are checked against `served`, the compiled handlers.
 pub async fn preflight(
     args: &Deploy,
     declarations: &Declarations,
+    served: &std::collections::BTreeSet<String>,
 ) -> Result<Vec<crate::ontology::Action>> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
@@ -128,23 +181,40 @@ pub async fn preflight(
     let mut request = request(args, declarations)?;
     request.dry_run = true;
     let response = apply(&client, request).await?;
-    Ok(response
-        .required_actions
-        .into_iter()
-        .map(|a| crate::ontology::Action {
-            subject: a.subject,
-            message: a.message,
-            url: a.url,
-        })
-        .collect())
+    Ok(
+        with_ontology_tools(response.required_actions, declarations, served)
+            .into_iter()
+            .map(|a| crate::ontology::Action {
+                subject: a.subject,
+                message: a.message,
+                url: a.url,
+            })
+            .collect(),
+    )
 }
 
-pub async fn run(args: &Deploy, declarations: &Declarations) -> Result<()> {
+/// Apply the specs. A dry run's plan checks the tools on the project's ontology connections
+/// against `served`, the compiled handlers, as `preflight` does.
+pub async fn run(
+    args: &Deploy,
+    declarations: &Declarations,
+    served: &std::collections::BTreeSet<String>,
+) -> Result<()> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
     };
     let client = Client::new(url, args.api_key.clone())?;
-    let response = apply(&client, request(args, declarations)?).await?;
+    let mut response = apply(&client, request(args, declarations)?).await?;
+    if args.dry_run && !served.is_empty() {
+        let actions = with_ontology_tools(response.required_actions, declarations, served);
+        response.outcome = if actions.is_empty() {
+            wire::ApplyOutcome::Planned
+        } else {
+            wire::ApplyOutcome::Blocked
+        }
+        .into();
+        response.required_actions = actions;
+    }
     if args.json {
         println!("{}", serde_json::to_string(&response)?);
     } else {
@@ -326,7 +396,9 @@ mod tests {
         };
         // SAFETY: tests in this binary do not read these variables concurrently.
         unsafe { std::env::remove_var("GITHUB_RUN_ID") };
-        run(&args(url), &declarations).await.unwrap();
+        run(&args(url), &declarations, &Default::default())
+            .await
+            .unwrap();
         let request = received.lock().unwrap().take().unwrap();
         assert_eq!(request.team, "agents");
         assert_eq!(request.users[0].email, "ada@acme.test");

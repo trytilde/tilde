@@ -18,8 +18,8 @@ use crate::deploy::Deploy;
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// An ontology as `@trytilde/iac`'s `defineProject` writes it.
@@ -328,7 +328,7 @@ fn head(dir: &Path, allow_dirty: bool) -> Result<(String, String)> {
 }
 
 /// `<package>` as `dir` resolves it (its own `node_modules` or an ancestor's): its directory.
-fn installed(dir: &Path, package: &str) -> Option<std::path::PathBuf> {
+fn installed(dir: &Path, package: &str) -> Option<PathBuf> {
     dir.ancestors()
         .map(|d| d.join("node_modules").join(package))
         .find(|p| p.join("package.json").is_file())
@@ -352,7 +352,13 @@ fn node(cli: &Path, args: &[&std::ffi::OsStr]) -> Result<Vec<u8>> {
 /// `ontology.ir.json`, `worker.js` (the handler module) and `spaces/<id>/` (built against the
 /// contract Tilde compiles for the IR, which is written into the spaces project as
 /// `@tilde/contract`). An IR Tilde refuses fails the deploy with its errors.
-async fn build(client: &Client, project: &Project, folder: &Path) -> Result<Vec<u8>> {
+/// Evaluate an ontology here with the project's `@trytilde/ontology` and have Tilde compile it:
+/// the package's client build, its runtime, the IR and Tilde's answer (its contract).
+async fn compile(
+    client: &Client,
+    project: &Project,
+    folder: &Path,
+) -> Result<(PathBuf, u64, Vec<u8>, Value)> {
     let name = &project.name;
     let package = installed(folder, "@trytilde/ontology").with_context(|| {
         format!(
@@ -382,6 +388,35 @@ async fn build(client: &Client, project: &Project, folder: &Path) -> Result<Vec<
             errors.join("\n  ")
         );
     }
+    Ok((cli, runtime, ir, compiled))
+}
+
+/// The handlers of a compiled ontology (its contract's `contract.json`) that are tools: the ones
+/// its `tilde_ontology` connection serves once it runs (reads and actions; realtime views are
+/// not tools).
+fn handlers(compiled: &Value) -> Result<BTreeSet<String>> {
+    let contract: Value = serde_json::from_str(
+        compiled["contract"]["contract.json"]
+            .as_str()
+            .context("Tilde's contract has no contract.json")?,
+    )?;
+    Ok(contract["handlers"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|h| h["kind"] != "realtime")
+        .filter_map(|h| h["handler"].as_str().map(str::to_owned))
+        .collect())
+}
+
+/// Build an ontology into its artifact (and its handlers, `handlers`).
+async fn build(
+    client: &Client,
+    project: &Project,
+    folder: &Path,
+) -> Result<(Vec<u8>, BTreeSet<String>)> {
+    let name = &project.name;
+    let (cli, runtime, ir, compiled) = compile(client, project, folder).await?;
     let out = folder.join(".tilde/build");
     let _ = std::fs::remove_dir_all(&out);
     std::fs::create_dir_all(&out)?;
@@ -452,7 +487,7 @@ async fn build(client: &Client, project: &Project, folder: &Path) -> Result<Vec<
             MAX_ARTIFACT / (1024 * 1024)
         );
     }
-    Ok(artifact)
+    Ok((artifact, handlers(&compiled)?))
 }
 
 /// Until `read` says the value is no longer in progress (`waiting` is its in-progress status).
@@ -478,11 +513,13 @@ async fn poll(
 
 /// Check and resolve the ontologies (all, or `--ontology`'s) and build each into an artifact,
 /// changing nothing: the actions that block a deploy, else the plan (none when there is nothing to
-/// do or it is a dry run).
+/// do or it is a dry run), and the tools the ontologies' connections will serve (their compiled
+/// handlers: a dry run compiles for them only when `tools` asks).
 pub async fn prepare(
     args: &Deploy,
     ontologies: &BTreeMap<String, OntologySpec>,
-) -> Result<(Vec<Action>, Option<Plan>)> {
+    tools: bool,
+) -> Result<(Vec<Action>, Option<Plan>, BTreeSet<String>)> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
     };
@@ -495,7 +532,7 @@ pub async fn prepare(
         .map(|(name, spec)| (name.clone(), spec))
         .collect();
     if selected.is_empty() {
-        return Ok((Vec::new(), None));
+        return Ok((Vec::new(), None, BTreeSet::new()));
     }
     // Each ontology is `ontologies/<name>/` of the repository.
     let dir = args.dir.canonicalize().context("the project directory")?;
@@ -524,11 +561,18 @@ pub async fn prepare(
     let mut actions = Vec::new();
     let projects = preflight(&client, &selected, &mut actions).await?;
     if !actions.is_empty() {
-        return Ok((actions, None));
+        return Ok((actions, None, BTreeSet::new()));
     }
     if args.dry_run {
         eprint!("{}", plan_text(&client, &projects, &selected).await?);
-        return Ok((Vec::new(), None));
+        let mut served = BTreeSet::new();
+        if tools {
+            for p in &projects {
+                let folder = dir.join("ontologies").join(&p.name);
+                served.extend(handlers(&compile(&client, p, &folder).await?.3)?);
+            }
+        }
+        return Ok((Vec::new(), None, served));
     }
     // A check uploads nothing, so it builds the working tree as it is.
     let (commit, branch) = match args.check {
@@ -536,14 +580,17 @@ pub async fn prepare(
         false => head(&dir, args.allow_dirty)?,
     };
     let mut artifacts = BTreeMap::new();
+    let mut served = BTreeSet::new();
     for p in &projects {
         eprintln!("Ontology {}: building", p.name);
         let folder = dir.join("ontologies").join(&p.name);
-        artifacts.insert(p.name.clone(), build(&client, p, &folder).await?);
+        let (artifact, handlers) = build(&client, p, &folder).await?;
+        artifacts.insert(p.name.clone(), artifact);
+        served.extend(handlers);
     }
     if args.check {
         eprintln!("Checked (nothing deployed): each ontology compiles and builds");
-        return Ok((Vec::new(), None));
+        return Ok((Vec::new(), None, served));
     }
     Ok((
         Vec::new(),
@@ -554,6 +601,7 @@ pub async fn prepare(
             commit,
             branch,
         }),
+        served,
     ))
 }
 
@@ -988,6 +1036,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         bound: BTreeMap<&'static str, Value>,
         /// What CompileOntology answers when the IR does not compile.
         compile_errors: Option<Value>,
+        /// Whether a dry-run Apply finds the ontology's tools unserved, as on a new environment.
+        ontology_unserved: bool,
     }
 
     impl Default for World {
@@ -1003,6 +1053,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 agents_blocked: false,
                 bound: BTreeMap::new(),
                 compile_errors: None,
+                ontology_unserved: false,
             }
         }
     }
@@ -1021,9 +1072,17 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                     if service.ends_with("ApplyService") {
                         let request = wire::ApplyRequest::decode_from_slice(&body).unwrap();
                         calls.lock().unwrap().push((format!("Apply dryRun={}", request.dry_run), Value::Null));
+                        let unserved = world.ontology_unserved && request.dry_run;
                         let response = wire::ApplyResponse {
-                            outcome: if world.agents_blocked { wire::ApplyOutcome::Blocked } else { wire::ApplyOutcome::Planned }.into(),
-                            required_actions: if world.agents_blocked {
+                            outcome: if world.agents_blocked || unserved { wire::ApplyOutcome::Blocked } else { wire::ApplyOutcome::Planned }.into(),
+                            required_actions: if unserved {
+                                vec![wire::RequiredAction {
+                                    code: wire::RequiredActionCode::ToolNotOffered.into(),
+                                    subject: "triage/tools/tilde_ontology/shop".into(),
+                                    message: "Connection tilde_ontology/shop offers no tool listOrders".into(),
+                                    ..Default::default()
+                                }]
+                            } else if world.agents_blocked {
                                 vec![wire::RequiredAction {
                                     subject: "triage/tools/linear/acme".into(),
                                     message: "Connection linear/other does not exist".into(),
@@ -1050,7 +1109,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                         "ListSecrets" => world.secrets.clone(),
                         "CompileOntology" => match &world.compile_errors {
                             Some(errors) => json!({"errors": errors}),
-                            None => json!({"errors": [], "contract": {"contract.json": "{}"}}),
+                            None => json!({"errors": [], "contract": {"contract.json": r#"{"handlers": [{"handler": "listOrders", "kind": "read"}, {"handler": "watchOrders", "kind": "realtime"}]}"#}}),
                         },
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
                         "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"],
@@ -1078,6 +1137,14 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             let _ = axum::serve(listener, app).await;
         });
         (url, calls)
+    }
+
+    /// A project whose agent `triage` uses `tools` of the shop ontology's connection.
+    fn agent_using(tools: &[&str]) -> crate::discover::Declarations {
+        let mut d = declarations(true);
+        d.agents = vec![json!({"key": "triage", "name": "Triage",
+            "tools": [{"connection": {"slug": "tilde_ontology/shop"}, "tools": tools}]})];
+        d
     }
 
     fn declarations(agents: bool) -> crate::discover::Declarations {
@@ -1125,7 +1192,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             ..Default::default()
         })
         .await;
-        let actions = crate::deploy::ontologies_first(
+        let (actions, _) = crate::deploy::ontologies_first(
             &args(url.clone(), repo.path()),
             &declarations(false),
             false,
@@ -1162,7 +1229,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             ..Default::default()
         })
         .await;
-        let actions = crate::deploy::ontologies_first(
+        let (actions, _) = crate::deploy::ontologies_first(
             &args(url.clone(), repo.path()),
             &declarations(true),
             true,
@@ -1188,11 +1255,130 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         let (url, calls) = cloud(World::default()).await;
         let mut dry = args(url, repo.path());
         dry.dry_run = true;
-        let actions = crate::deploy::ontologies_first(&dry, &declarations(true), true)
+        let (actions, _) = crate::deploy::ontologies_first(&dry, &declarations(true), true)
             .await
             .unwrap();
         assert!(actions.is_empty());
         assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// A new environment's first deploy is one command: its ontology isn't running yet, so the
+    /// server lists none of its tools, and the agents' tools on its connection are checked against
+    /// the compiled handlers instead; a tool the ontology does not serve still blocks the deploy
+    /// before anything changes.
+    #[tokio::test]
+    async fn a_new_environment_deploys_its_ontology_and_agents_in_one_command() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            ontology_unserved: true,
+            ..World::default()
+        })
+        .await;
+        let a = args(url, repo.path());
+        let (actions, served) =
+            crate::deploy::ontologies_first(&a, &agent_using(&["listOrders"]), true)
+                .await
+                .unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(served.contains("listOrders"));
+        assert!(
+            changes(&calls).iter().any(|c| c.starts_with("Deploy")),
+            "{:?}",
+            changes(&calls)
+        );
+
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            ontology_unserved: true,
+            ..World::default()
+        })
+        .await;
+        let (actions, _) = crate::deploy::ontologies_first(
+            &args(url, repo.path()),
+            &agent_using(&["listOrders", "listOrderz"]),
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(actions.len(), 1, "{actions:?}");
+        assert!(
+            actions[0].message.contains("serve no tool listOrderz"),
+            "{actions:?}"
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// The server's findings on ontology connections give way only where there are compiled
+    /// handlers to check against, and only for the connections it could not list: `--only agents
+    /// --dry-run` (no handlers) keeps them, a misspelling included; a connection whose tools the
+    /// server listed (another project's running ontology) is not checked here; a realtime view is
+    /// not a tool.
+    #[test]
+    fn ontology_tools_are_checked_only_against_what_was_compiled() {
+        let finding = |slug: &str| wire::RequiredAction {
+            code: wire::RequiredActionCode::ToolNotOffered.into(),
+            subject: format!("triage/tools/{slug}"),
+            message: format!("Connection {slug} offers no tool listOrderz"),
+            ..Default::default()
+        };
+        let mut declarations = agent_using(&["listOrderz"]);
+        let kept = crate::apply::with_ontology_tools(
+            vec![finding("tilde_ontology/shop")],
+            &declarations,
+            &BTreeSet::new(),
+        );
+        assert_eq!(kept.len(), 1);
+        assert!(
+            kept[0].message.contains("offers no tool listOrderz"),
+            "{kept:?}"
+        );
+
+        let served: BTreeSet<String> = ["listOrders".to_string()].into();
+        declarations.agents[0]["tools"] = json!([
+            {"connection": {"slug": "tilde_ontology/shop"}, "tools": ["listOrders", "watchOrders"]},
+            {"connection": {"slug": "tilde_ontology/other"}, "tools": ["theirTool"]},
+        ]);
+        let found = crate::apply::with_ontology_tools(
+            vec![finding("tilde_ontology/shop")],
+            &declarations,
+            &served,
+        );
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].subject, "triage/tools/tilde_ontology/shop");
+        assert!(
+            found[0].message.contains("serve no tool watchOrders"),
+            "{found:?}"
+        );
+    }
+
+    /// `--check` runs the agents' dry-run Apply too (with the compiled handlers), and changes
+    /// nothing.
+    #[tokio::test]
+    async fn a_check_runs_the_agents_dry_run_apply() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            ontology_unserved: true,
+            ..World::default()
+        })
+        .await;
+        let mut check = args(url, repo.path());
+        check.check = true;
+        let (actions, served) =
+            crate::deploy::ontologies_first(&check, &agent_using(&["listOrders"]), true)
+                .await
+                .unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(served.contains("listOrders") && !served.contains("watchOrders"));
+        let calls = calls.lock().unwrap().clone();
+        assert!(
+            calls.iter().any(|(m, _)| m == "Apply dryRun=true"),
+            "{calls:?}"
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|(m, _)| m == "Apply dryRun=false" || m == "Deploy" || m == "CreateVersion")
+        );
     }
 
     /// A check builds each ontology as a deploy would, compiling it on the server, from a dirty
@@ -1208,7 +1394,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         let (url, calls) = cloud(World::default()).await;
         let mut check = args(url, repo.path());
         check.check = true;
-        let actions = crate::deploy::ontologies_first(&check, &declarations(false), false)
+        let (actions, _) = crate::deploy::ontologies_first(&check, &declarations(false), false)
             .await
             .unwrap();
         assert!(actions.is_empty());
@@ -1277,6 +1463,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             crate::deploy::ontologies_first(&a, &declarations(false), false)
                 .await
                 .unwrap()
+                .0
                 .is_empty()
         );
         assert_eq!(
@@ -1478,7 +1665,9 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         tokio::spawn(async move {
             let _ = axum::serve(listener, Router::new()).await;
         });
-        let (actions, plan) = prepare(&args(url, repo.path()), &spec()).await.unwrap();
+        let (actions, plan, _) = prepare(&args(url, repo.path()), &spec(), false)
+            .await
+            .unwrap();
         assert!(plan.is_none());
         assert_eq!(actions.len(), 1);
         assert!(
