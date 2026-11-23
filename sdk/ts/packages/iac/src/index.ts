@@ -292,21 +292,19 @@ export const ontology = <const C extends OntologyConnections = OntologyConnectio
 ): Ontology<C> => spec;
 const ontologyJson = (spec: Ontology) => ({
   environments: Object.fromEntries(
-    Object.entries(spec.environments).map(([name, env]) => {
-      return [
-        name,
-        {
-          connections: Object.fromEntries(
-            Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
-              connection ? [[name, ref(connection as ConnectionRef)]] : [],
-            ),
+    Object.entries(spec.environments).map(([name, env]) => [
+      name,
+      {
+        connections: Object.fromEntries(
+          Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
+            connection ? [[name, ref(connection as ConnectionRef)]] : [],
           ),
-          secrets: Object.fromEntries(
-            Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
-          ),
-        },
-      ];
-    }),
+        ),
+        secrets: Object.fromEntries(
+          Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
+        ),
+      },
+    ]),
   ),
 });
 

@@ -1916,7 +1916,7 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract. A binding is
-  named by its `name`; servers before the rename sent `slot`, which the CLI still reads.
+  named by its `name`.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
   reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
   `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't
