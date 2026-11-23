@@ -62,6 +62,11 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
       }),
       routine({ name: "Gone", prompt: "", delete: true }),
     ],
+    channels: [
+      { access: "public" },
+      { connection: connection.ref("google_chat/support"), access: "private" },
+      { connection: connection.ref("slack/old"), delete: true },
+    ],
     deploy: lambda("arn:aws:lambda:us-east-1:1:function:triage:3"),
   });
   assert.equal(agent[SPEC], "agent");
@@ -94,6 +99,15 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
   assert.equal(parsed.routines[1].trigger.kind.value.filters[0].values[0], "ENG");
   assert.equal(parsed.routines[2].delete, true);
   assert.equal(parsed.deployment.targetReference, "arn:aws:lambda:us-east-1:1:function:triage:3");
+  // Without a connection, the agent's own Tilde chat.
+  assert.deepEqual(
+    parsed.channels.map((c) => [c.connection?.slug, c.access, c.delete]),
+    [
+      [undefined, 2, false],
+      ["google_chat/support", 1, false],
+      ["slack/old", undefined, true],
+    ],
+  );
 });
 
 test("ALL is the star and both selection methods accumulate in any order", () => {
