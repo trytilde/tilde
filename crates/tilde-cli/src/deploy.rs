@@ -38,7 +38,8 @@ pub struct Deploy {
     pub dry_run: bool,
     /// Build the project's ontologies as a deploy would (evaluate each, compile it on the server,
     /// bundle its handler module, build its spaces) and stop: nothing is uploaded or changed, and
-    /// the working tree may be dirty. The spaces' contract is left in their `node_modules`.
+    /// the working tree may be dirty. The spaces' contract is left in their `node_modules`. It
+    /// runs the deploy's preflight, so a missing connection, secret or environment fails it.
     #[arg(long, conflicts_with = "dry_run")]
     pub check: bool,
     /// The team new agents and blueprints belong to (Tilde Cloud). It must match the team the
@@ -124,6 +125,9 @@ pub async fn run(args: Deploy) -> Result<()> {
     let specs = !declarations.agents.is_empty()
         || !declarations.users.is_empty()
         || !declarations.groups.is_empty();
+    if args.check && only == Some("agents") {
+        bail!("--check builds a project's ontologies: it cannot be combined with --only agents");
+    }
     if args.check && declarations.ontologies.is_empty() {
         bail!(
             "--check builds a project's ontologies, and this one declares none (defineProject({{ ontologies }}))"
