@@ -16,8 +16,8 @@ import {
 } from "@trytilde/contracts/tilde/management/v1/memory_pb.js";
 import type { Wiki } from "@trytilde/contracts/tilde/management/v1/wikis_pb.js";
 import { memory, wikis as wikiClient } from "@/client";
-import { dollars } from "./inference-usage-chart";
 import { inferenceConnections } from "./memory";
+import { dollars } from "./inference-usage-chart";
 import { RemoveButton } from "./remove-button";
 import { message } from "./tool-connections";
 import {

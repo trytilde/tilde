@@ -4,7 +4,7 @@ use super::{catalog, model::*, service::Connections};
 use crate::{chat::access::identity, error::Error};
 
 impl Connections {
-    pub(super) async fn sync_agent_identity(
+    pub(crate) async fn sync_agent_identity(
         &self,
         tx: &crate::database::Transaction<'_>,
         connection: &Connection,

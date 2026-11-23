@@ -1,5 +1,6 @@
 //! Provider-route IAM. All policy/identity changes serialize on the connection lock.
 //! Verification tokens are possession proofs delivered only to the recipient, never to management clients.
+pub(crate) mod apply;
 pub mod db;
 pub mod identity;
 pub mod rpc;

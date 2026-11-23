@@ -228,6 +228,17 @@ impl Apply {
                 crate::inference::apply::aliases(&tx, agent, key, refs, &spec.inference).await?,
             );
             changes.extend(crate::tools::apply::sources(&tx, agent, key, refs, &spec.tools).await?);
+            changes.extend(
+                crate::chat::access::apply::channels(
+                    &tx,
+                    &self.tools.connections,
+                    agent,
+                    key,
+                    refs,
+                    &spec.channels,
+                )
+                .await?,
+            );
             if let Some(blueprint) = spec.sandbox.as_option() {
                 changes.push(
                     crate::sandboxes::apply::agent_sandbox(
