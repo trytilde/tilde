@@ -211,7 +211,8 @@ impl AgentAccess {
         drop(tx_client);
         self.stop_invalid(connection, agent).await
     }
-    async fn stop_invalid(&self, connection: Uuid, agent: Uuid) -> Result<()> {
+    /// Stop the agent's runs on `connection` from identities its access no longer allows.
+    pub(crate) async fn stop_invalid(&self, connection: Uuid, agent: Uuid) -> Result<()> {
         let rows = crate::chat::access::db::invalid_invocations_all(
             &self.connections.pool.get().await.map_err(ChatError::from)?,
             connection,

@@ -168,6 +168,8 @@ pub struct Apply {
     agents: Agents,
     tools: crate::tools::Tools,
     deployments: crate::deployment::Deployments,
+    /// Channel access: runs a tightened channel no longer allows are stopped after commit.
+    access: crate::chat::access::AgentAccess,
     /// The app's origin required-action links start with; empty leaves them relative.
     app_url: String,
 }
@@ -176,12 +178,14 @@ impl Apply {
         agents: Agents,
         tools: crate::tools::Tools,
         deployments: crate::deployment::Deployments,
+        access: crate::chat::access::AgentAccess,
         app_url: String,
     ) -> Self {
         Self {
             agents,
             tools,
             deployments,
+            access,
             app_url: app_url.trim_end_matches('/').to_owned(),
         }
     }
@@ -220,6 +224,7 @@ impl Apply {
             blueprints.insert(spec.name.clone(), id);
         }
         let mut applied = Vec::new();
+        let mut tightened = Vec::new();
         for spec in &request.agents {
             let (agent, change) = crate::agent::apply::agent(&tx, &agents, spec).await?;
             changes.push(change);
@@ -228,17 +233,17 @@ impl Apply {
                 crate::inference::apply::aliases(&tx, agent, key, refs, &spec.inference).await?,
             );
             changes.extend(crate::tools::apply::sources(&tx, agent, key, refs, &spec.tools).await?);
-            changes.extend(
-                crate::chat::access::apply::channels(
-                    &tx,
-                    &self.tools.connections,
-                    agent,
-                    key,
-                    refs,
-                    &spec.channels,
-                )
-                .await?,
-            );
+            let (channel_changes, channels_tightened) = crate::chat::access::apply::channels(
+                &tx,
+                &self.tools.connections,
+                agent,
+                key,
+                refs,
+                &spec.channels,
+            )
+            .await?;
+            changes.extend(channel_changes);
+            tightened.extend(channels_tightened.into_iter().map(|c| (c, agent)));
             if let Some(blueprint) = spec.sandbox.as_option() {
                 changes.push(
                     crate::sandboxes::apply::agent_sandbox(
@@ -272,6 +277,12 @@ impl Apply {
             Outcome::Planned
         } else {
             tx.commit().await.map_err(Error::from)?;
+            // Follow-ups once committed: runs a tightened channel no longer allows stop.
+            for (connection, agent) in tightened {
+                if let Err(error) = self.access.stop_invalid(connection, agent).await {
+                    tracing::warn!(%connection, %agent, %error, "Runs of a tightened channel were not stopped");
+                }
+            }
             Outcome::Applied
         };
         Ok(Report {

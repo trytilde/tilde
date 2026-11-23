@@ -456,6 +456,7 @@ mod tests {
         }
         // An agent folder may hold its own tilde.config.ts: its code is still the package's.
         std::fs::write(root.path().join("agents/triage/tilde.config.ts"), "").unwrap();
+        std::fs::write(root.path().join("agents/triage/index.js"), "").unwrap();
         // A stand-in declaration reader: each agent's prompt is named after its folder and the
         // module it read.
         let reader = root.path().join("reader.sh");
@@ -496,6 +497,51 @@ mod tests {
         assert!(request.agents[2].deployment.as_option().is_none());
         assert!(request.agents[3].deployment.as_option().is_none());
         assert_eq!(request.agents[3].name, "Remote");
+
+        // From inside an agent's folder: its tilde.config.ts declares only it, and the folder's
+        // package is its code.
+        let triage_dir = crate::project::Project::find(&root.path().join("agents/triage")).unwrap();
+        let mut inside = Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            agents: vec![json!({"key": "triage", "name": "Triage", "deployment": gateway})],
+            ..Default::default()
+        };
+        unsafe { std::env::set_var("TILDE_DECLARATIONS", &reader) };
+        crate::discover::releases(&triage_dir, "tilde.config.ts", &mut inside)
+            .await
+            .unwrap();
+        unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
+        assert_eq!(
+            inside.releases["triage"]["prompts"][0]["name"],
+            "triage:index.js"
+        );
+
+        // A config-only repo declaring one remote agent, with a package whose `main` is missing:
+        // not the agent's folder, so its spec is applied without a release (the reader is never
+        // run on the missing entry).
+        let config_only = root.path().join("ops");
+        std::fs::create_dir_all(&config_only).unwrap();
+        std::fs::write(
+            config_only.join("package.json"),
+            r#"{"name": "ops", "main": "index.js"}"#,
+        )
+        .unwrap();
+        std::fs::write(config_only.join("tilde.config.ts"), "").unwrap();
+        let mut remote = Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            agents: vec![json!({"key": "remote", "name": "Remote", "deployment": gateway})],
+            ..Default::default()
+        };
+        unsafe { std::env::set_var("TILDE_DECLARATIONS", "/nonexistent/reader") };
+        crate::discover::releases(
+            &crate::project::Project::find(&config_only).unwrap(),
+            "tilde.config.ts",
+            &mut remote,
+        )
+        .await
+        .unwrap();
+        unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
+        assert!(remote.releases.is_empty());
 
         // From the agent's own folder its entry is the release of the one agent without code.
         let mut own = Declarations {

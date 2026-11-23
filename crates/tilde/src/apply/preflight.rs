@@ -26,8 +26,11 @@ enum Use {
     Sandbox,
     Egress(String),
     Signal(String),
-    /// A channel of the agent (by key): one agent per channel connection.
-    Channel(String),
+    /// A channel of the agent (by key), and whether it sets private access: one agent per
+    /// channel connection, and a mode its provider supports.
+    Channel(String, bool),
+    /// A deleted channel: resolved to unassign it, never checked (gone or moved is a no-op).
+    ChannelDelete,
 }
 struct Usage<'a> {
     reference: &'a m::ConnectionRef,
@@ -113,6 +116,26 @@ fn shape(request: &m::ApplyRequest, found: &mut Found) {
     let mut blueprints: HashMap<&str, (&str, &m::BlueprintSpec)> = HashMap::new();
     if request.agents.is_empty() && request.users.is_empty() && request.groups.is_empty() {
         found.invalid("spec", "The spec declares no agents or people");
+    }
+    // Channel connections the request assigns, with the agent claiming each: one agent each.
+    let mut claimed: HashMap<&str, &str> = HashMap::new();
+    for agent in &request.agents {
+        let key = agent.key.as_str();
+        for reference in agent
+            .channels
+            .iter()
+            .filter(|c| !c.delete)
+            .filter_map(|c| c.connection.as_option())
+        {
+            if let Some(other) = claimed.insert(reference.slug.as_str(), key)
+                && other != key
+            {
+                found.invalid(
+                    format!("{key}/channels/{}", reference.slug),
+                    format!("Agent {other} also declares this channel; a channel has one agent"),
+                );
+            }
+        }
     }
     for agent in &request.agents {
         let key = agent.key.as_str();
@@ -266,7 +289,19 @@ fn usages(request: &m::ApplyRequest) -> Vec<Usage<'_>> {
                 out.push(Usage {
                     reference,
                     subject: format!("{key}/channels/{}", reference.slug),
-                    usage: Use::Channel(key.clone()),
+                    usage: if channel.delete {
+                        Use::ChannelDelete
+                    } else {
+                        Use::Channel(
+                            key.clone(),
+                            channel.access.is_some_and(|a| {
+                                a.as_known()
+                                    == Some(
+                                        crate::proto::tilde::types::v1::ChannelAccessMode::Private,
+                                    )
+                            }),
+                        )
+                    },
                     owner: Owner::Agent(key),
                     team: None,
                 });
@@ -489,13 +524,14 @@ pub(super) async fn check(
                         ),
                     }
                 }
-                Use::Channel(_) if !details.channel_capable => found.push(
+                Use::ChannelDelete => {}
+                Use::Channel(..) if !details.channel_capable => found.push(
                     Code::CapabilityMissing,
                     subject,
                     missing("be a chat channel"),
                     catalog_url.clone(),
                 ),
-                Use::Channel(key) => {
+                Use::Channel(key, private) => {
                     // A channel connection has one agent: another agent's stays theirs.
                     let ours = existing.get(key.as_str()).map(|row| row.id);
                     if let Some(other) = details.associated_agents.0.iter().find(|a| {
@@ -508,6 +544,19 @@ pub(super) async fn check(
                                 "Connection {slug} is agent {}'s channel; a channel has one agent",
                                 other.name
                             ),
+                        );
+                    }
+                    if *private
+                        && !crate::chat::providers::adapter(&row.provider_id, &row.type_id)
+                            .is_some_and(|p| p.verification_supported() || p.attests_identities())
+                    {
+                        found.push(
+                            Code::CapabilityMissing,
+                            subject,
+                            format!(
+                                "Connection {slug} supports public or disabled access only, not private"
+                            ),
+                            catalog_url.clone(),
                         );
                     }
                 }

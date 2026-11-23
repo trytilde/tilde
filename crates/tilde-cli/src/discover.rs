@@ -180,8 +180,10 @@ pub async fn declarations(
 /// with its own package.json or pyproject.toml), else `agents/<key>/` when the project has that
 /// folder, from the project's directory. When the entry is code rather than the project's
 /// `tilde.config.ts` (`tilde deploy` from one agent's folder), the one deploying agent with
-/// neither releases the entry's own declarations. Any other agent with neither has its code in
-/// another repository: its spec is applied, and its release is that repository's to register.
+/// neither releases the entry's own declarations; when it is the folder's own tilde.config.ts
+/// declaring only that agent, the folder's package code is its release. Any other agent with
+/// neither has its code in another repository: its spec is applied, and its release is that
+/// repository's to register.
 pub async fn releases(
     project: &Project,
     entry: &str,
@@ -256,6 +258,27 @@ pub async fn releases(
                 keys.join(", ")
             ),
         }
+    }
+    // `tilde deploy` from an agent's own folder (named after its key, or under `agents/`): its
+    // tilde.config.ts declares only that agent, and the folder's package is its code. A
+    // config-only repo declaring one remote agent is not its folder, whatever package it has.
+    let own_folder = |key: &str| {
+        project.dir.file_name().is_some_and(|name| name == key)
+            || project
+                .dir
+                .parent()
+                .and_then(|parent| parent.file_name())
+                .is_some_and(|name| name == "agents")
+    };
+    if let ([key], 1) = (&elsewhere[..], declarations.agents.len())
+        && own_folder(key)
+        && let Ok(code_entry) = project.code_entry()
+        && project.dir.join(&code_entry).is_file()
+    {
+        eprintln!("Agent {key}: reading its code in {}", project.dir.display());
+        let read = self::declarations(project, &code_entry, false, false).await?;
+        declarations.releases.insert(key.clone(), read.value);
+        elsewhere.clear();
     }
     for key in elsewhere {
         eprintln!(

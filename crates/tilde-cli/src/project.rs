@@ -83,7 +83,7 @@ impl Project {
                     }
                 }
                 bail!(
-                    "Could not find this project's entry module: add a tilde.config.ts, build it, or pass --entry"
+                    "Could not find this package's code: set `main` in package.json, build dist/index.js, or pass --entry"
                 )
             }
             Runtime::Python => {
@@ -92,7 +92,9 @@ impl Project {
                         return Ok(candidate.to_string());
                     }
                 }
-                bail!("Could not find this project's entry module: pass --entry")
+                bail!(
+                    "Could not find this package's code (src/agent.py, agent.py, src/main.py or main.py): pass --entry"
+                )
             }
         }
     }
@@ -108,7 +110,7 @@ impl Project {
                         return Ok(vec!["npm".into(), "run".into(), script.into()]);
                     }
                 }
-                Ok(vec!["node".into(), self.entry()?])
+                Ok(vec!["node".into(), self.code_entry()?])
             }
             Runtime::Python => {
                 // The host that dials the gateway is usually a different module from the one
@@ -117,7 +119,7 @@ impl Project {
                     .into_iter()
                     .find(|candidate| self.dir.join(candidate).is_file())
                     .map(str::to_string)
-                    .unwrap_or(self.entry()?);
+                    .unwrap_or(self.code_entry()?);
                 Ok(vec![self.python(), script])
             }
         }

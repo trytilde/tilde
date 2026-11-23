@@ -1843,8 +1843,11 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
 - Channels (`chat::access::apply`): each names a channel connection, assigned to the agent (a
   channel connection has one agent, so another agent's is refused in preflight), or without a
   connection the agent's own Tilde chat, and optionally its access mode (`SetChannelAccess`'s
-  private, public or disabled; a new assignment starts private). A channel left out stays;
-  `delete` unassigns a connection, never the Tilde chat.
+  private, public or disabled; a new assignment starts in its provider's mode, GitHub's
+  disabled). Preflight refuses a mode the provider does not support and two agents of the
+  request claiming one connection. A channel left out stays; `delete` unassigns a connection,
+  never the Tilde chat, and is a no-op for one gone or moved. Once the apply commits, runs on a
+  channel whose access it tightened from identities no longer allowed are stopped.
 - Then one transaction for every agent of the request, in dependency order: blueprints, then per
   agent its fields, aliases, tool sources, sandbox link, routines and deployment. A dry run runs
   the same writes and rolls back, so the plan is what an apply does.

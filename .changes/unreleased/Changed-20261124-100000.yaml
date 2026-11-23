@@ -1,0 +1,3 @@
+kind: Changed
+body: "Declarative apply of channels: tightening a channel's access stops the runs it no longer allows, a new channel starts in its provider's own mode (GitHub's is disabled) so a repeat changes nothing, an unsupported mode or two agents claiming one connection are required actions before anything is written, and deleting a channel another agent has is a no-op."
+time: 2026-11-24T10:00:00+00:00
