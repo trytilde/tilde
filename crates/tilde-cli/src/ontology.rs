@@ -30,9 +30,8 @@ pub struct OntologySpec {
 }
 #[derive(Debug, Default, Deserialize)]
 pub struct EnvironmentSpec {
-    /// The ontology's connection -> the organization's connection it binds. A spec from
-    /// `@trytilde/iac` before the rename says `slots`.
-    #[serde(default, alias = "slots")]
+    /// The ontology's connection -> the organization's connection it binds.
+    #[serde(default)]
     pub connections: BTreeMap<String, ConnectionSpec>,
     /// The ontology's secret name -> the Tilde secret's name.
     #[serde(default)]
@@ -601,13 +600,9 @@ pub async fn prepare(
     ))
 }
 
-/// A binding's connection name: `name`, or `slot` from servers before the rename.
+/// A binding's connection name.
 fn binding_name(binding: &Value) -> &str {
-    binding["name"]
-        .as_str()
-        .filter(|n| !n.is_empty())
-        .or_else(|| binding["slot"].as_str())
-        .unwrap_or_default()
+    binding["name"].as_str().unwrap_or_default()
 }
 
 /// The dry run's plan: each connection whose binding changes as `connection name: current → new`
@@ -693,11 +688,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             .filter_map(|v| key.map_or(v, |k| &v[k]).as_str().map(str::to_string))
             .collect()
     };
-    // Servers before the rename list them as `slots`.
-    let declared = match version.get("connections").is_some_and(|c| c.is_array()) {
-        true => names("connections", Some("name")),
-        false => names("slots", Some("name")),
-    };
+    let declared = names("connections", Some("name"));
     let secrets = names("secrets", None);
     let mut problems = Vec::new();
     for env in &p.environments {
@@ -863,7 +854,7 @@ async fn deploy_one(
             };
             for (name, connection) in &env.connections {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "name": name, "slot": name, "connectionId": connection}))
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "name": name, "connectionId": connection}))
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
@@ -1040,7 +1031,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         secrets: Value,
         /// The environment whose rollout fails.
         failing: Option<&'static str>,
-        /// Slots the built version declares.
+        /// Connections the built version declares.
         declared: Value,
         /// Whether a dry-run Apply of the agents comes back blocked.
         agents_blocked: bool,
@@ -1050,8 +1041,6 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         compile_errors: Option<Value>,
         /// Whether a dry-run Apply finds the ontology's tools unserved, as on a new environment.
         ontology_unserved: bool,
-        /// A server before the rename: `slots`/`slot` fields, and binding requires `slot`.
-        old_server: bool,
     }
 
     impl Default for World {
@@ -1068,7 +1057,6 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 bound: BTreeMap::new(),
                 compile_errors: None,
                 ontology_unserved: false,
-                old_server: false,
             }
         }
     }
@@ -1129,18 +1117,15 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
                         "GetVersion" => {
                             let declared: Vec<Value> = world.declared.as_array().unwrap().iter().map(|name| json!({"name": name, "provider": name})).collect();
-                            let field = if world.old_server { "slots" } else { "connections" };
-                            json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"], field: declared}})
-                        }
-                        "SetEnvironmentConnection" if body["slot"].as_str().unwrap_or_default().is_empty() => {
-                            return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"code": "invalid_argument", "message": "slot is required"}))).into_response();
+                            json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"], "connections": declared}})
                         }
                         // What the environment has bound (nothing yet); the connections it lists are the
                         // project's newest version's, which the CLI must not rely on.
-                        "ListEnvironmentConnections" => world.bound.get(env.as_str()).cloned().unwrap_or_else(|| match world.old_server {
-                            true => json!({"connections": [{"slot": "github", "declared": true}, {"slot": "linear", "declared": true}]}),
-                            false => json!({"connections": [{"name": "github", "declared": true}, {"name": "linear", "declared": true}]}),
-                        }),
+                        "ListEnvironmentConnections" => world
+                            .bound
+                            .get(env.as_str())
+                            .cloned()
+                            .unwrap_or_else(|| json!({"connections": [{"name": "github", "declared": true}, {"name": "linear", "declared": true}]})),
                         "ListEnvironmentSecrets" => json!({"secrets": [{"name": "PG_PASSWORD", "declared": true, "set": false}]}),
                         "Deploy" => json!({"deployment": {"id": format!("d-{env}"), "status": "DEPLOYMENT_STATUS_DEPLOYING"}}),
                         "ListDeployments" => {
@@ -1455,16 +1440,15 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
     }
 
     /// The plan shows each connection binding that changes, from what the environment has bound
-    /// now (listed by an older server as `slot`, which still reads),
-    /// and counts the ones that stay.
+    /// now, and counts the ones that stay.
     #[tokio::test]
     async fn the_plan_shows_connection_changes() {
         let (url, _) = cloud(World {
             bound: BTreeMap::from([(
                 "e1",
                 json!({"connections": [
-                    {"slot": "github", "connectionId": "c9", "connectionName": "github/old"},
-                    {"slot": "linear", "connectionId": "c2", "connectionName": "linear/acme"}]}),
+                    {"name": "github", "connectionId": "c9", "connectionName": "github/old"},
+                    {"name": "linear", "connectionId": "c2", "connectionName": "linear/acme"}]}),
             )]),
             ..Default::default()
         })
@@ -1493,42 +1477,6 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             plan.contains("staging: connection linear: unbound → linear/acme\n"),
             "{plan}"
         );
-    }
-
-    /// A server before the rename (`slots`/`slot` fields, binding refused without `slot`) and a
-    /// spec from `@trytilde/iac` before it (`slots`): the deploy still binds by name and rolls
-    /// out, so this CLI works before and after Tilde Cloud ships the rename.
-    #[tokio::test]
-    async fn an_old_server_and_an_old_spec_still_deploy() {
-        let repo = repository();
-        let (url, calls) = cloud(World {
-            old_server: true,
-            ..World::default()
-        })
-        .await;
-        let mut a = args(url, repo.path());
-        a.ontology = vec!["shop".into()];
-        let mut d = declarations(false);
-        d.ontologies = serde_json::from_value(json!({"shop": {"environments": {"production": {
-            "slots": {"github": {"slug": "github/acme"}, "linear": {"slug": "linear/acme", "type": "api_key"}},
-            "secrets": {"PG_PASSWORD": "SHOP_PG_PASSWORD"}}}}}))
-        .unwrap();
-        assert!(
-            crate::deploy::ontologies_first(&a, &d, false)
-                .await
-                .unwrap()
-                .0
-                .is_empty()
-        );
-        let calls = calls.lock().unwrap().clone();
-        let bound: Vec<&Value> = calls
-            .iter()
-            .filter(|(m, _)| m == "SetEnvironmentConnection")
-            .map(|(_, body)| body)
-            .collect();
-        assert_eq!(bound.len(), 2, "{calls:?}");
-        assert!(bound.iter().all(|b| b["name"] == b["slot"]), "{bound:?}");
-        assert!(calls.iter().any(|(m, _)| m == "Deploy"), "{calls:?}");
     }
 
     /// One version per ontology from the archive, then each environment bound and rolled out in
