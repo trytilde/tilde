@@ -1315,6 +1315,10 @@ pub struct RegisterDeploymentRequestView<'a> {
     pub branch: ::core::option::Option<&'a str>,
     /// Field 12: `commit_author`
     pub commit_author: ::core::option::Option<&'a str>,
+    /// Lambda: the IAM role Tilde assumes to invoke the function (see DeploymentSpec.target_role).
+    ///
+    /// Field 14: `target_role`
+    pub target_role: ::core::option::Option<&'a str>,
     /// What the agent's code declares, read by `tilde deploy` from the entry module. A repeat of an
     /// existing external id ignores it: a deployment's contents never change.
     ///
@@ -1433,6 +1437,13 @@ impl<'a> ::buffa::MessageView<'a> for RegisterDeploymentRequestView<'a> {
                 )?;
                 view.commit_author = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.target_role = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             13u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -1493,6 +1504,7 @@ impl<'a> ::buffa::MessageView<'a> for RegisterDeploymentRequestView<'a> {
             commit_message: self.commit_message.map(|s| s.to_string()),
             branch: self.branch.map(|s| s.to_string()),
             commit_author: self.commit_author.map(|s| s.to_string()),
+            target_role: self.target_role.map(|s| s.to_string()),
             declarations: match self.declarations.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
@@ -1560,6 +1572,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RegisterDeploymentRequestView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.target_role {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1618,6 +1633,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RegisterDeploymentRequestView<'a> {
             );
             self.declarations.write_to(__cache, buf);
         }
+        if let Some(ref v) = self.target_role {
+            ::buffa::types::put_string_field(14u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -1671,6 +1689,9 @@ impl<'__a> ::serde::Serialize for RegisterDeploymentRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.commit_author {
             __map.serialize_entry("commitAuthor", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.target_role {
+            __map.serialize_entry("targetRole", __v)?;
         }
         {
             if let ::core::option::Option::Some(__v) = self.declarations.as_option() {
@@ -1830,6 +1851,13 @@ impl RegisterDeploymentRequestOwnedView {
     #[must_use]
     pub fn commit_author(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().commit_author
+    }
+    /// Lambda: the IAM role Tilde assumes to invoke the function (see DeploymentSpec.target_role).
+    ///
+    /// Field 14: `target_role`
+    #[must_use]
+    pub fn target_role(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().target_role
     }
     /// What the agent's code declares, read by `tilde deploy` from the entry module. A repeat of an
     /// existing external id ignores it: a deployment's contents never change.

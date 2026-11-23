@@ -36,6 +36,10 @@ pub struct ToolHostView<'a> {
     ///
     /// Field 9: `auth_methods`
     pub auth_methods: ::buffa::RepeatedView<'a, &'a str>,
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 10: `function_role`
+    pub function_role: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ToolHostView<'a> {
@@ -109,6 +113,13 @@ impl<'a> ::buffa::MessageView<'a> for ToolHostView<'a> {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 view.provider_id = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.function_role = Some(::buffa::types::borrow_str(&mut cur)?);
             }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -200,6 +211,7 @@ impl<'a> ::buffa::MessageView<'a> for ToolHostView<'a> {
                 .map(|v| v.to_owned_from_source(__buffa_src))
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             auth_methods: self.auth_methods.iter().map(|s| s.to_string()).collect(),
+            function_role: self.function_role.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -249,6 +261,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolHostView<'a> {
                     + inner_size as u64;
         }
         for v in &self.auth_methods {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.function_role {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -302,6 +317,9 @@ impl<'a> ::buffa::ViewEncode<'a> for ToolHostView<'a> {
         for v in &self.auth_methods {
             ::buffa::types::put_string_field(9u32, v, buf);
         }
+        if let Some(ref v) = self.function_role {
+            ::buffa::types::put_string_field(10u32, v, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -349,6 +367,9 @@ impl<'__a> ::serde::Serialize for ToolHostView<'__a> {
         }
         if !self.auth_methods.is_empty() {
             __map.serialize_entry("authMethods", &*self.auth_methods)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.function_role {
+            __map.serialize_entry("functionRole", __v)?;
         }
         __map.end()
     }
@@ -499,6 +520,13 @@ impl ToolHostOwnedView {
     #[must_use]
     pub fn auth_methods(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
         &self.0.reborrow().auth_methods
+    }
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 10: `function_role`
+    #[must_use]
+    pub fn function_role(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().function_role
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<ToolHostView<'static>>>
@@ -1101,6 +1129,11 @@ pub struct RegisterToolHostRequestView<'a> {
     pub r#type: ::buffa::EnumValue<super::super::ToolHostType>,
     /// Field 3: `function_arn`
     pub function_arn: ::core::option::Option<&'a str>,
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and
+    /// assumes it with the organization's ID as its external ID.
+    ///
+    /// Field 5: `function_role`
+    pub function_role: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for RegisterToolHostRequestView<'a> {
@@ -1154,6 +1187,13 @@ impl<'a> ::buffa::MessageView<'a> for RegisterToolHostRequestView<'a> {
                 )?;
                 view.function_arn = Some(::buffa::types::borrow_str(&mut cur)?);
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.function_role = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -1185,6 +1225,7 @@ impl<'a> ::buffa::MessageView<'a> for RegisterToolHostRequestView<'a> {
             name: self.name.to_string(),
             r#type: self.r#type,
             function_arn: self.function_arn.map(|s| s.to_string()),
+            function_role: self.function_role.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -1206,6 +1247,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RegisterToolHostRequestView<'a> {
             }
         }
         if let Some(ref v) = self.function_arn {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        if let Some(ref v) = self.function_role {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
@@ -1230,6 +1274,9 @@ impl<'a> ::buffa::ViewEncode<'a> for RegisterToolHostRequestView<'a> {
         }
         if let Some(ref v) = self.function_arn {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.function_role {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1260,6 +1307,9 @@ impl<'__a> ::serde::Serialize for RegisterToolHostRequestView<'__a> {
         }
         if let ::core::option::Option::Some(__v) = self.function_arn {
             __map.serialize_entry("functionArn", __v)?;
+        }
+        if let ::core::option::Option::Some(__v) = self.function_role {
+            __map.serialize_entry("functionRole", __v)?;
         }
         __map.end()
     }
@@ -1370,6 +1420,14 @@ impl RegisterToolHostRequestOwnedView {
     #[must_use]
     pub fn function_arn(&self) -> ::core::option::Option<&'_ str> {
         self.0.reborrow().function_arn
+    }
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and
+    /// assumes it with the organization's ID as its external ID.
+    ///
+    /// Field 5: `function_role`
+    #[must_use]
+    pub fn function_role(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().function_role
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<RegisterToolHostRequestView<'static>>>

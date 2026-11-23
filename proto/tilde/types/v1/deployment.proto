@@ -24,6 +24,8 @@ message AgentDeployment {
   uint32 traffic_weight = 19;
   // Registered Lambda, published Hosted, or a live/ready Gateway or Sidecar connection chain.
   bool routable = 20;
+  // Lambda: the IAM role Tilde assumes to invoke the function.
+  string target_role = 21;
 }
 // One process incarnation that dialed in with a deployment's token.
 message AgentInstance { string instance_id = 1; string agent_id = 2; string public_url = 3; string runtime_url = 4; bool ready = 5; google.protobuf.Timestamp last_seen_at = 6; string deployment_id = 7; }

@@ -745,6 +745,15 @@ pub struct RegisterDeploymentRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub commit_author: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Lambda: the IAM role Tilde assumes to invoke the function (see DeploymentSpec.target_role).
+    ///
+    /// Field 14: `target_role`
+    #[serde(
+        rename = "targetRole",
+        alias = "target_role",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub target_role: ::core::option::Option<::buffa::alloc::string::String>,
     /// What the agent's code declares, read by `tilde deploy` from the entry module. A repeat of an
     /// existing external id ignores it: a deployment's contents never change.
     ///
@@ -775,6 +784,7 @@ impl ::core::fmt::Debug for RegisterDeploymentRequest {
             .field("commit_message", &self.commit_message)
             .field("branch", &self.branch)
             .field("commit_author", &self.commit_author)
+            .field("target_role", &self.target_role)
             .field("declarations", &self.declarations)
             .finish()
     }
@@ -867,6 +877,16 @@ impl RegisterDeploymentRequest {
         self.commit_author = Some(value.into());
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::target_role`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_target_role(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.target_role = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(RegisterDeploymentRequest);
 impl ::buffa::MessageName for RegisterDeploymentRequest {
@@ -935,6 +955,9 @@ impl ::buffa::Message for RegisterDeploymentRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.target_role {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -991,6 +1014,9 @@ impl ::buffa::Message for RegisterDeploymentRequest {
                 buf,
             );
             self.declarations.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.target_role {
+            ::buffa::types::put_string_field(14u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1133,6 +1159,18 @@ impl ::buffa::Message for RegisterDeploymentRequest {
                     ctx,
                 )?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .target_role
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1153,6 +1191,7 @@ impl ::buffa::Message for RegisterDeploymentRequest {
         self.branch = ::core::option::Option::None;
         self.commit_author = ::core::option::Option::None;
         self.declarations = ::buffa::MessageField::none();
+        self.target_role = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

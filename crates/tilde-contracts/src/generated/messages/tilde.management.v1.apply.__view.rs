@@ -5886,6 +5886,11 @@ pub struct DeploymentSpecView<'a> {
     pub declarations: ::buffa::MessageFieldView<
         super::super::__buffa::view::DeploymentDeclarationsView<'a>,
     >,
+    /// Lambda: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and assumes
+    /// it with the organization's ID as its external ID.
+    ///
+    /// Field 6: `target_role`
+    pub target_role: ::core::option::Option<&'a str>,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for DeploymentSpecView<'a> {
@@ -5967,6 +5972,13 @@ impl<'a> ::buffa::MessageView<'a> for DeploymentSpecView<'a> {
                     }
                 }
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.target_role = Some(::buffa::types::borrow_str(&mut cur)?);
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -6002,6 +6014,7 @@ impl<'a> ::buffa::MessageView<'a> for DeploymentSpecView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            target_role: self.target_role.map(|s| s.to_string()),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -6036,6 +6049,9 @@ impl<'a> ::buffa::ViewEncode<'a> for DeploymentSpecView<'a> {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if let Some(ref v) = self.target_role {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -6069,6 +6085,9 @@ impl<'a> ::buffa::ViewEncode<'a> for DeploymentSpecView<'a> {
                 buf,
             );
             self.declarations.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.target_role {
+            ::buffa::types::put_string_field(6u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6107,6 +6126,9 @@ impl<'__a> ::serde::Serialize for DeploymentSpecView<'__a> {
             if let ::core::option::Option::Some(__v) = self.declarations.as_option() {
                 __map.serialize_entry("declarations", __v)?;
             }
+        }
+        if let ::core::option::Option::Some(__v) = self.target_role {
+            __map.serialize_entry("targetRole", __v)?;
         }
         __map.end()
     }
@@ -6231,6 +6253,14 @@ impl DeploymentSpecOwnedView {
         super::super::__buffa::view::DeploymentDeclarationsView<'_>,
     > {
         &self.0.reborrow().declarations
+    }
+    /// Lambda: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and assumes
+    /// it with the organization's ID as its external ID.
+    ///
+    /// Field 6: `target_role`
+    #[must_use]
+    pub fn target_role(&self) -> ::core::option::Option<&'_ str> {
+        self.0.reborrow().target_role
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<DeploymentSpecView<'static>>>

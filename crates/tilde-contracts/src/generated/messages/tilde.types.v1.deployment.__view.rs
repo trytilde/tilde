@@ -387,6 +387,10 @@ pub struct AgentDeploymentView<'a> {
     ///
     /// Field 20: `routable`
     pub routable: bool,
+    /// Lambda: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 21: `target_role`
+    pub target_role: &'a str,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for AgentDeploymentView<'a> {
@@ -584,6 +588,13 @@ impl<'a> ::buffa::MessageView<'a> for AgentDeploymentView<'a> {
                 )?;
                 view.routable = ::buffa::types::decode_bool(&mut cur)?;
             }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.target_role = ::buffa::types::borrow_str(&mut cur)?;
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -641,6 +652,7 @@ impl<'a> ::buffa::MessageView<'a> for AgentDeploymentView<'a> {
             commit_author: self.commit_author.to_string(),
             traffic_weight: self.traffic_weight,
             routable: self.routable,
+            target_role: self.target_role.to_string(),
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -734,6 +746,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentDeploymentView<'a> {
         if self.routable {
             size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if !self.target_role.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.target_role) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -821,6 +836,9 @@ impl<'a> ::buffa::ViewEncode<'a> for AgentDeploymentView<'a> {
         if self.routable {
             ::buffa::types::put_bool_field(20u32, self.routable, buf);
         }
+        if !self.target_role.is_empty() {
+            ::buffa::types::put_string_field(21u32, &self.target_role, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -906,6 +924,9 @@ impl<'__a> ::serde::Serialize for AgentDeploymentView<'__a> {
         }
         if self.routable {
             __map.serialize_entry("routable", &self.routable)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.target_role) {
+            __map.serialize_entry("targetRole", self.target_role)?;
         }
         __map.end()
     }
@@ -1108,6 +1129,13 @@ impl AgentDeploymentOwnedView {
     #[must_use]
     pub fn routable(&self) -> bool {
         self.0.reborrow().routable
+    }
+    /// Lambda: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 21: `target_role`
+    #[must_use]
+    pub fn target_role(&self) -> &'_ str {
+        self.0.reborrow().target_role
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<AgentDeploymentView<'static>>>

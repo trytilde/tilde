@@ -119,9 +119,18 @@ export type Channel = {
  */
 export type Deploy =
   | { target: "gateway" | "sidecar" | "hosted" }
-  | { target: "lambda"; functionArn: string };
-/** A Lambda function; a version-qualified ARN keeps the deployment fixed. */
-export const lambda = (functionArn: string): Deploy => ({ target: "lambda", functionArn });
+  | { target: "lambda"; functionArn: string; role?: string };
+/**
+ * A Lambda function; a version-qualified ARN keeps the deployment fixed. `role` is the IAM role
+ * Tilde assumes to invoke it, allowed `lambda:InvokeFunction` on the function. Tilde Cloud requires
+ * one and assumes it with your organization's ID as the external ID, so its trust policy names
+ * Tilde's role and `sts:ExternalId`; a self-hosted Tilde without one uses its own credentials.
+ */
+export const lambda = (functionArn: string, role?: string): Deploy => ({
+  target: "lambda",
+  functionArn,
+  ...(role ? { role } : {}),
+});
 /** A host that dials in to Tilde's gateway with its deployment token. */
 export const gateway = (): Deploy => ({ target: "gateway" });
 export const sidecar = (): Deploy => ({ target: "sidecar" });
@@ -417,7 +426,12 @@ export function defineAgent(spec: Agent): AgentSpec {
       ? {
           deployment: {
             target: `DEPLOYMENT_TARGET_${deploy.target.toUpperCase()}`,
-            ...(deploy.target === "lambda" ? { targetReference: deploy.functionArn } : {}),
+            ...(deploy.target === "lambda"
+              ? {
+                  targetReference: deploy.functionArn,
+                  ...(deploy.role ? { targetRole: deploy.role } : {}),
+                }
+              : {}),
           },
         }
       : {}),
