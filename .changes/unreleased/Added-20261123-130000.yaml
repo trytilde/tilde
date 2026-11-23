@@ -1,3 +1,0 @@
-kind: Added
-body: "Memory's own model calls now show up in inference usage. Background embedding and recall from the console count as the organization's spend. A recall query an agent's memory tool embeds counts toward that agent's usage and budgets. Synthesis calls are billed to their memory bank. The embedding settings and each bank's synthesis panel show this month's spend. Rows in `inference_requests` may now have no agent or invocation, and carry `memory_bank_id` for synthesis."
-time: 2026-11-23T12:00:00+00:00

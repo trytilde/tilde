@@ -1,3 +1,0 @@
-kind: Changed
-body: "`tilde deploy --ontology` naming every ontology of the project checks the agents' ontology tools against the compiled contract, as a deploy without `--ontology` does. Only a selection that leaves an ontology out has nothing to check them against."
-time: 2026-11-24T00:00:00+00:00
