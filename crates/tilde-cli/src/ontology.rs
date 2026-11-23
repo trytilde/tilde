@@ -545,11 +545,6 @@ pub async fn prepare(
         if !folder.join("ontology.ts").is_file() {
             bail!("ontology {name}: ontologies/{name}/ontology.ts does not exist");
         }
-        if folder.join("tilde.toml").is_file() {
-            bail!(
-                "ontology {name}: ontologies/{name}/tilde.toml: a repository has at most one tilde.toml, at its root"
-            );
-        }
     }
     let client = Client {
         base: crate::api::base_url(url)?,

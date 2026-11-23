@@ -1,0 +1,3 @@
+kind: Removed
+body: "`tilde.toml` is gone. The CLI finds a project's `tilde.config.ts` at its root; agents' code comes from `agents/<key>/` or `defineAgent({ code })`; a project without a config keeps its package's conventions for its entry (`main`, then `dist/index.js`, then `src/index.ts`; Python's `src/agent.py` and so on), and `--entry` still overrides it. Ontology projects are named by their key in `defineProject({ ontologies })`, and `tilde dev` starts an agent with its package's `dev` or `start` script."
+time: 2026-11-24T03:00:00+00:00

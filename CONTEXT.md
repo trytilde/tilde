@@ -1877,7 +1877,7 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
 - Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
   environments: { <env>: { slots, secrets } } }) } })`, each in the repository's
   `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
-  workspace with one root lockfile and at most one root `tilde.toml`; each ontology is the Tilde
+  workspace with one root lockfile and no `tilde.toml` (the root `tilde.config.ts` is the project); each ontology is the Tilde
   project of its name. `ontology<typeof slots>()` takes the ontology's own `defineSlots` type (a
   type-only import), so a slot bound to a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
