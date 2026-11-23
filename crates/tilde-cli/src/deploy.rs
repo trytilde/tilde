@@ -1,6 +1,8 @@
-//! `tilde deploy`: register a release carrying what the agent's code declares. This is the
-//! command CI runs; it prints the deployment token on stdout and its inventory on stderr, so
-//! `TOKEN=$(tilde deploy)` works.
+//! `tilde deploy`: register a release carrying what the agent's code declares, or with
+//! `@trytilde/iac` specs apply them: the project's ontologies, then its agents, each deploying
+//! agent releasing its own code (`agents/<key>/`, or its `defineAgent({ code })`). This is the
+//! command CI runs; it prints a dial-in deployment's token on stdout and its inventory on stderr,
+//! so `TOKEN=$(tilde deploy)` works for one (several print a `<key> <token>` line each).
 use crate::{api::Client, discover, project::Project, registry};
 use anyhow::{Result, bail};
 use clap::Args;
@@ -46,7 +48,10 @@ pub struct Deploy {
     /// code declares (`defineProject`, `defineTeam`), if any.
     #[arg(long, env = "TILDE_TEAM")]
     pub team: Option<String>,
-    /// Print the deployment id, token and creation status as JSON.
+    /// Print the result as JSON: the deployment's id, token and creation status, or with
+    /// `@trytilde/iac` specs the Apply result with each agent's deployment id and token. Without
+    /// it, a dial-in deployment registered now prints its token alone, several a `<key> <token>`
+    /// line each.
     #[arg(long)]
     pub json: bool,
     /// Deploy only the project's ontologies, or only its agents (default: both, ontologies first).
@@ -133,9 +138,13 @@ pub async fn run(args: Deploy) -> Result<()> {
         Some(entry) => entry.clone(),
         None => project.entry()?,
     };
-    let declarations = discover::declarations(&project, &entry, false, true).await?;
-    // The project's ontologies first (`ontology.rs`): build, bind, roll out; then its agents.
+    let mut declarations = discover::declarations(&project, &entry, false, true).await?;
+    // The project's ontologies first (`ontology.rs`): build, bind, roll out; then its agents,
+    // each releasing its own code (`discover::releases`).
     let only = args.only.as_deref();
+    if only != Some("ontologies") {
+        discover::releases(&project, &mut declarations).await?;
+    }
     let specs = !declarations.agents.is_empty()
         || !declarations.users.is_empty()
         || !declarations.groups.is_empty();

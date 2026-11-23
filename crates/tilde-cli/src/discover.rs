@@ -85,6 +85,7 @@ fn reader(project: &Project) -> Option<(String, Vec<String>)> {
     }
 }
 
+#[derive(Default)]
 pub struct Declarations {
     pub value: Value,
     /// Stable digest of the declarations, so `tilde dev` can tell a real change from a rebuild.
@@ -98,6 +99,11 @@ pub struct Declarations {
     pub groups: Vec<Value>,
     /// A `defineProject`'s ontologies (Tilde Cloud), by name.
     pub ontologies: std::collections::BTreeMap<String, crate::ontology::OntologySpec>,
+    /// Each agent's `defineAgent({ code })`, by key: where its code is, from the project's
+    /// directory. Never sent: Apply's specs have no such field.
+    pub code: std::collections::BTreeMap<String, String>,
+    /// The declarations of each deploying agent's own code (`releases`), by key.
+    pub releases: std::collections::BTreeMap<String, Value>,
 }
 
 /// `allow_empty` is for `tilde dev`: an agent that declares no prompts, skills or tools is still
@@ -140,7 +146,7 @@ pub async fn declarations(
     let mut value: Value = serde_json::from_str(text.trim())
         .context("The declaration reader did not print declaration JSON")?;
     let (mut agents, mut team, mut users, mut groups) = (Vec::new(), None, Vec::new(), Vec::new());
-    let mut ontologies = Default::default();
+    let (mut ontologies, mut code) = Default::default();
     if specs && let Some(found) = value.get_mut("declarations").map(Value::take) {
         let list = |key: &str| value[key].as_array().cloned().unwrap_or_default();
         agents = list("agents");
@@ -150,6 +156,10 @@ pub async fn declarations(
         if let Some(found) = value.get("ontologies").filter(|o| !o.is_null()) {
             ontologies = serde_json::from_value(found.clone())
                 .context("The declaration reader printed ontologies that are not a project's")?;
+        }
+        if let Some(found) = value.get("code").filter(|c| !c.is_null()) {
+            code = serde_json::from_value(found.clone())
+                .context("The declaration reader printed agents' code that is not paths")?;
         }
         value = found;
     }
@@ -161,7 +171,58 @@ pub async fn declarations(
         users,
         groups,
         ontologies,
+        code,
+        releases: Default::default(),
     })
+}
+
+/// Read each deploying agent's own code (`releases`): its `code` (an entry module, or a folder
+/// with its own package.json or pyproject.toml), else `agents/<key>/` when the project has that
+/// folder, from the project's directory. An agent with neither releases the entry's own
+/// declarations, the way `tilde deploy` from one agent's folder does (`apply::request`).
+pub async fn releases(project: &Project, declarations: &mut Declarations) -> Result<()> {
+    let deploying: Vec<String> = declarations
+        .agents
+        .iter()
+        .filter(|agent| agent.get("deployment").is_some())
+        .filter_map(|agent| agent["key"].as_str().map(str::to_owned))
+        .collect();
+    for key in &deploying {
+        let (path, explicit) = match declarations.code.get(key) {
+            Some(code) => (project.dir.join(code), true),
+            None => (project.dir.join("agents").join(key), false),
+        };
+        if !path.exists() {
+            if explicit {
+                bail!("Agent {key}: its code, {}, does not exist", path.display());
+            }
+            continue;
+        }
+        let (dir, entry) = match path.is_dir() {
+            true => (path.clone(), None),
+            false => (
+                path.parent()
+                    .context("an entry module has a folder")?
+                    .to_path_buf(),
+                Some(path.clone()),
+            ),
+        };
+        let code = Project::find(&dir)?;
+        if path.is_dir() && code.dir != path.canonicalize()? {
+            bail!(
+                "Agent {key}: {} has no package.json or pyproject.toml of its own",
+                path.display()
+            );
+        }
+        let entry = match entry {
+            Some(file) => file.to_string_lossy().into_owned(),
+            None => code.entry()?,
+        };
+        eprintln!("Agent {key}: reading its code in {}", code.dir.display());
+        let read = self::declarations(&code, &entry, false, false).await?;
+        declarations.releases.insert(key.clone(), read.value);
+    }
+    Ok(())
 }
 
 /// Canonical digest: serde_json's maps are ordered, so re-serialising is stable across runs.

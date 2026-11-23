@@ -1160,6 +1160,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             users: Vec::new(),
             groups: Vec::new(),
             ontologies: spec(),
+            ..Default::default()
         }
     }
 

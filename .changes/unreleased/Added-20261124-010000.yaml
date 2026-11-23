@@ -1,0 +1,3 @@
+kind: Added
+body: "A project's root `tilde deploy` releases every agent that declares `deploy`, after its ontologies and their bindings. Each agent's code is in `agents/<key>/`, or wherever `defineAgent({ code })` names (an entry module, or a folder with its own package.json or pyproject.toml); `tilde deploy` reads each one's prompts, skills and tools there and registers a deployment with an external ID of its own. An entry exporting a single deploying agent without code of its own still releases its own declarations, so `tilde deploy` from an agent's folder works as before. Several dial-in deployments registered at once print a `<key> <token>` line each."
+time: 2026-11-24T01:00:00+00:00

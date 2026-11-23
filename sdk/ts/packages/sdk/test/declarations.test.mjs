@@ -179,7 +179,7 @@ test("with TILDE_DISCOVERY_SPECS the reader adds the @trytilde/iac specs the ent
 import { defineAgent, defineProject, defineTeam, github, gateway, ontology, user } from ${JSON.stringify(iac)};
 export const respond = definePrompt("respond", { template: "Hi" });
 export const triage = defineAgent({ key: "triage", name: "Triage", deploy: gateway(),
-  tools: [github.ref("acme").tools("github_get_issue")] });
+  code: "services/triage", tools: [github.ref("acme").tools("github_get_issue")] });
 // The same agent again, inside its project, is kept once.
 export const project = defineProject({ team: "acme", agents: [triage], ontologies: { shop: ontology({
   environments: { production: { slots: { github: github.ref("acme") } } } }) } });
@@ -211,6 +211,9 @@ export const clash = process.env.CLASH ? defineAgent({ key: "triage", name: "Oth
   assert.equal(found.agents.length, 1);
   assert.equal(found.agents[0].deployment.target, "DEPLOYMENT_TARGET_GATEWAY");
   assert.deepEqual(found.agents[0].tools[0].tools, ["github_get_issue"]);
+  // Where its code is, beside the spec (which has no such field) for `tilde deploy` to read.
+  assert.deepEqual(found.code, { triage: "services/triage" });
+  assert.equal(found.agents[0].code, undefined);
   // The project's ontologies, for `tilde deploy` to build, bind and roll out first.
   assert.deepEqual(found.ontologies, {
     shop: {

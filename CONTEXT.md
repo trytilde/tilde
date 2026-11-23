@@ -1901,13 +1901,18 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
-  reader that knows specs prints `{declarations, agents, team}` (validating each agent against
-  `AgentSpec`), older readers ignore the variable. With agents, the CLI sends one `Apply`: the
-  one agent declaring `deploy` gets the entry's declarations (skill files inline) and an external
-  ID (`--external-id`, the GitHub run, else a digest of what is deployed, so an unchanged rerun
-  registers nothing); `--team`/`TILDE_TEAM` overrides the project's team; `--dry-run` asks for
-  the plan. It prints the plan or every required action with its link (relative links joined to
-  the server URL) on stderr, a newly registered dial-in deployment's token on stdout, or with
+  reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
+  `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't
+  carry), older readers ignore the variable. With agents, the CLI sends one `Apply`, in which
+  every agent declaring `deploy` releases its own code: the reader runs once in that code
+  (`code`, an entry module or a folder with its own manifest, else `agents/<key>/` from the
+  project's directory) for its declarations (skill files inline), and the deployment gets an
+  external ID (`--external-id`, the GitHub run, else a digest of what it deploys, so an unchanged
+  rerun registers nothing). One deploying agent without code of its own releases the entry's
+  declarations (`tilde deploy` from that agent's folder); two are refused. `--team`/`TILDE_TEAM`
+  overrides the project's team; `--dry-run` asks for the plan. It prints the plan or every
+  required action with its link (relative links joined to the server URL) on stderr, a newly
+  registered dial-in deployment's token on stdout (several: a `<key> <token>` line each), or with
   `--json` the response. Exit codes: 0 applied or planned, 1 error, 2 blocked. Without agents it
   registers the deployment as before.
 - The response lists one `Change` per resource (create, update with before and after per field,

@@ -36,35 +36,58 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
         .filter(|(_, agent)| agent.get("deployment").is_some())
         .map(|(i, _)| i)
         .collect();
-    if deploying.len() > 1 {
-        bail!(
-            "Several agents in this entry declare deploy; an entry module deploys one agent's code"
-        );
-    }
     let declares = ["prompts", "skills", "tools"].iter().any(|kind| {
         declarations.value[kind]
             .as_array()
             .is_some_and(|items| !items.is_empty())
     });
-    if deploying.is_empty() && declares {
+    // Each deploying agent releases its own code's declarations (`discover::releases`); the one
+    // without code of its own releases the entry's (`tilde deploy` from that agent's folder).
+    let without: Vec<usize> = deploying
+        .iter()
+        .copied()
+        .filter(|&i| {
+            !declarations
+                .releases
+                .contains_key(agents[i]["key"].as_str().unwrap_or_default())
+        })
+        .collect();
+    if without.len() > 1 {
+        let keys: Vec<&str> = without
+            .iter()
+            .map(|&i| agents[i]["key"].as_str().unwrap_or_default())
+            .collect();
         bail!(
-            "This entry declares prompts, skills or tools, but no exported agent declares deploy: \
-             add `deploy: gateway()` (or `lambda(arn)`, `sidecar()`) to the agent whose code this is"
+            "Agents {} declare deploy but have no code of their own: put each in agents/<key>/, or name it with defineAgent({{ code }})",
+            keys.join(", ")
         );
     }
-    if let Some(&i) = deploying.first() {
+    if declares && without.is_empty() {
+        bail!(
+            "This entry declares prompts, skills or tools, but no exported agent declares deploy \
+             without code of its own: add `deploy: gateway()` (or `lambda(arn)`, `sidecar()`) to \
+             the agent whose code this is"
+        );
+    }
+    for &i in &deploying {
+        let key = agents[i]["key"].as_str().unwrap_or_default().to_owned();
+        let released = declarations
+            .releases
+            .get(&key)
+            .unwrap_or(&declarations.value)
+            .clone();
         let deployment = agents[i]["deployment"]
             .as_object_mut()
             .context("deployment is an object")?;
         // Stable across reruns: the CI run, else the content of what is deployed (and its commit
-        // when known), so an unchanged deploy registers nothing new.
+        // when known), so an unchanged deploy registers nothing new. Per agent: each has its own.
         let external = args.external_id.clone().unwrap_or_else(|| {
             match (variable("GITHUB_REPOSITORY"), variable("GITHUB_RUN_ID")) {
                 (Some(repository), Some(run)) => format!("{repository}:{run}"),
                 _ => format!(
                     "sha256:{}",
                     digest(&json!([
-                        declarations.value,
+                        released,
                         deployment.clone(),
                         variable("GITHUB_SHA")
                     ]))
@@ -72,7 +95,7 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
             }
         });
         deployment.insert("externalId".into(), Value::String(external));
-        deployment.insert("declarations".into(), declarations.value.clone());
+        deployment.insert("declarations".into(), released);
         if let Some(label) = &args.label {
             deployment.insert("label".into(), Value::String(label.clone()));
         }
@@ -224,15 +247,20 @@ pub async fn run(
         }) {
             eprintln!("Deployment {} already registered (no token)", change.key);
         }
-        // `TOKEN=$(tilde deploy)` keeps working for a dial-in deployment registered just now.
-        if let [token] = response
+        // The dial-in deployments registered just now: one prints its token alone
+        // (`TOKEN=$(tilde deploy)`), several a `<key> <token>` line each (`--json` has them too).
+        let tokens: Vec<_> = response
             .agents
             .iter()
             .filter(|a| !a.deployment_token.is_empty())
-            .map(|a| a.deployment_token.as_str())
-            .collect::<Vec<_>>()[..]
-        {
-            println!("{token}");
+            .collect();
+        match &tokens[..] {
+            [one] => println!("{}", one.deployment_token),
+            several => {
+                for agent in several {
+                    println!("{} {}", agent.key, agent.deployment_token);
+                }
+            }
         }
     }
     if response.outcome.as_known() == Some(wire::ApplyOutcome::Blocked) {
@@ -393,6 +421,7 @@ mod tests {
             users: vec![json!({"email": "ada@acme.test", "name": "Ada", "login": true})],
             groups: vec![json!({"name": "eng", "members": [{"email": "ada@acme.test"}]})],
             ontologies: Default::default(),
+            ..Default::default()
         };
         // SAFETY: tests in this binary do not read these variables concurrently.
         unsafe { std::env::remove_var("GITHUB_RUN_ID") };
@@ -425,6 +454,72 @@ mod tests {
         );
     }
 
+    /// A root `tilde deploy` releases every deploying agent's own code: each reads its folder
+    /// (`agents/<key>/`, or its `code`), and each deployment carries those declarations and an
+    /// external ID of its own; two deploying agents without code of their own are refused.
+    #[tokio::test]
+    async fn a_root_deploy_releases_each_agents_own_code() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(
+            root.path().join("package.json"),
+            r#"{"name": "project", "main": "tilde.config.js"}"#,
+        )
+        .unwrap();
+        for dir in ["agents/triage", "code/helper"] {
+            std::fs::create_dir_all(root.path().join(dir)).unwrap();
+            std::fs::write(
+                root.path().join(dir).join("package.json"),
+                r#"{"name": "agent", "main": "index.js"}"#,
+            )
+            .unwrap();
+        }
+        // A stand-in declaration reader: each agent's prompt is named after its folder.
+        let reader = root.path().join("reader.sh");
+        std::fs::write(
+            &reader,
+            "#!/bin/sh\necho '{\"prompts\": [{\"name\": \"'\"$(basename \"$PWD\")\"'\"}], \"skills\": [], \"tools\": []}'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&reader, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        // SAFETY: tests in this binary do not read these variables concurrently.
+        unsafe {
+            std::env::set_var("TILDE_DECLARATIONS", &reader);
+            std::env::remove_var("GITHUB_RUN_ID");
+        }
+        let gateway = json!({"target": "DEPLOYMENT_TARGET_GATEWAY"});
+        let mut declarations = Declarations {
+            value: json!({"prompts": [], "skills": [], "tools": []}),
+            agents: vec![
+                json!({"key": "triage", "name": "Triage", "deployment": gateway}),
+                json!({"key": "helper", "name": "Helper", "deployment": gateway}),
+                json!({"key": "quiet", "name": "Quiet"}),
+            ],
+            code: [("helper".to_string(), "code/helper".to_string())].into(),
+            ..Default::default()
+        };
+        let project = crate::project::Project::find(root.path()).unwrap();
+        crate::discover::releases(&project, &mut declarations)
+            .await
+            .unwrap();
+        unsafe { std::env::remove_var("TILDE_DECLARATIONS") };
+        let request = super::request(&args("http://x".into()), &declarations).unwrap();
+        let released = |i: usize| request.agents[i].deployment.as_option().unwrap().clone();
+        assert_eq!(released(0).declarations.prompts[0].name, "triage");
+        assert_eq!(released(1).declarations.prompts[0].name, "helper");
+        assert_ne!(released(0).external_id, released(1).external_id);
+        assert!(request.agents[2].deployment.as_option().is_none());
+
+        declarations.releases.clear();
+        let error = super::request(&args("http://x".into()), &declarations).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("Agents triage, helper declare deploy"),
+            "{error}"
+        );
+    }
+
     #[test]
     fn code_without_a_deploying_agent_and_flags_the_spec_owns_are_refused() {
         let declarations = |prompts: Value| Declarations {
@@ -435,6 +530,7 @@ mod tests {
             users: Vec::new(),
             groups: Vec::new(),
             ontologies: Default::default(),
+            ..Default::default()
         };
         let error = super::request(
             &args("http://x".into()),
