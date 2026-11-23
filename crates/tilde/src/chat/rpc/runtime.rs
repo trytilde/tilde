@@ -277,19 +277,6 @@ impl ChatService for Rpc {
             .await?;
         Response::ok(runtime_pb::RegisterBundledToolsResponse::default())
     }
-    async fn invoke_tool<'a>(
-        &'a self,
-        ctx: RequestContext,
-        requests: InboundStream<runtime_pb::InvokeToolRequest>,
-    ) -> ServiceResult<impl connectrpc::Encodable<runtime_pb::InvokeToolResponse> + Send + use<'a>>
-    {
-        let scope = self.scope(&ctx).await?;
-        let capability = SecretString::from(capability(&ctx)?.to_owned());
-        // Boxed: the invocation's future is large, and unoptimized builds otherwise overflow a
-        // worker's stack polling a provider call beneath it.
-        let output = Box::pin(self.1.invoke(self.0.clone(), scope, capability, requests)).await?;
-        Response::ok(tool_response(output)?)
-    }
     async fn invoke_tool_stream(
         &self,
         ctx: RequestContext,

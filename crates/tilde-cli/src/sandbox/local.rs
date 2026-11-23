@@ -160,27 +160,16 @@ async fn invoke(
 }
 
 /// InvokeToolStream: Tilde sends a heartbeat every few seconds while the tool runs, so a call
-/// outlasting a proxy's idle timeout (a load balancer's 60 s) survives. A Tilde without it gets
-/// the silent InvokeTool.
+/// outlasting a proxy's idle timeout (a load balancer's 60 s) survives.
 async fn call_tool(
     daemon: &Daemon,
     request: wire::InvokeToolRequest,
 ) -> Result<String, connectrpc::ConnectError> {
     use wire::invoke_tool_stream_response::Frame;
-    let mut stream = match daemon
+    let mut stream = daemon
         .client
-        .invoke_tool_stream_with_options(request.clone(), daemon.options())
-        .await
-    {
-        Err(error) if error.code == Code::Unimplemented => {
-            let response = daemon
-                .client
-                .invoke_tool_with_options(request, daemon.options())
-                .await?;
-            return Ok(response.into_owned().output_json);
-        }
-        stream => stream?,
-    };
+        .invoke_tool_stream_with_options(request, daemon.options())
+        .await?;
     while let Some(frame) = stream.message().await? {
         if let Some(Frame::Result(result)) = frame.to_owned_message().frame {
             return Ok(result.output_json);

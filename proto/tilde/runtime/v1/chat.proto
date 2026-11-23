@@ -22,15 +22,10 @@ service ChatService {
   // code and runs in its process, so tools.search can rank them beside server tools. The engine
   // never executes them.
   rpc RegisterBundledTools(RegisterBundledToolsRequest) returns (RegisterBundledToolsResponse);
-  // Deprecated for InvokeToolStream; kept while agents on older SDKs call it.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
-  rpc InvokeTool(stream InvokeToolRequest) returns (InvokeToolResponse);
-  // Runs a tool as InvokeTool does, but streams a heartbeat at least every 10 s while it runs,
-  // then the result. A long tool call is otherwise silent, and proxies cut silent connections
-  // (an AWS load balancer after 60 s idle); HTTP/2 PINGs end at the first proxy, so only
-  // response bytes keep the whole path alive. It shares InvokeTool's request frames until
-  // InvokeTool is removed.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // Runs a tool, streaming a heartbeat at least every 10 s while it runs, then the result. A
+  // long tool call is otherwise silent, and proxies cut silent connections (an AWS load balancer
+  // after 60 s idle); HTTP/2 PINGs end at the first proxy, so only response bytes keep the whole
+  // path alive.
   // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
   rpc InvokeToolStream(stream InvokeToolRequest) returns (stream InvokeToolStreamResponse);
   rpc ListGoals(ListGoalsRequest) returns (ListGoalsResponse);

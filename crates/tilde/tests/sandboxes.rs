@@ -86,16 +86,24 @@ async fn process(origin: String, vm: String, token: String, world: Shared) {
                     json!({"exit_code":0,"stdout":env["SECRET"],"stderr":"","timed_out":false,"truncated":false})
                 }
                 ("exec", Some("call-tool")) => {
-                    let answer: Value = http
-                        .post(format!("{base}/InvokeTool"))
+                    let body = common::invocation::framed(
+                        json!({"name":"creds.git_credentials","operationId":op["id"],"inputJson":json!({"host":"github.com","path":"acme/api"}).to_string()}),
+                    );
+                    let mut bytes = http
+                        .post(format!("{base}/InvokeToolStream"))
                         .bearer_auth(&session)
-                        .json(&json!({"name":"creds.git_credentials","operationId":op["id"],"inputJson":json!({"host":"github.com","path":"acme/api"}).to_string()}))
+                        .header("content-type", "application/connect+json")
+                        .header("connect-protocol-version", "1")
+                        .body(body)
                         .send()
                         .await
                         .unwrap()
-                        .json()
+                        .bytes()
                         .await
-                        .unwrap();
+                        .unwrap()
+                        .to_vec();
+                    let answer =
+                        common::invocation::tool_result(common::invocation::drain(&mut bytes));
                     json!({"exit_code":0,"stdout":answer["outputJson"],"stderr":"","timed_out":false,"truncated":false})
                 }
                 ("write_file", _) => {
@@ -461,13 +469,17 @@ async fn agent_sandbox_is_launched_served_slept_woken_and_terminated() {
     // A call outside any operation (a background job's) belongs to the latest invocation.
     let session = world.lock().unwrap().sessions["sbx-1"].clone();
     let detached = reqwest::Client::new()
-        .post(format!("{}/tilde.sandbox.v1.SandboxService/InvokeTool", fx.origin))
+        .post(format!("{}/tilde.sandbox.v1.SandboxService/InvokeToolStream", fx.origin))
         .bearer_auth(&session)
-        .json(&json!({"name":"creds.git_credentials","inputJson":json!({"host":"github.com","path":"acme/web"}).to_string()}))
+        .header("content-type", "application/connect+json")
+        .header("connect-protocol-version", "1")
+        .body(framed(json!({"name":"creds.git_credentials","inputJson":json!({"host":"github.com","path":"acme/web"}).to_string()})))
         .send()
         .await
         .unwrap();
     assert!(detached.status().is_success());
+    // The call's span ends with its stream.
+    detached.bytes().await.unwrap();
     let background = spans
         .get_finished_spans()
         .unwrap()

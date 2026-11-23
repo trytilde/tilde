@@ -515,24 +515,6 @@ mod tests {
             })
         }
 
-        async fn invoke_tool<'a>(
-            &'a self,
-            ctx: RequestContext,
-            request: ServiceRequest<'_, wire::InvokeToolRequest>,
-        ) -> ServiceResult<impl connectrpc::Encodable<wire::InvokeToolResponse> + Send + use<'a>>
-        {
-            self.saw("InvokeTool", &ctx);
-            let request = request.to_owned_message();
-            if request.name != "git.token" {
-                return Err(ConnectError::not_found("no such tool"));
-            }
-            let input: Value = serde_json::from_str(&request.input_json).unwrap();
-            Response::ok(wire::InvokeToolResponse {
-                output_json: json!({ "token": "ghs_x", "repo": input["repo"] }).to_string(),
-                ..Default::default()
-            })
-        }
-
         /// A heartbeat, then the result, as Tilde streams a call that takes a while.
         async fn invoke_tool_stream(
             &self,

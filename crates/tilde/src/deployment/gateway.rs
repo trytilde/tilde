@@ -161,17 +161,9 @@ impl Client {
             ..Default::default()
         };
         // Relayed tool calls can run for minutes: the gateway streams heartbeats, so the call
-        // is bounded by silence rather than total time. A gateway without RelayStream gets the
-        // unary Relay and its 15 s limit.
-        let result = match self.relay_stream(request.clone()).await {
-            Err(error) if error.code == connectrpc::ErrorCode::Unimplemented => self
-                .inner
-                .relay_with_options(request, Self::options())
-                .await
-                .map(|r| r.into_owned().result.into_option()),
-            result => result,
-        };
-        result
+        // is bounded by silence rather than total time.
+        self.relay_stream(request)
+            .await
             .map_err(|error| match error.code {
                 connectrpc::ErrorCode::PermissionDenied
                 | connectrpc::ErrorCode::Unauthenticated => ChatError::Denied,

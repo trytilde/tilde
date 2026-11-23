@@ -24,6 +24,9 @@ breaking:
   # RunService.Watch. InvokeRequest stays in that file and stays checked.
   # GetLogsStatus and GetTracingStatus were deliberately retired: ClickHouse is required, so
   # there is no storage state to report.
+  # ChatService.InvokeTool, SandboxService.InvokeTool and SidecarService.Relay were retired once
+  # SDKs, CLIs and sidecars of 5.2 and later called only their streaming forms (no compatibility
+  # kept, by decision).
   ignore_only:
     FIELD_SAME_TYPE:
       # ApplyService had shipped in no release when SignalTriggerSpec.filters moved from
@@ -31,6 +34,7 @@ breaking:
       # ports to open-source Tilde byte-identical. Drop this once Apply has been released.
       - proto/tilde/management/v1/apply.proto
     MESSAGE_NO_DELETE:
+      - proto/tilde/agent_event_ingress/v1/sidecars.proto
       - proto/tilde/agent_host/v1/agent.proto
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
@@ -38,6 +42,9 @@ breaking:
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
     RPC_NO_DELETE:
+      - proto/tilde/agent_event_ingress/v1/sidecars.proto
+      - proto/tilde/runtime/v1/chat.proto
+      - proto/tilde/sandbox/v1/sandbox.proto
       - proto/tilde/management/v1/logs.proto
       - proto/tilde/management/v1/tracing.proto
     SERVICE_NO_DELETE:

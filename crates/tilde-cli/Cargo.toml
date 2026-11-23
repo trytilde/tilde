@@ -13,6 +13,7 @@ name = "tilde-cli"
 path = "src/main.rs"
 
 [dependencies]
+tar = "0.4"
 anyhow = "1"
 axum = "0.8"
 base64.workspace = true

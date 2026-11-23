@@ -349,20 +349,7 @@ impl SandboxService for Runtime {
             ..Default::default()
         })
     }
-    /// Deprecated for InvokeToolStream; kept while sandboxes run an older CLI.
-    async fn invoke_tool<'a>(
-        &'a self,
-        ctx: RequestContext,
-        request: ServiceRequest<'_, wire::InvokeToolRequest>,
-    ) -> ServiceResult<impl Encodable<wire::InvokeToolResponse> + Send + use<'a>> {
-        let session = self.session(&ctx).await?;
-        let output = self.call_tool(session, request.to_owned_message()).await?;
-        Response::ok(wire::InvokeToolResponse {
-            output_json: output.to_string(),
-            ..Default::default()
-        })
-    }
-    /// InvokeTool with a heartbeat while the tool runs, so proxies never cut a long call.
+    /// A tool call with a heartbeat while the tool runs, so proxies never cut a long call.
     async fn invoke_tool_stream(
         &self,
         ctx: RequestContext,

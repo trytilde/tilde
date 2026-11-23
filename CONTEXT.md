@@ -374,7 +374,7 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
 The invocation catalog lists the agent's tools on sources whose connection is ready or whose
 host can take a call; invoke rechecks the same catalog, validates input against
 the tool schema, resolves credentials and calls the provider or host. The catalog is built once
-per invocation (first ListTools or InvokeTool) and held in memory until the invocation ends, at
+per invocation (first ListTools or InvokeToolStream) and held in memory until the invocation ends, at
 most 15 minutes: tools added or removed, a mode change or a source going unready take effect from
 the agent's next invocation. Credentials, provider state and a connected host's liveness are
 still checked on every call, so an offline host is refused at once. Every server-executed tool
@@ -1251,8 +1251,7 @@ Rust domain code is grouped under `agent/{mod,health,rpc}.rs` and
 `average_turns_per_thread`. This is a breaking rename without legacy aliases.
 
 Chat provider tools use an invocation-scoped ConnectRPC catalog and the streaming
-`InvokeToolStream` transport (input frames in, heartbeats then the result out; the older
-`InvokeTool` returns the result alone and stays for older SDKs). The SDK registers their server-authored descriptions and
+`InvokeToolStream` transport (input frames in, heartbeats then the result out). The SDK registers their server-authored descriptions and
 schemas as framework tool wrappers before the agent loop. Sending is provider-owned;
 there is no SendMessage RPC or shared sending trait. Providers explicitly publish
 canonical message events through scoped lifecycle helpers. Native text sending is one provider implementation. Connection-backed adapters expose
@@ -1801,7 +1800,7 @@ refreshes every 30 seconds; it does not yet have a registry subscription API.
 When the gateway claims an invocation it primes, in the background, the channel catalog
 for that agent and thread and the decrypted credentials of every connection in it; the
 wake's first history page is cached for that invocation as it is loaded. Subsequent
-ListTools, InvokeTool and first-page ListMessages calls are answered from memory. The
+ListTools, InvokeToolStream and first-page ListMessages calls are answered from memory. The
 catalog and credential caches empty on `tilde_sidecar_configuration`; history pages empty
 on `tilde_chat_activity` and on any local message write to the thread; short TTLs bound
 staleness and the invocation's end evicts its entries. Credentials live only in
@@ -1881,9 +1880,15 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   checked: the ontologies' preflight (projects, environments, connections and secrets exist;
   each missing one is a required action with its link, the secret's naming the project's team; a
   server without the ontology control plane answers "Ontologies need Tilde Cloud") and the
-  agents' dry-run `Apply`, reported together (exit 2). Then the repository at HEAD is archived
-  once (uncommitted changes refused without `--allow-dirty`; over 32 MiB refused) and, per
-  ontology: a version (`VersionService.CreateVersion`), a check that it declares exactly the
+  agents' dry-run `Apply`, reported together (exit 2). Then each ontology is built here, on the
+  client (Tilde never builds a project), with the project's own `@trytilde/ontology` and
+  `@trytilde/spaces` (Tilde Cloud's packages, run with `node`): its IR (`tilde-ontology-build ir`),
+  sent to `VersionService.CompileOntology`, whose errors fail the deploy and whose contract is
+  written into the spaces project as `@tilde/contract`; its handler module (`worker`); its
+  spaces (`tilde-spaces-build build`); all as an artifact (a plain tar: `artifact.json` with the
+  runtime the package declares, `ontology.ir.json`, `worker.js`, `spaces/`; uncommitted changes
+  refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
+  (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
   slots and secrets the spec binds (else nothing is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
@@ -2105,7 +2110,7 @@ Gateway provider WatchThread subscriptions read projected activity with opaque r
 cursors, so clients do not need a management API or direct sidecar URL for streaming.
 Registry RPCs (agents, prompts, skills, and the memory tools the replica's tool registry
 offers) from an agent beside a sidecar are verified by the replica, relayed over
-`Relay`, and re-verified at the gateway: token signature, agent generation, the
+`RelayStream`, and re-verified at the gateway: token signature, agent generation, the
 thread lease, and the capability ceiling, before the existing registry handlers run.
 The projection may lag a young invocation or roster, so only an invocation the gateway
 already knows to be over is refused there.

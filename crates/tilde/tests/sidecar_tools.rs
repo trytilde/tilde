@@ -348,16 +348,13 @@ async fn a_sidecar_agent_lists_and_calls_its_tool_sources_with_replicated_creden
         let body = common::invocation::framed(
             json!({"name":name,"callId":Uuid::new_v4().to_string(),"sequence":0,"inputJson":"{}","finish":true}),
         );
-        let mut bytes = chat_call(wake, "InvokeTool", body, false)
+        let mut bytes = chat_call(wake, "InvokeToolStream", body, false)
             .await
             .bytes()
             .await
             .unwrap()
             .to_vec();
-        let result = common::invocation::drain(&mut bytes)
-            .into_iter()
-            .next()
-            .unwrap();
+        let result = common::invocation::tool_result(common::invocation::drain(&mut bytes));
         serde_json::from_str(
             result["outputJson"]
                 .as_str()

@@ -32,6 +32,15 @@ pub fn framed(value: Value) -> Vec<u8> {
     out.extend(bytes);
     out
 }
+/// A tool call's outcome from InvokeToolStream's frames (heartbeats, then the result, or an
+/// end-stream error): `{outputJson}` on success, `{error}` otherwise.
+pub fn tool_result(frames: Vec<Value>) -> Value {
+    frames
+        .iter()
+        .find_map(|f| f.get("result").cloned())
+        .or_else(|| frames.iter().find(|f| f.get("error").is_some()).cloned())
+        .unwrap_or(Value::Null)
+}
 /// Complete Connect envelopes at the front of `buffer`, leaving any partial frame behind.
 pub fn drain(buffer: &mut Vec<u8>) -> Vec<Value> {
     let mut out = vec![];
@@ -150,7 +159,7 @@ impl Fixture {
     /// The single response envelope: `outputJson` on success, `error` otherwise.
     pub async fn invoke(&self, name: &str, input: Value) -> Value {
         let response = reqwest::Client::new()
-            .post(format!("{}/tilde.runtime.v1.ChatService/InvokeTool", self.origin))
+            .post(format!("{}/tilde.runtime.v1.ChatService/InvokeToolStream", self.origin))
             .bearer_auth(self.token.expose_secret())
             .header("content-type", "application/connect+json")
             .header("connect-protocol-version", "1")
@@ -159,7 +168,7 @@ impl Fixture {
             .await
             .unwrap();
         let mut bytes = response.bytes().await.unwrap().to_vec();
-        drain(&mut bytes).into_iter().next().unwrap()
+        tool_result(drain(&mut bytes))
     }
     /// A successful call's decoded output.
     pub async fn output(&self, name: &str, input: Value) -> Value {

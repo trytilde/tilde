@@ -31,7 +31,11 @@ fn responses(mut bytes: &[u8]) -> Vec<Value> {
     let mut out = vec![];
     while !bytes.is_empty() {
         let len = u32::from_be_bytes(bytes[1..5].try_into().unwrap()) as usize;
-        out.push(serde_json::from_slice(&bytes[5..5 + len]).unwrap());
+        // InvokeToolStream: heartbeats while the tool runs, then the result (or an error).
+        let frame: Value = serde_json::from_slice(&bytes[5..5 + len]).unwrap();
+        if frame.get("heartbeat").is_none() {
+            out.push(frame.get("result").cloned().unwrap_or(frame));
+        }
         bytes = &bytes[5 + len..];
     }
     out
@@ -181,7 +185,7 @@ async fn an_agents_tools_reach_the_provider_with_connection_credentials() {
     let invoke = async |token: &SecretString, input: Value| -> (String, Vec<Value>) {
         let call = Uuid::new_v4().to_string();
         let response = http
-            .post(format!("{endpoint}/InvokeTool"))
+            .post(format!("{endpoint}/InvokeToolStream"))
             .bearer_auth(token.expose_secret())
             .header("content-type", "application/connect+json")
             .header("connect-protocol-version", "1")

@@ -806,7 +806,9 @@ async fn channel_send_and_callback(selected_provider: &str) {
         body.extend_from_slice(&(frame.len() as u32).to_be_bytes());
         body.extend(frame);
         let result = http
-            .post(format!("{origin}/tilde.runtime.v1.ChatService/InvokeTool"))
+            .post(format!(
+                "{origin}/tilde.runtime.v1.ChatService/InvokeToolStream"
+            ))
             .bearer_auth(token.expose_secret())
             .header("content-type", "application/connect+json")
             .header("connect-protocol-version", "1")
@@ -817,8 +819,8 @@ async fn channel_send_and_callback(selected_provider: &str) {
             .bytes()
             .await
             .unwrap();
-        let len = u32::from_be_bytes(result[1..5].try_into().unwrap()) as usize;
-        let result: Value = serde_json::from_slice(&result[5..5 + len]).unwrap();
+        let result =
+            common::invocation::tool_result(common::invocation::drain(&mut result.to_vec()));
         assert!(result.get("outputJson").is_some(), "{provider}: {result}");
         let outbound = chat.message(call).await.unwrap();
         assert_ne!(outbound.thread_id, thread.id);
@@ -959,7 +961,9 @@ async fn channel_send_and_callback(selected_provider: &str) {
         body.extend_from_slice(&(frame.len() as u32).to_be_bytes());
         body.extend(frame);
         let response = http
-            .post(format!("{origin}/tilde.runtime.v1.ChatService/InvokeTool"))
+            .post(format!(
+                "{origin}/tilde.runtime.v1.ChatService/InvokeToolStream"
+            ))
             .bearer_auth(token.expose_secret())
             .header("content-type", "application/connect+json")
             .header("connect-protocol-version", "1")
@@ -970,8 +974,8 @@ async fn channel_send_and_callback(selected_provider: &str) {
             .bytes()
             .await
             .unwrap();
-        let len = u32::from_be_bytes(response[1..5].try_into().unwrap()) as usize;
-        let failure: Value = serde_json::from_slice(&response[5..5 + len]).unwrap();
+        let failure =
+            common::invocation::tool_result(common::invocation::drain(&mut response.to_vec()));
         assert!(failure.get("outputJson").is_none(), "{provider}: {failure}");
         assert!(
             chat.message(failed_call).await.is_err(),
