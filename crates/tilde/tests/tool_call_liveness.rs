@@ -129,24 +129,6 @@ async fn long_tool_calls_survive_an_idle_timeout_proxy_only_with_heartbeats() {
         7
     );
 
-    // The same call over the silent InvokeTool: the proxy cuts it after 2 s.
-    let started = std::time::Instant::now();
-    let silent = call(
-        &proxy,
-        &fx.token,
-        "InvokeTool",
-        frame(
-            Uuid::new_v4(),
-            &usage,
-            0,
-            json!({"inputJson": "{}", "finish": true}),
-        )
-        .into(),
-    )
-    .await;
-    assert!(silent.is_none(), "{silent:?}");
-    assert!(started.elapsed() < TOOL);
-
     // Streamed input over HTTP/1.1: chunks of a native message arrive a second apart while
     // heartbeats flow back, for longer than the proxy's idle timeout in all.
     let message = Uuid::new_v4();

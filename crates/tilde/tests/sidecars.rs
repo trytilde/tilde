@@ -610,17 +610,14 @@ async fn replicas_own_execute_project_forward_and_fail_over_through_the_gateway(
     );
     let invoke = async |name: &str, input: serde_json::Value| -> serde_json::Value {
         let response = chat_call(
-            "InvokeTool",
+            "InvokeToolStream",
             common::invocation::framed(serde_json::json!({"name":name,"callId":Uuid::new_v4().to_string(),"sequence":0,"inputJson":input.to_string(),"finish":true})),
             "application/connect+json",
         )
         .await
         .unwrap();
         let mut bytes = response.bytes().await.unwrap().to_vec();
-        let result = common::invocation::drain(&mut bytes)
-            .into_iter()
-            .next()
-            .unwrap();
+        let result = common::invocation::tool_result(common::invocation::drain(&mut bytes));
         serde_json::from_str(
             result["outputJson"]
                 .as_str()

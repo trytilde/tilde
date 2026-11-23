@@ -353,7 +353,11 @@ fn responses(mut bytes: &[u8]) -> Vec<Value> {
     let mut result = vec![];
     while !bytes.is_empty() {
         let n = u32::from_be_bytes(bytes[1..5].try_into().unwrap()) as usize;
-        result.push(serde_json::from_slice(&bytes[5..5 + n]).unwrap());
+        // InvokeToolStream: heartbeats while the tool runs, then the result (or an error).
+        let frame: Value = serde_json::from_slice(&bytes[5..5 + n]).unwrap();
+        if frame.get("heartbeat").is_none() {
+            result.push(frame.get("result").cloned().unwrap_or(frame));
+        }
         bytes = &bytes[5 + n..];
     }
     result
@@ -375,7 +379,7 @@ async fn complete_native_messages_preserve_snapshots_and_execute_a_call_only_onc
         .unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!(
-        "http://{}/tilde.runtime.v1.ChatService/InvokeTool",
+        "http://{}/tilde.runtime.v1.ChatService/InvokeToolStream",
         listener.local_addr().unwrap()
     );
     let server = tokio::spawn(

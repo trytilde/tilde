@@ -13,12 +13,8 @@ service SandboxService {
   rpc Connect(ConnectRequest) returns (stream ConnectResponse);
   rpc Respond(RespondRequest) returns (RespondResponse);
   rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
-  // Deprecated for InvokeToolStream; kept while sandboxes run an older CLI.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
-  rpc InvokeTool(InvokeToolRequest) returns (InvokeToolResponse);
-  // Runs a tool as InvokeTool does, streaming a heartbeat at least every 10 s while it runs and
-  // then the result, so proxies with idle timeouts never cut a long call.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // Runs a tool, streaming a heartbeat at least every 10 s while it runs and then the result, so
+  // proxies with idle timeouts never cut a long call.
   // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
   rpc InvokeToolStream(InvokeToolRequest) returns (stream InvokeToolStreamResponse);
 }

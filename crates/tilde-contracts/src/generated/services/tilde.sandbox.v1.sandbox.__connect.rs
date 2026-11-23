@@ -26,10 +26,6 @@ pub type OwnedListToolsResponseView = ::buffa::view::OwnedView<
 pub type OwnedInvokeToolRequestView = ::buffa::view::OwnedView<
     crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolRequestView<'static>,
 >;
-///Shorthand for `OwnedView<InvokeToolResponseView<'static>>`.
-pub type OwnedInvokeToolResponseView = ::buffa::view::OwnedView<
-    crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolResponseView<'static>,
->;
 ///Shorthand for `OwnedView<InvokeToolStreamResponseView<'static>>`.
 pub type OwnedInvokeToolStreamResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolStreamResponseView<
@@ -138,40 +134,6 @@ for ::buffa::view::OwnedView<
         )
     }
 }
-impl ::connectrpc::Encodable<crate::proto::tilde::sandbox::v1::InvokeToolResponse>
-for crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::tilde::sandbox::v1::InvokeToolResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-    /// An `OwnedView` still holds the buffer it was decoded from, so
-    /// its large fields can be handed to the response body by
-    /// reference count instead of copied. The bare view impl above
-    /// cannot do this: it has borrows but no buffer to name.
-    fn encode_segments(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body_segments(
-            self.reborrow(),
-            self.bytes(),
-            codec,
-        )
-    }
-}
 impl ::connectrpc::Encodable<crate::proto::tilde::sandbox::v1::InvokeToolStreamResponse>
 for crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolStreamResponseView<'_> {
     fn encode(
@@ -225,12 +187,6 @@ pub const SANDBOX_SERVICE_RESPOND_SPEC: ::connectrpc::Spec = ::connectrpc::Spec:
 /// Static [`Spec`](::connectrpc::Spec) for the `ListTools` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const SANDBOX_SERVICE_LIST_TOOLS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.sandbox.v1.SandboxService/ListTools",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the `InvokeTool` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
-pub const SANDBOX_SERVICE_INVOKE_TOOL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/tilde.sandbox.v1.SandboxService/InvokeTool",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -365,33 +321,8 @@ pub trait SandboxService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Deprecated for InvokeToolStream; kept while sandboxes run an older CLI.
-    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn invoke_tool<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::tilde::sandbox::v1::InvokeToolResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Runs a tool as InvokeTool does, streaming a heartbeat at least every 10 s while it runs and
-    /// then the result, so proxies with idle timeouts never cut a long call.
-    /// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+    /// Runs a tool, streaming a heartbeat at least every 10 s while it runs and then the result, so
+    /// proxies with idle timeouts never cut a long call.
     /// buf:lint:ignore RPC_REQUEST_STANDARD_NAME
     ///
     /// `request` is borrowed from the request body and is valid for the
@@ -533,35 +464,6 @@ impl<S: SandboxService> SandboxServiceExt for S {
                 },
             )
             .with_spec(SANDBOX_SERVICE_LIST_TOOLS_SPEC)
-            .route_view(
-                SANDBOX_SERVICE_SERVICE_NAME,
-                "InvokeTool",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.invoke_tool(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::tilde::sandbox::v1::InvokeToolResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(SANDBOX_SERVICE_INVOKE_TOOL_SPEC)
             .route_view_server_stream::<
                 _,
                 _,
@@ -662,12 +564,6 @@ impl<T: SandboxService> ::connectrpc::Dispatcher for SandboxServiceServer<T> {
                         .with_spec(SANDBOX_SERVICE_LIST_TOOLS_SPEC),
                 )
             }
-            "InvokeTool" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(SANDBOX_SERVICE_INVOKE_TOOL_SPEC),
-                )
-            }
             "InvokeToolStream" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::server_streaming()
@@ -730,28 +626,6 @@ impl<T: SandboxService> ::connectrpc::Dispatcher for SandboxServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::sandbox::v1::ListToolsResponse,
-                        >(format)
-                })
-            }
-            "InvokeTool" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                        ctx.decode_options(),
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-                    >::from_parts(&req, &body);
-                    svc.invoke_tool(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::tilde::sandbox::v1::InvokeToolResponse,
                         >(format)
                 })
             }
@@ -1052,51 +926,6 @@ where
                 &self.transport,
                 &self.config,
                 SANDBOX_SERVICE_LIST_TOOLS_SPEC
-                    .with_origin(::connectrpc::SpecOrigin::Client),
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the InvokeTool RPC. Sends a request to /tilde.sandbox.v1.SandboxService/InvokeTool.
-    pub async fn invoke_tool(
-        &self,
-        request: crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.invoke_tool_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the InvokeTool RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn invoke_tool_with_options(
-        &self,
-        request: crate::proto::tilde::sandbox::v1::InvokeToolRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::tilde::sandbox::v1::__buffa::view::InvokeToolResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                SANDBOX_SERVICE_INVOKE_TOOL_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

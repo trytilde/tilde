@@ -262,7 +262,7 @@ impl Gateway {
     ) -> serde_json::Value {
         let response = reqwest::Client::new()
             .post(format!(
-                "{}/tilde.runtime.v1.ChatService/InvokeTool",
+                "{}/tilde.runtime.v1.ChatService/InvokeToolStream",
                 self.runtime
             ))
             .bearer_auth(&wake.capability)
@@ -279,10 +279,7 @@ impl Gateway {
             .await
             .unwrap();
         let mut bytes = response.bytes().await.unwrap().to_vec();
-        super::invocation::drain(&mut bytes)
-            .into_iter()
-            .next()
-            .unwrap()
+        super::invocation::tool_result(super::invocation::drain(&mut bytes))
     }
     pub async fn close(self) {
         let _ = self.stop.send(true);

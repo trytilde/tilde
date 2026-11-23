@@ -1,10 +1,13 @@
 //! `tilde deploy` for a project's ontologies (Tilde Cloud): `defineProject({ ontologies })`.
 //!
-//! Each ontology is the Tilde project of its name, built from `ontologies/<name>/` of the
-//! repository at HEAD (`tilde deploy` runs at the repository's root). `prepare` changes nothing:
-//! it checks every project, environment, connection and secret the specs name (each missing one
-//! is a required action with a link, reported with the agents' own before anything changes) and
-//! archives the repository once. `execute` then, per ontology: builds the archive into a version
+//! Each ontology is the Tilde project of its name, `ontologies/<name>/` of the repository
+//! (`tilde deploy` runs at the repository's root), built here, on the client: Tilde never builds
+//! a project. `prepare` changes nothing: it checks every project, environment, connection and
+//! secret the specs name (each missing one is a required action with a link, reported with the
+//! agents' own before anything changes), then builds each ontology into an artifact with the
+//! project's own `@trytilde/ontology` and `@trytilde/spaces` ([`build`]): the IR, the errors or
+//! the contract Tilde compiles for it (`VersionService.CompileOntology`), the handler module, the
+//! spaces. `execute` then, per ontology: uploads the artifact as a version
 //! (`VersionService.CreateVersion`), checks that the version declares exactly what the spec binds,
 //! and binds and rolls out one environment at a time. Agents are applied after (`apply.rs`).
 //!
@@ -105,14 +108,15 @@ struct Project {
     environments: Vec<Resolved>,
 }
 
-/// The largest source archive Tilde Cloud takes (its `versions::MAX_ARCHIVE`).
-const MAX_ARCHIVE: usize = 32 * 1024 * 1024;
+/// The largest artifact Tilde Cloud takes (its `versions::MAX_ARTIFACT`).
+const MAX_ARTIFACT: usize = 32 * 1024 * 1024;
 
 /// What `prepare` found, for `execute`: every project resolved, the repository archived once.
 pub struct Plan {
     client: Client,
     projects: Vec<Project>,
-    archive: Vec<u8>,
+    /// Each project's artifact, by project name.
+    artifacts: BTreeMap<String, Vec<u8>>,
     commit: String,
     branch: String,
 }
@@ -300,31 +304,20 @@ async fn preflight(
     Ok(out)
 }
 
-/// `git archive` of the repository at HEAD, with the commit and branch.
-fn archive(dir: &Path, allow_dirty: bool) -> Result<(Vec<u8>, String, String)> {
+/// The commit and branch a deploy is of: HEAD. Uncommitted changes are refused, unless allowed
+/// (they are built, under HEAD's commit).
+fn head(dir: &Path, allow_dirty: bool) -> Result<(String, String)> {
     if !git(dir, &["status", "--porcelain"])?.is_empty() {
         if !allow_dirty {
             bail!(
-                "the working tree has uncommitted changes; commit them, or pass --allow-dirty to deploy HEAD without them"
+                "the working tree has uncommitted changes; commit them, or pass --allow-dirty to build it as it is"
             );
         }
-        eprintln!("warning: uncommitted changes are not included; deploying HEAD");
+        eprintln!("warning: building uncommitted changes as HEAD's commit");
     }
     let commit = git(dir, &["rev-parse", "HEAD"])?;
     let branch = git(dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
-    let out = std::process::Command::new("git")
-        .args(["archive", "--format=tar", "HEAD"])
-        .current_dir(dir)
-        .output()
-        .context("running git archive")?;
-    if !out.status.success() {
-        bail!(
-            "git archive: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
-    }
     Ok((
-        out.stdout,
         commit,
         if branch == "HEAD" {
             String::new()
@@ -332,6 +325,134 @@ fn archive(dir: &Path, allow_dirty: bool) -> Result<(Vec<u8>, String, String)> {
             branch
         },
     ))
+}
+
+/// `<package>` as `dir` resolves it (its own `node_modules` or an ancestor's): its directory.
+fn installed(dir: &Path, package: &str) -> Option<std::path::PathBuf> {
+    dir.ancestors()
+        .map(|d| d.join("node_modules").join(package))
+        .find(|p| p.join("package.json").is_file())
+}
+
+/// `node <cli> <args>` from a project package, as the user runs it: its stdout.
+fn node(cli: &Path, args: &[&std::ffi::OsStr]) -> Result<Vec<u8>> {
+    let out = std::process::Command::new("node")
+        .arg(cli)
+        .args(args)
+        .output()
+        .context("running node (Node 22 or newer builds ontologies)")?;
+    if !out.status.success() {
+        bail!("{}", String::from_utf8_lossy(&out.stderr).trim());
+    }
+    Ok(out.stdout)
+}
+
+/// Build the ontology in `folder` (`ontologies/<name>/`) into an artifact, as Tilde takes it (a
+/// plain tar): `artifact.json` (the runtime the project's `@trytilde/ontology` builds for),
+/// `ontology.ir.json`, `worker.js` (the handler module) and `spaces/<id>/` (built against the
+/// contract Tilde compiles for the IR, which is written into the spaces project as
+/// `@tilde/contract`). An IR Tilde refuses fails the deploy with its errors.
+async fn build(client: &Client, project: &Project, folder: &Path) -> Result<Vec<u8>> {
+    let name = &project.name;
+    let package = installed(folder, "@trytilde/ontology").with_context(|| {
+        format!(
+            "ontologies/{name} needs @trytilde/ontology installed (pnpm add @trytilde/ontology)"
+        )
+    })?;
+    let manifest: Value = serde_json::from_slice(&std::fs::read(package.join("package.json"))?)?;
+    let runtime = manifest["tilde"]["runtime"].as_u64().with_context(|| {
+        format!(
+            "{} declares no runtime: upgrade @trytilde/ontology",
+            package.display()
+        )
+    })?;
+    let cli = package.join("dist/cli.js");
+    let ir = node(&cli, &["ir".as_ref(), folder.as_os_str()])
+        .with_context(|| format!("ontology {name}: evaluating ontology.ts"))?;
+    let compiled = client
+        .ok(
+            &format!("{VERSIONS}/CompileOntology"),
+            json!({"projectId": project.id, "ir": String::from_utf8(ir.clone())?}),
+        )
+        .await?;
+    if let Some(errors) = compiled["errors"].as_array().filter(|e| !e.is_empty()) {
+        let errors: Vec<&str> = errors.iter().filter_map(Value::as_str).collect();
+        bail!(
+            "ontology {name} does not compile:\n  {}",
+            errors.join("\n  ")
+        );
+    }
+    let out = folder.join(".tilde/build");
+    let _ = std::fs::remove_dir_all(&out);
+    std::fs::create_dir_all(&out)?;
+    // The build is never part of the tree: the next deploy needs it clean.
+    std::fs::write(folder.join(".tilde/.gitignore"), "*\n")?;
+    let worker = out.join("worker.js");
+    node(
+        &cli,
+        &["worker".as_ref(), folder.as_os_str(), worker.as_os_str()],
+    )
+    .with_context(|| format!("ontology {name}: bundling the handler module"))?;
+    let mut files: Vec<(String, Vec<u8>)> = vec![
+        (
+            "artifact.json".into(),
+            json!({ "runtime": runtime }).to_string().into_bytes(),
+        ),
+        ("ontology.ir.json".into(), ir),
+        ("worker.js".into(), std::fs::read(&worker)?),
+    ];
+    let spaces = folder.join("spaces");
+    if spaces.join("package.json").is_file() {
+        let contract = spaces.join("node_modules/@tilde/contract");
+        let _ = std::fs::remove_dir_all(&contract);
+        for (path, text) in compiled["contract"].as_object().into_iter().flatten() {
+            let file = contract.join(path);
+            if file.strip_prefix(&contract).is_err() || path.contains("..") {
+                bail!("the contract names {path}, outside its package");
+            }
+            std::fs::create_dir_all(file.parent().unwrap_or(&contract))?;
+            std::fs::write(file, text.as_str().unwrap_or_default())?;
+        }
+        let kit = installed(&spaces, "@trytilde/spaces").with_context(|| {
+            format!("ontologies/{name}/spaces needs @trytilde/spaces installed (pnpm add @trytilde/spaces)")
+        })?;
+        let built = out.join("spaces");
+        node(
+            &kit.join("dist/cli.js"),
+            &["build".as_ref(), spaces.as_os_str(), built.as_os_str()],
+        )
+        .with_context(|| format!("ontology {name}: building the spaces"))?;
+        let mut stack = vec![built.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir)? {
+                let path = entry?.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else {
+                    let relative = path.strip_prefix(&built)?.to_string_lossy().into_owned();
+                    files.push((format!("spaces/{relative}"), std::fs::read(&path)?));
+                }
+            }
+        }
+    }
+    files.sort();
+    let mut tar = tar::Builder::new(Vec::new());
+    for (path, bytes) in &files {
+        let mut header = tar::Header::new_ustar();
+        header.set_size(bytes.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append_data(&mut header, path, bytes.as_slice())?;
+    }
+    let artifact = tar.into_inner()?;
+    if artifact.len() > MAX_ARTIFACT {
+        bail!(
+            "ontology {name}: the artifact is {} MiB, over Tilde's {} MiB (its spaces' assets, most likely)",
+            artifact.len() / (1024 * 1024),
+            MAX_ARTIFACT / (1024 * 1024)
+        );
+    }
+    Ok(artifact)
 }
 
 /// Until `read` says the value is no longer in progress (`waiting` is its in-progress status).
@@ -355,9 +476,9 @@ async fn poll(
     }
 }
 
-/// Check and resolve the ontologies (all, or `--ontology`'s) and archive the repository, changing
-/// nothing: the actions that block a deploy, else the plan (none when there is nothing to do or
-/// it is a dry run).
+/// Check and resolve the ontologies (all, or `--ontology`'s) and build each into an artifact,
+/// changing nothing: the actions that block a deploy, else the plan (none when there is nothing to
+/// do or it is a dry run).
 pub async fn prepare(
     args: &Deploy,
     ontologies: &BTreeMap<String, OntologySpec>,
@@ -376,7 +497,7 @@ pub async fn prepare(
     if selected.is_empty() {
         return Ok((Vec::new(), None));
     }
-    // The control plane builds `ontologies/<name>/` of the archive, which is the repository root.
+    // Each ontology is `ontologies/<name>/` of the repository.
     let dir = args.dir.canonicalize().context("the project directory")?;
     let root = git(&dir, &["rev-parse", "--show-toplevel"])?;
     if Path::new(&root).canonicalize().ok().as_deref() != Some(dir.as_path()) {
@@ -409,20 +530,19 @@ pub async fn prepare(
         eprint!("{}", plan_text(&client, &projects, &selected).await?);
         return Ok((Vec::new(), None));
     }
-    let (archive, commit, branch) = archive(&dir, args.allow_dirty)?;
-    if archive.len() > MAX_ARCHIVE {
-        bail!(
-            "the repository archive is {} MiB, over Tilde's {} MiB: move large files out of the repository (or into .gitattributes export-ignore)",
-            archive.len() / (1024 * 1024),
-            MAX_ARCHIVE / (1024 * 1024)
-        );
+    let (commit, branch) = head(&dir, args.allow_dirty)?;
+    let mut artifacts = BTreeMap::new();
+    for p in &projects {
+        eprintln!("Ontology {}: building", p.name);
+        let folder = dir.join("ontologies").join(&p.name);
+        artifacts.insert(p.name.clone(), build(&client, p, &folder).await?);
     }
     Ok((
         Vec::new(),
         Some(Plan {
             client,
             projects,
-            archive,
+            artifacts,
             commit,
             branch,
         }),
@@ -587,9 +707,9 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
 /// ontology; and that the agents were not applied.
 pub async fn execute(args: &Deploy, plan: Plan) -> Result<()> {
     use base64::Engine;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&plan.archive);
     let mut completed = Vec::new();
     for p in &plan.projects {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&plan.artifacts[&p.name]);
         if let Err(e) = deploy_one(args, &plan, p, &encoded, &mut completed).await {
             let before = if completed.is_empty() {
                 "none".to_string()
@@ -615,14 +735,14 @@ async fn deploy_one(
     let client = &plan.client;
     {
         eprintln!(
-            "Ontology {}: building {}",
+            "Ontology {}: uploading {}",
             p.name,
             &plan.commit[..plan.commit.len().min(12)]
         );
         let created = client
             .ok(
                 &format!("{VERSIONS}/CreateVersion"),
-                json!({"projectId": p.id, "commitSha": plan.commit, "ref": plan.branch, "archive": encoded}),
+                json!({"projectId": p.id, "commitSha": plan.commit, "ref": plan.branch, "artifact": encoded}),
             )
             .await?;
         let version_id = created["version"]["id"]
@@ -808,6 +928,15 @@ mod tests {
         assert!(ok, "git {args:?}");
     }
 
+    /// A stand-in `@trytilde/ontology` (runtime 1): `ir` prints an IR naming the folder, `worker`
+    /// writes a module.
+    const CLIENT: &str = r#"import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+const [command, root, out] = process.argv.slice(2);
+if (command === "ir") process.stdout.write(JSON.stringify({ root }));
+else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export default {};\n"); }
+"#;
+
     /// A repository with `ontologies/shop/` and `ontologies/warehouse/` committed.
     fn repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
@@ -819,6 +948,17 @@ mod tests {
             )
             .unwrap();
         }
+        // The project's packages: installed, not committed.
+        // `.tilde/` is not listed: the build ignores its own output.
+        std::fs::write(dir.path().join(".gitignore"), "node_modules/\n").unwrap();
+        let package = dir.path().join("node_modules/@trytilde/ontology");
+        std::fs::create_dir_all(package.join("dist")).unwrap();
+        std::fs::write(
+            package.join("package.json"),
+            r#"{"name": "@trytilde/ontology", "type": "module", "tilde": {"runtime": 1}}"#,
+        )
+        .unwrap();
+        std::fs::write(package.join("dist/cli.js"), CLIENT).unwrap();
         git(dir.path(), &["init", "-q", "-b", "main"]);
         git(dir.path(), &["add", "-A"]);
         git(dir.path(), &["commit", "-q", "-m", "ontologies"]);
@@ -837,6 +977,8 @@ mod tests {
         agents_blocked: bool,
         /// Per environment id, what ListEnvironmentConnections answers.
         bound: BTreeMap<&'static str, Value>,
+        /// What CompileOntology answers when the IR does not compile.
+        compile_errors: Option<Value>,
     }
 
     impl Default for World {
@@ -851,6 +993,7 @@ mod tests {
                 declared: json!(["github", "linear"]),
                 agents_blocked: false,
                 bound: BTreeMap::new(),
+                compile_errors: None,
             }
         }
     }
@@ -896,6 +1039,10 @@ mod tests {
                         "ListEnvironments" => json!({"environments": [{"id": "e3", "name": "production"}]}),
                         "ListConnections" => world.connections.clone(),
                         "ListSecrets" => world.secrets.clone(),
+                        "CompileOntology" => match &world.compile_errors {
+                            Some(errors) => json!({"errors": errors}),
+                            None => json!({"errors": [], "contract": {"contract.json": "{}"}}),
+                        },
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
                         "GetVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"],
                             "slots": world.declared.as_array().unwrap().iter().map(|slot| json!({"name": slot, "provider": slot})).collect::<Vec<_>>()}}),
@@ -1108,7 +1255,26 @@ mod tests {
         let calls = calls.lock().unwrap().clone();
         let created = &calls.iter().find(|(m, _)| m == "CreateVersion").unwrap().1;
         assert_eq!(created["projectId"], "p1");
-        assert!(!created["archive"].as_str().unwrap().is_empty());
+        // The artifact the client built: the runtime, the IR the project's package evaluated, the
+        // handler module.
+        use base64::Engine;
+        let artifact = base64::engine::general_purpose::STANDARD
+            .decode(created["artifact"].as_str().unwrap())
+            .unwrap();
+        let mut entries = BTreeMap::new();
+        for entry in tar::Archive::new(artifact.as_slice()).entries().unwrap() {
+            let mut entry = entry.unwrap();
+            let path = entry.path().unwrap().to_string_lossy().into_owned();
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut entry, &mut text).unwrap();
+            entries.insert(path, text);
+        }
+        assert_eq!(entries["artifact.json"], r#"{"runtime":1}"#);
+        assert!(
+            entries["ontology.ir.json"].contains("ontologies/shop"),
+            "{entries:?}"
+        );
+        assert_eq!(entries["worker.js"], "export default {};\n");
         let secret = &calls
             .iter()
             .find(|(m, _)| m == "SetEnvironmentSecretBinding")
@@ -1126,6 +1292,32 @@ mod tests {
                 .iter()
                 .any(|(m, b)| m == "ListEnvironments" && b["projectId"] == "p2")
         );
+        // The build left the tree clean: the next deploy builds HEAD again.
+        assert!(head(repo.path(), false).is_ok());
+    }
+
+    /// An IR Tilde does not compile fails the deploy with its errors, before anything changes.
+    #[tokio::test]
+    async fn an_ontology_that_does_not_compile_changes_nothing() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            compile_errors: Some(json!(["ontology.ts:3:1 (objects.Customer): no key"])),
+            ..Default::default()
+        })
+        .await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        let error = format!(
+            "{:#}",
+            crate::deploy::ontologies_first(&a, &declarations(false), false)
+                .await
+                .unwrap_err()
+        );
+        assert!(
+            error.contains("ontology shop does not compile") && error.contains("no key"),
+            "{error}"
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
     }
 
     /// A failed rollout stops there and says what runs the new version and what does not.

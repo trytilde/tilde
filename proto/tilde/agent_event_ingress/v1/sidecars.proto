@@ -24,13 +24,9 @@ service SidecarService {
   rpc UploadAttachment(UploadAttachmentRequest) returns (UploadAttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
   rpc ResolveParticipant(ResolveParticipantRequest) returns (ResolveParticipantResponse);
-  // Registry RPCs from the agent process, re-verified at the gateway.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
-  rpc Relay(RelayRequest) returns (RelayResponse);
-  // Relay with a heartbeat at least every 10 s while the call runs, then its result: relayed
-  // tool calls can outlast a proxy's idle timeout (a load balancer's 60 s). Sidecars fall back to
-  // Relay against a gateway without it.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE
+  // Registry RPCs from the agent process, re-verified at the gateway, with a heartbeat at least
+  // every 10 s while the call runs, then its result: relayed tool calls can outlast a proxy's idle
+  // timeout (a load balancer's 60 s).
   // buf:lint:ignore RPC_REQUEST_STANDARD_NAME
   rpc RelayStream(RelayRequest) returns (stream RelayStreamResponse);
 }
@@ -86,7 +82,6 @@ message UploadAttachmentResponse { tilde.types.v1.Attachment attachment = 1; }
 message DownloadAttachmentRequest { string thread_id = 1; string attachment_id = 2; }
 message DownloadAttachmentResponse { bytes content = 1; }
 message RelayRequest { string instance_id = 1; string path = 2; string content_type = 3; bytes body = 4; string caller_token = 5 [debug_redact = true]; }
-message RelayResponse { CallResult result = 1; }
 message RelayStreamResponse { oneof frame { tilde.types.v1.Heartbeat heartbeat = 1; CallResult result = 2; } }
 message ResolveParticipantRequest { oneof key { string agent_id = 1; string user_id = 2; } }
 message ResolveParticipantResponse { string id = 1; string name = 2; }
