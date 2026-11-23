@@ -108,7 +108,7 @@ struct Project {
     environments: Vec<Resolved>,
 }
 
-/// The largest source archive Tilde Cloud takes (its `versions::MAX_ARCHIVE`).
+/// The largest artifact Tilde Cloud takes (its `versions::MAX_ARTIFACT`).
 const MAX_ARTIFACT: usize = 32 * 1024 * 1024;
 
 /// What `prepare` found, for `execute`: every project resolved, the repository archived once.
@@ -385,6 +385,8 @@ async fn build(client: &Client, project: &Project, folder: &Path) -> Result<Vec<
     let out = folder.join(".tilde/build");
     let _ = std::fs::remove_dir_all(&out);
     std::fs::create_dir_all(&out)?;
+    // The build is never part of the tree: the next deploy needs it clean.
+    std::fs::write(folder.join(".tilde/.gitignore"), "*\n")?;
     let worker = out.join("worker.js");
     node(
         &cli,
@@ -926,7 +928,6 @@ mod tests {
         assert!(ok, "git {args:?}");
     }
 
-    /// A repository with `ontologies/shop/` and `ontologies/warehouse/` committed.
     /// A stand-in `@trytilde/ontology` (runtime 1): `ir` prints an IR naming the folder, `worker`
     /// writes a module.
     const CLIENT: &str = r#"import { mkdirSync, writeFileSync } from "node:fs";
@@ -936,6 +937,7 @@ if (command === "ir") process.stdout.write(JSON.stringify({ root }));
 else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export default {};\n"); }
 "#;
 
+    /// A repository with `ontologies/shop/` and `ontologies/warehouse/` committed.
     fn repository() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         for name in ["shop", "warehouse"] {
@@ -947,7 +949,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             .unwrap();
         }
         // The project's packages: installed, not committed.
-        std::fs::write(dir.path().join(".gitignore"), "node_modules/\n.tilde/\n").unwrap();
+        // `.tilde/` is not listed: the build ignores its own output.
+        std::fs::write(dir.path().join(".gitignore"), "node_modules/\n").unwrap();
         let package = dir.path().join("node_modules/@trytilde/ontology");
         std::fs::create_dir_all(package.join("dist")).unwrap();
         std::fs::write(
@@ -1289,6 +1292,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 .iter()
                 .any(|(m, b)| m == "ListEnvironments" && b["projectId"] == "p2")
         );
+        // The build left the tree clean: the next deploy builds HEAD again.
+        assert!(head(repo.path(), false).is_ok());
     }
 
     /// An IR Tilde does not compile fails the deploy with its errors, before anything changes.
