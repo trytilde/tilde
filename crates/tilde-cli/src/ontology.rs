@@ -1287,6 +1287,24 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             changes(&calls)
         );
 
+        // `--ontology` naming every ontology of the project is all of them: the same deploy.
+        let repo = repository();
+        let (url, _) = cloud(World {
+            ontology_unserved: true,
+            ..World::default()
+        })
+        .await;
+        let mut every = args(url, repo.path());
+        every.ontology = vec!["shop".into(), "warehouse".into()];
+        let (actions, served) =
+            crate::deploy::ontologies_first(&every, &agent_using(&["listOrders"]), true)
+                .await
+                .unwrap();
+        assert!(
+            actions.is_empty() && served.contains("listOrders"),
+            "{actions:?}"
+        );
+
         let repo = repository();
         let (url, calls) = cloud(World {
             ontology_unserved: true,
