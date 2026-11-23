@@ -20,7 +20,6 @@ import {
   openai,
   routine,
   secret,
-  tildeSandbox,
   defineTeam,
   grant,
   group,
@@ -44,7 +43,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
     ],
     sandbox: blueprint({
       name: "box",
-      provider: connection.ref("e2b/acme"),
+      connection: connection.ref("e2b/acme"),
       template: "tilde-base",
       env: { MODE: "strict", NPM_TOKEN: secret.ref("NPM_TOKEN"), OLD: { delete: true } },
       egress: [egress("github", github.ref("acme"), { pull_requests: true })],
@@ -237,11 +236,15 @@ test("a hosted agent on Tilde sandboxes is a spec the server accepts", () => {
   const agent = defineAgent({
     key: "fixer",
     name: "Fixer",
-    sandbox: blueprint({ name: "fixer", provider: tildeSandbox, template: "debian-full" }),
+    sandbox: blueprint({
+      name: "fixer",
+      connection: connection.ref("tilde_sandbox/tilde"),
+      template: "debian-full",
+    }),
     deploy: { target: "hosted" },
   });
   const spec = fromJson(AgentSpecSchema, agent.json);
   assert.equal(spec.deployment?.target, 4);
   assert.equal(spec.deployment?.targetReference, undefined);
-  assert.equal(spec.sandbox?.provider?.slug, "tilde_sandbox/tilde");
+  assert.equal(spec.sandbox?.connection?.slug, "tilde_sandbox/tilde");
 });

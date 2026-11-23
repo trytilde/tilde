@@ -82,8 +82,9 @@ message ToolSourceSpec { ConnectionRef connection = 1; repeated string tools = 2
 // removed only by its own `delete`.
 message BlueprintSpec {
   string name = 1;
-  // An E2B or Modal connection.
-  ConnectionRef provider = 2;
+  // The sandbox connection it launches through: E2B, Modal, or (Tilde Cloud) the team's Tilde
+  // sandbox connection `tilde_sandbox/tilde`.
+  ConnectionRef connection = 2;
   string template = 3;
   SandboxReuse reuse = 4;
   optional SandboxTimings timings = 5;

@@ -41,7 +41,7 @@ pub(crate) async fn blueprint(
     let name = text(&spec.name, "name", 128)?;
     let template = text(&spec.template, "template", 512)?;
     let reuse_mode = reuse(reuse_text(spec.reuse)?)?;
-    let provider = refs.connection(&spec.provider)?;
+    let connection = refs.connection(&spec.connection)?;
     let (id, mut change) = match db::blueprint_by_name_opt(tx, &name).await? {
         Some(row) => {
             let current = Timings {
@@ -52,7 +52,7 @@ pub(crate) async fn blueprint(
             // Absent or zero timings keep the blueprint's own.
             let timings = current.with(timings(spec))?;
             let mut change = Change::existing("sandbox_blueprint", &name);
-            change.field("provider", &row.connection_slug, &provider.slug);
+            change.field("connection", &row.connection_slug, &connection.slug);
             change.field("template", &row.template, &template);
             change.field("reuse", &row.reuse, reuse_mode);
             change.field("timings", timing_text(current), timing_text(timings));
@@ -61,7 +61,7 @@ pub(crate) async fn blueprint(
                     tx,
                     row.id,
                     None,
-                    Some(provider.id),
+                    Some(connection.id),
                     Some(&template),
                     Some(reuse_mode),
                     Some(timings),
@@ -77,14 +77,14 @@ pub(crate) async fn blueprint(
                 tx,
                 id,
                 &name,
-                provider.id,
+                connection.id,
                 &template,
                 reuse_mode,
                 timings,
             )
             .await?;
             let mut change = Change::create("sandbox_blueprint", &name);
-            change.field("provider", "", &provider.slug);
+            change.field("connection", "", &connection.slug);
             change.field("template", "", &template);
             (id, change)
         }

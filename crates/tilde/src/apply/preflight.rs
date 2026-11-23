@@ -267,7 +267,7 @@ fn usages(request: &m::ApplyRequest) -> Vec<Usage<'_>> {
             && seen_blueprints.insert(&blueprint.name)
         {
             out.push(Usage {
-                reference: &blueprint.provider,
+                reference: &blueprint.connection,
                 subject: format!("sandbox {}", blueprint.name),
                 usage: Use::Sandbox,
                 owner: Owner::Blueprint(&blueprint.name),

@@ -9,12 +9,7 @@
  * Nothing is removed because it is missing from a spec: an entry with `delete: true` removes it.
  * The JSON built here is the `AgentSpec` protobuf JSON the server takes.
  */
-import {
-  catalogProvider,
-  type ConnectionRef,
-  type RemovedSource,
-  type ToolSelection,
-} from "./refs.js";
+import type { ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
 
 export { ALL, connection, catalogProvider } from "./refs.js";
 export type { All, ConnectionRef, Connections, RemovedSource, ToolSelection } from "./refs.js";
@@ -54,9 +49,12 @@ export type Reuse = "thread" | "agent" | "agent_identity" | "global" | "global_i
 export type Blueprint = {
   /** The blueprint's key: agents declaring the same name share it and must agree on it. */
   name: string;
-  /** An E2B or Modal connection, or `tildeSandbox` (Tilde Cloud). */
-  provider: ConnectionRef;
-  /** The provider's template or image; for `tildeSandbox` one of {@link TildeSandboxImage}. */
+  /**
+   * The sandbox connection it launches through, like any connection: an E2B or Modal one, or on
+   * Tilde Cloud the team's own Tilde sandbox connection, `connection.ref("tilde_sandbox/tilde")`.
+   */
+  connection: ConnectionRef;
+  /** The connection's template or image; on the Tilde sandbox connection one of {@link TildeSandboxImage}. */
   template: string;
   reuse?: Reuse;
   timings?: {
@@ -73,14 +71,7 @@ export type Blueprint = {
 };
 export const blueprint = (spec: Blueprint): Blueprint => spec;
 
-/**
- * Sandboxes Tilde runs itself (Tilde Cloud), paid from the organization's credits: every team has
- * this connection, so it needs no setup. Its blueprints run one of {@link TildeSandboxImage}.
- */
-export const tildeSandbox = catalogProvider<never, "managed", "tilde_sandbox">("tilde_sandbox").ref(
-  "tilde",
-);
-/** Debian images with the Tilde CLI: Node.js, Python, or both with Docker Engine and Compose. */
+/** The Tilde sandbox connection's images, Debian with the Tilde CLI: Node.js, Python, or both with Docker Engine and Compose. */
 export type TildeSandboxImage = "debian-node" | "debian-python" | "debian-full";
 
 /** A secret set in the app (Connections → Secrets), referenced by name; its value never enters a spec. */
@@ -334,7 +325,7 @@ const REUSE = {
 function blueprintJson(spec: Blueprint) {
   return {
     name: spec.name,
-    provider: ref(spec.provider),
+    connection: ref(spec.connection),
     template: spec.template,
     reuse: REUSE[spec.reuse ?? "thread"],
     ...(spec.timings ? { timings: spec.timings } : {}),
