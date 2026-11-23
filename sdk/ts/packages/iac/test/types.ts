@@ -14,26 +14,26 @@ github.ref("acme", { type: "api_key" });
 // @ts-expect-error also after untypedTools
 github.ref("acme").untypedTools("x").tools("github_get_isue");
 
-// An ontology's slots type its bindings: the slot's provider flows into the connection.
+// An ontology's connections type its bindings: each one's provider flows into the binding.
 import { defineProject, ontology, secret } from "../src/index.js";
-type Slots = { github: { provider: "github" }; linear: { provider: "linear" } };
+type Connections = { github: { provider: "github" }; linear: { provider: "linear" } };
 defineProject({
   ontologies: {
-    faro: ontology<Slots>({
+    faro: ontology<Connections>({
       environments: {
         production: {
-          slots: { github: github.ref("faroai"), linear: connection.ref("linear/faro") },
+          connections: { github: github.ref("faroai"), linear: connection.ref("linear/faro") },
           secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
         },
       },
     }),
   },
 });
-ontology<Slots>({
-  // @ts-expect-error a GitHub slot takes a GitHub connection, not a Linear one
-  environments: { production: { slots: { github: connection.ref("linear/faro") } } },
+ontology<Connections>({
+  // @ts-expect-error a GitHub connection binds a GitHub connection, not a Linear one
+  environments: { production: { connections: { github: connection.ref("linear/faro") } } },
 });
-ontology<Slots>({
-  // @ts-expect-error no such slot
-  environments: { production: { slots: { gitlab: github.ref("faroai") } } },
+ontology<Connections>({
+  // @ts-expect-error no such connection
+  environments: { production: { connections: { gitlab: github.ref("faroai") } } },
 });

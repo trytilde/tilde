@@ -201,7 +201,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
       faro: ontology({
         environments: {
           production: {
-            slots: { github: github.ref("faroai", { type: "github_app" }), linear },
+            connections: { github: github.ref("faroai", { type: "github_app" }), linear },
             secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
           },
           staging: {},
@@ -215,13 +215,13 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
     faro: {
       environments: {
         production: {
-          slots: {
+          connections: {
             github: { slug: "github/faroai", type: "github_app" },
             linear: { slug: "linear/acme", type: "api_key" },
           },
           secrets: { PG_PASSWORD: "FARO_PG_PASSWORD" },
         },
-        staging: { slots: {}, secrets: {} },
+        staging: { connections: {}, secrets: {} },
       },
     },
   });

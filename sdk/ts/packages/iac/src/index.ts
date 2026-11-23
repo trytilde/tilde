@@ -265,15 +265,16 @@ export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[
   });
 }
 /**
- * An ontology's connection slots, as its own `defineSlots` declares them (Tilde Cloud): each
- * slot's connection provider. Pass the ontology's `slots` type to `ontology<...>()` so a binding
- * to a connection of another provider does not compile:
- * `ontology<typeof import("./ontologies/faro/slots.ts").slots>({ ... })` (a type-only import).
+ * An ontology's connections, as its own `connections.ts` declares them (Tilde Cloud): each one's
+ * provider. Pass the ontology's `connections` type to `ontology<...>()` so a binding to a
+ * connection of another provider does not compile:
+ * `ontology<typeof import("./ontologies/faro/connections.ts").connections>({ ... })` (type-only).
  */
-export type OntologySlots = { readonly [slot: string]: { readonly provider: string } };
-/** What one environment of the ontology binds: slots to connections, secret names to secrets. */
-export type OntologyEnvironment<S extends OntologySlots = OntologySlots> = {
-  slots?: { readonly [K in keyof S]?: ConnectionRef<string, S[K]["provider"]> };
+export type OntologyConnections = { readonly [name: string]: { readonly provider: string } };
+/** What one environment of the ontology binds: its connections to the organization's, secret
+ * names to secrets. */
+export type OntologyEnvironment<C extends OntologyConnections = OntologyConnections> = {
+  connections?: { readonly [K in keyof C]?: ConnectionRef<string, C[K]["provider"]> };
   /** The ontology's secret name to a Tilde secret of the project's team (or the organization). */
   secrets?: { readonly [name: string]: SecretRef };
 };
@@ -283,20 +284,20 @@ export type OntologyEnvironment<S extends OntologySlots = OntologySlots> = {
  * version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
  * its project's in Tilde.
  */
-export type Ontology<S extends OntologySlots = OntologySlots> = {
-  environments: { readonly [environment: string]: OntologyEnvironment<S> };
+export type Ontology<C extends OntologyConnections = OntologyConnections> = {
+  environments: { readonly [environment: string]: OntologyEnvironment<C> };
 };
-export const ontology = <const S extends OntologySlots = OntologySlots>(
-  spec: Ontology<S>,
-): Ontology<S> => spec;
+export const ontology = <const C extends OntologyConnections = OntologyConnections>(
+  spec: Ontology<C>,
+): Ontology<C> => spec;
 const ontologyJson = (spec: Ontology) => ({
   environments: Object.fromEntries(
     Object.entries(spec.environments).map(([name, env]) => [
       name,
       {
-        slots: Object.fromEntries(
-          Object.entries(env.slots ?? {}).flatMap(([slot, connection]) =>
-            connection ? [[slot, ref(connection as ConnectionRef)]] : [],
+        connections: Object.fromEntries(
+          Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
+            connection ? [[name, ref(connection as ConnectionRef)]] : [],
           ),
         ),
         secrets: Object.fromEntries(

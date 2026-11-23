@@ -22,7 +22,7 @@ export type RemovedSource = { readonly connection: ConnectionRef<string>; readon
 
 export type ConnectionRef<Tool extends string = string, Provider extends string = string> = {
   readonly slug: string;
-  /** The slug's provider (`github` of `github/acme`), typed on catalog refs: an ontology slot
+  /** The slug's provider (`github` of `github/acme`), typed on catalog refs: an ontology connection
    * bound to it must be of that provider. */
   readonly provider: Provider;
   /** The connection type preflight requires, such as `github_app`. */

@@ -1891,11 +1891,11 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
   plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
 - Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
-  environments: { <env>: { slots, secrets } } }) } })`, each in the repository's
+  environments: { <env>: { connections, secrets } } }) } })`, each in the repository's
   `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
   workspace with one root lockfile and no `tilde.toml` (the root `tilde.config.ts` is the project); each ontology is the Tilde
-  project of its name. `ontology<typeof slots>()` takes the ontology's own `defineSlots` type (a
-  type-only import), so a slot bound to a connection of another provider does not compile
+  project of its name. `ontology<typeof connections>()` takes the ontology's own `connections` type
+  (a type-only import), so binding a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
   `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`). `tilde deploy` deploys
   them before the agents (`tilde-cli` `ontology.rs`). Nothing changes until everything is
@@ -1911,11 +1911,12 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   runtime the package declares, `ontology.ir.json`, `worker.js`, `spaces/`; uncommitted changes
   refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
   (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
-  slots and secrets the spec binds (else nothing is bound), then each environment bound and
+  connections and secrets the spec binds (else nothing is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
-  called as Connect JSON: open-source Tilde depends on no part of its contract.
+  called as Connect JSON: open-source Tilde depends on no part of its contract. A binding is
+  named by its `name`; servers before the rename sent `slot`, which the CLI still reads.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
   reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
   `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't
