@@ -30,10 +30,47 @@ before they expire. Add your site's origin to the project's allowed origins in T
 `mountConnectionSetup(element | "popup", …)` shows Tilde's setup page, which hosts the
 provider's form and OAuth redirects; credentials never pass through your app.
 
-One `Theme` (`{ tokens, scheme }`) styles all three: `mountSpace` and `mountConnectionSetup` take
-`theme` and return `setTheme` for later changes; `<Space>`, `<ConnectionSetup>`, `<Chat>` and
-`<ListSessions>` take it as a prop. Each derives its own colours from the tokens you give and
-keeps its defaults for the rest.
+## Theming
+
+One `Theme` styles all three surfaces. Each derives its own colours from the tokens you give and
+keeps its defaults for the rest; `scheme` picks the light or dark defaults whatever the page's own.
+
+```tsx
+import { Chat, ConnectionSetup, Space, chatProxy, type Theme } from "@trytilde/embed/react";
+import "@trytilde/embed/style.css";
+
+const theme: Theme = {
+  scheme: "dark",
+  tokens: { canvas: "#211714", surface: "#30211d", ink: "#faf9f5", accent: "#e08a5b", radius: "10px" },
+};
+
+<Space environment="<environment id>" space="pipeline" theme={theme} />
+<Chat proxy={chatProxy()} agentId="<agent id>" sessionId={session} identity={user.id} theme={theme} />
+<ConnectionSetup {...setup} url={setup.setupUrl} theme={theme} />
+```
+
+Without React, `mountSpace` and `mountConnectionSetup` take `theme` and return `setTheme` for later
+changes. To change one surface, pass it a copy: `{ ...theme, tokens: { ...theme.tokens, canvas: "#14100e" } }`.
+
+A space uses every token: they are the spaces preset's own, chart series colours included. The
+other two use what they have a place for and ignore the rest:
+
+| Token | Chat | Connection setup |
+| --- | --- | --- |
+| `canvas` | page, session list and composer backdrop | page background |
+| `surface` | agent bubbles, fields, menus | cards, secondary buttons |
+| `ink` | text; borders and hover washes are tints of it | text; input borders are a tint of it |
+| `muted` | secondary text (a tint of `ink` without it) | secondary text |
+| `line` | hairlines | borders |
+| `accent` | your bubbles (their text turns black or white to read on it), focus, links | primary button (same text rule), focus ring |
+| `good`, `critical` | success and error colours | success and error colours |
+| `font` | text | body and headings |
+| `radius` | ignored: the chat keeps its bubble and composer shapes | corner radius |
+| `series-1` … `series-5` | ignored | ignored |
+
+`<Chat header={false}>` shows only the transcript and the message bar. In this repository,
+`task preview:chat-ui` and `task preview:connection-setup` render the chat and the setup page with
+one example theme in both schemes.
 
 React (`@trytilde/embed/react`): `<Space>`, `<ConnectionSetup>`, and `Chat` and
 `ListSessions` from `@trytilde/chat-ui` (`<Chat proxy={chatProxy()} agentId="…" sessionId={session} identity={user.id} />`).
