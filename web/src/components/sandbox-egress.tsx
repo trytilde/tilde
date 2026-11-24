@@ -363,7 +363,7 @@ function EgressForm({
           />
           {!offered.length && (
             <p className="text-xs text-muted-foreground">
-              No connection that offers egress, such as GitHub, is left to grant.
+              No connection that offers egress, such as GitHub, GitLab or Entire, is left to grant.
             </p>
           )}
         </div>
@@ -389,11 +389,12 @@ function EgressForm({
             </p>
           )}
         </div>
-        {chosen?.providerId === "github" && chosen.typeId !== "github_app" && (
+        {chosen && chosen.typeId !== "github_app" && (
           <Warning>
             This connection's token cannot be narrowed to the grant, so only the gateway's checks
-            limit what sandboxes do with it. A GitHub App connection also mints a token limited to
-            the grant.
+            limit what sandboxes do with it.
+            {chosen.providerId === "github" &&
+              " A GitHub App connection also mints a token limited to the grant."}
           </Warning>
         )}
         {schema && (
