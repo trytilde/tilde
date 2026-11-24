@@ -35,6 +35,7 @@ import {
   errorText,
   listAgents,
   type ChatAgent,
+  type ChatFetch,
 } from "./client.js";
 export interface ChatProps {
   sessionId: string;
@@ -42,6 +43,8 @@ export interface ChatProps {
   proxy: string;
   agentId?: string;
   className?: string;
+  /** Replaces the cookie-carrying fetch, e.g. to send a bearer token (a Tilde space's chat). */
+  fetch?: ChatFetch;
 }
 export function Chat(props: ChatProps) {
   const [attempt, setAttempt] = useState(0);
@@ -60,6 +63,7 @@ function ChatWindow({
   proxy,
   agentId,
   className = "",
+  fetch: proxyFetch,
   onRetry,
 }: ChatProps & { onRetry: () => void }) {
   const [agent, setAgent] = useState<ChatAgent>();
@@ -100,7 +104,10 @@ function ChatWindow({
   >(undefined);
   const form = useForm({ defaultValues: { draft: "" } });
   const draft = form.watch("draft");
-  const client = useMemo(() => (agent ? chatClient(proxy, agent.id) : undefined), [proxy, agent]);
+  const client = useMemo(
+    () => (agent ? chatClient(proxy, agent.id, proxyFetch) : undefined),
+    [proxy, agent, proxyFetch],
+  );
   useEffect(() => {
     const abort = new AbortController();
     lifetime.current = abort;
@@ -112,7 +119,7 @@ function ChatWindow({
   useEffect(() => {
     const abort = new AbortController();
     void (async () => {
-      const agents = await listAgents(proxy, abort.signal);
+      const agents = await listAgents(proxy, abort.signal, proxyFetch);
       const candidates = agentId ? agents.filter((a) => a.id === agentId) : agents;
       if (candidates.length === 1) {
         if (!abort.signal.aborted) setAgent(candidates[0]);
@@ -120,7 +127,7 @@ function ChatWindow({
       }
       for (const candidate of candidates) {
         try {
-          await chatClient(proxy, candidate.id).getSession(
+          await chatClient(proxy, candidate.id, proxyFetch).getSession(
             { threadId: sessionId },
             { signal: abort.signal },
           );
@@ -139,7 +146,7 @@ function ChatWindow({
       }
     });
     return () => abort.abort();
-  }, [proxy, identity, agentId, sessionId]);
+  }, [proxy, identity, agentId, sessionId, proxyFetch]);
   useEffect(() => {
     if (!client || !search.trim()) {
       setSearching(false);

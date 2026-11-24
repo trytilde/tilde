@@ -21,7 +21,7 @@ export function Conversations({ userId }: { userId: string }) {
 }
 ```
 
-The proxy may be on another origin; requests carry cookies (`credentials: "include"`), so a cross-origin proxy must allow credentialed CORS from your app.
+The proxy may be on another origin; requests carry cookies (`credentials: "include"`), so a cross-origin proxy must allow credentialed CORS from your app. `Chat.fetch` replaces that fetch, e.g. to send a bearer token instead (a Tilde Cloud space's `<AgentChat>`), or to answer from fixtures in tests and Storybook.
 
 `identity` is a stable UI/cache identity, not authorization. The server proxy independently resolves the authenticated user. Change this prop when signing in as another user; unmount the components on sign-out. `Chat.agentId` is optional for a single-agent proxy; supplying it avoids discovery requests for a multi-agent sidebar.
 
