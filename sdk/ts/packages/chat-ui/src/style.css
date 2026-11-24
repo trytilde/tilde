@@ -208,7 +208,7 @@
   --hover-2: #7777776b;
   --ink: var(--tilde-chat-ink, #fcfcfc);
   --ink-2: var(--tilde-chat-muted, #fcfcfc99);
-  --ink-3: #fcfcfc66;
+  --ink-3: var(--tilde-chat-muted, #fcfcfc66);
   --line: var(--tilde-chat-line, #fcfcfc1a);
   --line-strong: #fcfcfc26;
   --field: #262626;
@@ -398,7 +398,7 @@
   --hover: var(--ob-fill-secondary);
   --ink: var(--tilde-chat-ink, var(--ob-text-primary));
   --ink-2: var(--tilde-chat-muted, var(--ob-text-secondary));
-  --ink-3: var(--ob-text-tertiary);
+  --ink-3: var(--tilde-chat-muted, var(--ob-text-tertiary));
   --line: var(--tilde-chat-line, var(--ob-border-weak));
   --line-strong: var(--ob-border-default);
   --accent: var(--ob-fill-accent);
