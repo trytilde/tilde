@@ -4,7 +4,7 @@
 //! read, otherwise into the JSON body), so agents can use the rest of GitHub's REST parameters.
 use super::{
     ToolProvider,
-    rest::{self, Rest, Verb},
+    rest::{self, Tool, Verb, tool},
 };
 use crate::chat::{providers::Access, tools::ToolResult};
 use crate::connections::mints;
@@ -12,7 +12,7 @@ use crate::proto::tilde::types::v1 as types;
 use connectrpc::ConnectError;
 use futures::future::BoxFuture;
 use secrecy::ExposeSecret;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 const API: &str = "https://api.github.com";
 
@@ -25,31 +25,6 @@ pub static APP: Github = Github { typ: "github_app" };
 pub static ACCESS_TOKEN: Github = Github { typ: "oauth" };
 pub static PERSONAL_TOKEN: Github = Github { typ: "pat" };
 
-struct Tool {
-    rest: Rest,
-    /// Space-separated input fields beside the path placeholders; `!` marks required ones.
-    fields: &'static str,
-}
-const fn tool(
-    name: &'static str,
-    summary: &'static str,
-    description: &'static str,
-    verb: Verb,
-    path: &'static str,
-    fields: &'static str,
-) -> Tool {
-    Tool {
-        rest: Rest {
-            name,
-            summary,
-            description,
-            verb,
-            path,
-            query: &[],
-        },
-        fields,
-    }
-}
 const PAGE: &str = "max_results page";
 
 use Verb::{Delete, Get, Patch, Post, Put};
@@ -195,36 +170,12 @@ fn property(tool: &str, name: &str) -> Value {
     }
 }
 
-fn definition(tool: &Tool) -> types::ToolDefinition {
-    let mut properties = Map::new();
-    let mut required = vec![];
-    let placeholders = tool
-        .rest
-        .path
-        .split('{')
-        .skip(1)
-        .filter_map(|part| part.split_once('}'))
-        .map(|(name, _)| format!("!{}", name.trim_end_matches('*')));
-    for field in placeholders.chain(tool.fields.split_whitespace().map(str::to_owned)) {
-        let name = field.trim_start_matches('!');
-        if field.starts_with('!') {
-            required.push(name.to_owned());
-        }
-        properties.insert(name.to_owned(), property(tool.rest.name, name));
-    }
-    rest::definition(
-        "github",
-        tool.rest.name,
-        tool.rest.summary,
-        tool.rest.description,
-        json!({"type":"object","properties":properties,"required":required,"additionalProperties":true}),
-        tool.rest.verb.hints(),
-    )
-}
-
 impl ToolProvider for Github {
     fn tools(&self) -> Vec<types::ToolDefinition> {
-        TOOLS.iter().map(definition).collect()
+        TOOLS
+            .iter()
+            .map(|tool| tool.definition("github", |name| property(tool.rest.name, name)))
+            .collect()
     }
     fn invoke<'a>(
         &'a self,
