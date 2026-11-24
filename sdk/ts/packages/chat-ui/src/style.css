@@ -846,7 +846,7 @@
 }
 
 .tilde-chat .message-menu button:hover {
-  background: #77777717;
+  background: var(--hover);
 }
 
 .tilde-chat .message-actions {
@@ -894,7 +894,7 @@
 
 .tilde-chat .message-actions > button:hover {
   color: var(--ink);
-  background: #77777717;
+  background: var(--hover);
 }
 
 .tilde-chat .message-actions svg {
@@ -1315,7 +1315,6 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-right: 1px solid var(--line);
   background: var(--surface);
 }
 .tilde-chat .chat-pane > header {
@@ -1388,7 +1387,6 @@
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-right: 1px solid var(--line);
   background: var(--surface);
 }
 .tilde-chat .chat-pane > header {
@@ -1444,11 +1442,6 @@
   place-items: center;
   color: var(--surface);
   background: var(--ink);
-}
-@media (max-width: 760px) {
-  .tilde-chat .chat-pane {
-    border: 0;
-  }
 }
 
 .tilde-chat.rich-chat .composer > .attachment-tray {
@@ -1667,7 +1660,7 @@
 .tilde-chat.rich-chat .chat-actions button:hover,
 .tilde-chat.rich-chat .chat-actions button.active {
   color: var(--ink);
-  background: #77777717;
+  background: var(--hover);
 }
 
 .tilde-chat.rich-chat .chat-actions svg,
@@ -1928,7 +1921,7 @@
 
 .tilde-chat.rich-chat .composer .attach-button:hover {
   color: var(--ink);
-  background: #77777717;
+  background: var(--hover);
 }
 
 .tilde-chat.rich-chat .composer .composer-actions > button {
@@ -1958,7 +1951,6 @@
   .tilde-chat.rich-chat .chat-pane {
     min-width: 0;
     width: 100%;
-    border: 0;
   }
 }
 
@@ -2228,7 +2220,8 @@
   animation: composer-menu-in 120ms ease-out both;
 }
 
-.tilde-chat .composer-attachment-menu > button {
+/* Through .rich-chat .composer, to beat that surface's grey fill for composer buttons. */
+.tilde-chat.rich-chat .composer .composer-attachment-menu > button {
   width: 100%;
   min-height: 48px;
   padding: 7px 9px;
@@ -2242,7 +2235,7 @@
   text-align: left;
 }
 
-.tilde-chat .composer-attachment-menu > button:hover {
+.tilde-chat.rich-chat .composer .composer-attachment-menu > button:hover {
   background: var(--hover);
 }
 

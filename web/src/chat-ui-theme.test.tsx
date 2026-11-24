@@ -26,6 +26,7 @@ function painted(container: HTMLElement) {
     scheme: getComputedStyle(container.querySelector(".tilde-chat")!).colorScheme,
     page: value(".tilde-chat", "--page"),
     ink: value(".tilde-chat", "--ink"),
+    hover: value(".tilde-chat", "--hover"),
     user: value(".message.user", "--bubble-user"),
     userInk: value(".message.user", "--bubble-user-ink"),
     agent: value(".message:not(.user)", "--bubble-agent"),
@@ -37,6 +38,13 @@ it("paints the page and bubbles from a theme's tokens, and keeps its own palette
   expect(css).toMatch(/background: var\(--bubble-user\)/);
   expect(css).toMatch(/background: var\(--bubble-agent\)/);
   expect(css).toMatch(/background: var\(--page\)/);
+  // Every hover wash reads the palette: the attach button, the attach menu's rows, and no rule
+  // paints the default grey itself.
+  expect(css).toMatch(
+    /\.attach-button:hover \{\s+color: var\(--ink\);\s+background: var\(--hover\)/,
+  );
+  expect(css).toMatch(/\.composer-attachment-menu > button:hover \{\s+background: var\(--hover\)/);
+  expect(css).not.toMatch(/background: #77777717/);
 
   const plain = painted(render(<Transcript entries={entries} />).container);
   expect(plain).toMatchObject({ scheme: "light", user: "#070707", agent: "#eeeeee" });
@@ -55,6 +63,8 @@ it("paints the page and bubbles from a theme's tokens, and keeps its own palette
     user: "#89c0ff",
   });
   expect(dark.userInk).toContain("#89c0ff");
+  // Without an ink, the hover wash stays the dark default.
+  expect(dark.hover).toBe("#7777773d");
   cleanup();
 
   // A light theme inside a dark page stays light, with every colour it names.
@@ -78,6 +88,7 @@ it("paints the page and bubbles from a theme's tokens, and keeps its own palette
       agent: "#f1e9da",
       user: "#0038ae",
     });
+    expect(themed.hover).toBe("color-mix(in srgb, #3e2723 8%, transparent)");
     cleanup();
     expect(painted(render(<Transcript entries={entries} />).container)).toMatchObject({
       scheme: "dark",

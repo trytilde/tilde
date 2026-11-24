@@ -164,6 +164,27 @@ it("loads history, sends as the server-resolved identity, renders live messages 
   view.unmount();
   expect(watchSignal?.aborted).toBe(true);
 });
+it("without its header shows only the transcript and the message bar, and still sends", async () => {
+  const view = render(
+    <Chat sessionId="session" identity="browser-supplied-id" proxy="/api/chat" header={false} />,
+  );
+  await screen.findByText("Earlier answer");
+  await waitFor(() => expect(emit).toBeDefined());
+  expect(view.container.querySelector("header")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Find in conversation" })).toBeNull();
+  expect(screen.queryByText("Helper")).toBeNull();
+  expect(screen.queryByText("Conversation")).toBeNull();
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "Hello" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  await waitFor(() => expect(api.postMessage).toHaveBeenCalledTimes(1));
+  expect(api.postMessage.mock.calls[0][0]).toMatchObject({
+    participantId: "human",
+    text: "Hello",
+    threadId: "session",
+  });
+});
 it("searches the provider and coordinates sidebar rename and per-user unread changes", async () => {
   const select = vi.fn();
   render(<ListSessions identity="alice" proxy="/api/chat" onSelectSession={select} />);
