@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import {
+  ChevronDownIcon,
+  FileTextIcon,
+  type LucideIcon,
+  PencilIcon,
+  SparklesIcon,
+  SquareTerminalIcon,
+  WrenchIcon,
+} from "lucide-react";
+import { useState } from "react";
 
 /* ─────────────────────────────────────────────────────────
  * TOOL CHIPS BLOCK
@@ -13,53 +22,12 @@ import { useState, type ReactNode } from "react";
 
 export type ToolChipIcon = "think" | "write" | "run" | "read" | "tool";
 
-const Icons: Record<ToolChipIcon, ReactNode> = {
-  think: <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />,
-  write: (
-    <g
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
-    </g>
-  ),
-  run: (
-    <g
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 17l6-5-6-5M12 19h8" />
-    </g>
-  ),
-  read: (
-    <g
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6" />
-    </g>
-  ),
-  tool: (
-    <g
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </g>
-  ),
+const Icons: Record<ToolChipIcon, LucideIcon> = {
+  think: SparklesIcon,
+  write: PencilIcon,
+  run: SquareTerminalIcon,
+  read: FileTextIcon,
+  tool: WrenchIcon,
 };
 
 export interface ToolChipDetailLine {
@@ -112,21 +80,12 @@ export function ToolChipsBlock({
         className="-mx-1.5 flex w-fit items-center gap-1.5 rounded-control px-1.5 py-1
           text-[12.5px] text-ink-2 transition-colors duration-100 hover:bg-hover-2"
       >
-        <svg
+        <ChevronDownIcon
           aria-hidden
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          size={12}
           className="transition-transform duration-200"
           style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        />
         <span className="tabular-nums">{headerLabel}</span>
       </button>
 
@@ -138,6 +97,7 @@ export function ToolChipsBlock({
           <div className="mt-1.5 flex flex-col gap-1">
             {rows.map((row) => {
               const rowOpen = openRows.has(row.id);
+              const RowIcon = Icons[row.icon ?? "tool"];
               const expandable = Boolean(row.detail?.length);
               return (
                 <div
@@ -164,36 +124,21 @@ export function ToolChipsBlock({
                         />
                       ) : (
                         <>
-                          <svg
+                          <RowIcon
                             aria-hidden
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill={(row.icon ?? "tool") === "think" ? "currentColor" : "none"}
-                            stroke="currentColor"
+                            size={13}
                             className={`transition-opacity duration-100 ${
                               expandable ? "group-hover/row:opacity-0" : ""
                             } ${rowOpen ? "opacity-0" : ""}`}
-                          >
-                            {Icons[row.icon ?? "tool"]}
-                          </svg>
+                          />
                           {expandable ? (
-                            <svg
+                            <ChevronDownIcon
                               aria-hidden
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                              size={12}
                               className={`absolute transition-[opacity,transform] duration-150
                                 group-hover/row:opacity-100 ${rowOpen ? "opacity-100" : "opacity-0"}`}
                               style={{ transform: rowOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                            >
-                              <path d="M6 9l6 6 6-6" />
-                            </svg>
+                            />
                           ) : null}
                         </>
                       )}

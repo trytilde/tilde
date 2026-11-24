@@ -1,0 +1,3 @@
+kind: Changed
+body: '`@trytilde/chat-ui`: themable and embeddable in a host''s own panel. The background is transparent by default (the host''s surface shows through) and dark follows `.dark` or `data-theme="dark"` on an ancestor; `--tilde-chat-background`, `-ink`, `-muted`, `-line`, `-bubble-agent`, `-bubble-user`, `-bubble-user-ink` and `-composer-background` let a host map its own tokens. `Chat` takes `showHeader` and `showSearch` (both default true) and `classNames` (`header`, `conversation`, `composer`). Every icon is lucide''s, including the trace''s done and failed marks (circled check and cross) that were drawn by hand.'
+time: 2026-11-24T18:00:00+00:00

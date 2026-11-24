@@ -163,3 +163,31 @@ it("lists sessions through the given fetch too", async () => {
   await screen.findByText("Fix checkout");
   expect(global).not.toHaveBeenCalled();
 });
+it("hides its header or just the search, and puts the host's classes on its parts", async () => {
+  const send = withToken(proxy().send);
+  const { unmount } = render(
+    <Chat
+      sessionId="thread"
+      identity="viewer"
+      proxy={space}
+      fetch={send}
+      showHeader={false}
+      className="host-chat"
+      classNames={{ conversation: "host-transcript", composer: "host-composer" }}
+    />,
+  );
+  await screen.findByText("Opened a pull request with the fix");
+  expect(screen.queryByRole("heading")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Find in conversation" })).toBeNull();
+  const root = screen.getByRole("region", { name: "Chat" });
+  expect(root.classList.contains("host-chat")).toBe(true);
+  expect(root.querySelector(".conversation.host-transcript")).not.toBeNull();
+  expect(root.querySelector(".composer-dock.host-composer")).not.toBeNull();
+  unmount();
+  render(
+    <Chat sessionId="thread" identity="viewer" proxy={space} fetch={send} showSearch={false} />,
+  );
+  await screen.findByText("Opened a pull request with the fix");
+  expect(screen.getByRole("heading")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Find in conversation" })).toBeNull();
+});

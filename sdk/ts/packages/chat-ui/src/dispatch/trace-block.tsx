@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDownIcon, CircleCheckIcon, CircleXIcon, SparklesIcon } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 /* ─────────────────────────────────────────────────────────
@@ -65,15 +66,7 @@ export function TraceBlock({
         className="-mx-1.5 flex w-fit items-center gap-2 rounded-control px-1.5 py-1
           transition-colors duration-100 hover:bg-hover-2"
       >
-        <svg
-          aria-hidden
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill={working ? "var(--ink-2)" : "var(--ink-3)"}
-        >
-          <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-        </svg>
+        <SparklesIcon aria-hidden size={16} className={working ? "text-ink-2" : "text-ink-3"} />
         <span role="status" className="contents">
           {working ? (
             <span
@@ -96,21 +89,12 @@ export function TraceBlock({
             </span>
           )}
         </span>
-        <svg
+        <ChevronDownIcon
           aria-hidden
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--ink-3)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="transition-transform duration-300"
+          size={14}
+          className="text-ink-3 transition-transform duration-300"
           style={{ transform: expanded ? "rotate(180deg)" : "rotate(0)" }}
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        />
       </button>
 
       <div
@@ -146,34 +130,9 @@ export function TraceBlock({
                     style={{ animation: "spin 700ms linear infinite" }}
                   />
                 ) : row.failed ? (
-                  <svg
-                    aria-hidden
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--red)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    className="shrink-0"
-                  >
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
+                  <CircleXIcon aria-hidden size={14} className="shrink-0 text-red" />
                 ) : (
-                  <svg
-                    aria-hidden
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--ink-3)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="shrink-0"
-                  >
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
+                  <CircleCheckIcon aria-hidden size={14} className="shrink-0 text-ink-3" />
                 );
                 const content = (
                   <>

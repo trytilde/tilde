@@ -42,7 +42,15 @@ export interface ChatProps {
   identity: string;
   proxy: string;
   agentId?: string;
+  /** Classes on the chat's root. Colours come from `--tilde-chat-*` variables (README). */
   className?: string;
+  /** Classes on its parts, for hosts that style them. */
+  classNames?: { header?: string; conversation?: string; composer?: string };
+  /** Show the header (agent, thread title, search). Default true. A host with a title of its
+   * own hides it; a waiting run's Resume button still shows. */
+  showHeader?: boolean;
+  /** Show the header's find-in-conversation search. Default true. */
+  showSearch?: boolean;
   /** Replaces the cookie-carrying fetch, e.g. to send a bearer token (a Tilde space's chat).
    * Keep it stable (define it once or memoise it): a new function reconnects the chat. */
   fetch?: ChatFetch;
@@ -64,6 +72,9 @@ function ChatWindow({
   proxy,
   agentId,
   className = "",
+  classNames = {},
+  showHeader = true,
+  showSearch = true,
   fetch: proxyFetch,
   onRetry,
 }: ChatProps & { onRetry: () => void }) {
@@ -532,79 +543,92 @@ function ChatWindow({
       ?.querySelector(`[data-message-id="${CSS.escape(matches[next].id)}"]`)
       ?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
+  const resumable = !!session?.run && ["waiting", "failed"].includes(session.run.status) && !busy;
+  // Without its header the chat still offers a waiting run's Resume.
+  const header = showHeader || resumable;
   return (
     <section className={`tilde-chat rich-chat tc-chat ${className}`} aria-label="Chat">
-      <div className="chat-pane">
-        <header className="chat-header" data-find-open={findOpen || undefined}>
-          <div className="chat-identity">
-            {agent ? (
-              <AgentAvatar id={agent.id} state={busy ? "working" : "idle"} />
-            ) : (
-              <span className="agent-avatar">{agentName.charAt(0).toUpperCase()}</span>
-            )}
-            <div className="chat-title">
-              <h2
-                title={
-                  session?.thread?.title ? `${agentName} · ${session.thread.title}` : agentName
-                }
-              >
-                <span className="chat-participant-names">{agentName}</span>
-                {session?.thread?.title ? (
-                  <>
-                    <span aria-hidden="true"> · </span>
-                    <span>{session.thread.title}</span>
-                  </>
-                ) : null}
-              </h2>
-              {reconnecting || busy ? (
-                <span className="chat-status" role="status">
-                  {reconnecting ? "Reconnecting…" : "Working…"}
-                </span>
+      <div className="chat-pane" data-header={header ? undefined : "none"}>
+        {header ? (
+          <header
+            className={`chat-header ${classNames.header ?? ""}`}
+            data-find-open={findOpen || undefined}
+            data-minimal={showHeader ? undefined : true}
+          >
+            {showHeader ? (
+              <div className="chat-identity">
+                {agent ? (
+                  <AgentAvatar id={agent.id} state={busy ? "working" : "idle"} />
+                ) : (
+                  <span className="agent-avatar">{agentName.charAt(0).toUpperCase()}</span>
+                )}
+                <div className="chat-title">
+                  <h2
+                    title={
+                      session?.thread?.title ? `${agentName} · ${session.thread.title}` : agentName
+                    }
+                  >
+                    <span className="chat-participant-names">{agentName}</span>
+                    {session?.thread?.title ? (
+                      <>
+                        <span aria-hidden="true"> · </span>
+                        <span>{session.thread.title}</span>
+                      </>
+                    ) : null}
+                  </h2>
+                  {reconnecting || busy ? (
+                    <span className="chat-status" role="status">
+                      {reconnecting ? "Reconnecting…" : "Working…"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {findOpen ? (
+              <div className="chat-header-find">
+                <ChatFindBar
+                  query={search}
+                  matchCount={matches.length}
+                  currentOrdinal={matches.length ? matchIndex + 1 : 0}
+                  loading={searching}
+                  onQueryChange={(value) => {
+                    setSearch(value);
+                    setMatchIndex(0);
+                  }}
+                  onStepNext={() => stepMatch(1)}
+                  onStepPrevious={() => stepMatch(-1)}
+                  onClose={() => {
+                    setFindOpen(false);
+                    setSearch("");
+                  }}
+                />
+              </div>
+            ) : null}
+            <div className="chat-actions" hidden={findOpen}>
+              {session?.run && ["waiting", "failed"].includes(session.run.status) && !busy ? (
+                <button
+                  type="button"
+                  className="chat-resume"
+                  onClick={() => void act(() => client!.resumeRun({ id: session.run!.id }))}
+                >
+                  Resume
+                </button>
+              ) : null}
+              {showHeader && showSearch ? (
+                <button
+                  type="button"
+                  aria-label="Find in conversation"
+                  title="Find in conversation"
+                  onClick={() => setFindOpen(true)}
+                >
+                  <SearchIcon />
+                </button>
               ) : null}
             </div>
-          </div>
-          {findOpen ? (
-            <div className="chat-header-find">
-              <ChatFindBar
-                query={search}
-                matchCount={matches.length}
-                currentOrdinal={matches.length ? matchIndex + 1 : 0}
-                loading={searching}
-                onQueryChange={(value) => {
-                  setSearch(value);
-                  setMatchIndex(0);
-                }}
-                onStepNext={() => stepMatch(1)}
-                onStepPrevious={() => stepMatch(-1)}
-                onClose={() => {
-                  setFindOpen(false);
-                  setSearch("");
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="chat-actions" hidden={findOpen}>
-            {session?.run && ["waiting", "failed"].includes(session.run.status) && !busy ? (
-              <button
-                type="button"
-                className="chat-resume"
-                onClick={() => void act(() => client!.resumeRun({ id: session.run!.id }))}
-              >
-                Resume
-              </button>
-            ) : null}
-            <button
-              type="button"
-              aria-label="Find in conversation"
-              title="Find in conversation"
-              onClick={() => setFindOpen(true)}
-            >
-              <SearchIcon />
-            </button>
-          </div>
-        </header>
+          </header>
+        ) : null}
         <div
-          className="conversation"
+          className={`conversation ${classNames.conversation ?? ""}`}
           aria-live="polite"
           ref={scroll}
           onScroll={() => {
@@ -760,7 +784,7 @@ function ChatWindow({
             </div>
           )}
         </div>
-        <ChatComposerDock>
+        <ChatComposerDock className={classNames.composer}>
           {reply ? (
             <div className="prompt-reply" aria-label="Replying to message">
               <ReplyIcon className="prompt-reply-icon" aria-hidden />

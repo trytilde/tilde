@@ -25,6 +25,25 @@ The proxy may be on another origin; requests carry cookies (`credentials: "inclu
 
 `identity` is a stable UI/cache identity, not authorization. The server proxy independently resolves the authenticated user. Change this prop when signing in as another user; unmount the components on sign-out. `Chat.agentId` is optional for a single-agent proxy; supplying it avoids discovery requests for a multi-agent sidebar.
 
+`showHeader={false}` hides the header (agent, thread title, search) for a host with a title of its own; a waiting run's Resume button still shows. `showSearch={false}` keeps the header without its search. `className` styles the root and `classNames` (`header`, `conversation`, `composer`) its parts.
+
+Colours: the chat's background is transparent by default, so it sits on the host's own surface, and light or dark follows a `.dark` class or `data-theme="dark"` on an ancestor. A host on its own tokens sets these on the chat (or an ancestor); unset ones keep chat-ui's palette:
+
+```css
+.my-chat {
+  --tilde-chat-background: var(--surface); /* default: transparent */
+  --tilde-chat-ink: var(--text);
+  --tilde-chat-muted: var(--text-muted);
+  --tilde-chat-line: var(--border);
+  --tilde-chat-bubble-agent: var(--surface-raised);
+  --tilde-chat-bubble-user: var(--text);
+  --tilde-chat-bubble-user-ink: var(--surface);
+  --tilde-chat-composer-background: var(--surface-raised);
+}
+```
+
+Icons are lucide's throughout.
+
 The components own requests and clean up subscriptions and attachment object URLs on unmount. Mutations invalidate mounted sidebars sharing the proxy and identity; background sidebar refresh also observes other tabs. CSS is scoped to `.tilde-chat` and does not reset the host page. Dispatch's palette variables (`--page`, `--ink`, `--line`, `--accent`, `--bubble-agent`, `--bubble-user`, …) may be overridden on `.tilde-chat`. Give Chat a bounded height for history scrolling. React 19 is a peer dependency. No router, API key or Next.js dependency is required in the browser.
 
 The look is Dispatch's (openbot's) chat: grey agent bubbles on the left, black user bubbles on the right, grouped consecutive messages, centred day separators, a pill composer with `+` and a round send button, and a session list with agent avatars, unread dots and a ⌘K search. Reply and Copy appear on hover. Light and dark follow a `.dark` class on an ancestor. Run `task preview:chat-ui` for a fixture-backed preview at `/chat-ui-preview.html`.

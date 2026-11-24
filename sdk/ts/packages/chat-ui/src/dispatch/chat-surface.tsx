@@ -120,7 +120,13 @@ export function ThinkingIndicator({ children }: { children: ReactNode }) {
 }
 
 /** Keeps the queue and input in one layout row and tells the conversation how tall it is. */
-export function ChatComposerDock({ children }: { children: ReactNode }) {
+export function ChatComposerDock({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = ref.current;
@@ -140,7 +146,7 @@ export function ChatComposerDock({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <div className="composer-dock chat-prompt" ref={ref}>
+    <div className={`composer-dock chat-prompt ${className}`} ref={ref}>
       {children}
     </div>
   );

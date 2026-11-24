@@ -183,9 +183,9 @@
   --tooltip-fg: #fcfcfc;
   --tooltip-muted: #fcfcfc99;
   --tooltip-border: #fcfcfc1a;
-  --bubble-agent: #eeeeee;
-  --bubble-user: #070707;
-  --bubble-user-ink: #fcfcfc;
+  --bubble-agent: var(--tilde-chat-bubble-agent, #eeeeee);
+  --bubble-user: var(--tilde-chat-bubble-user, #070707);
+  --bubble-user-ink: var(--tilde-chat-bubble-user-ink, #fcfcfc);
   --skeleton-agent-line: #1414141c;
   --skeleton-user-line: #fcfcfc3d;
   --scrim: #14141480;
@@ -197,7 +197,7 @@
   --shadow-inset-field: inset 0 0 0 0.5px #14141426;
 }
 
-.dark .tilde-chat {
+:is(.dark, [data-theme="dark"]) .tilde-chat {
   color-scheme: dark;
   --page: #070707;
   --canvas: #111111;
@@ -206,10 +206,10 @@
   --inset: #151515;
   --hover: #7777773d;
   --hover-2: #7777776b;
-  --ink: #fcfcfc;
-  --ink-2: #fcfcfc99;
+  --ink: var(--tilde-chat-ink, #fcfcfc);
+  --ink-2: var(--tilde-chat-muted, #fcfcfc99);
   --ink-3: #fcfcfc66;
-  --line: #fcfcfc1a;
+  --line: var(--tilde-chat-line, #fcfcfc1a);
   --line-strong: #fcfcfc26;
   --field: #262626;
   --stripe: #7777772c;
@@ -227,9 +227,9 @@
   --tooltip-fg: #fcfcfc;
   --tooltip-muted: #fcfcfc99;
   --tooltip-border: #fcfcfc1a;
-  --bubble-agent: #262626;
-  --bubble-user: #5a5a5a;
-  --bubble-user-ink: #fcfcfc;
+  --bubble-agent: var(--tilde-chat-bubble-agent, #262626);
+  --bubble-user: var(--tilde-chat-bubble-user, #5a5a5a);
+  --bubble-user-ink: var(--tilde-chat-bubble-user-ink, #fcfcfc);
   --skeleton-agent-line: #fcfcfc24;
   --skeleton-user-line: #fcfcfc3d;
   --scrim: #141414b2;
@@ -396,10 +396,10 @@
   --surface: var(--ob-bg-elevated);
   --field: var(--ob-bg-subtle);
   --hover: var(--ob-fill-secondary);
-  --ink: var(--ob-text-primary);
-  --ink-2: var(--ob-text-secondary);
+  --ink: var(--tilde-chat-ink, var(--ob-text-primary));
+  --ink-2: var(--tilde-chat-muted, var(--ob-text-secondary));
   --ink-3: var(--ob-text-tertiary);
-  --line: var(--ob-border-weak);
+  --line: var(--tilde-chat-line, var(--ob-border-weak));
   --line-strong: var(--ob-border-default);
   --accent: var(--ob-fill-accent);
   --accent-ink: var(--ob-text-accent);
@@ -412,7 +412,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 }
-.dark .tilde-chat {
+:is(.dark, [data-theme="dark"]) .tilde-chat {
   --ob-bg-base: #070707;
   --ob-bg-subtle: #111111;
   --ob-bg-elevated: #181818;
@@ -809,7 +809,7 @@
   overflow: visible;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.25;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -908,7 +908,7 @@
 .tilde-chat {
   min-width: 0;
   color: var(--ink);
-  background: var(--page);
+  background: var(--tilde-chat-background, transparent);
   font-family: var(--font-sans-face);
   font-size: 13px;
   line-height: 18px;
@@ -1089,7 +1089,7 @@
   width: 11px;
   height: 11px;
   flex: 0 0 11px;
-  stroke-width: 1.8;
+  stroke-width: 2;
 }
 .tilde-chat.rich-chat .message-list {
   width: min(820px, 100%);
@@ -1481,7 +1481,7 @@
 }
 
 .tilde-chat.rich-chat .chat-pane {
-  background: var(--page);
+  background: var(--tilde-chat-background, transparent);
 }
 
 .tilde-chat.rich-chat .chat-pane > header {
@@ -1489,7 +1489,7 @@
   min-height: 52px;
   padding-inline: 16px;
   border-bottom: 0.5px solid var(--line);
-  background: var(--canvas);
+  background: var(--tilde-chat-background, transparent);
 }
 
 .tilde-chat.rich-chat .chat-title .eyebrow {
@@ -1587,7 +1587,7 @@
   min-height: 38px;
   padding: 0 12px;
   border-bottom: 0;
-  background: var(--page);
+  background: var(--tilde-chat-background, transparent);
 }
 
 .tilde-chat .chat-identity {
@@ -1675,7 +1675,7 @@
   overflow: visible;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.25;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1687,7 +1687,7 @@
 
 .tilde-chat.rich-chat .conversation {
   padding: 16px clamp(18px, 4vw, 52px) 12px;
-  background: var(--page);
+  background: var(--tilde-chat-background, transparent);
 }
 
 .tilde-chat.rich-chat .message-list {
@@ -1826,7 +1826,7 @@
   padding: 8px;
   border: 0;
   border-radius: 16px;
-  background: var(--canvas);
+  background: var(--tilde-chat-composer-background, var(--canvas));
   box-shadow:
     inset 0 0 0 0.5px #1414141a,
     0 8px 24px #14141412;
@@ -1864,7 +1864,7 @@
   height: 14px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.25;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2502,7 +2502,7 @@
 .tilde-chat .queue-item button svg {
   width: 14px;
   height: 14px;
-  stroke-width: 1.75;
+  stroke-width: 2;
 }
 
 .tilde-chat .queue-message {
@@ -2960,7 +2960,7 @@
 .tilde-chat .chat-find-icon svg {
   width: 17px;
   height: 17px;
-  stroke-width: 1.7;
+  stroke-width: 2;
 }
 .tilde-chat .chat-find-bar input {
   width: auto;
@@ -3499,12 +3499,12 @@
 .tilde-chat .message.user .message-quote {
   align-self: flex-end;
 }
-.dark .tilde-chat .message-actions,
-.dark .tilde-chat .message-menu {
+:is(.dark, [data-theme="dark"]) .tilde-chat .message-actions,
+:is(.dark, [data-theme="dark"]) .tilde-chat .message-menu {
   border-color: var(--line-strong);
   box-shadow: 0 5px 18px #0000005c;
 }
-.dark .tilde-chat :is(.message-actions, .message-menu) button:hover {
+:is(.dark, [data-theme="dark"]) .tilde-chat :is(.message-actions, .message-menu) button:hover {
   background: var(--hover);
 }
 .tilde-chat .message-menu button {
@@ -3603,7 +3603,7 @@
   height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.3;
+  stroke-width: 2;
   stroke-linecap: round;
 }
 .tilde-chat .tc-search input {
@@ -3668,7 +3668,7 @@
   height: 16px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.3;
+  stroke-width: 2;
   stroke-linecap: round;
 }
 .tilde-chat .tc-agent-group ul {
@@ -3903,4 +3903,12 @@
 .tilde-chat .queue-item:is(:hover, :focus-within) > button[aria-label^="Move"] {
   width: 24px;
   opacity: 1;
+}
+
+/* Without its header (`showHeader={false}`) the transcript is the first row. */
+.tilde-chat .chat-pane[data-header="none"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.tilde-chat.rich-chat .chat-pane > .chat-header[data-minimal] {
+  justify-content: flex-end;
 }
