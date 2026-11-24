@@ -7,7 +7,8 @@ export interface ChatAgent {
   name: string;
 }
 /** How requests reach the proxy. By default with cookies: the proxy may live on another
- * origin (an app's API host) and authenticate by cookie. */
+ * origin (an app's API host) and authenticate by cookie. A replacement must be stable (defined
+ * once, or memoised): the components reconnect whenever it changes. */
 export type ChatFetch = typeof globalThis.fetch;
 const withCookies: ChatFetch = (input, init) => fetch(input, { ...init, credentials: "include" });
 export const chatClient = (proxy: string, agentId: string, send: ChatFetch = withCookies) =>
@@ -28,8 +29,12 @@ export async function listAgents(
   send: ChatFetch = withCookies,
 ): Promise<ChatAgent[]> {
   const response = await send(`${proxy.replace(/\/$/, "")}/agents`, { signal, cache: "no-store" });
-  if (!response.ok)
+  if (!response.ok) {
+    // A Connect error's own words (`{code, message}`) say why: a sign-in, a refused space.
+    const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
+    if (typeof body?.message === "string" && body.message) throw new Error(body.message);
     throw new Error(response.status === 401 ? "Sign in to chat" : "Unable to load agents");
+  }
   return ((await response.json()) as { agents: ChatAgent[] }).agents;
 }
 // Invalidation only; no user data or credentials live in a global cache.
