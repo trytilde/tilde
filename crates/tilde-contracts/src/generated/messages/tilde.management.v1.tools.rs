@@ -375,6 +375,15 @@ pub struct ToolHost {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub auth_methods: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 10: `function_role`
+    #[serde(
+        rename = "functionRole",
+        alias = "function_role",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub function_role: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -391,6 +400,7 @@ impl ::core::fmt::Debug for ToolHost {
             .field("provider_id", &self.provider_id)
             .field("health_history", &self.health_history)
             .field("auth_methods", &self.auth_methods)
+            .field("function_role", &self.function_role)
             .finish()
     }
 }
@@ -420,6 +430,16 @@ impl ToolHost {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.provider_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::function_role`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_function_role(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.function_role = Some(value.into());
         self
     }
 }
@@ -483,6 +503,9 @@ impl ::buffa::Message for ToolHost {
         for v in &self.auth_methods {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.function_role {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -532,6 +555,9 @@ impl ::buffa::Message for ToolHost {
         }
         for v in &self.auth_methods {
             ::buffa::types::put_string_field(9u32, v, buf);
+        }
+        if let Some(ref v) = self.function_role {
+            ::buffa::types::put_string_field(10u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -635,6 +661,18 @@ impl ::buffa::Message for ToolHost {
                 )?;
                 self.auth_methods.push(__elem);
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .function_role
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -652,6 +690,7 @@ impl ::buffa::Message for ToolHost {
         self.provider_id = ::core::option::Option::None;
         self.health_history.clear();
         self.auth_methods.clear();
+        self.function_role = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1021,6 +1060,16 @@ pub struct RegisterToolHostRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub function_arn: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Lambda hosts: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and
+    /// assumes it with the organization's ID as its external ID.
+    ///
+    /// Field 5: `function_role`
+    #[serde(
+        rename = "functionRole",
+        alias = "function_role",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub function_role: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1031,6 +1080,7 @@ impl ::core::fmt::Debug for RegisterToolHostRequest {
             .field("name", &self.name)
             .field("type", &self.r#type)
             .field("function_arn", &self.function_arn)
+            .field("function_role", &self.function_role)
             .finish()
     }
 }
@@ -1050,6 +1100,16 @@ impl RegisterToolHostRequest {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.function_arn = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::function_role`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_function_role(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.function_role = Some(value.into());
         self
     }
 }
@@ -1085,6 +1145,9 @@ impl ::buffa::Message for RegisterToolHostRequest {
         if let Some(ref v) = self.function_arn {
             size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
         }
+        if let Some(ref v) = self.function_role {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1106,6 +1169,9 @@ impl ::buffa::Message for RegisterToolHostRequest {
         }
         if let Some(ref v) = self.function_arn {
             ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if let Some(ref v) = self.function_role {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1148,6 +1214,18 @@ impl ::buffa::Message for RegisterToolHostRequest {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .function_role
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1159,6 +1237,7 @@ impl ::buffa::Message for RegisterToolHostRequest {
         self.name.clear();
         self.r#type = ::buffa::EnumValue::from(0);
         self.function_arn = ::core::option::Option::None;
+        self.function_role = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }

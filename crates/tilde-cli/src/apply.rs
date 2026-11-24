@@ -26,6 +26,7 @@ fn request_with(
         (args.agent_id.is_some(), "--agent-id (TILDE_AGENT_ID)"),
         (args.target.is_some(), "--target"),
         (args.function_arn.is_some(), "--function-arn"),
+        (args.role.is_some(), "--role"),
     ] {
         if set {
             bail!(
@@ -404,6 +405,7 @@ mod tests {
             api_key: None,
             target: None,
             function_arn: None,
+            role: None,
             external_id: None,
             label: None,
             dry_run: false,

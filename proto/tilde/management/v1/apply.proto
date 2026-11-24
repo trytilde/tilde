@@ -117,6 +117,9 @@ message DeploymentSpec {
   string external_id = 3;
   optional string label = 4;
   DeploymentDeclarations declarations = 5;
+  // Lambda: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and assumes
+  // it with the organization's ID as its external ID.
+  optional string target_role = 6;
 }
 
 enum ApplyOutcome { APPLY_OUTCOME_UNSPECIFIED = 0; APPLY_OUTCOME_PLANNED = 1; APPLY_OUTCOME_APPLIED = 2; APPLY_OUTCOME_BLOCKED = 3; }

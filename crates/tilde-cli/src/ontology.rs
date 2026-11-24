@@ -956,6 +956,7 @@ mod tests {
             api_key: Some("tilde_key_test".into()),
             target: None,
             function_arn: None,
+            role: None,
             external_id: None,
             label: None,
             dry_run: false,
