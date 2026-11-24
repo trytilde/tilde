@@ -18,6 +18,7 @@ const setup = await connections({ agent: "<agent id>" }).setup("linear");
 mountConnectionSetup(document.getElementById("connect")!, {
   ...setup,
   url: setup.setupUrl,
+  theme: { tokens: { accent: "#6d28d9", radius: "12px" }, scheme: "light" },
   onComplete: () => refresh(),
 });
 ```
@@ -28,6 +29,11 @@ before they expire. Add your site's origin to the project's allowed origins in T
 
 `mountConnectionSetup(element | "popup", …)` shows Tilde's setup page, which hosts the
 provider's form and OAuth redirects; credentials never pass through your app.
+
+One `Theme` (`{ tokens, scheme }`) styles all three: `mountSpace` and `mountConnectionSetup` take
+`theme` and return `setTheme` for later changes; `<Space>`, `<ConnectionSetup>`, `<Chat>` and
+`<ListSessions>` take it as a prop. Each derives its own colours from the tokens you give and
+keeps its defaults for the rest.
 
 React (`@trytilde/embed/react`): `<Space>`, `<ConnectionSetup>`, and `Chat` and
 `ListSessions` from `@trytilde/chat-ui` (`<Chat proxy={chatProxy()} agentId="…" sessionId={session} identity={user.id} />`).
