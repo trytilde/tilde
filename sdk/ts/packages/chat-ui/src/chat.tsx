@@ -43,7 +43,8 @@ export interface ChatProps {
   proxy: string;
   agentId?: string;
   className?: string;
-  /** Replaces the cookie-carrying fetch, e.g. to send a bearer token (a Tilde space's chat). */
+  /** Replaces the cookie-carrying fetch, e.g. to send a bearer token (a Tilde space's chat).
+   * Keep it stable (define it once or memoise it): a new function reconnects the chat. */
   fetch?: ChatFetch;
 }
 export function Chat(props: ChatProps) {
@@ -402,8 +403,9 @@ function ChatWindow({
   }
   async function send() {
     if (!client || !user || submitting || (!draft.trim() && !files.length)) return;
+    // Someone reading a thread they are not in yet (a Tilde space's chat) posts naming no
+    // participant: the server binds the post to them, or refuses it.
     const participant = session?.thread?.participants.find((p) => p.userId === user.id && p.active);
-    if (!participant) return;
     setSubmitting(true);
     setError("");
     try {
@@ -449,7 +451,7 @@ function ChatWindow({
         {
           id: attempt.id,
           threadId: sessionId,
-          participantId: participant.id,
+          participantId: participant?.id ?? "",
           text: attempt.text,
           attachmentIds,
           inReplyToMessageId: attempt.reply,

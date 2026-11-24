@@ -5,7 +5,15 @@ import { useForm } from "react-hook-form";
 import { Button, Input } from "@trytilde/connection-ui";
 import type { Session } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 import { MoreIcon, PlusIcon, SearchIcon } from "./dispatch/icons.js";
-import { chatClient, changed, errorText, listAgents, subscribe, type ChatAgent } from "./client.js";
+import {
+  chatClient,
+  changed,
+  errorText,
+  listAgents,
+  subscribe,
+  type ChatAgent,
+  type ChatFetch,
+} from "./client.js";
 export interface ListSessionsProps {
   identity: string;
   proxy: string;
@@ -13,6 +21,9 @@ export interface ListSessionsProps {
   selectedAgentId?: string;
   onSelectSession: (sessionId: string, agentId: string) => void;
   className?: string;
+  /** Replaces the cookie-carrying fetch, as `Chat.fetch` does. Keep it stable (define it once
+   * or memoise it): a new function reloads the list. */
+  fetch?: ChatFetch;
 }
 interface Group {
   agent: ChatAgent;
@@ -29,6 +40,7 @@ function Sessions({
   selectedAgentId,
   onSelectSession,
   className = "",
+  fetch: proxyFetch,
 }: ListSessionsProps) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [query, setQuery] = useState("");
@@ -69,14 +81,14 @@ function Sessions({
     const abort = new AbortController();
     setError("");
     void (async () => {
-      const agents = await listAgents(proxy, abort.signal);
+      const agents = await listAgents(proxy, abort.signal, proxyFetch);
       const pages = await Promise.all(
         agents.map(async (agent) => {
           const wanted = groups.find((group) => group.agent.id === agent.id)?.sessions.length ?? 30;
           const sessions: Session[] = [];
           let next = "";
           do {
-            const page = await chatClient(proxy, agent.id).listSessions(
+            const page = await chatClient(proxy, agent.id, proxyFetch).listSessions(
               { query: search, pageSize: 30, pageToken: next },
               { signal: abort.signal },
             );
@@ -95,7 +107,7 @@ function Sessions({
         if (!abort.signal.aborted) setLoading(false);
       });
     return () => abort.abort();
-  }, [proxy, identity, search, version]);
+  }, [proxy, identity, search, version, proxyFetch]);
   async function act(operation: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -110,7 +122,7 @@ function Sessions({
   }
   async function create(agent: ChatAgent) {
     await act(async () => {
-      const result = await chatClient(proxy, agent.id).createThread({
+      const result = await chatClient(proxy, agent.id, proxyFetch).createThread({
         title: "New conversation",
         primaryAgentId: agent.id,
       });
@@ -119,7 +131,7 @@ function Sessions({
   }
   async function more(group: Group) {
     await act(async () => {
-      const page = await chatClient(proxy, group.agent.id).listSessions({
+      const page = await chatClient(proxy, group.agent.id, proxyFetch).listSessions({
         query: search,
         pageToken: group.next,
         pageSize: 30,
@@ -267,7 +279,7 @@ function Sessions({
                           onClick={(event) => {
                             event.currentTarget.closest("details")?.removeAttribute("open");
                             void act(async () => {
-                              const client = chatClient(proxy, group.agent.id);
+                              const client = chatClient(proxy, group.agent.id, proxyFetch);
                               const current = await client.getSession({ threadId: thread.id });
                               await client.setReadState({
                                 threadId: thread.id,
@@ -303,7 +315,7 @@ function Sessions({
           className="tc-rename"
           onSubmit={form.handleSubmit(({ title }) =>
             act(async () => {
-              await chatClient(proxy, editing.agentId).renameSession({
+              await chatClient(proxy, editing.agentId, proxyFetch).renameSession({
                 threadId: editing.id,
                 title,
               });
