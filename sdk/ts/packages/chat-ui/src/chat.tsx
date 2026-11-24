@@ -37,12 +37,15 @@ import {
   type ChatAgent,
   type ChatFetch,
 } from "./client.js";
+import { themeStyle, type Theme } from "./theme.js";
 export interface ChatProps {
   sessionId: string;
   identity: string;
   proxy: string;
   agentId?: string;
   className?: string;
+  /** The host's theme (the one `@trytilde/embed` takes); tokens left out keep the defaults. */
+  theme?: Theme;
   /** Replaces the cookie-carrying fetch, e.g. to send a bearer token (a Tilde space's chat).
    * Keep it stable (define it once or memoise it): a new function reconnects the chat. */
   fetch?: ChatFetch;
@@ -64,6 +67,7 @@ function ChatWindow({
   proxy,
   agentId,
   className = "",
+  theme,
   fetch: proxyFetch,
   onRetry,
 }: ChatProps & { onRetry: () => void }) {
@@ -533,7 +537,12 @@ function ChatWindow({
       ?.scrollIntoView({ block: "center", behavior: "smooth" });
   }
   return (
-    <section className={`tilde-chat rich-chat tc-chat ${className}`} aria-label="Chat">
+    <section
+      className={`tilde-chat rich-chat tc-chat ${className}`}
+      data-scheme={theme?.scheme}
+      style={themeStyle(theme)}
+      aria-label="Chat"
+    >
       <div className="chat-pane">
         <header className="chat-header" data-find-open={findOpen || undefined}>
           <div className="chat-identity">

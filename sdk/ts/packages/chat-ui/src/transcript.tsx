@@ -7,6 +7,7 @@ import {
   type ToolChipIcon,
 } from "./dispatch/tool-chips-block.js";
 import { TraceBlock } from "./dispatch/trace-block.js";
+import { themeStyle, type Theme } from "./theme.js";
 type Source = { id: string; sourceId: string; timestamp: string; timestampLabel: string };
 export type TranscriptEntry = Source &
   (
@@ -26,10 +27,12 @@ export interface TranscriptProps {
   entries: TranscriptEntry[];
   onInspect?: (sourceId: string) => void;
   className?: string;
+  /** The host's theme (the one `@trytilde/embed` takes); tokens left out keep the defaults. */
+  theme?: Theme;
 }
 
 /** A read-only adapter over Dispatch's original message and execution components. */
-export function Transcript({ entries, onInspect, className = "" }: TranscriptProps) {
+export function Transcript({ entries, onInspect, className = "", theme }: TranscriptProps) {
   const groups: TranscriptEntry[][] = [];
   for (const entry of entries) {
     const previous = groups.at(-1);
@@ -39,7 +42,12 @@ export function Transcript({ entries, onInspect, className = "" }: TranscriptPro
     else groups.push([entry]);
   }
   return (
-    <div className={`tilde-chat rich-chat ${className}`} aria-label="Recorded conversation">
+    <div
+      className={`tilde-chat rich-chat ${className}`}
+      data-scheme={theme?.scheme}
+      style={themeStyle(theme)}
+      aria-label="Recorded conversation"
+    >
       <div className="conversation">
         <div className="message-list">
           {groups.map((group) => {
