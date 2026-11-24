@@ -3,16 +3,25 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub slug: String,
+    pub connection_id: uuid::Uuid,
     pub provider_id: String,
 }
 pub struct RecordBorrowed<'a> {
     pub slug: &'a str,
+    pub connection_id: uuid::Uuid,
     pub provider_id: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
-    fn from(RecordBorrowed { slug, provider_id }: RecordBorrowed<'a>) -> Self {
+    fn from(
+        RecordBorrowed {
+            slug,
+            connection_id,
+            provider_id,
+        }: RecordBorrowed<'a>,
+    ) -> Self {
         Self {
             slug: slug.into(),
+            connection_id,
             provider_id: provider_id.into(),
         }
     }
@@ -86,7 +95,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT g.slug,c.provider_id FROM sandbox_blueprint_egress g JOIN connections c ON c.id=g.connection_id WHERE g.blueprint_id=$1 AND g.enabled ORDER BY g.slug",
+        "SELECT g.slug,g.connection_id,c.provider_id FROM sandbox_blueprint_egress g JOIN connections c ON c.id=g.connection_id WHERE g.blueprint_id=$1 AND g.enabled ORDER BY g.slug",
         None,
     )
 }
@@ -112,7 +121,8 @@ impl RunStmt {
                 |row: &tokio_postgres::Row| -> Result<RecordBorrowed, tokio_postgres::Error> {
                     Ok(RecordBorrowed {
                         slug: row.try_get(0)?,
-                        provider_id: row.try_get(1)?,
+                        connection_id: row.try_get(1)?,
+                        provider_id: row.try_get(2)?,
                     })
                 },
             mapper: |it| Record::from(it),

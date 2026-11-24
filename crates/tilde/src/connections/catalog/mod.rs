@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 
 pub mod agentmail;
 pub mod aws;
+pub mod entire;
 pub mod github;
+pub mod gitlab;
 pub mod google_chat;
 pub mod inference;
 pub mod linq;
@@ -46,6 +48,16 @@ pub fn builtins() -> Vec<Provider> {
         crate::tools::providers::e2b::definition(),
         crate::tools::providers::aws::definition(),
         crate::tools::providers::modal::definition(),
+        crate::tools::providers::gitlab::definition(),
+        crate::tools::providers::jira::definition(),
+        crate::tools::providers::entire::definition(),
+        crate::tools::providers::datadog::definition(),
+        crate::tools::providers::grafana::definition(),
+        crate::tools::providers::prometheus::definition(),
+        crate::tools::providers::pagerduty::definition(),
+        crate::tools::providers::newrelic::definition(),
+        crate::tools::providers::honeycomb::definition(),
+        crate::tools::providers::terraform::definition(),
     ])
     .collect();
     crate::tools::mcp_catalog::extend(&mut providers);

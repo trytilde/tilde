@@ -4,7 +4,8 @@
 //! personal access token or API key, or an OAuth access token the connection keeps refreshed);
 //! nothing narrower exists, so the scope is ignored and consumers narrow in their own checks.
 //! `Custom` is provider code: GitHub App installation tokens limited to the scope's repositories
-//! and permissions, and AWS STS sessions in the scope's account.
+//! and permissions, AWS STS sessions in the scope's account, and Entire service account tokens
+//! exchanged from the connection's secret.
 //!
 //! Minted credentials are cached in memory by connection, a fingerprint of its stored values
 //! (any credential change misses) and the scope, until five minutes before they expire; one mint
@@ -32,7 +33,7 @@ pub enum Mint {
 /// The connection types whose credentials provider code mints.
 pub fn strategy(provider: &str, typ: &str) -> Mint {
     match (provider, typ) {
-        ("github", "github_app") | ("aws", _) => Mint::Custom,
+        ("github", "github_app") | ("aws", _) | ("entire", _) => Mint::Custom,
         _ => Mint::Stored,
     }
 }
@@ -164,30 +165,16 @@ pub async fn mint(
         // The installation token the connection keeps refreshed serves unscoped consumers.
         (Mint::Custom, "github") if scope.is_empty() => stored(access),
         (Mint::Custom, "github") => {
-            let key = format!(
-                "github|{}|{}|{}",
-                access.connection_id,
-                fingerprint(access),
-                scope.digest()
-            );
-            single_flight(key, || {
-                let span = tracing::info_span!(
-                    "credential.mint",
-                    connection_id = %access.connection_id,
-                    scope = %scope.digest(),
-                    consumer,
-                    expires_at = tracing::field::Empty,
-                );
-                async {
-                    let minted =
-                        crate::connections::catalog::github::installation_token(access, scope)
-                            .await?;
-                    if let Some(at) = minted.expires_at {
-                        tracing::Span::current().record("expires_at", at.to_rfc3339());
-                    }
-                    Ok(minted)
-                }
-                .instrument(span)
+            networked(access, provider, scope, consumer, async {
+                crate::connections::catalog::github::installation_token(access, scope).await
+            })
+            .await
+        }
+        // A service account token reaches what the service account does; no scope narrows it.
+        (Mint::Custom, "entire") => {
+            let scope = MintScope::default();
+            networked(access, provider, &scope, consumer, async {
+                crate::connections::catalog::entire::service_token(access).await
             })
             .await
         }
@@ -195,6 +182,41 @@ pub async fn mint(
             "{provider} {typ} connections mint no credentials"
         ))),
     }
+}
+
+/// A mint that calls the provider: cached per connection, credential fingerprint and scope,
+/// one at a time per key, and traced as a `credential.mint` span.
+async fn networked(
+    access: &Access,
+    provider: &str,
+    scope: &MintScope,
+    consumer: &str,
+    mint: impl Future<Output = ToolResult<Minted>>,
+) -> ToolResult<Minted> {
+    let key = format!(
+        "{provider}|{}|{}|{}",
+        access.connection_id,
+        fingerprint(access),
+        scope.digest()
+    );
+    single_flight(key, || {
+        let span = tracing::info_span!(
+            "credential.mint",
+            connection_id = %access.connection_id,
+            scope = %scope.digest(),
+            consumer,
+            expires_at = tracing::field::Empty,
+        );
+        async {
+            let minted = mint.await?;
+            if let Some(at) = minted.expires_at {
+                tracing::Span::current().record("expires_at", at.to_rfc3339());
+            }
+            Ok(minted)
+        }
+        .instrument(span)
+    })
+    .await
 }
 
 /// The stored OAuth access token, else a personal token or API key, as a bearer token.
