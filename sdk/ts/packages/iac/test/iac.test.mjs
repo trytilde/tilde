@@ -69,7 +69,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
     ],
     deploy: lambda(
       "arn:aws:lambda:us-east-1:1:function:triage:3",
-      "arn:aws:iam::1:role/tilde-invoke",
+      "arn:aws:iam::1:role/tilde-org-invoke",
     ),
   });
   assert.equal(agent[SPEC], "agent");
@@ -102,7 +102,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
   assert.equal(parsed.routines[1].trigger.kind.value.filters[0].values[0], "ENG");
   assert.equal(parsed.routines[2].delete, true);
   assert.equal(parsed.deployment.targetReference, "arn:aws:lambda:us-east-1:1:function:triage:3");
-  assert.equal(parsed.deployment.targetRole, "arn:aws:iam::1:role/tilde-invoke");
+  assert.equal(parsed.deployment.targetRole, "arn:aws:iam::1:role/tilde-org-invoke");
   // Without a connection, the agent's own Tilde chat.
   assert.deepEqual(
     parsed.channels.map((c) => [c.connection?.slug, c.access, c.delete]),

@@ -169,7 +169,7 @@ which this package asks for at its own version, so `uv run tilde` is the matchin
 ```sh
 uv run tilde dev                                   # register, run and chat with the agent locally
 uv run tilde deploy [ENTRY] [--agent-id ID] [--url URL] [--api-key KEY] \
-  [--target gateway|sidecar|lambda] [--function-arn ARN] [--external-id ID] [--label L] \
+  [--target gateway|sidecar|lambda] [--function-arn ARN] [--role ROLE_ARN] [--external-id ID] [--label L] \
   [--dry-run] [--json]
 ```
 

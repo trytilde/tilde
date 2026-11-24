@@ -507,7 +507,8 @@ npx tilde-declarations dist/index.js                # the same JSON, straight fr
 ```
 
 Flags: `[ENTRY] --agent-id --url --api-key --target gateway|sidecar|lambda --function-arn
---external-id --label --dry-run --json`. ENTRY defaults to package.json `main`. Point it at
+--role --external-id --label --dry-run --json`. A Lambda target's `--role` is the IAM role Tilde
+assumes to invoke the function (Tilde Cloud requires one, named `tilde-org-*`). ENTRY defaults to package.json `main`. Point it at
 built JavaScript; a `.ts` entry only loads when Node's type stripping can run it as is. Text
 files up to 256 KiB travel inline, other skill files are uploaded first by digest. The
 same name with different content is an error; stdout carries only the token (`--json`

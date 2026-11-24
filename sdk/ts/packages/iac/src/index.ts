@@ -123,8 +123,9 @@ export type Deploy =
 /**
  * A Lambda function; a version-qualified ARN keeps the deployment fixed. `role` is the IAM role
  * Tilde assumes to invoke it, allowed `lambda:InvokeFunction` on the function. Tilde Cloud requires
- * one and assumes it with your organization's ID as the external ID, so its trust policy names
- * Tilde's role and `sts:ExternalId`; a self-hosted Tilde without one uses its own credentials.
+ * one, named `tilde-org-<name>`, and assumes it with your organization's ID as the external ID, so
+ * its trust policy names Tilde's role and `sts:ExternalId`; a self-hosted Tilde without one uses
+ * its own credentials.
  */
 export const lambda = (functionArn: string, role?: string): Deploy => ({
   target: "lambda",
