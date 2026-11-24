@@ -193,7 +193,7 @@ tasks:
       - task: build:chat
       - scripts/with-sccache.sh cargo build -p tilde --bin tilde
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
-      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
+      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/chat-ui-fetch.test.tsx src/embed.test.tsx
 
   preview:chat-ui:
     desc: Serve chat-ui's visual preview (light, dark, phone width) against in-browser fixtures
@@ -295,7 +295,7 @@ tasks:
       - scripts/with-postgres.sh node sdk/ts/packages/sdk-vercel-ai-node/test/attachments.integration.mjs
       - task: build:chat
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/native-provider.integration.mjs
-      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/embed.test.tsx
+      - pnpm --dir web exec vitest run src/chat-ui.test.tsx src/chat-ui-fetch.test.tsx src/embed.test.tsx
 
   iac:catalog:
     desc: Regenerate @trytilde/iac's typed providers from the built-in catalog of a disposable server
