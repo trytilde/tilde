@@ -113,7 +113,20 @@ message Connection {
   google.protobuf.Timestamp created_at = 9; google.protobuf.Timestamp updated_at = 10; repeated AssociatedAgent associated_agents = 11; optional string webhook_url = 12;
   // `provider_id/name`, the stable route key agents use; unique among ready assignments per agent and capability.
   string slug = 13;
+  // What uses the connection (GetConnection and ListConnections): it cannot be disconnected until
+  // each is removed.
+  repeated ConnectionUsage usages = 16;
 }
+
+// One use of a connection. `kind`: `agent` (an assignment; `detail` its capability),
+// `personal_agent` (an agent a personal connection allows), `tool_source` (an agent's; `detail`
+// its slug), `sandbox_tool_source` (a sandbox blueprint's; `detail` its slug), `routine` (fired
+// by its signals; `detail` its agent and signal), `sandbox_blueprint`,
+// `sandbox` (a sandbox on it its blueprint no longer names; `detail` its status),
+// `sandbox_egress` (a blueprint's egress grant; `detail` its slug), `memory` (the memory
+// embeddings; `detail` the model) or `memory_synthesis` (a memory bank's).
+// `id` is the agent, routine, blueprint, sandbox or memory bank.
+message ConnectionUsage { string kind = 1; string id = 2; string name = 3; string detail = 4; }
 
 message InputField { string key = 1; string value = 2 [debug_redact = true]; }
 

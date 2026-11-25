@@ -52,6 +52,10 @@ impl DbError {
     pub fn is_invalid_regex(&self) -> bool {
         self.code() == Some(&tokio_postgres::error::SqlState::INVALID_REGULAR_EXPRESSION)
     }
+    /// A disconnected connection was put to use (`connection_usable`).
+    pub fn is_unusable_connection(&self) -> bool {
+        self.code().map(tokio_postgres::error::SqlState::code) == Some("TL001")
+    }
     /// A statement timeout fired.
     pub fn is_query_canceled(&self) -> bool {
         self.code() == Some(&tokio_postgres::error::SqlState::QUERY_CANCELED)

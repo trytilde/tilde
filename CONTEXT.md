@@ -40,6 +40,20 @@ template and served at `/catalog/<provider>/ui`. Static and OAuth methods use th
 shared `/catalog/_standard/ui` page and a canonical JSON Schema for rendering and
 server validation. Rust serves the setup host/assets and proxies Vite during development.
 Opaque-origin frames use a scoped MessagePort bridge; only the host holds the setup token.
+
+Connection usage: a connection in use is never disconnected or deleted. Its uses
+(`queries/connections/usages.sql`, `Connections::usages`; `Connection.usages` on
+GetConnection and ListConnections) are agent assignments, the agents a personal connection allows
+by name, agents' and sandbox blueprints' tool sources, routines on its signals, sandbox blueprints
+and their egress grants, sandboxes left on it by a blueprint that no longer names it, the
+memory embeddings and memory banks' synthesis.
+`Disconnect` (and deleting a tool host, whose instances go with it) refuses with
+`failed_precondition` naming every use; the person removes each first.
+Disconnect holds the connection's row `FOR UPDATE` while it looks, and the `connection_usable`
+trigger on every using table refuses a disconnected connection after waiting on that row, so a
+racing bind and disconnect never both commit. Foreign keys from users to `connections` restrict
+deletes; deleting an agent drops its tool sources, routines and personal allowances (its row
+stays), and with its routines their run history.
 The agent's chat-provider pills list catalog connection types with the channel capability.
 Each menu offers an available existing connection or a new setup method. The new-connection
 dialog opens the hosted brokering iframe immediately. Creation assigns chat to the agent

@@ -647,6 +647,18 @@ async fn provider_host_instances_are_verified_and_called_with_their_own_credenti
         .get(0);
     assert_eq!(queued, 0, "sealed credentials leave with their queue rows");
 
+    // An instance still in use keeps its host: the agent's tool source goes first.
+    let refused = agent_tools.hosts.delete(host.id).await.unwrap_err();
+    assert!(
+        matches!(&refused, tilde::error::Error::InUse(message) if message.contains("tool source")),
+        "{refused:?}"
+    );
+    pg.execute(
+        "DELETE FROM agent_tool_sources WHERE connection_id=$1",
+        &[&instance],
+    )
+    .await
+    .unwrap();
     // Deleting the host takes its provider and instances with it.
     agent_tools.hosts.delete(host.id).await.unwrap();
     assert!(fx.connections.get(instance).await.is_err());

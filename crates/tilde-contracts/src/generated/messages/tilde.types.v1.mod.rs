@@ -96,6 +96,7 @@ pub mod __buffa {
         reg.register_json_any(super::__BUILT_IN_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CONFIGURED_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_JSON_ANY);
+        reg.register_json_any(super::__CONNECTION_USAGE_JSON_ANY);
         reg.register_json_any(super::__INPUT_FIELD_JSON_ANY);
         reg.register_json_any(super::__REMOTE_PROVIDER_JSON_ANY);
         reg.register_json_any(super::__CAPABILITY_ASSIGNMENT_JSON_ANY);
@@ -302,6 +303,10 @@ pub use self::__buffa::view::ConfiguredProviderOwnedView;
 pub use self::__buffa::view::ConnectionView;
 #[doc(inline)]
 pub use self::__buffa::view::ConnectionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionUsageView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectionUsageOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::InputFieldView;
 #[doc(inline)]

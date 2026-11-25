@@ -3,6 +3,7 @@
 pub mod apply_get;
 pub mod apply_update;
 pub mod avatar;
+pub mod connection_uses_delete;
 pub mod create;
 pub mod delete;
 pub mod get;

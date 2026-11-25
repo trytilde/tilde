@@ -328,6 +328,32 @@ pub(crate) fn provider_model(provider: types::Provider) -> Result<m::Provider, E
         categories: provider.categories,
     })
 }
+/// One use of a connection.
+pub(super) fn usage_wire(u: &crate::connections::db::Usage) -> types::ConnectionUsage {
+    types::ConnectionUsage {
+        kind: u.kind.clone(),
+        id: u.id.map(|id| id.to_string()).unwrap_or_default(),
+        name: u.name.clone(),
+        detail: u.detail.clone(),
+        ..Default::default()
+    }
+}
+/// The connection with its uses (`usages`: of any connections, ordered by connection).
+pub(super) fn connection_wire_used(
+    c: m::Connection,
+    base: &str,
+    usages: &[crate::connections::db::Usage],
+) -> types::Connection {
+    let id = c.id;
+    types::Connection {
+        usages: usages
+            .iter()
+            .filter(|u| u.connection_id == id)
+            .map(usage_wire)
+            .collect(),
+        ..connection_wire(c, base)
+    }
+}
 pub(super) fn connection_wire(c: m::Connection, base: &str) -> types::Connection {
     let timestamp =
         |date: chrono::DateTime<chrono::Utc>| buffa_types::google::protobuf::Timestamp {

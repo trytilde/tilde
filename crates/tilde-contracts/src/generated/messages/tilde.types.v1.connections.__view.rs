@@ -4899,6 +4899,14 @@ pub struct ConnectionView<'a> {
     ///
     /// Field 13: `slug`
     pub slug: &'a str,
+    /// What uses the connection (GetConnection and ListConnections): it cannot be disconnected until
+    /// each is removed.
+    ///
+    /// Field 16: `usages`
+    pub usages: ::buffa::RepeatedView<
+        'a,
+        super::super::__buffa::view::ConnectionUsageView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for ConnectionView<'a> {
@@ -5076,6 +5084,26 @@ impl<'a> ::buffa::MessageView<'a> for ConnectionView<'a> {
                         )?,
                     );
             }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                ctx.register_element_memory(
+                    ::core::mem::size_of::<
+                        super::super::__buffa::view::ConnectionUsageView,
+                    >(),
+                )?;
+                view.usages
+                    .push(
+                        <super::super::__buffa::view::ConnectionUsageView as ::buffa::MessageView>::decode_view_ctx(
+                            sub,
+                            __sub_ctx,
+                        )?,
+                    );
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -5130,6 +5158,11 @@ impl<'a> ::buffa::MessageView<'a> for ConnectionView<'a> {
                 .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             webhook_url: self.webhook_url.map(|s| s.to_string()),
             slug: self.slug.to_string(),
+            usages: self
+                .usages
+                .iter()
+                .map(|v| v.to_owned_from_source(__buffa_src))
+                .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -5196,6 +5229,14 @@ impl<'a> ::buffa::ViewEncode<'a> for ConnectionView<'a> {
         }
         if !self.slug.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.slug) as u64;
+        }
+        for v in &self.usages {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
         }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
@@ -5267,6 +5308,14 @@ impl<'a> ::buffa::ViewEncode<'a> for ConnectionView<'a> {
         if !self.slug.is_empty() {
             ::buffa::types::put_string_field(13u32, &self.slug, buf);
         }
+        for v in &self.usages {
+            ::buffa::types::put_len_delimited_header(
+                16u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -5331,6 +5380,9 @@ impl<'__a> ::serde::Serialize for ConnectionView<'__a> {
         }
         if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
             __map.serialize_entry("slug", self.slug)?;
+        }
+        if !self.usages.is_empty() {
+            __map.serialize_entry("usages", &*self.usages)?;
         }
         __map.end()
     }
@@ -5500,6 +5552,19 @@ impl ConnectionOwnedView {
     pub fn slug(&self) -> &'_ str {
         self.0.reborrow().slug
     }
+    /// What uses the connection (GetConnection and ListConnections): it cannot be disconnected until
+    /// each is removed.
+    ///
+    /// Field 16: `usages`
+    #[must_use]
+    pub fn usages(
+        &self,
+    ) -> &::buffa::RepeatedView<
+        '_,
+        super::super::__buffa::view::ConnectionUsageView<'_>,
+    > {
+        &self.0.reborrow().usages
+    }
 }
 impl ::core::convert::From<::buffa::OwnedView<ConnectionView<'static>>>
 for ConnectionOwnedView {
@@ -5524,6 +5589,331 @@ impl ::buffa::HasMessageView for super::super::Connection {
     type ViewHandle = ConnectionOwnedView;
 }
 impl ::serde::Serialize for ConnectionOwnedView {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        ::serde::Serialize::serialize(&self.0, __s)
+    }
+}
+/// One use of a connection. `kind`: `agent` (an assignment; `detail` its capability),
+/// `personal_agent` (an agent a personal connection allows), `tool_source` (an agent's; `detail`
+/// its slug), `sandbox_tool_source` (a sandbox blueprint's; `detail` its slug), `routine` (fired
+/// by its signals; `detail` its agent and signal), `sandbox_blueprint`,
+/// `sandbox` (a sandbox on it its blueprint no longer names; `detail` its status),
+/// `sandbox_egress` (a blueprint's egress grant; `detail` its slug), `memory` (the memory
+/// embeddings; `detail` the model) or `memory_synthesis` (a memory bank's).
+/// `id` is the agent, routine, blueprint, sandbox or memory bank.
+#[derive(Clone, Debug, Default)]
+pub struct ConnectionUsageView<'a> {
+    /// Field 1: `kind`
+    pub kind: &'a str,
+    /// Field 2: `id`
+    pub id: &'a str,
+    /// Field 3: `name`
+    pub name: &'a str,
+    /// Field 4: `detail`
+    pub detail: &'a str,
+    pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+}
+impl<'a> ::buffa::MessageView<'a> for ConnectionUsageView<'a> {
+    type Owned = super::super::ConnectionUsage;
+    fn decode_view(buf: &'a [u8]) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        let __limit = ::core::cell::Cell::new(::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT);
+        <Self as ::buffa::MessageView>::decode_view_ctx(
+            buf,
+            ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+        )
+    }
+    fn decode_view_with_ctx(
+        buf: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+    }
+    #[inline]
+    fn merge_view_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        cur: &'a [u8],
+        before_tag: &'a [u8],
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+        let _ = ctx;
+        #[allow(unused_variables)]
+        let view = self;
+        let mut cur = cur;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.kind = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.id = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.name = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                view.detail = ::buffa::types::borrow_str(&mut cur)?;
+            }
+            _ => {
+                ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                let span_len = before_tag.len() - cur.len();
+                view.__buffa_unknown_fields.push_record(before_tag, span_len, ctx)?;
+            }
+        }
+        ::core::result::Result::Ok(cur)
+    }
+    fn to_owned_message(
+        &self,
+    ) -> ::core::result::Result<super::super::ConnectionUsage, ::buffa::DecodeError> {
+        self.to_owned_from_source(None)
+    }
+    #[allow(clippy::useless_conversion, clippy::needless_update)]
+    fn to_owned_from_source(
+        &self,
+        __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+    ) -> ::core::result::Result<super::super::ConnectionUsage, ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::alloc::string::ToString as _;
+        let _ = __buffa_src;
+        ::core::result::Result::Ok(super::super::ConnectionUsage {
+            kind: self.kind.to_string(),
+            id: self.id.to_string(),
+            name: self.name.to_string(),
+            detail: self.detail.to_string(),
+            __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
+            ..::core::default::Default::default()
+        })
+    }
+}
+impl<'a> ::buffa::ViewEncode<'a> for ConnectionUsageView<'a> {
+    #[allow(clippy::needless_borrow, clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.kind.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.kind) as u64;
+        }
+        if !self.id.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.id) as u64;
+        }
+        if !self.name.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.name) as u64;
+        }
+        if !self.detail.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.detail) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    #[allow(clippy::needless_borrow)]
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.kind.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.kind, buf);
+        }
+        if !self.id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.name, buf);
+        }
+        if !self.detail.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.detail, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+}
+/// Serializes this view as protobuf JSON.
+///
+/// Implicit-presence fields with default values are omitted, `required`
+/// fields are always emitted, explicit-presence (`optional`) fields are
+/// emitted only when set, bytes fields are base64-encoded, and enum
+/// values are their proto name strings.
+///
+/// This impl uses `serialize_map(None)` because the number of emitted
+/// fields depends on default-omission rules; serializers that require
+/// known map lengths (e.g. `bincode`) will return a runtime error.
+/// Use the owned message type for those formats.
+impl<'__a> ::serde::Serialize for ConnectionUsageView<'__a> {
+    fn serialize<__S: ::serde::Serializer>(
+        &self,
+        __s: __S,
+    ) -> ::core::result::Result<__S::Ok, __S::Error> {
+        use ::serde::ser::SerializeMap as _;
+        let mut __map = __s.serialize_map(::core::option::Option::None)?;
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.kind) {
+            __map.serialize_entry("kind", self.kind)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.id) {
+            __map.serialize_entry("id", self.id)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+            __map.serialize_entry("name", self.name)?;
+        }
+        if !::buffa::json_helpers::skip_if::is_empty_str(self.detail) {
+            __map.serialize_entry("detail", self.detail)?;
+        }
+        __map.end()
+    }
+}
+impl<'a> ::buffa::MessageName for ConnectionUsageView<'a> {
+    const PACKAGE: &'static str = "tilde.types.v1";
+    const NAME: &'static str = "ConnectionUsage";
+    const FULL_NAME: &'static str = "tilde.types.v1.ConnectionUsage";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.types.v1.ConnectionUsage";
+}
+::buffa::impl_default_view_instance!(ConnectionUsageView);
+::buffa::impl_view_reborrow!(ConnectionUsageView);
+/** Self-contained, `'static` owned view of a `ConnectionUsage` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConnectionUsageView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConnectionUsageView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+#[derive(Clone, Debug)]
+pub struct ConnectionUsageOwnedView(::buffa::OwnedView<ConnectionUsageView<'static>>);
+impl ConnectionUsageOwnedView {
+    /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+    ///
+    /// The view borrows directly from the buffer's data; the buffer is
+    /// retained inside the returned handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+    /// protobuf data.
+    pub fn decode(
+        bytes: ::buffa::bytes::Bytes,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ConnectionUsageOwnedView(::buffa::OwnedView::decode(bytes)?),
+        )
+    }
+    /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+    /// max message size).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+    /// exceeds the configured limits.
+    pub fn decode_with_options(
+        bytes: ::buffa::bytes::Bytes,
+        opts: &::buffa::DecodeOptions,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ConnectionUsageOwnedView(
+                ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+            ),
+        )
+    }
+    /// Build from an owned message via an encode → decode round-trip.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`::buffa::DecodeError::MessageTooLarge`] if the
+    /// message's encoded size exceeds the 2 GiB protobuf limit, or
+    /// another [`::buffa::DecodeError`] if the re-encoded bytes are
+    /// somehow invalid (should not happen for well-formed messages).
+    pub fn from_owned(
+        msg: &super::super::ConnectionUsage,
+    ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+        ::core::result::Result::Ok(
+            ConnectionUsageOwnedView(::buffa::OwnedView::from_owned(msg)?),
+        )
+    }
+    /// Borrow the full [`ConnectionUsageView`] with its lifetime tied to `&self`.
+    #[must_use]
+    pub fn view(&self) -> &ConnectionUsageView<'_> {
+        self.0.reborrow()
+    }
+    /// Convert to the owned message type.
+    ///
+    /// Infallible: this type's constructors wire-decode their
+    /// buffer, and a view produced by wire decoding always
+    /// converts. Delegates to [`::buffa::OwnedView::to_owned_message`],
+    /// whose contract also governs handles converted from a raw
+    /// [`::buffa::OwnedView`].
+    #[must_use]
+    pub fn to_owned_message(&self) -> super::super::ConnectionUsage {
+        self.0.to_owned_message()
+    }
+    /// The underlying bytes buffer.
+    #[must_use]
+    pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+        self.0.bytes()
+    }
+    /// Consume the handle, returning the underlying bytes buffer.
+    #[must_use]
+    pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+        self.0.into_bytes()
+    }
+    /// Field 1: `kind`
+    #[must_use]
+    pub fn kind(&self) -> &'_ str {
+        self.0.reborrow().kind
+    }
+    /// Field 2: `id`
+    #[must_use]
+    pub fn id(&self) -> &'_ str {
+        self.0.reborrow().id
+    }
+    /// Field 3: `name`
+    #[must_use]
+    pub fn name(&self) -> &'_ str {
+        self.0.reborrow().name
+    }
+    /// Field 4: `detail`
+    #[must_use]
+    pub fn detail(&self) -> &'_ str {
+        self.0.reborrow().detail
+    }
+}
+impl ::core::convert::From<::buffa::OwnedView<ConnectionUsageView<'static>>>
+for ConnectionUsageOwnedView {
+    fn from(inner: ::buffa::OwnedView<ConnectionUsageView<'static>>) -> Self {
+        ConnectionUsageOwnedView(inner)
+    }
+}
+impl ::core::convert::From<ConnectionUsageOwnedView>
+for ::buffa::OwnedView<ConnectionUsageView<'static>> {
+    fn from(wrapper: ConnectionUsageOwnedView) -> Self {
+        wrapper.0
+    }
+}
+impl ::core::convert::AsRef<::buffa::OwnedView<ConnectionUsageView<'static>>>
+for ConnectionUsageOwnedView {
+    fn as_ref(&self) -> &::buffa::OwnedView<ConnectionUsageView<'static>> {
+        &self.0
+    }
+}
+impl ::buffa::HasMessageView for super::super::ConnectionUsage {
+    type View<'a> = ConnectionUsageView<'a>;
+    type ViewHandle = ConnectionUsageOwnedView;
+}
+impl ::serde::Serialize for ConnectionUsageOwnedView {
     fn serialize<__S: ::serde::Serializer>(
         &self,
         __s: __S,

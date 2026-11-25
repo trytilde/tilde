@@ -306,6 +306,9 @@ pub async fn host_of_provider_opt(
         .opt()
         .await?)
 }
+pub async fn host_connections_all(db: &impl GenericClient, host: Uuid) -> DbResult<Vec<Uuid>> {
+    Ok(q::host_connections::run().bind(db, &host).all().await?)
+}
 /// Removes the host's provider definition details and its instances; returns the instances.
 pub async fn host_provider_remove_execute(db: &impl GenericClient, host: Uuid) -> DbResult<u64> {
     Ok(q::host_provider_remove::run().bind(db, &host).await?)

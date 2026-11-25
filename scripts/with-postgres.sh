@@ -39,7 +39,9 @@ if [[ "${WITH_PGBOUNCER:-}" == 1 ]]; then
   image=pgvector/pgvector:pg18
   data=/var/lib/postgresql
 fi
-docker run --detach --name "$container" "${network_args[@]}" --tmpfs "$data:rw,size=2g" --tmpfs /var/run/postgresql:rw,size=16m --env POSTGRES_USER=engine --env POSTGRES_PASSWORD=engine-test --env POSTGRES_DB=engine_test "${init[@]}" --publish 127.0.0.1::5432 "$image" \
+# Every test migrates a schema of its own into this in-memory data directory; the whole suite's
+# catalogs outgrew 2 GB ("could not extend file ... No space left on device" mid-migration).
+docker run --detach --name "$container" "${network_args[@]}" --tmpfs "$data:rw,size=4g" --tmpfs /var/run/postgresql:rw,size=16m --env POSTGRES_USER=engine --env POSTGRES_PASSWORD=engine-test --env POSTGRES_DB=engine_test "${init[@]}" --publish 127.0.0.1::5432 "$image" \
   "${settings[@]}" >/dev/null
 for attempt in {1..60}; do
   if docker exec "$container" pg_isready -h 127.0.0.1 -U engine -d engine_test >/dev/null 2>&1; then break; fi

@@ -20,6 +20,7 @@ import { connections, toolHosts, tools } from "@/client";
 import { FilterSearchInput } from "@/features/observability/filter-search-input";
 import { quote, tokens, unquote } from "@/features/observability/query";
 import { AddServers } from "./add-servers";
+import { ConnectionUsages, DisconnectDescription } from "./connection-usages";
 import { AgentStack, useAgentRegistry } from "./agent-stack";
 import { NewConnectionDialog, SANDBOX_PROVIDERS } from "./new-connection-dialog";
 import { ProviderIcon } from "./provider-icon";
@@ -573,6 +574,9 @@ function ConnectionActions({
           >
             <UnplugIcon />
             Disconnect
+            {connection.usages.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">In use</span>
+            )}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -581,9 +585,10 @@ function ConnectionActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect {connection.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Its credentials are removed and its tools disappear from every agent using it.
+              <DisconnectDescription usages={connection.usages} />
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {connection.usages.length > 0 && <ConnectionUsages usages={connection.usages} />}
           {error && (
             <p role="alert" className="m-0 text-sm text-destructive">
               {error}
@@ -591,7 +596,11 @@ function ConnectionActions({
           )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <Button variant="destructive" disabled={busy} onClick={() => void disconnect()}>
+            <Button
+              variant="destructive"
+              disabled={busy || connection.usages.length > 0}
+              onClick={() => void disconnect()}
+            >
               Disconnect
             </Button>
           </AlertDialogFooter>
