@@ -1,3 +1,0 @@
-kind: Added
-body: "Connection setup prefill on provider pages (the same contract as Tilde Cloud): a setup URL may carry `name=<account name>` and `field.<key>=<value>`, which the brokering page forwards to the provider page. `useSetup` fills the account name while the connection still has the provider's placeholder name, and `CredentialForm` fills schema fields, skipping write-only fields, secret-looking keys and values outside a field's choices; saved drafts win and everything stays editable. `@trytilde/connection-ui` exports `readPrefill`, `withPrefill` and `secretKey` for provider-owned pages."
-time: 2026-11-25T21:00:00+00:00
