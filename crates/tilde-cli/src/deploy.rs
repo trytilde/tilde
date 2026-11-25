@@ -117,8 +117,10 @@ pub async fn ontologies_first(
     specs: bool,
 ) -> Result<(Vec<crate::ontology::Action>, BTreeSet<String>)> {
     let agents = specs && args.only.is_none();
+    // A project the deploy creates belongs to the deploy's team, as its agents do.
+    let team = args.team.as_deref().or(declarations.team.as_deref());
     let (mut actions, plan, mut served) =
-        crate::ontology::prepare(args, &declarations.ontologies, agents).await?;
+        crate::ontology::prepare(args, &declarations.ontologies, team, agents).await?;
     // Only all of the project's ontologies say which tools their connections serve: a selection
     // that leaves some out has nothing to check against.
     if declarations

@@ -198,7 +198,7 @@ test("a project carries its team and agents", () => {
   assert.equal(project.agents[0], a);
 });
 
-test("a project's ontologies carry each environment's bindings, by slug and secret name", () => {
+test("a project's ontologies carry each environment's bindings and live, by slug and secret name", () => {
   const project = defineProject({
     team: "factory",
     ontologies: {
@@ -207,6 +207,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
           production: {
             connections: { github: github.ref("faroai", { type: "github_app" }), linear },
             secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
+            live: true,
           },
           staging: {},
         },
@@ -224,6 +225,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
             linear: { slug: "linear/acme", type: "api_key" },
           },
           secrets: { PG_PASSWORD: "FARO_PG_PASSWORD" },
+          live: true,
         },
         staging: { connections: {}, secrets: {} },
       },

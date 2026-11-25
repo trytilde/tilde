@@ -1891,18 +1891,29 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
   plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
 - Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
-  environments: { <env>: { connections, secrets } } }) } })`, each in the repository's
+  environments: { <env>: { connections, secrets, live } } }) } })`, each in the repository's
   `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
   workspace with one root lockfile and no `tilde.toml` (the root `tilde.config.ts` is the project); each ontology is the Tilde
   project of its name. `ontology<typeof connections>()` takes the ontology's own `connections` type
   (a type-only import), so binding a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
-  `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`). `tilde deploy` deploys
+  `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`); `live` is whether
+  Tilde serves the environment's spaces to the organization, set when the deploy creates the
+  environment (no RPC changes it later: a difference from an existing environment is reported in
+  the plan and left). `tilde deploy` deploys
   them before the agents (`tilde-cli` `ontology.rs`). Nothing changes until everything is
-  checked: the ontologies' preflight (projects, environments, connections and secrets exist;
+  checked: the ontologies' preflight (connections and secrets exist;
   each missing one is a required action with its link, the secret's naming the project's team; a
   server without the ontology control plane answers "Ontologies need Tilde Cloud") and the
-  agents' dry-run `Apply`, reported together (exit 2). Then each ontology is built here, on the
+  agents' dry-run `Apply`, reported together (exit 2). A first deploy needs nothing set up by
+  hand: a project or environment Tilde does not have is part of the plan and the deploy creates
+  it, the project (`ProjectService.CreateProject`) in the deploy's team (`--team` or
+  `defineProject({ team })`, a slug resolved with `IamService.ListTeams`; none: the
+  organization), each environment (`EnvironmentService.CreateEnvironment`, on Cloudflare) once
+  the version is ready, with the storage its IR declares and the spec's `live`. Tilde compiles
+  an ontology for its project, so a new project's ontology is built after the project is
+  created rather than before anything changes, its tools are not checked against the agents'
+  specs on that first deploy, and `--check` refuses a project that does not exist yet. Then each ontology is built here, on the
   client (Tilde never builds a project), with the project's own `@trytilde/ontology` and
   `@trytilde/spaces` (Tilde Cloud's packages, run with `node`): its IR (`tilde-ontology-build ir`),
   sent to `VersionService.CompileOntology`, whose errors fail the deploy and whose contract is
@@ -1911,7 +1922,9 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   runtime the package declares, `ontology.ir.json`, `worker.js`, `spaces/`; uncommitted changes
   refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
   (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
-  connections and secrets the spec binds (else nothing is bound), then each environment bound and
+  connections and secrets the spec binds (else nothing is bound; a connection the ontology
+  declares optional, `slot(provider, { optional: true })`, may stay unbound and is reported as
+  skipped: its pipelines do not run until it is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is

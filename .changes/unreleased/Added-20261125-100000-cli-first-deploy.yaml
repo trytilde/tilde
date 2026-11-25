@@ -1,0 +1,3 @@
+kind: Added
+body: "`tilde deploy` (Tilde Cloud ontologies): a first deploy creates the ontology's project (in the deploy's team) and each environment the organization does not have yet, instead of asking for them to be created by hand; the plan lists what it creates. `@trytilde/iac`: an ontology environment takes `live` (`environments: { production: { live: true } }`), set when the deploy creates the environment."
+time: 2026-11-25T10:00:00+00:00
