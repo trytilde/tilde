@@ -7,7 +7,7 @@
 #
 # Published as ghcr.io/trytilde/sandbox-debian-<target>. TILDE_VERSION is the release version
 # (Changie replaces it with VERSION); the image's tags and its CLI share it.
-ARG TILDE_VERSION=5.5.0
+ARG TILDE_VERSION=5.6.0
 
 FROM debian:bookworm-slim AS base
 ARG TILDE_VERSION

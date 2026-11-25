@@ -1,3 +1,0 @@
-kind: Added
-body: 'Hosted deployments (Tilde Cloud): `deploy: { target: "hosted" }` in `@trytilde/iac`, or `tilde deploy --target hosted`, has Tilde run the agent''s code itself. `tilde deploy` bundles the code with esbuild (`dist/index.mjs` exporting `handler`, with `prompts/` and `skills/`) and publishes it once the deployment is registered (`DeploymentService/PublishHostedDeployment`; an open-source server refuses it). A blueprint spec names its sandbox `connection` (it was `provider`) like any connection reference; on Tilde Cloud every team has the Tilde sandbox connection `tilde_sandbox/sandbox`, whose blueprints run `debian-node`, `debian-python` or `debian-full`.'
-time: 2026-11-24T13:00:00+00:00

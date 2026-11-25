@@ -1,3 +1,0 @@
-kind: Changed
-body: "Ontology slots are connections: `defineProject({ ontologies: { <name>: ontology({ environments: { <env>: { connections, secrets } } }) } })` replaces `slots`, `ontology<typeof connections>()` types the bindings by the ontology's own `connections`, and `tilde deploy`'s plan says `connection <name>`."
-time: 2026-11-24T13:00:00+00:00
