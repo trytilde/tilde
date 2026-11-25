@@ -1,0 +1,3 @@
+kind: Added
+body: "One theme for every embedded UI: `@trytilde/chat-ui`'s `Chat`, `ListSessions` and `Transcript` take `theme` (the `Theme` that `@trytilde/embed` gives a space) and derive their palette from its tokens, with `scheme` choosing light or dark without a `.dark` ancestor; `@trytilde/embed`'s `mountConnectionSetup({ theme })` (plus `setTheme`) and `<ConnectionSetup theme>` style Tilde's setup page, including provider pages built on `useSetup`. The type now lives in `@trytilde/sdk/theme`; Tilde's own setup dialog follows the app's light or dark."
+time: 2026-11-24T18:00:00+00:00

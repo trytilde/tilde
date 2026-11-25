@@ -4,28 +4,10 @@
  * handler, which holds the embed key and says who the signed-in user is.
  */
 
-/** Colours and shape of a space; any CSS value. Unknown tokens are ignored. */
-export interface ThemeTokens {
-  canvas?: string;
-  surface?: string;
-  ink?: string;
-  muted?: string;
-  line?: string;
-  accent?: string;
-  good?: string;
-  critical?: string;
-  "series-1"?: string;
-  "series-2"?: string;
-  "series-3"?: string;
-  "series-4"?: string;
-  "series-5"?: string;
-  radius?: string;
-  font?: string;
-}
-export interface Theme {
-  tokens?: ThemeTokens;
-  scheme?: "light" | "dark";
-}
+import type { Theme } from "@trytilde/chat-ui";
+
+/** One theme for every embedded Tilde UI: spaces, chat and connection setup. */
+export type { Theme, ThemeTokens } from "@trytilde/chat-ui";
 
 export interface SpaceOptions {
   /** Where your server mounted `@trytilde/embed-server`. Defaults to `/api/tilde`. */
@@ -211,17 +193,19 @@ export interface ConnectionSetupOptions {
   onError?: (error: Error) => void;
   /** The frame's height (default `640px`). */
   height?: string;
+  theme?: Theme;
 }
 export interface MountedConnectionSetup {
   /** The frame, or the popup window. */
   target: HTMLIFrameElement | Window;
+  setTheme(theme: Theme): void;
   close(): void;
 }
 
 /**
  * Show Tilde's connection setup page in `element` (a frame) or in a popup (`"popup"`, from a
  * click handler). Tilde hosts the provider's form and OAuth redirects; credentials never pass
- * through your app. Completion is announced by the page's window, matched by window and
+ * through your app. The page takes `theme` when it loads and again on `setTheme`. Completion is announced by the page's window, matched by window and
  * connection id.
  */
 export function mountConnectionSetup(
@@ -233,7 +217,7 @@ export function mountConnectionSetup(
     const popup = window.open(options.url, "tilde-connection-setup", "popup,width=520,height=720");
     if (!popup) {
       options.onError?.(new Error("The popup was blocked"));
-      return { target: window, close() {} };
+      return { target: window, setTheme() {}, close() {} };
     }
     opened = popup;
   } else {
@@ -249,6 +233,9 @@ export function mountConnectionSetup(
   }
   const source = () => (opened instanceof HTMLIFrameElement ? opened.contentWindow : opened);
   let done = false;
+  let theme = options.theme;
+  const post = (next: Theme) =>
+    source()?.postMessage({ type: "tilde.connection.theme", theme: next }, "*");
   function close() {
     done = true;
     window.removeEventListener("message", onMessage);
@@ -257,8 +244,13 @@ export function mountConnectionSetup(
   }
   function onMessage(event: MessageEvent) {
     const data = event.data as { type?: string; connectionId?: string } | null;
-    if (done || event.source !== source() || !data || data.connectionId !== options.connectionId)
+    if (done || event.source !== source() || !data) return;
+    // The page asks before it knows its connection, so this one is matched by window alone.
+    if (data.type === "tilde.connection.ready") {
+      if (theme) post(theme);
       return;
+    }
+    if (data.connectionId !== options.connectionId) return;
     if (data.type === "tilde.connection.complete") {
       close();
       options.onComplete?.(options.connectionId);
@@ -268,5 +260,12 @@ export function mountConnectionSetup(
     }
   }
   window.addEventListener("message", onMessage);
-  return { target: opened, close };
+  return {
+    target: opened,
+    setTheme(next) {
+      theme = next;
+      post(next);
+    },
+    close,
+  };
 }

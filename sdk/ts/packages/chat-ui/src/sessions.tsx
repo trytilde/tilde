@@ -14,6 +14,7 @@ import {
   type ChatAgent,
   type ChatFetch,
 } from "./client.js";
+import { themeStyle, type Theme } from "./theme.js";
 export interface ListSessionsProps {
   identity: string;
   proxy: string;
@@ -21,6 +22,8 @@ export interface ListSessionsProps {
   selectedAgentId?: string;
   onSelectSession: (sessionId: string, agentId: string) => void;
   className?: string;
+  /** The host's theme (the one `@trytilde/embed` takes); tokens left out keep the defaults. */
+  theme?: Theme;
   /** Replaces the cookie-carrying fetch, as `Chat.fetch` does. Keep it stable (define it once
    * or memoise it): a new function reloads the list. */
   fetch?: ChatFetch;
@@ -40,6 +43,7 @@ function Sessions({
   selectedAgentId,
   onSelectSession,
   className = "",
+  theme,
   fetch: proxyFetch,
 }: ListSessionsProps) {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -155,7 +159,12 @@ function Sessions({
     });
   }
   return (
-    <nav className={`tilde-chat tc-sessions ${className}`} aria-label="Chat sessions">
+    <nav
+      className={`tilde-chat tc-sessions ${className}`}
+      data-scheme={theme?.scheme}
+      style={themeStyle(theme)}
+      aria-label="Chat sessions"
+    >
       <div className="tc-sessions-search">
         <label className="tc-search">
           <SearchIcon />

@@ -73,6 +73,12 @@ The outer frame is the trusted broker; provider code remains in its opaque-origi
 Completion/cancellation notifications are checked against the frame window, origin and
 connection ID. Embedded authorization redirects and manifest posts open a separate window;
 the original provider UI polls setup state through its existing bridge to follow callbacks.
+A host's `Theme` (`@trytilde/sdk/theme`: the spaces preset's tokens plus a scheme) styles every
+embedded UI. Chat derives its palette from it on its `.tilde-chat` root. For setup it travels two
+hops: the embedding page answers the broker's `tilde.connection.ready` with
+`tilde.connection.theme`, and the broker hands it to the provider frame with `tilde.setup.port`
+and, on change, over that port; each page applies it to its shadcn variables. Without one the
+provider frame follows the broker's scheme.
 A connection setup token authorizes only its setup session. Browser clients open the
 returned brokering URL; the setup client does not send management bearer credentials.
 OAuth callback state is separate from the connection setup token.

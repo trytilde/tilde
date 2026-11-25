@@ -10,9 +10,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: "Bricolage Grotesque Variable", var(--font-sans);
+  --font-heading: var(--font-display);
   --font-mono: "Geist Mono Variable", "IBM Plex Mono", ui-monospace, monospace;
-  --font-sans: "Geist Variable", sans-serif;
+  --font-sans: var(--font-body);
   --color-espresso: var(--espresso);
   --color-blue: var(--blue);
   --color-blue-soft: var(--blue-soft);
@@ -65,6 +65,8 @@
 
 :root {
   color-scheme: light;
+  --font-body: "Geist Variable", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", var(--font-body);
   --espresso: #3e2723;
   --blue: #0038ae;
   --blue-soft: #89c0ff;

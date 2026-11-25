@@ -1,11 +1,21 @@
-import { fireEvent, render, screen, waitFor, cleanup, renderHook } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  cleanup,
+  renderHook,
+} from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   Form,
   Input,
   Label,
   useConnectionForm,
+  Page,
   useForm,
+  useSetup,
   type Setup,
 } from "@trytilde/connection-ui";
 afterEach(cleanup);
@@ -105,4 +115,58 @@ it("renders JSON Schema secret, boolean, enum and numeric fields without provide
       limit: "3",
     }),
   );
+});
+
+it("takes the host's theme through the setup handshake, and a later change", async () => {
+  // Stands in for BrokeringPage: answers the page's `ready` with a port and the theme.
+  const channel = new MessageChannel();
+  channel.port1.onmessage = ({ data }) =>
+    channel.port1.postMessage({
+      id: data.id,
+      state: { providerName: "Linear", setupInstructions: [], action: { case: "form", value: {} } },
+    });
+  window.addEventListener("message", function ready(event) {
+    if (event.data?.type !== "tilde.setup.ready") return;
+    window.removeEventListener("message", ready);
+    const message = new MessageEvent("message", {
+      source: window,
+      data: {
+        type: "tilde.setup.port",
+        theme: { scheme: "dark", tokens: { accent: "#89c0ff", surface: "#30211d", radius: "2px" } },
+      },
+    });
+    Object.defineProperty(message, "ports", { value: [channel.port2] });
+    window.dispatchEvent(message);
+  });
+  // A provider's own page: it only uses `useSetup` and `Page`.
+  function Provider() {
+    return <Page setup={useSetup()}>fields</Page>;
+  }
+  const root = document.documentElement;
+  const variable = (name: string) => getComputedStyle(root).getPropertyValue(name);
+  try {
+    render(<Provider />);
+    await screen.findByText("Connect Linear to Tilde");
+    expect(root.classList.contains("dark")).toBe(true);
+    expect(variable("--primary")).toBe("#89c0ff");
+    expect(variable("--primary-foreground")).toContain("#89c0ff");
+    expect(variable("--card")).toBe("#30211d");
+    expect(variable("--radius")).toBe("2px");
+
+    // A change replaces the theme: variables of tokens it no longer names go back to the page's.
+    await act(async () => {
+      channel.port1.postMessage({
+        theme: { scheme: "light", tokens: { canvas: "#fffaf0", font: "Inter" } },
+      });
+      await waitFor(() => expect(variable("--background")).toBe("#fffaf0"));
+    });
+    expect(root.classList.contains("dark")).toBe(false);
+    expect(variable("--font-body")).toBe("Inter");
+    expect(variable("--primary")).toBe("");
+    expect(variable("--card")).toBe("");
+  } finally {
+    channel.port1.close();
+    root.removeAttribute("style");
+    root.classList.remove("dark");
+  }
 });

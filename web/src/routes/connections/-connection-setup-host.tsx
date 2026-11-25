@@ -1,4 +1,4 @@
-import { LoadingReveal } from "@trytilde/connection-ui";
+import { LoadingReveal, applyTheme, type Theme } from "@trytilde/connection-ui";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
@@ -37,6 +37,33 @@ export function BrokeringPage({ setupId }: { setupId: string }) {
   }, [state?.uiPath, frameReady]);
   const [error, setError] = useState("");
   const frame = useRef<HTMLIFrameElement>(null);
+  // An embedding page's theme (`tilde.connection.theme`, asked for with `tilde.connection.ready`)
+  // styles this page and is passed on to the provider frame; without one the frame follows this
+  // page's own scheme. A theme is CSS values only, applied as custom properties.
+  const [theme, setTheme] = useState<Theme>(() => ({
+    scheme: document.documentElement.classList.contains("dark") ? "dark" : "light",
+  }));
+  const latestTheme = useRef(theme);
+  latestTheme.current = theme;
+  const providerPort = useRef<MessagePort | undefined>(undefined);
+  useEffect(() => {
+    const embedders = [window.opener, window.parent !== window ? window.parent : null].filter(
+      Boolean,
+    ) as Window[];
+    const receive = (event: MessageEvent) => {
+      const data = event.data;
+      if (!embedders.includes(event.source as Window) || data?.type !== "tilde.connection.theme")
+        return;
+      if (data.theme && typeof data.theme === "object") setTheme(data.theme as Theme);
+    };
+    window.addEventListener("message", receive);
+    for (const embedder of embedders) embedder.postMessage({ type: "tilde.connection.ready" }, "*");
+    return () => window.removeEventListener("message", receive);
+  }, []);
+  useEffect(() => {
+    applyTheme(theme);
+    providerPort.current?.postMessage({ theme });
+  }, [theme]);
   useEffect(() => {
     if (!connectionSetupToken) {
       setError("Missing connection setup token");
@@ -67,6 +94,7 @@ export function BrokeringPage({ setupId }: { setupId: string }) {
       port?.close();
       const channel = new MessageChannel();
       port = channel.port1;
+      providerPort.current = port;
       port.onmessage = async ({ data }) => {
         if (!data || !Number.isSafeInteger(data.id)) return;
         try {
@@ -140,12 +168,17 @@ export function BrokeringPage({ setupId }: { setupId: string }) {
         }
       };
       // Opaque sandbox origins require '*'; transfer is restricted to this exact iframe window.
-      frame.current!.contentWindow!.postMessage({ type: "tilde.setup.port" }, "*", [channel.port2]);
+      frame.current!.contentWindow!.postMessage(
+        { type: "tilde.setup.port", theme: latestTheme.current },
+        "*",
+        [channel.port2],
+      );
     };
     window.addEventListener("message", connect);
     return () => {
       window.removeEventListener("message", connect);
       port?.close();
+      providerPort.current = undefined;
     };
   }, [setupId, connectionSetupToken]);
   useEffect(() => {

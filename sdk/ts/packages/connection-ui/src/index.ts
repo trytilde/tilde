@@ -13,3 +13,6 @@ export { TildeWordmark } from "./wordmark.js";
 export { LoadingReveal } from "./loading-reveal.js";
 
 export { ProviderPage } from "./provider-page.js";
+
+export { applyTheme } from "./theme.js";
+export type { Theme, ThemeTokens } from "@trytilde/sdk/theme";
