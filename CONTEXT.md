@@ -1972,13 +1972,13 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
   (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
   connections and secrets the spec binds (else nothing is bound; a connection the ontology
-  declares optional, `slot(provider, { optional: true })`, may stay unbound and is reported as
+  declares optional, `{ provider, optional: true }`, may stay unbound and is reported as
   skipped: its pipelines do not run until it is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract. A binding is
-  named by its `name`; servers before the rename sent `slot`, which the CLI still reads.
+  named by its `name`.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
   reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
   `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't

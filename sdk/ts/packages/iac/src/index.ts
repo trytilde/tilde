@@ -282,7 +282,7 @@ export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[
  */
 export type OntologyConnections = { readonly [name: string]: { readonly provider: string } };
 /** What one environment of the ontology binds: its connections to the organization's, secret
- * names to secrets. An optional connection (`slot(provider, { optional: true })`) may be left
+ * names to secrets. An optional connection (`{ provider, optional: true }`) may be left
  * out: the environment deploys without it and its pipelines wait until it is bound. */
 export type OntologyEnvironment<C extends OntologyConnections = OntologyConnections> = {
   connections?: { readonly [K in keyof C]?: ConnectionRef<string, C[K]["provider"]> };
@@ -310,25 +310,20 @@ export const ontology = <const C extends OntologyConnections = OntologyConnectio
 ): Ontology<C> => spec;
 const ontologyJson = (spec: Ontology) => ({
   environments: Object.fromEntries(
-    Object.entries(spec.environments).map(([name, env]) => {
-      // A config loaded without type checking may still say `slots`: refuse it rather than drop it.
-      if ("slots" in env)
-        throw new Error(`ontology environment ${name}: "slots" is now "connections"`);
-      return [
-        name,
-        {
-          connections: Object.fromEntries(
-            Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
-              connection ? [[name, ref(connection as ConnectionRef)]] : [],
-            ),
+    Object.entries(spec.environments).map(([name, env]) => [
+      name,
+      {
+        connections: Object.fromEntries(
+          Object.entries(env.connections ?? {}).flatMap(([name, connection]) =>
+            connection ? [[name, ref(connection as ConnectionRef)]] : [],
           ),
-          secrets: Object.fromEntries(
-            Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
-          ),
-          ...(env.live === undefined ? {} : { live: env.live }),
-        },
-      ];
-    }),
+        ),
+        secrets: Object.fromEntries(
+          Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
+        ),
+        ...(env.live === undefined ? {} : { live: env.live }),
+      },
+    ]),
   ),
 });
 
