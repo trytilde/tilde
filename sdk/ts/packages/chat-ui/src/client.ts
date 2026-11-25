@@ -1,5 +1,5 @@
 "use client";
-import { createClient } from "@connectrpc/connect";
+import { Code, ConnectError, createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { ChatService } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 export interface ChatAgent {
@@ -23,19 +23,27 @@ export const chatClient = (proxy: string, agentId: string, send: ChatFetch = wit
 export type ChatClient = ReturnType<typeof chatClient>;
 export const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to load chat";
+/** The agents this user may chat with through `proxy`: `ChatService/ListAgents` at the proxy
+ * itself, which asks every agent it is configured for. */
 export async function listAgents(
   proxy: string,
   signal: AbortSignal,
   send: ChatFetch = withCookies,
 ): Promise<ChatAgent[]> {
-  const response = await send(`${proxy.replace(/\/$/, "")}/agents`, { signal, cache: "no-store" });
-  if (!response.ok) {
-    // A Connect error's own words (`{code, message}`) say why: a sign-in, a refused space.
-    const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
-    if (typeof body?.message === "string" && body.message) throw new Error(body.message);
-    throw new Error(response.status === 401 ? "Sign in to chat" : "Unable to load agents");
+  const client = createClient(
+    ChatService,
+    createConnectTransport({ baseUrl: proxy.replace(/\/$/, ""), useBinaryFormat: true, fetch: send }),
+  );
+  try {
+    const { agents } = await client.listAgents({}, { signal });
+    return agents.map((agent) => ({ id: agent.id, name: agent.name }));
+  } catch (error) {
+    if (signal.aborted) throw error;
+    // A Connect error's own words say why: a sign-in, a refused space.
+    if (error instanceof ConnectError && error.rawMessage) throw new Error(error.rawMessage);
+    const unauthenticated = error instanceof ConnectError && error.code === Code.Unauthenticated;
+    throw new Error(unauthenticated ? "Sign in to chat" : "Unable to load agents");
   }
-  return ((await response.json()) as { agents: ChatAgent[] }).agents;
 }
 // Invalidation only; no user data or credentials live in a global cache.
 export function changed(proxy: string, identity: string) {

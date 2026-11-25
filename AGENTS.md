@@ -11,6 +11,7 @@ Tilde's goal is to be the ubiqutous harness for AI agents. We want to focus on a
 
 - Wrap cloud/on-prem-only code in `CLOUD ONLY`, a description, and `END CLOUD ONLY` comments using the language's comment syntax to guide OSS ports.
 - Prioritise simple code, don't over abstract or over-use traits.
+- ConnectRPC for every API we design; plain HTTP only for third-party webhooks, OAuth/OIDC, OTLP, protocol passthrough proxies, pages/static assets and health checks.
 - Keep PostgreSQL in `queries/` and generate typed bindings with Cornucopia (`task queries:generate`). Domain `db` modules call those bindings; application services own transaction boundaries. Use deadpool and tokio-postgres, not inline SQL or SQLx. Bootstrap migration SQL and ClickHouse SQL live in underscore-prefixed query directories outside Cornucopia.
 - simple light interfaces and traits that can have fat implementations. Traits explain functionality, functionality needs to be simple, trait implementation can be complex
 - Keep `docs/` clean. Add documents there only when explicitly asked. Document implementation details and decisions in the relevant source files. If temporary documents are needed to share context with subagents, delete them when that coordination is finished. This overrides automatic documentation or ADR requirements in skills.

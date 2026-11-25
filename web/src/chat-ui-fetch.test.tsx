@@ -26,13 +26,17 @@ const thread = (member: boolean) =>
     ],
   });
 const posted: { text: string; participantId: string }[] = [];
-/** The proxy: `member` whether the viewer is in the thread yet, `agents` its discovery answer. */
-function proxy({
-  member = true,
-  agents = () => Response.json({ agents: [{ id: "agent", name: "Bug Fixer" }] }),
-}: { member?: boolean; agents?: () => Response } = {}): { send: ChatFetch; seen: string[] } {
+/**
+ * The proxy: `member` whether the viewer is in the thread yet, `agents` an answer to its
+ * discovery (`ChatService/ListAgents` at the proxy itself) instead of the router's.
+ */
+function proxy({ member = true, agents }: { member?: boolean; agents?: () => Response } = {}): {
+  send: ChatFetch;
+  seen: string[];
+} {
   const router = createConnectRouter().service(ChatService, {
     getIdentity: () => ({ user: create(UserSchema, { id: "viewer", name: "You" }) }),
+    listAgents: () => ({ agents: [{ id: "agent", name: "Bug Fixer" }] }),
     listSessions: () => ({ sessions: [create(SessionSchema, { thread: thread(member) })] }),
     getSession: () => ({
       session: create(SessionSchema, { thread: thread(member) }),
@@ -88,7 +92,7 @@ function proxy({
     if (request.headers.get("authorization") !== "Bearer space-token")
       return new Response(null, { status: 401 });
     const path = new URL(request.url).pathname;
-    if (path.endsWith("/agents")) return agents();
+    if (agents && path.endsWith("/ListAgents")) return agents();
     const handler = handlers.find((h) => path.endsWith(h.path));
     return handler ? handler.serve(request) : new Response(null, { status: 404 });
   };

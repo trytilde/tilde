@@ -20,7 +20,7 @@ Read the API key in the agent's Chat Providers → Tilde card. Keys authenticate
 
 `baseUrl` defaults to the hosted API. `baseUrlOverride` replaces the complete agent ingress base URL, including any `/agents/{id}` prefix; it is server configuration, never request input. `mountPath` defaults to `/api/chat`; adapters can instead supply catch-all path segments to `handle(request, path)`.
 
-For a sidebar across agents, replace `apiKey`/`agentId` with `agents: [{agentId,apiKey,baseUrl?}, …]`. Each entry is independently authorized by `resolveIdentity`. `GET /api/chat/agents` returns only authorized agent names/IDs. Connect calls use `/api/chat/{agentId}/tilde.provider.tilde.v1.ChatService/{method}`. A single-agent proxy also accepts the service path directly.
+For a sidebar across agents, replace `apiKey`/`agentId` with `agents: [{agentId,apiKey,baseUrl?}, …]`. Each entry is independently authorized by `resolveIdentity`. `/api/chat/tilde.provider.tilde.v1.ChatService/ListAgents` (ConnectRPC, at the mount itself) returns only the authorized agents, each asked of its own ingress. Other Connect calls use `/api/chat/{agentId}/tilde.provider.tilde.v1.ChatService/{method}`. A single-agent proxy also accepts the service path directly.
 
 Only declared provider RPC methods are forwarded. Browser credentials and identity headers are replaced; cookies stay at the host. Cross-origin browser requests are rejected. Streaming request/response bodies and cancellation pass through without buffering, responses disable caching, and redirects are rejected so credentials cannot follow an upstream redirect. Application authentication and upstream failures do not expose keys or internal error details.
 

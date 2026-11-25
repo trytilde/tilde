@@ -1,0 +1,3 @@
+kind: Changed
+body: "Chat agent discovery is ConnectRPC. `@trytilde/chat-ui` lists the agents through `ChatService/ListAgents` at the proxy itself (`<proxy>/tilde.provider.tilde.v1.ChatService/ListAgents`), and `@trytilde/chat-proxy` (with `@trytilde/chat-next`) and the Python `create_chat_proxy` serve it there, in the caller's codec (Connect's JSON or binary), for every configured agent the user may chat with. `GET <proxy>/agents` is gone: update chat-ui and the proxy together. AGENTS.md now says ConnectRPC is for every API we design, and plain HTTP only for third-party webhooks, OAuth/OIDC, OTLP, protocol passthrough proxies, pages and static assets, and health checks."
+time: 2026-11-26T00:30:00+00:00

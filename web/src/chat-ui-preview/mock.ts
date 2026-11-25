@@ -1,6 +1,7 @@
 /**
  * In-browser chat proxy for the chat-ui preview page. `installMockProxy` patches `window.fetch`
- * so `/preview-chat/agents` and `/preview-chat/<agent>/tilde.provider.tilde.v1.ChatService/*`
+ * so `/preview-chat/tilde.provider.tilde.v1.ChatService/ListAgents` and
+ * `/preview-chat/<agent>/tilde.provider.tilde.v1.ChatService/*`
  * are answered by a real Connect router over fixtures; everything else passes through.
  */
 import { create } from "@bufbuild/protobuf";
@@ -212,8 +213,11 @@ export function installMockProxy() {
     const request = new Request(input, init);
     const url = new URL(request.url);
     if (!url.pathname.startsWith(`${PROXY}/`)) return real(input, init);
-    if (url.pathname === `${PROXY}/agents`) return Response.json({ agents });
-    const [, agentId, ...rest] = url.pathname.slice(PROXY.length).split("/");
+    // Discovery is the proxy's own ListAgents, at its root: every agent.
+    const root = url.pathname === `${PROXY}/${ChatService.typeName}/ListAgents`;
+    const [, agentId, ...rest] = root
+      ? ["", "", ChatService.typeName, "ListAgents"]
+      : url.pathname.slice(PROXY.length).split("/");
     const path = `/${rest.join("/")}`;
     const key = `${agentId}${path}`;
     if (!handlers.has(key)) {

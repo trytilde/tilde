@@ -9,6 +9,7 @@ import pyqwest
 from support import serve_app
 
 from tilde.chat_proxy import CHAT_SERVICE, ChatAgentConfig, create_chat_proxy
+from tilde.provider.tilde.v1 import chat_pb2
 
 
 class Upstream:
@@ -162,8 +163,23 @@ async def test_proxy_forwards_allowed_methods_with_server_identity(served):
     )
     assert ignored.status == 403
 
-    agents = await http.get(f"{base}/agents", headers={"cookie": "session=ok"})
+    # ListAgents at the mount itself, in the caller's codec: Connect's JSON, or binary.
+    list_agents = f"{base}/{CHAT_SERVICE}/ListAgents"
+    agents = await http.post(
+        list_agents,
+        headers={"cookie": "session=ok", "content-type": "application/json"},
+        content=b"{}",
+    )
     assert agents.status == 200 and json.loads(agents.content) == {
         "agents": [{"id": "agent-1", "name": "Helper"}]
     }
+    binary = await http.post(
+        list_agents,
+        headers={"cookie": "session=ok", "content-type": "application/proto"},
+        content=b"",
+    )
+    assert binary.status == 200
+    assert binary.headers["content-type"] == "application/proto"
+    decoded = chat_pb2.ListAgentsResponse.FromString(binary.content)
+    assert [(a.id, a.name) for a in decoded.agents] == [("agent-1", "Helper")]
     assert seen[0] == ("", "agent-1") and seen[1] == ("session=ok", "agent-1")

@@ -16,6 +16,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 import pyqwest
+from google.protobuf import json_format
 
 from tilde.provider.tilde.v1 import chat_pb2
 
@@ -159,8 +160,16 @@ class ChatProxy:
             return await _failure(send, 404, "not_found", "Unknown chat route")
         if any(not part or not _SEGMENT.match(part) or part in (".", "..") for part in path):
             return await _failure(send, 404, "not_found", "Unknown chat route")
-        if path == ["agents"] and request.method == "GET":
-            return await self._list_agents(request, send)
+        if path == [CHAT_SERVICE, "ListAgents"]:
+            # At the mount itself: every configured agent this user may chat with.
+            if request.method != "POST":
+                return await _failure(send, 405, "unimplemented", "Use ConnectRPC POST")
+            content_type = request.headers.get("content-type", "")
+            if not _CONTENT_TYPE.match(content_type):
+                return await _failure(
+                    send, 415, "invalid_argument", "Connect content type required"
+                )
+            return await self._list_agents(request, send, "proto" in content_type)
         agent = None
         if len(path) == 3:
             agent = self._agents.get(path[0])
@@ -200,8 +209,8 @@ class ChatProxy:
                 await send({"type": "http.response.body", "body": bytes(chunk), "more_body": True})
             await send({"type": "http.response.body", "body": b"", "more_body": False})
 
-    async def _list_agents(self, request: ProxyRequest, send) -> None:
-        listed = []
+    async def _list_agents(self, request: ProxyRequest, send, binary: bool) -> None:
+        listed = chat_pb2.ListAgentsResponse()
         for agent_id in self._order:
             agent, base = self._agents[agent_id]
             auth = await self._headers(request, agent_id)
@@ -214,13 +223,24 @@ class ChatProxy:
             )
             if response.status != 200:
                 return await _failure(send, 502, "unavailable", "Chat provider is unavailable")
-            data = json.loads(response.content or b"{}")
-            for entry in data.get("agents", []):
-                if entry.get("id") == agent_id:
-                    listed.append({"id": entry["id"], "name": entry.get("name", "")})
-        if not listed:
+            data = json_format.Parse(
+                response.content or b"{}", chat_pb2.ListAgentsResponse(), ignore_unknown_fields=True
+            )
+            listed.agents.extend(entry for entry in data.agents if entry.id == agent_id)
+        if not listed.agents:
             return await _failure(send, 401, "unauthenticated", "Sign in to chat")
-        await _json(send, 200, {"agents": listed})
+        if binary:
+            body, content_type = listed.SerializeToString(), b"application/proto"
+        else:
+            body, content_type = json_format.MessageToJson(listed).encode(), b"application/json"
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [(b"content-type", content_type), (b"cache-control", b"no-store")],
+            }
+        )
+        await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
 def create_chat_proxy(
