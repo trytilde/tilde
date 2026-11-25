@@ -12,6 +12,7 @@ import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
 
 import { createConnectionSetupClient } from "@trytilde/sdk/connection-setup";
 import { applyTheme } from "./theme.js";
+import { readPrefill } from "./prefill.js";
 // Iframe widths stay narrow even on desktop, so use the primary input's capabilities.
 const continueClass =
   "h-11 w-full gap-2 px-5 [@media(hover:hover)_and_(pointer:fine)]:h-12 [@media(hover:hover)_and_(pointer:fine)]:w-auto [@media(hover:hover)_and_(pointer:fine)]:px-6 [@media(hover:hover)_and_(pointer:fine)]:text-base";
@@ -33,10 +34,13 @@ export function useSetup() {
       const updated = await operation(client.current);
       latest.current = updated;
       if (!nameInitialized.current) {
-        // StartConnection uses the provider title as a temporary name until this form is filled.
+        // StartConnection uses the provider title as a temporary name until this form is filled;
+        // a `name` in the page's URL (see prefill.ts) replaces only that placeholder.
         accountNameForm.setValue(
           "name",
-          updated.connectionName === updated.providerName ? "" : updated.connectionName,
+          updated.connectionName === updated.providerName
+            ? (readPrefill(window.location.search).name ?? "")
+            : updated.connectionName,
         );
         nameInitialized.current = true;
       }

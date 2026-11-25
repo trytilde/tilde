@@ -1,4 +1,10 @@
-import { LoadingReveal, applyTheme, type Theme } from "@trytilde/connection-ui";
+import {
+  LoadingReveal,
+  applyTheme,
+  readPrefill,
+  withPrefill,
+  type Theme,
+} from "@trytilde/connection-ui";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
@@ -23,6 +29,11 @@ export function BrokeringPage({ setupId }: { setupId: string }) {
       history.replaceState(null, "", url.pathname + url.search);
     }
     return supplied ?? sessionStorage.getItem(key) ?? "";
+  });
+  // The prefill the link carries goes on to the provider page (the setup's type is fixed by now).
+  const [prefill] = useState(() => {
+    const { name, fields } = readPrefill(window.location.search);
+    return { name, fields };
   });
   const [state, setState] = useState<Brokering>();
   const [frameReady, setFrameReady] = useState(false);
@@ -213,7 +224,7 @@ export function BrokeringPage({ setupId }: { setupId: string }) {
         <iframe
           ref={frame}
           title="Connection setup"
-          src={state.uiPath}
+          src={withPrefill(state.uiPath, prefill)}
           referrerPolicy="no-referrer"
           sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
           style={{ width: "100%", height: "100dvh", border: 0, display: "block" }}

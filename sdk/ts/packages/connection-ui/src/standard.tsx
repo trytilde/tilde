@@ -3,6 +3,7 @@ import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
 import { Page, Form, useSetup, useConnectionForm, type Setup } from "./setup.js";
 import { Input } from "./components/input.js";
 import { Label, Textarea, NativeSelect } from "./components/controls.js";
+import { readPrefill, secretKey } from "./prefill.js";
 
 type Property = {
   type: "string" | "boolean" | "integer" | "number";
@@ -34,6 +35,13 @@ function encode(property: Property, value: string | boolean | number) {
     return "";
   }
 }
+/** A URL prefill value as a form value, or nothing when it is not one of the field's choices. */
+function prefilled(property: Property, value: string) {
+  const choices = property.enum ?? (property.type === "boolean" ? [true, false] : undefined);
+  if (!choices) return value;
+  const choice = choices.find((choice) => String(choice) === value);
+  return choice === undefined ? undefined : encode(property, choice);
+}
 function decode(property: Property, value: string) {
   return property.enum ? String(JSON.parse(value)) : value;
 }
@@ -45,12 +53,20 @@ export function CredentialForm({ setup, state }: { setup: Setup; state: Brokerin
   );
   const entries = Object.entries(schema.properties);
   const required = new Set(schema.required ?? []);
+  // URL prefill (prefill.ts) over schema defaults, never for write-only or secret-looking fields;
+  // saved drafts are applied after and win.
+  const fields = useMemo(() => readPrefill(window.location.search).fields ?? {}, []);
   const defaults = Object.fromEntries(
-    entries.flatMap(([, property], index) =>
-      property.default === undefined
+    entries.flatMap(([key, property], index) => {
+      const value =
+        fields[key] !== undefined && !property.writeOnly && !secretKey(key)
+          ? prefilled(property, fields[key])
+          : undefined;
+      if (value !== undefined) return [[`field_${index}`, value]];
+      return property.default === undefined
         ? []
-        : [[`field_${index}`, encode(property, property.default)]],
-    ),
+        : [[`field_${index}`, encode(property, property.default)]];
+    }),
   );
   const form = useConnectionForm(defaults);
   useEffect(() => {

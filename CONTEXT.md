@@ -100,6 +100,11 @@ static/OAuth definitions need no remote state machine. The browser SDK subpath
 `@trytilde/connection-ui` contains the React setup hooks, Tailwind theme and small
 shadcn-style control set. Provider credential forms use React Hook Form; providers
 still author their own TSX and interactions. No per-provider HTML source is required.
+Setup prefill (`prefill.ts` in connection-ui, the same contract as Tilde Cloud's console): a
+setup URL may carry `type`, `name` and `field.<key>` values, all still editable. The brokering
+page forwards `name` and `field.*` to the provider iframe; `useSetup` uses `name` only over the
+provider's placeholder name and `CredentialForm` fills schema fields under saved drafts. Secrets
+never come from a URL: secret-looking keys are dropped and write-only fields are skipped.
 Connection setup tokens expire after ten minutes. Startup cleanup and a periodic
 Tokio task purge expired setup rows, including completed sessions, and cascade-delete
 their drafts and staged values without touching working connection credentials.
