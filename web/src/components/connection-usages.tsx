@@ -14,10 +14,7 @@ const KINDS: Record<string, string> = {
   memory_synthesis: "Memory synthesis",
 };
 
-/**
- * What uses a connection: it cannot be disconnected until each is removed. A use without a name
- * is one the viewer may not see.
- */
+/** What uses a connection: it cannot be disconnected until each is removed. */
 export function ConnectionUsages({ usages }: { usages: ConnectionUsage[] }) {
   return (
     <ul aria-label="In use by" className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">
@@ -30,9 +27,7 @@ export function ConnectionUsages({ usages }: { usages: ConnectionUsage[] }) {
             {KINDS[usage.kind] ?? usage.kind}
           </Badge>
           <span className="truncate font-medium">
-            {usage.name || (
-              <span className="font-normal text-muted-foreground">Hidden from you</span>
-            )}
+            {usage.name}
           </span>
           {usage.detail && <span className="truncate text-muted-foreground">{usage.detail}</span>}
         </li>

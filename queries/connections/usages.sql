@@ -4,15 +4,14 @@
 -- disconnected or deleted. `kind`: `agent` (an assignment; `detail` its capability),
 -- `personal_agent` (an agent a personal connection allows), `tool_source` (an agent's;
 -- `detail` its slug), `sandbox_tool_source` (a sandbox blueprint's; `detail` its slug),
--- `routine` (fired by the connection's signals; `detail` its agent and signal), `sandbox_blueprint`, `sandbox` (a live sandbox on it its blueprint no longer names;
--- `detail` its status), `sandbox_egress` (a blueprint's egress grant; `detail` its slug),
+-- `routine` (fired by the connection's signals; `detail` its agent and signal),
+-- `sandbox_blueprint`, `sandbox` (one on it its blueprint no longer names; `detail` its status), `sandbox_egress` (a blueprint's egress grant; `detail` its slug),
 -- `memory` (the memory embeddings; `detail` the model), `memory_synthesis` (a bank's; `detail`
 -- the model).
 -- Not uses: what the connection owns (values, tools, skills, grants), history (chat, audit,
 -- inference requests), queues (ingress outbox, tool host calls) and an assignment's inference
 -- budget (a spend policy; the connection row is never deleted by a disconnect).
--- `resource_kind`/`resource_id` name the resource whose roles decide who may see the use (none:
--- everyone).
+-- `resource_kind`/`resource_id` name the resource the use belongs to.
 --! run (ids) : Record
 SELECT u.connection_id,u.kind,u.id,u.name,u.detail,u.resource_kind,u.resource_id
 FROM (
