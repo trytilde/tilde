@@ -7,7 +7,7 @@ use crate::{api::Client, discover, project::Project, registry};
 use anyhow::{Result, bail};
 use clap::Args;
 use serde_json::json;
-use std::{collections::BTreeSet, env, path::PathBuf};
+use std::{env, path::PathBuf};
 use tilde_contracts::proto::tilde::management::v1 as wire;
 use tilde_contracts::proto::tilde::types::v1 as types;
 
@@ -108,38 +108,39 @@ pub fn ci_metadata() -> wire::RegisterDeploymentRequest {
 }
 
 /// Check everything before changing anything (the ontologies' preflight and, when agents follow,
-/// a dry-run Apply whose tools on the project's ontology connections are checked against the
-/// compiled handlers, since a new environment serves none yet), then deploy the ontologies. The
-/// actions that blocked it, if any, in which case nothing changed, and the compiled handlers.
+/// a dry-run Apply that names the environments the deploy creates and whose uses of the project's
+/// ontology connections are checked against the compiled ontologies, since a new environment
+/// serves nothing yet), then deploy the ontologies. The actions that blocked it, if any, in which
+/// case nothing changed, and what the ontologies offer.
 pub async fn ontologies_first(
     args: &Deploy,
     declarations: &discover::Declarations,
     specs: bool,
-) -> Result<(Vec<crate::ontology::Action>, BTreeSet<String>)> {
+) -> Result<(Vec<crate::ontology::Action>, crate::ontology::Offered)> {
     let agents = specs && args.only.is_none();
     // A project the deploy creates belongs to the deploy's team, as its agents do.
     let team = args.team.as_deref().or(declarations.team.as_deref());
-    let (mut actions, plan, mut served) =
+    let (mut actions, plan, mut offered) =
         crate::ontology::prepare(args, &declarations.ontologies, team, agents).await?;
-    // Only all of the project's ontologies say which tools their connections serve: a selection
-    // that leaves some out has nothing to check against.
+    // Only all of the project's ontologies say what their connections offer: a selection that
+    // leaves some out has nothing to check against.
     if declarations
         .ontologies
         .keys()
         .any(|name| !args.ontology.is_empty() && !args.ontology.contains(name))
     {
-        served.clear();
+        offered.compiled = None;
     }
-    // A dry run's Apply comes after (`apply::run`), with these handlers.
+    // A dry run's Apply comes after (`apply::run`), with these.
     if agents && !args.dry_run {
-        actions.extend(crate::apply::preflight(args, declarations, &served).await?);
+        actions.extend(crate::apply::preflight(args, declarations, &offered).await?);
     }
     if actions.is_empty()
         && let Some(plan) = plan
     {
         crate::ontology::execute(args, plan).await?;
     }
-    Ok((actions, served))
+    Ok((actions, offered))
 }
 
 pub async fn run(args: Deploy) -> Result<()> {
@@ -167,10 +168,10 @@ pub async fn run(args: Deploy) -> Result<()> {
             "--check builds a project's ontologies, and this one declares none (defineProject({{ ontologies }}))"
         );
     }
-    let mut served = BTreeSet::new();
+    let mut offered = crate::ontology::Offered::default();
     if only != Some("agents") && !declarations.ontologies.is_empty() {
         let actions;
-        (actions, served) = ontologies_first(&args, &declarations, specs).await?;
+        (actions, offered) = ontologies_first(&args, &declarations, specs).await?;
         if !actions.is_empty() {
             let base = args.url.as_deref().unwrap_or_default();
             eprint!("{}", crate::ontology::render(&actions, base));
@@ -202,7 +203,7 @@ pub async fn run(args: Deploy) -> Result<()> {
     // An entry exporting `@trytilde/iac` specs is applied whole; otherwise the deployment alone
     // is registered, as before specs existed.
     if specs {
-        return crate::apply::run(&args, &declarations, &served).await;
+        return crate::apply::run(&args, &declarations, &offered).await;
     }
     let target = args.target.as_deref().unwrap_or("gateway");
     if (target == "lambda") != args.function_arn.is_some() {

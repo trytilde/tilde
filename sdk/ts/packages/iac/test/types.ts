@@ -37,3 +37,34 @@ ontology<Connections>({
   // @ts-expect-error no such connection
   environments: { production: { connections: { gitlab: github.ref("faroai") } } },
 });
+
+// An ontology signal (`@trytilde/ontology`'s `SignalRef`) keys a routine's filters by its data;
+// a routine on it still belongs in an agent's routines.
+import { defineAgent, routine, tildeOntology } from "../src/index.js";
+type StageRequestCreated = {
+  readonly kind: "signal";
+  readonly object: string;
+  readonly change: "created" | "updated" | "deleted";
+  readonly type: string;
+  readonly $data: { requestKey: string; stage: "triage" | "fix" };
+};
+declare const stageRequestCreated: StageRequestCreated;
+const production = tildeOntology.environment("factory", "production");
+const triage = routine({
+  name: "Triage",
+  prompt: "{{ requestKey }}",
+  signal: { connection: production, type: stageRequestCreated, filters: { stage: ["triage"] } },
+});
+defineAgent({ key: "triage", name: "Triage", routines: [triage] });
+routine({
+  name: "Typo",
+  prompt: "",
+  // @ts-expect-error the signal's data has no `stag`
+  signal: { connection: production, type: stageRequestCreated, filters: { stag: ["triage"] } },
+});
+// A plain type id takes any filter key, as before.
+routine({
+  name: "Plain",
+  prompt: "",
+  signal: { connection: production, type: "x.y", filters: { any: [] } },
+});

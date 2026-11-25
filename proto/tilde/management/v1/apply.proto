@@ -34,7 +34,16 @@ message ApplyRequest {
   // People of the apply's team (`defineTeam`); agent specs may declare more. See UserSpec.
   repeated UserSpec users = 9;
   repeated GroupSpec groups = 10;
+  // Ontology environments the same deploy creates before it applies (Tilde Cloud). Each gets a
+  // connection of its own with it, `tilde_ontology/<project>-<environment>`, which cannot exist
+  // while the deploy is still asking whether anything blocks it: a dry run takes a reference to
+  // one as satisfied and leaves its tools and signals unchecked (the client has the compiled
+  // ontology). An apply that is not a dry run ignores them: the connection must exist by then.
+  repeated OntologyEnvironmentRef new_ontology_environments = 11;
 }
+
+// An ontology environment by its project's and its own name.
+message OntologyEnvironmentRef { string project = 1; string environment = 2; }
 
 // A connection by slug (`provider/name`, for example `github/acme`), optionally of one type.
 message ConnectionRef { string slug = 1; optional string type = 2; }

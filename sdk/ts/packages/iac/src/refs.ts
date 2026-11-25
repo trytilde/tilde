@@ -90,6 +90,26 @@ export const connection = {
   ): ConnectionRef<ToolsOf<Slug>, ProviderOf<Slug>> => ref(slug, options.type),
 };
 
+/**
+ * An ontology environment's own connection (Tilde Cloud), `tilde_ontology/<project>-<environment>`:
+ * made with the environment, it serves the ontology's tools and offers its signals to routines.
+ * `tilde deploy` creates the environment before it applies the agents, so a first deploy needs
+ * nothing set up by hand. The slug's tools are typed once `tilde iac types` has generated it.
+ */
+export const tildeOntology = {
+  environment: <Project extends string, Environment extends string>(
+    project: Project,
+    environment: Environment,
+  ): ConnectionRef<ToolsOf<`tilde_ontology/${Project}-${Environment}`>, "tilde_ontology"> => {
+    for (const name of [project, environment])
+      if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(name))
+        throw new Error(
+          `Ontology environment ${project}/${environment}: ${name} is not lowercase letters, digits and dashes`,
+        );
+    return ref(`tilde_ontology/${project}-${environment}`);
+  },
+};
+
 /** A typed provider of the catalog: `github.ref("acme")` is the connection `github/acme`. */
 export function catalogProvider<
   Tool extends string,

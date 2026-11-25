@@ -11,7 +11,7 @@
  */
 import type { ConnectionRef, RemovedSource, ToolSelection } from "./refs.js";
 
-export { ALL, connection, catalogProvider } from "./refs.js";
+export { ALL, connection, catalogProvider, tildeOntology } from "./refs.js";
 export type { All, ConnectionRef, Connections, RemovedSource, ToolSelection } from "./refs.js";
 // Typed catalog providers, generated: rerun `task iac:catalog` when the provider catalog changes.
 export * from "./catalog.js";
@@ -84,19 +84,35 @@ export const secret = {
   },
 };
 
-export type Routine = {
+/**
+ * A signal an ontology declares, as `@trytilde/ontology`'s `signal(Order, "created")` returns it:
+ * its `type`, `tilde_ontology.<object id>.<change>`, offered by each environment's own connection
+ * (`tildeOntology.environment(...)`), and at the type level its data, which the routine's filters
+ * and templates name.
+ */
+export type SignalRef<Data = Record<string, unknown>> = {
+  readonly type: string;
+  readonly $data: Data;
+};
+
+export type Routine<Data = Record<string, unknown>> = {
   /** The routine's key within its agent. */
   name: string;
   prompt: string;
   threadTitle?: string;
   /** A five-field UTC cron expression; or `signal`. */
   cron?: string;
-  signal?: { connection: ConnectionRef; type: string; filters?: Record<string, string[]> };
+  signal?: {
+    connection: ConnectionRef;
+    /** The signal's type id, or an ontology's {@link SignalRef}, whose data keys the filters. */
+    type: string | SignalRef<Data>;
+    filters?: { readonly [K in keyof Data & string]?: string[] };
+  };
   /** Absent: created disabled, then left to people. */
   enabled?: boolean;
   delete?: boolean;
 };
-export const routine = (spec: Routine): Routine => spec;
+export const routine = <Data = Record<string, unknown>>(spec: Routine<Data>): Routine<Data> => spec;
 
 /**
  * A chat channel the agent answers on: a channel connection (`googleChat.ref("support")`), or
@@ -381,7 +397,8 @@ function routineJson(spec: Routine) {
           trigger: {
             signal: {
               connection: ref(spec.signal.connection),
-              signalType: spec.signal.type,
+              signalType:
+                typeof spec.signal.type === "string" ? spec.signal.type : spec.signal.type.type,
               filters: Object.entries(spec.signal.filters ?? {}).map(([key, values]) => ({
                 key,
                 values,

@@ -20,6 +20,7 @@ import {
   openai,
   routine,
   secret,
+  tildeOntology,
   defineTeam,
   grant,
   group,
@@ -132,6 +133,41 @@ test("refs and routines refuse what the server would", () => {
     () => defineAgent({ key: "a", name: "A", routines: [routine({ name: "R", prompt: "P" })] }),
     /exactly one of cron and signal/,
   );
+});
+
+test("a routine on an ontology's signal, from its environment's own connection", () => {
+  const production = tildeOntology.environment("factory", "production");
+  assert.equal(production.slug, "tilde_ontology/factory-production");
+  assert.equal(production.provider, "tilde_ontology");
+  assert.throws(() => tildeOntology.environment("factory", "Production"), /lowercase/);
+  // What `@trytilde/ontology`'s `signal(StageRequest, "created")` returns.
+  const stageRequestCreated = {
+    kind: "signal",
+    object: "StageRequest",
+    change: "created",
+    type: "tilde_ontology.stage_request.created",
+  };
+  const agent = defineAgent({
+    key: "triage",
+    name: "Triage",
+    tools: [production.tools("listRequests")],
+    routines: [
+      routine({
+        name: "Triage",
+        prompt: "{{ key }}",
+        signal: {
+          connection: production,
+          type: stageRequestCreated,
+          filters: { stage: ["triage"] },
+        },
+      }),
+    ],
+  });
+  const parsed = fromJson(AgentSpecSchema, agent.json);
+  const signal = parsed.routines[0].trigger.kind.value;
+  assert.equal(signal.connection.slug, "tilde_ontology/factory-production");
+  assert.equal(signal.signalType, "tilde_ontology.stage_request.created");
+  assert.equal(signal.filters[0].key, "stage");
 });
 
 test("people: a team's users and groups, and an agent's own with its grants", () => {

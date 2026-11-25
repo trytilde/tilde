@@ -216,6 +216,7 @@ pub mod __buffa {
         reg.register_json_any(super::__MCP_SERVER_HEALTH_JSON_ANY);
         reg.register_json_any(super::__LIST_MCP_SERVER_HEALTH_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__APPLY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ONTOLOGY_ENVIRONMENT_REF_JSON_ANY);
         reg.register_json_any(super::__CONNECTION_REF_JSON_ANY);
         reg.register_json_any(super::__AGENT_SPEC_JSON_ANY);
         reg.register_json_any(super::__CHANNEL_SPEC_JSON_ANY);
@@ -1075,6 +1076,10 @@ pub use self::__buffa::view::ListMcpServerHealthResponseOwnedView;
 pub use self::__buffa::view::ApplyRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ApplyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OntologyEnvironmentRefView;
+#[doc(inline)]
+pub use self::__buffa::view::OntologyEnvironmentRefOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ConnectionRefView;
 #[doc(inline)]

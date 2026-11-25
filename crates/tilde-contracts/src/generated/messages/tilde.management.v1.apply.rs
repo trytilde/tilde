@@ -1012,6 +1012,20 @@ pub struct ApplyRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub groups: ::buffa::alloc::vec::Vec<GroupSpec>,
+    /// Ontology environments the same deploy creates before it applies (Tilde Cloud). Each gets a
+    /// connection of its own with it, `tilde_ontology/<project>-<environment>`, which cannot exist
+    /// while the deploy is still asking whether anything blocks it: a dry run takes a reference to
+    /// one as satisfied and leaves its tools and signals unchecked (the client has the compiled
+    /// ontology). An apply that is not a dry run ignores them: the connection must exist by then.
+    ///
+    /// Field 11: `new_ontology_environments`
+    #[serde(
+        rename = "newOntologyEnvironments",
+        alias = "new_ontology_environments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub new_ontology_environments: ::buffa::alloc::vec::Vec<OntologyEnvironmentRef>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1029,6 +1043,7 @@ impl ::core::fmt::Debug for ApplyRequest {
             .field("commit_author", &self.commit_author)
             .field("users", &self.users)
             .field("groups", &self.groups)
+            .field("new_ontology_environments", &self.new_ontology_environments)
             .finish()
     }
 }
@@ -1156,6 +1171,14 @@ impl ::buffa::Message for ApplyRequest {
                 += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        for v in &self.new_ontology_environments {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1206,6 +1229,14 @@ impl ::buffa::Message for ApplyRequest {
         for v in &self.groups {
             ::buffa::types::put_len_delimited_header(
                 10u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        for v in &self.new_ontology_environments {
+            ::buffa::types::put_len_delimited_header(
+                11u32,
                 u64::from(__cache.consume_next()),
                 buf,
             );
@@ -1332,6 +1363,18 @@ impl ::buffa::Message for ApplyRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.groups.push(elem);
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.new_ontology_environments.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1350,6 +1393,7 @@ impl ::buffa::Message for ApplyRequest {
         self.commit_author = ::core::option::Option::None;
         self.users.clear();
         self.groups.clear();
+        self.new_ontology_environments.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1380,6 +1424,155 @@ pub const __APPLY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     type_url: "type.googleapis.com/tilde.management.v1.ApplyRequest",
     to_json: ::buffa::type_registry::any_to_json::<ApplyRequest>,
     from_json: ::buffa::type_registry::any_from_json::<ApplyRequest>,
+    is_wkt: false,
+};
+/// An ontology environment by its project's and its own name.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OntologyEnvironmentRef {
+    /// Field 1: `project`
+    #[serde(
+        rename = "project",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub project: ::buffa::alloc::string::String,
+    /// Field 2: `environment`
+    #[serde(
+        rename = "environment",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub environment: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OntologyEnvironmentRef {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OntologyEnvironmentRef")
+            .field("project", &self.project)
+            .field("environment", &self.environment)
+            .finish()
+    }
+}
+impl OntologyEnvironmentRef {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.OntologyEnvironmentRef";
+}
+::buffa::impl_default_instance!(OntologyEnvironmentRef);
+impl ::buffa::MessageName for OntologyEnvironmentRef {
+    const PACKAGE: &'static str = "tilde.management.v1";
+    const NAME: &'static str = "OntologyEnvironmentRef";
+    const FULL_NAME: &'static str = "tilde.management.v1.OntologyEnvironmentRef";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.management.v1.OntologyEnvironmentRef";
+}
+impl ::buffa::Message for OntologyEnvironmentRef {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.project.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.project) as u64;
+        }
+        if !self.environment.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.environment) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.project.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.project, buf);
+        }
+        if !self.environment.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.environment, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.project, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.environment, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.project.clear();
+        self.environment.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OntologyEnvironmentRef {
+    const PROTO_FQN: &'static str = "tilde.management.v1.OntologyEnvironmentRef";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OntologyEnvironmentRef {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ONTOLOGY_ENVIRONMENT_REF_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.management.v1.OntologyEnvironmentRef",
+    to_json: ::buffa::type_registry::any_to_json::<OntologyEnvironmentRef>,
+    from_json: ::buffa::type_registry::any_from_json::<OntologyEnvironmentRef>,
     is_wkt: false,
 };
 /// A connection by slug (`provider/name`, for example `github/acme`), optionally of one type.

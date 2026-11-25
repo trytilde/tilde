@@ -3,7 +3,7 @@
 //! or, with `--json`, the response as protobuf JSON.
 //!
 //! Exit codes: 0 applied or planned, 1 an error, 2 blocked by preflight (nothing was applied).
-use crate::{api::Client, deploy::Deploy, discover::Declarations};
+use crate::{api::Client, deploy::Deploy, discover::Declarations, ontology::Offered};
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use std::fmt::Write as _;
@@ -144,44 +144,85 @@ async fn apply(client: &Client, request: wire::ApplyRequest) -> Result<wire::App
         .into_owned())
 }
 
-/// The server lists an ontology connection's tools from the running ontology, so before this
-/// project's ontologies roll out (a new environment's first above all) it reports the tools it
-/// can't find there. With the project's compiled handlers at hand (`served`, from
-/// `ontology::prepare`), each such finding on a `tilde_ontology/...` connection gives way to a
-/// check of that source's tools against them. A connection whose tools the server did list (say,
-/// another project's running ontology) keeps the server's word. Without handlers (`--only
-/// agents`, `--ontology` choosing some, an ontology that does not compile) the server's findings
-/// stand as they are.
-pub(crate) fn with_ontology_tools(
+/// The server lists an ontology connection's tools and signals from the running ontology, so
+/// before this project's ontologies roll out it cannot vouch for what a new version adds, and a
+/// connection of an environment this deploy creates does not exist yet: the dry run names those
+/// environments (`new_ontology_environments`) and the server takes their uses as written. With
+/// the compiled ontologies at hand (`offered.compiled`, from `ontology::prepare`), the CLI checks
+/// them instead:
+///
+/// - tools: on a `tilde_ontology/...` connection the server found wanting (`ToolNotOffered`), or
+///   of a created environment, every named tool against the compiled handlers;
+/// - signals: of a routine on one of the project's own environment connections
+///   (`tilde_ontology/<ontology>-<environment>`, the only connections an ontology's signals come
+///   from) that the server found not offered (`SignalNotOffered`), or of a created environment,
+///   against the signals the compiled IRs declare.
+///
+/// A connection the server did vouch for (another project's running ontology) keeps the server's
+/// word. Without the compiled ontologies (`--only agents`, `--ontology` choosing some, a new
+/// project) the server's findings stand as they are.
+pub(crate) fn with_ontologies(
     actions: Vec<wire::RequiredAction>,
     declarations: &Declarations,
-    served: &std::collections::BTreeSet<String>,
+    offered: &Offered,
 ) -> Vec<wire::RequiredAction> {
-    if served.is_empty() {
+    use std::collections::{BTreeMap, BTreeSet};
+    let Some(compiled) = &offered.compiled else {
         return actions;
-    }
-    let unlisted = |a: &wire::RequiredAction| {
-        a.code.as_known() == Some(wire::RequiredActionCode::ToolNotOffered)
-            && a.subject.contains("/tools/tilde_ontology/")
     };
-    let subjects: std::collections::BTreeSet<String> = actions
+    let slug = crate::ontology::connection_slug;
+    let created: BTreeSet<String> = offered.created.iter().map(|(o, e)| slug(o, e)).collect();
+    let own: BTreeSet<String> = declarations
+        .ontologies
         .iter()
-        .filter(|a| unlisted(a))
+        .flat_map(|(o, spec)| spec.environments.keys().map(move |e| slug(o, e)))
+        .collect();
+    // Each signal routine's subject (as the server names it), with its connection and type.
+    let mut routines = BTreeMap::new();
+    for agent in &declarations.agents {
+        let key = agent["key"].as_str().unwrap_or_default();
+        for routine in agent["routines"].as_array().into_iter().flatten() {
+            let signal = &routine["trigger"]["signal"];
+            if routine["delete"] == true || !signal.is_object() {
+                continue;
+            }
+            let name = routine["name"].as_str().unwrap_or_default();
+            routines.insert(
+                format!("{key}/routines/{name}"),
+                (
+                    signal["connection"]["slug"].as_str().unwrap_or_default(),
+                    signal["signalType"].as_str().unwrap_or_default(),
+                ),
+            );
+        }
+    }
+    let checked_here = |a: &wire::RequiredAction| match a.code.as_known() {
+        Some(wire::RequiredActionCode::ToolNotOffered) => {
+            a.subject.contains("/tools/tilde_ontology/")
+        }
+        Some(wire::RequiredActionCode::SignalNotOffered) => routines
+            .get(&a.subject)
+            .is_some_and(|(slug, _)| own.contains(*slug)),
+        _ => false,
+    };
+    let subjects: BTreeSet<String> = actions
+        .iter()
+        .filter(|a| checked_here(a))
         .map(|a| a.subject.clone())
         .collect();
     let mut kept: Vec<wire::RequiredAction> =
-        actions.into_iter().filter(|a| !unlisted(a)).collect();
+        actions.into_iter().filter(|a| !checked_here(a)).collect();
     for agent in &declarations.agents {
         let key = agent["key"].as_str().unwrap_or_default();
         for source in agent["tools"].as_array().into_iter().flatten() {
             let slug = source["connection"]["slug"].as_str().unwrap_or_default();
             let subject = format!("{key}/tools/{slug}");
-            if !subjects.contains(&subject) {
+            if !subjects.contains(&subject) && !created.contains(slug) {
                 continue;
             }
             for name in source["tools"].as_array().into_iter().flatten() {
                 let name = name.as_str().unwrap_or_default();
-                if name != "*" && !served.contains(name) {
+                if name != "*" && !compiled.tools.contains(name) {
                     kept.push(wire::RequiredAction {
                         code: wire::RequiredActionCode::ToolNotOffered.into(),
                         subject: subject.clone(),
@@ -192,16 +233,71 @@ pub(crate) fn with_ontology_tools(
             }
         }
     }
+    for (subject, (slug, signal_type)) in &routines {
+        if !subjects.contains(subject) && !created.contains(*slug) {
+            continue;
+        }
+        if let Some(message) = undeclared_signal(compiled, signal_type) {
+            kept.push(wire::RequiredAction {
+                code: wire::RequiredActionCode::SignalNotOffered.into(),
+                subject: subject.clone(),
+                message,
+                ..Default::default()
+            });
+        }
+    }
     kept
 }
 
+/// Why the compiled ontologies offer no signal `signal_type`
+/// (`tilde_ontology.<object id>.<change>`), naming the object and what is declared.
+fn undeclared_signal(compiled: &crate::ontology::Compiled, signal_type: &str) -> Option<String> {
+    let declared = |object: &str| -> Vec<String> {
+        compiled.signals[object]
+            .iter()
+            .map(|change| format!("tilde_ontology.{object}.{change}"))
+            .collect()
+    };
+    let every: Vec<String> = compiled.signals.keys().flat_map(|o| declared(o)).collect();
+    let every = match every.is_empty() {
+        true => "none".to_owned(),
+        false => every.join(", "),
+    };
+    let Some((object, change)) = signal_type
+        .strip_prefix("tilde_ontology.")
+        .and_then(|rest| rest.rsplit_once('.'))
+    else {
+        return Some(format!(
+            "{signal_type} is not an ontology signal (tilde_ontology.<object id>.<created|updated|deleted>); the project's ontologies declare: {every}"
+        ));
+    };
+    let Some(changes) = compiled.signals.get(object) else {
+        return Some(format!(
+            "The project's ontologies have no object {object}, so no signal {signal_type}; they declare: {every}"
+        ));
+    };
+    if changes.iter().any(|c| c == change) {
+        return None;
+    }
+    Some(match changes.is_empty() {
+        true => format!(
+            "Object {object} declares no signals; add `signals: [\"{change}\"]` to it for {signal_type}"
+        ),
+        false => format!(
+            "Object {object} declares no {change} signal; it declares {}",
+            declared(object).join(", ")
+        ),
+    })
+}
+
 /// The actions that would block applying the specs, from a dry run: `tilde deploy` asks before
-/// it changes anything (its ontologies included), so a blocked deploy changed nothing. Tools on
-/// the project's ontology connections are checked against `served`, the compiled handlers.
+/// it changes anything (its ontologies included), so a blocked deploy changed nothing. The
+/// request names the environments the deploy creates, and uses of the project's ontology
+/// connections are checked against the compiled ontologies (`with_ontologies`).
 pub async fn preflight(
     args: &Deploy,
     declarations: &Declarations,
-    served: &std::collections::BTreeSet<String>,
+    offered: &Offered,
 ) -> Result<Vec<crate::ontology::Action>> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
@@ -209,9 +305,10 @@ pub async fn preflight(
     let client = Client::new(url, args.api_key.clone())?;
     let mut request = request(args, declarations)?;
     request.dry_run = true;
+    request.new_ontology_environments = new_environments(offered);
     let response = apply(&client, request).await?;
     Ok(
-        with_ontology_tools(response.required_actions, declarations, served)
+        with_ontologies(response.required_actions, declarations, offered)
             .into_iter()
             .map(|a| crate::ontology::Action {
                 subject: a.subject,
@@ -222,13 +319,21 @@ pub async fn preflight(
     )
 }
 
-/// Apply the specs. A dry run's plan checks the tools on the project's ontology connections
-/// against `served`, the compiled handlers, as `preflight` does.
-pub async fn run(
-    args: &Deploy,
-    declarations: &Declarations,
-    served: &std::collections::BTreeSet<String>,
-) -> Result<()> {
+fn new_environments(offered: &Offered) -> Vec<wire::OntologyEnvironmentRef> {
+    offered
+        .created
+        .iter()
+        .map(|(project, environment)| wire::OntologyEnvironmentRef {
+            project: project.clone(),
+            environment: environment.clone(),
+            ..Default::default()
+        })
+        .collect()
+}
+
+/// Apply the specs. A dry run (its ontologies not deployed) names the environments the deploy
+/// would create and checks uses of the project's ontology connections, as `preflight` does.
+pub async fn run(args: &Deploy, declarations: &Declarations, offered: &Offered) -> Result<()> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
     };
@@ -238,7 +343,10 @@ pub async fn run(
     } else {
         bundles(declarations)?
     };
-    let request = request_with(args, declarations, &bundles)?;
+    let mut request = request_with(args, declarations, &bundles)?;
+    if args.dry_run {
+        request.new_ontology_environments = new_environments(offered);
+    }
     let deploying = request
         .agents
         .iter()
@@ -246,8 +354,8 @@ pub async fn run(
         .count();
     let dial_in = dial_in(&request);
     let mut response = apply(&client, request).await?;
-    if args.dry_run && !served.is_empty() {
-        let actions = with_ontology_tools(response.required_actions, declarations, served);
+    if args.dry_run && offered.compiled.is_some() {
+        let actions = with_ontologies(response.required_actions, declarations, offered);
         response.outcome = if actions.is_empty() {
             wire::ApplyOutcome::Planned
         } else {

@@ -125,12 +125,46 @@ struct Project {
     environments: Vec<Resolved>,
 }
 
-/// An ontology built on the client: its artifact, the tools it serves and the storage its IR
+/// An ontology built on the client: its artifact, what it offers agents and the storage its IR
 /// declares (what a new environment is created with).
 struct Built {
     artifact: Vec<u8>,
-    handlers: BTreeSet<String>,
+    compiled: Compiled,
     storage: &'static str,
+}
+
+/// What the project's ontologies offer its agents, for the dry-run `Apply` that precedes their
+/// rollout (`apply::with_ontologies`).
+#[derive(Debug, Default)]
+pub struct Offered {
+    /// The `(ontology, environment)` pairs the plan creates. Each environment's own connection
+    /// ([`connection_slug`]) comes with it, so it does not exist while the deploy asks whether
+    /// anything blocks it.
+    pub created: Vec<(String, String)>,
+    /// What the compiled ontologies offer; none unless every ontology of the project was compiled
+    /// (`--only agents`, `--ontology` choosing some, a new project, a dry run without agents).
+    pub compiled: Option<Compiled>,
+}
+
+/// What compiled ontologies offer, together.
+#[derive(Debug, Default, Clone)]
+pub struct Compiled {
+    /// The tools their connections serve (`handlers`).
+    pub tools: BTreeSet<String>,
+    /// Each object's declared signal changes (`created`, `updated`, `deleted`), by object id: an
+    /// environment's own connection offers `tilde_ontology.<object id>.<change>`.
+    pub signals: BTreeMap<String, Vec<String>>,
+}
+impl Compiled {
+    fn extend(&mut self, other: Compiled) {
+        self.tools.extend(other.tools);
+        self.signals.extend(other.signals);
+    }
+}
+
+/// An ontology environment's own connection, made with it: `tilde_ontology/<project>-<environment>`.
+pub fn connection_slug(ontology: &str, environment: &str) -> String {
+    format!("tilde_ontology/{ontology}-{environment}")
 }
 
 /// The largest artifact Tilde Cloud takes (its `versions::MAX_ARTIFACT`).
@@ -453,9 +487,33 @@ fn handlers(compiled: &Value) -> Result<BTreeSet<String>> {
         .collect())
 }
 
-/// Build an ontology into its artifact (and its handlers, `handlers`).
+/// Each object's declared signal changes, by object id, from the IR (`objects[].signals`).
+fn signals(ir: &[u8]) -> Result<BTreeMap<String, Vec<String>>> {
+    let ir: Value = serde_json::from_slice(ir).context("the ontology's IR")?;
+    Ok(ir["objects"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|o| {
+            let changes = o["signals"].as_array().into_iter().flatten();
+            let changes = changes.filter_map(Value::as_str).map(str::to_owned);
+            Some((o["id"].as_str()?.to_owned(), changes.collect()))
+        })
+        .collect())
+}
+
+/// What a compiled ontology offers agents: its tools and its signals.
+fn offer(ir: &[u8], compiled: &Value) -> Result<Compiled> {
+    Ok(Compiled {
+        tools: handlers(compiled)?,
+        signals: signals(ir)?,
+    })
+}
+
+/// Build an ontology into its artifact (and what it offers agents, `offer`).
 async fn build(client: &Client, name: &str, project_id: &str, folder: &Path) -> Result<Built> {
     let (cli, runtime, ir, compiled) = compile(client, name, project_id, folder).await?;
+    let offer = offer(&ir, &compiled)?;
     // The IR's `storage`: `postgres`, or cells (the default).
     let storage = match serde_json::from_slice::<Value>(&ir)?["storage"].as_str() {
         Some("postgres") => "STORAGE_POSTGRES",
@@ -533,7 +591,7 @@ async fn build(client: &Client, name: &str, project_id: &str, folder: &Path) -> 
     }
     Ok(Built {
         artifact,
-        handlers: handlers(&compiled)?,
+        compiled: offer,
         storage,
     })
 }
@@ -561,14 +619,15 @@ async fn poll(
 
 /// Check and resolve the ontologies (all, or `--ontology`'s) and build each into an artifact,
 /// changing nothing: the actions that block a deploy, else the plan (none when there is nothing to
-/// do or it is a dry run), and the tools the ontologies' connections will serve (their compiled
-/// handlers: a dry run compiles for them only when `tools` asks).
+/// do or it is a dry run), and what the ontologies offer agents: the environments the plan
+/// creates and, when every chosen ontology was compiled, their tools and signals (a dry run
+/// compiles for them only when `agents` asks).
 pub async fn prepare(
     args: &Deploy,
     ontologies: &BTreeMap<String, OntologySpec>,
     team: Option<&str>,
-    tools: bool,
-) -> Result<(Vec<Action>, Option<Plan>, BTreeSet<String>)> {
+    agents: bool,
+) -> Result<(Vec<Action>, Option<Plan>, Offered)> {
     let Some(url) = &args.url else {
         bail!("--url (or TILDE_URL) is required");
     };
@@ -581,7 +640,7 @@ pub async fn prepare(
         .map(|(name, spec)| (name.clone(), spec))
         .collect();
     if selected.is_empty() {
-        return Ok((Vec::new(), None, BTreeSet::new()));
+        return Ok((Vec::new(), None, Offered::default()));
     }
     // Each ontology is `ontologies/<name>/` of the repository.
     let dir = args.dir.canonicalize().context("the project directory")?;
@@ -604,6 +663,18 @@ pub async fn prepare(
     };
     let mut actions = Vec::new();
     let projects = preflight(&client, &selected, team, &mut actions).await?;
+    let mut offered = Offered {
+        created: projects
+            .iter()
+            .flat_map(|p| {
+                let created = p.environments.iter().filter(|e| e.id.is_none());
+                created.map(|e| (p.name.clone(), e.environment.clone()))
+            })
+            .collect(),
+        compiled: None,
+    };
+    // Tilde compiles an ontology for its project, so a new project's is compiled once it exists.
+    let compilable = projects.iter().all(|p| p.id.is_some());
     // A check deploys nothing, and Tilde compiles an ontology for its project.
     if args.check {
         for p in projects.iter().filter(|p| p.id.is_none()) {
@@ -618,19 +689,21 @@ pub async fn prepare(
         }
     }
     if !actions.is_empty() {
-        return Ok((actions, None, BTreeSet::new()));
+        return Ok((actions, None, offered));
     }
     if args.dry_run {
         eprint!("{}", plan_text(&client, &projects, &selected).await?);
-        let mut served = BTreeSet::new();
-        if tools {
+        if agents && compilable {
+            let mut compiled = Compiled::default();
             for p in &projects {
                 let Some(id) = &p.id else { continue };
                 let folder = dir.join("ontologies").join(&p.name);
-                served.extend(handlers(&compile(&client, &p.name, id, &folder).await?.3)?);
+                let (_, _, ir, contract) = compile(&client, &p.name, id, &folder).await?;
+                compiled.extend(offer(&ir, &contract)?);
             }
+            offered.compiled = Some(compiled);
         }
-        return Ok((Vec::new(), None, served));
+        return Ok((Vec::new(), None, offered));
     }
     // A check uploads nothing, so it builds the working tree as it is.
     let (commit, branch) = match args.check {
@@ -638,18 +711,21 @@ pub async fn prepare(
         false => head(&dir, args.allow_dirty)?,
     };
     let mut built = BTreeMap::new();
-    let mut served = BTreeSet::new();
+    let mut compiled = Compiled::default();
     for p in &projects {
         let Some(id) = &p.id else { continue };
         eprintln!("Ontology {}: building", p.name);
         let folder = dir.join("ontologies").join(&p.name);
         let b = build(&client, &p.name, id, &folder).await?;
-        served.extend(b.handlers.iter().cloned());
+        compiled.extend(b.compiled.clone());
         built.insert(p.name.clone(), b);
+    }
+    if compilable {
+        offered.compiled = Some(compiled);
     }
     if args.check {
         eprintln!("Checked (nothing deployed): each ontology compiles and builds");
-        return Ok((Vec::new(), None, served));
+        return Ok((Vec::new(), None, offered));
     }
     Ok((
         Vec::new(),
@@ -661,7 +737,7 @@ pub async fn prepare(
             commit,
             branch,
         }),
-        served,
+        offered,
     ))
 }
 
@@ -1166,12 +1242,13 @@ mod tests {
         assert!(ok, "git {args:?}");
     }
 
-    /// A stand-in `@trytilde/ontology` (runtime 1): `ir` prints an IR naming the folder, `worker`
-    /// writes a module.
+    /// A stand-in `@trytilde/ontology` (runtime 1): `ir` prints an IR naming the folder, whose
+    /// `order` declares its `created` signal and `customer` none; `worker` writes a module.
     const CLIENT: &str = r#"import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 const [command, root, out] = process.argv.slice(2);
-if (command === "ir") process.stdout.write(JSON.stringify({ root, storage: "postgres" }));
+const objects = [{ name: "Order", id: "order", signals: ["created"] }, { name: "Customer", id: "customer" }];
+if (command === "ir") process.stdout.write(JSON.stringify({ root, storage: "postgres", objects }));
 else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export default {};\n"); }
 "#;
 
@@ -1217,8 +1294,15 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         bound: BTreeMap<&'static str, Value>,
         /// What CompileOntology answers when the IR does not compile.
         compile_errors: Option<Value>,
-        /// Whether a dry-run Apply finds the ontology's tools unserved, as on a new environment.
+        /// Whether a dry-run Apply finds the tools on `tilde_ontology/shop` unserved, as before its
+        /// ontology runs them.
         ontology_unserved: bool,
+        /// Whether a dry-run Apply finds every routine's signal not offered, as on an existing
+        /// environment whose running version declares none. Like Tilde Cloud, it takes the
+        /// connection of an environment the request names as new as written.
+        signals_unoffered: bool,
+        /// The shop project's environments.
+        shop_environments: Value,
         /// An organization with no project or environment yet.
         fresh: bool,
         /// The declared connections the version marks optional.
@@ -1239,6 +1323,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 bound: BTreeMap::new(),
                 compile_errors: None,
                 ontology_unserved: false,
+                signals_unoffered: false,
+                shop_environments: json!([{"id": "e1", "name": "production"}, {"id": "e2", "name": "staging"}]),
                 fresh: false,
                 optional: &[],
             }
@@ -1258,10 +1344,24 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 move |Route((service, method)): Route<(String, String)>, body: Bytes| async move {
                     if service.ends_with("ApplyService") {
                         let request = wire::ApplyRequest::decode_from_slice(&body).unwrap();
-                        calls.lock().unwrap().push((format!("Apply dryRun={}", request.dry_run), Value::Null));
+                        let new: Vec<String> = request.new_ontology_environments.iter().map(|e| connection_slug(&e.project, &e.environment)).collect();
+                        calls.lock().unwrap().push((format!("Apply dryRun={}", request.dry_run), json!(new)));
                         let unserved = world.ontology_unserved && request.dry_run;
+                        let mut unoffered = Vec::new();
+                        for agent in request.agents.iter().filter(|_| world.signals_unoffered && request.dry_run) {
+                            for routine in &agent.routines {
+                                let Some(wire::routine_trigger_spec::Kind::Signal(signal)) = &routine.trigger.kind else { continue };
+                                if new.contains(&signal.connection.slug) { continue }
+                                unoffered.push(wire::RequiredAction {
+                                    code: wire::RequiredActionCode::SignalNotOffered.into(),
+                                    subject: format!("{}/routines/{}", agent.key, routine.name),
+                                    message: format!("Connection {} offers no signal {}", signal.connection.slug, signal.signal_type),
+                                    ..Default::default()
+                                });
+                            }
+                        }
                         let response = wire::ApplyResponse {
-                            outcome: if world.agents_blocked || unserved { wire::ApplyOutcome::Blocked } else { wire::ApplyOutcome::Planned }.into(),
+                            outcome: if world.agents_blocked || unserved || !unoffered.is_empty() { wire::ApplyOutcome::Blocked } else { wire::ApplyOutcome::Planned }.into(),
                             required_actions: if unserved {
                                 vec![wire::RequiredAction {
                                     code: wire::RequiredActionCode::ToolNotOffered.into(),
@@ -1269,6 +1369,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                                     message: "Connection tilde_ontology/shop offers no tool listOrders".into(),
                                     ..Default::default()
                                 }]
+                            } else if !unoffered.is_empty() {
+                                unoffered
                             } else if world.agents_blocked {
                                 vec![wire::RequiredAction {
                                     subject: "triage/tools/linear/acme".into(),
@@ -1292,9 +1394,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                         "CreateProject" => json!({"project": {"id": "p1", "name": body["name"], "teamId": body["teamId"]}}),
                         "CreateEnvironment" => json!({"environment": {"id": format!("e-{}", body["name"].as_str().unwrap())}}),
                         "ListProjects" => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}, {"id": "p2", "name": "warehouse", "teamId": "t1"}]}),
-                        "ListEnvironments" if body["projectId"] == "p1" => {
-                            json!({"environments": [{"id": "e1", "name": "production"}, {"id": "e2", "name": "staging"}]})
-                        }
+                        "ListEnvironments" if body["projectId"] == "p1" => json!({"environments": world.shop_environments}),
                         "ListEnvironments" => json!({"environments": [{"id": "e3", "name": "production"}]}),
                         "ListConnections" => world.connections.clone(),
                         "ListSecrets" => world.secrets.clone(),
@@ -1339,6 +1439,28 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         let mut d = declarations(true);
         d.agents = vec![json!({"key": "triage", "name": "Triage",
             "tools": [{"connection": {"slug": "tilde_ontology/shop"}, "tools": tools}]})];
+        d
+    }
+
+    /// The tools the compiled ontologies serve.
+    fn tools(offered: &Offered) -> &BTreeSet<String> {
+        &offered.compiled.as_ref().expect("compiled").tools
+    }
+
+    /// A project whose agent `triage` uses `tools` of the shop production environment's own
+    /// connection and has a routine on each of `signals` from it.
+    fn agent_on_environment(tools: &[&str], signals: &[&str]) -> crate::discover::Declarations {
+        let mut d = declarations(true);
+        let routines: Vec<Value> = signals
+            .iter()
+            .map(|signal| {
+                json!({"name": signal, "prompt": "Look at {{ key }}", "trigger": {"signal": {
+                "connection": {"slug": "tilde_ontology/shop-production"}, "signalType": signal}}})
+            })
+            .collect();
+        d.agents = vec![json!({"key": "triage", "name": "Triage",
+            "tools": [{"connection": {"slug": "tilde_ontology/shop-production"}, "tools": tools}],
+            "routines": routines})];
         d
     }
 
@@ -1471,12 +1593,21 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         })
         .await;
         let a = args(url, repo.path());
-        let (actions, served) =
+        let (actions, offered) =
             crate::deploy::ontologies_first(&a, &agent_using(&["listOrders"]), true)
                 .await
                 .unwrap();
         assert!(actions.is_empty(), "{actions:?}");
-        assert!(served.contains("listOrders"));
+        assert!(tools(&offered).contains("listOrders"));
+        // Every environment exists: the dry run names none as new.
+        assert!(offered.created.is_empty());
+        assert!(
+            calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(m, new)| m == "Apply dryRun=true" && *new == json!([]))
+        );
         assert!(
             changes(&calls).iter().any(|c| c.starts_with("Deploy")),
             "{:?}",
@@ -1492,12 +1623,12 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         .await;
         let mut every = args(url, repo.path());
         every.ontology = vec!["shop".into(), "warehouse".into()];
-        let (actions, served) =
+        let (actions, offered) =
             crate::deploy::ontologies_first(&every, &agent_using(&["listOrders"]), true)
                 .await
                 .unwrap();
         assert!(
-            actions.is_empty() && served.contains("listOrders"),
+            actions.is_empty() && tools(&offered).contains("listOrders"),
             "{actions:?}"
         );
 
@@ -1522,6 +1653,148 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
     }
 
+    /// A project whose agent uses its own new environment's tool and a routine on its signal
+    /// deploys in one run: the dry run names the environment the deploy creates (its connection
+    /// does not exist yet), the CLI checks those uses against the compiled ontology, the
+    /// ontology rolls out, and the apply that follows names nothing.
+    #[tokio::test]
+    async fn a_first_deploy_uses_its_new_environments_tools_and_signals() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            shop_environments: json!([{"id": "e2", "name": "staging"}]),
+            signals_unoffered: true,
+            ..World::default()
+        })
+        .await;
+        let a = args(url, repo.path());
+        let d = agent_on_environment(&["listOrders"], &["tilde_ontology.order.created"]);
+        let (actions, offered) = crate::deploy::ontologies_first(&a, &d, true).await.unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert_eq!(offered.created, [("shop".into(), "production".into())]);
+        let applied = |calls: &Calls, method: &str| -> Vec<Value> {
+            let calls = calls.lock().unwrap();
+            calls
+                .iter()
+                .filter(|(m, _)| m == method)
+                .map(|(_, new)| new.clone())
+                .collect()
+        };
+        assert_eq!(
+            applied(&calls, "Apply dryRun=true"),
+            [json!(["tilde_ontology/shop-production"])]
+        );
+        assert!(
+            changes(&calls).contains(&"CreateEnvironment".to_string())
+                && changes(&calls).iter().any(|c| c.starts_with("Deploy")),
+            "{:?}",
+            changes(&calls)
+        );
+        crate::apply::run(&a, &d, &offered).await.unwrap();
+        assert_eq!(applied(&calls, "Apply dryRun=false"), [json!([])]);
+
+        // `--dry-run` names it too, and its plan is checked the same way.
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            shop_environments: json!([{"id": "e2", "name": "staging"}]),
+            ..World::default()
+        })
+        .await;
+        let mut dry = args(url, repo.path());
+        dry.dry_run = true;
+        let (actions, offered) = crate::deploy::ontologies_first(&dry, &d, true)
+            .await
+            .unwrap();
+        assert!(
+            actions.is_empty() && offered.compiled.is_some(),
+            "{actions:?}"
+        );
+        crate::apply::run(&dry, &d, &offered).await.unwrap();
+        assert_eq!(
+            applied(&calls, "Apply dryRun=true"),
+            [json!(["tilde_ontology/shop-production"])]
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// The server vouches for nothing on a connection that does not exist yet, so the CLI refuses
+    /// a tool the compiled ontology does not serve and a signal its IR does not declare, naming
+    /// the object and what it declares, before anything changes.
+    #[tokio::test]
+    async fn undeclared_tools_and_signals_of_a_new_environment_are_refused() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            shop_environments: json!([{"id": "e2", "name": "staging"}]),
+            ..World::default()
+        })
+        .await;
+        let d = agent_on_environment(
+            &["listOrders", "refundOrder"],
+            &[
+                "tilde_ontology.order.created",
+                "tilde_ontology.order.deleted",
+                "tilde_ontology.customer.created",
+                "tilde_ontology.invoice.created",
+                "order.created",
+            ],
+        );
+        let (actions, _) = crate::deploy::ontologies_first(&args(url, repo.path()), &d, true)
+            .await
+            .unwrap();
+        let found: Vec<String> = actions
+            .iter()
+            .map(|a| format!("{}: {}", a.subject, a.message))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                "triage/tools/tilde_ontology/shop-production: The project's ontologies serve no tool refundOrder",
+                "triage/routines/order.created: order.created is not an ontology signal (tilde_ontology.<object id>.<created|updated|deleted>); the project's ontologies declare: tilde_ontology.order.created",
+                "triage/routines/tilde_ontology.customer.created: Object customer declares no signals; add `signals: [\"created\"]` to it for tilde_ontology.customer.created",
+                "triage/routines/tilde_ontology.invoice.created: The project's ontologies have no object invoice, so no signal tilde_ontology.invoice.created; they declare: tilde_ontology.order.created",
+                "triage/routines/tilde_ontology.order.deleted: Object order declares no deleted signal; it declares tilde_ontology.order.created",
+            ]
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
+    /// An existing environment whose running version declares no signals yet: the server finds
+    /// the routine's signal not offered, and the version this deploy rolls out declares it, so
+    /// the deploy goes ahead; one it does not declare still blocks. Nothing is named as new.
+    #[tokio::test]
+    async fn an_existing_environments_new_signal_is_checked_against_the_compiled_ontology() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            signals_unoffered: true,
+            ..World::default()
+        })
+        .await;
+        let a = args(url, repo.path());
+        let d = agent_on_environment(&["listOrders"], &["tilde_ontology.order.created"]);
+        let (actions, offered) = crate::deploy::ontologies_first(&a, &d, true).await.unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(offered.created.is_empty());
+        assert!(changes(&calls).iter().any(|c| c.starts_with("Deploy")));
+
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            signals_unoffered: true,
+            ..World::default()
+        })
+        .await;
+        let d = agent_on_environment(&["listOrders"], &["tilde_ontology.order.updated"]);
+        let (actions, _) = crate::deploy::ontologies_first(&args(url, repo.path()), &d, true)
+            .await
+            .unwrap();
+        assert_eq!(actions.len(), 1, "{actions:?}");
+        assert!(
+            actions[0]
+                .message
+                .contains("Object order declares no updated signal"),
+            "{actions:?}"
+        );
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+    }
+
     /// The server's findings on ontology connections give way only where there are compiled
     /// handlers to check against, and only for the connections it could not list: `--only agents
     /// --dry-run` (no handlers) keeps them, a misspelling included; a connection whose tools the
@@ -1536,10 +1809,10 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             ..Default::default()
         };
         let mut declarations = agent_using(&["listOrderz"]);
-        let kept = crate::apply::with_ontology_tools(
+        let kept = crate::apply::with_ontologies(
             vec![finding("tilde_ontology/shop")],
             &declarations,
-            &BTreeSet::new(),
+            &Offered::default(),
         );
         assert_eq!(kept.len(), 1);
         assert!(
@@ -1547,21 +1820,54 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
             "{kept:?}"
         );
 
-        let served: BTreeSet<String> = ["listOrders".to_string()].into();
+        let offered = Offered {
+            created: Vec::new(),
+            compiled: Some(Compiled {
+                tools: ["listOrders".to_string()].into(),
+                signals: BTreeMap::new(),
+            }),
+        };
         declarations.agents[0]["tools"] = json!([
             {"connection": {"slug": "tilde_ontology/shop"}, "tools": ["listOrders", "watchOrders"]},
             {"connection": {"slug": "tilde_ontology/other"}, "tools": ["theirTool"]},
         ]);
-        let found = crate::apply::with_ontology_tools(
+        let found = crate::apply::with_ontologies(
             vec![finding("tilde_ontology/shop")],
             &declarations,
-            &served,
+            &offered,
         );
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].subject, "triage/tools/tilde_ontology/shop");
         assert!(
             found[0].message.contains("serve no tool watchOrders"),
             "{found:?}"
+        );
+
+        // Only an environment's own connection offers its signals: a routine on a hand-made
+        // ontology connection keeps the server's finding, though the ontology declares the type.
+        declarations.agents[0]["tools"] = json!([]);
+        declarations.agents[0]["routines"] = json!([{"name": "orders", "trigger": {"signal": {
+            "connection": {"slug": "tilde_ontology/shop"}, "signalType": "tilde_ontology.order.created"}}}]);
+        let offered = Offered {
+            created: Vec::new(),
+            compiled: Some(Compiled {
+                tools: BTreeSet::new(),
+                signals: [("order".to_string(), vec!["created".to_string()])].into(),
+            }),
+        };
+        let unoffered = wire::RequiredAction {
+            code: wire::RequiredActionCode::SignalNotOffered.into(),
+            subject: "triage/routines/orders".into(),
+            message: "Connection tilde_ontology/shop offers no signal tilde_ontology.order.created"
+                .into(),
+            ..Default::default()
+        };
+        let kept = crate::apply::with_ontologies(vec![unoffered], &declarations, &offered);
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(
+            kept[0]
+                .message
+                .starts_with("Connection tilde_ontology/shop")
         );
     }
 
@@ -1577,12 +1883,12 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         .await;
         let mut check = args(url, repo.path());
         check.check = true;
-        let (actions, served) =
+        let (actions, offered) =
             crate::deploy::ontologies_first(&check, &agent_using(&["listOrders"]), true)
                 .await
                 .unwrap();
         assert!(actions.is_empty(), "{actions:?}");
-        assert!(served.contains("listOrders") && !served.contains("watchOrders"));
+        assert!(tools(&offered).contains("listOrders") && !tools(&offered).contains("watchOrders"));
         let calls = calls.lock().unwrap().clone();
         assert!(
             calls.iter().any(|(m, _)| m == "Apply dryRun=true"),

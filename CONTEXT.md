@@ -1961,8 +1961,8 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   organization), each environment (`EnvironmentService.CreateEnvironment`, on Cloudflare) once
   the version is ready, with the storage its IR declares and the spec's `live`. Tilde compiles
   an ontology for its project, so a new project's ontology is built after the project is
-  created rather than before anything changes, its tools are not checked against the agents'
-  specs on that first deploy, and `--check` refuses a project that does not exist yet. Then each ontology is built here, on the
+  created rather than before anything changes, its tools and signals are not checked against the
+  agents' specs on that first deploy, and `--check` refuses a project that does not exist yet. Then each ontology is built here, on the
   client (Tilde never builds a project), with the project's own `@trytilde/ontology` and
   `@trytilde/spaces` (Tilde Cloud's packages, run with `node`): its IR (`tilde-ontology-build ir`),
   sent to `VersionService.CompileOntology`, whose errors fail the deploy and whose contract is
@@ -1979,6 +1979,27 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is
   called as Connect JSON: open-source Tilde depends on no part of its contract. A binding is
   named by its `name`.
+- An environment's own connection: Tilde Cloud makes one with every environment,
+  `tilde_ontology/<project>-<environment>` (`tildeOntology.environment(project, environment)`
+  in `@trytilde/iac`), which serves the ontology's tools and is the only connection that offers
+  its signals (`tilde_ontology.<object id>.<created|updated|deleted>`, from the IR's
+  `objects[].signals`; `@trytilde/ontology`'s `signal(Object, change)` is a `SignalRef` a
+  routine's `signal.type` takes, whose data keys its filters). One `tilde deploy` therefore
+  works for a project whose agents use its own ontology before the environment exists:
+  `ontology::prepare` returns what the ontologies offer (`Offered`: the `(ontology,
+  environment)` pairs the plan creates and, when every ontology of the project was compiled,
+  their tools and declared signals), and every dry-run `Apply` before the ontologies execute
+  (preflight's, and `--dry-run`'s) sends the pairs as `ApplyRequest.new_ontology_environments`,
+  so the server takes a reference to such a connection as satisfied and its uses as written.
+  The CLI checks those uses itself (`apply::with_ontologies`): every tool named on a created
+  environment's connection, or on any `tilde_ontology/...` connection the server found
+  wanting (`ToolNotOffered`, before the new version runs), against the compiled handlers; every
+  routine signal on a created environment's connection, or on one of the project's environment
+  connections the server found not offering it (`SignalNotOffered`: the running version lacks
+  it), against the declared signals, refused with the object and what it declares. A
+  connection the server vouched for keeps its word; without compiled ontologies (`--only
+  agents`, `--ontology` choosing some, a new project) the server's findings stand. The apply
+  after the rollout names no environments: by then they and their connections exist.
 - `tilde deploy` runs the SDK's `tilde-declarations` reader with `TILDE_DISCOVERY_SPECS=1`; a
   reader that knows specs prints `{declarations, agents, code, team}` (validating each agent against
   `AgentSpec`; `code` maps an agent's key to its `defineAgent({ code })`, which specs don't

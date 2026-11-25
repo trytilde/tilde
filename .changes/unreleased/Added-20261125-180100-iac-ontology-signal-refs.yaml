@@ -1,0 +1,3 @@
+kind: Added
+body: "`@trytilde/iac`: `tildeOntology.environment(project, environment)` is an ontology environment's own connection, and a routine's `signal.type` takes `@trytilde/ontology`'s `SignalRef`, whose data keys the routine's filters."
+time: 2026-11-25T18:01:00.000000+00:00
