@@ -2,14 +2,20 @@
 //!
 //! Each ontology is the Tilde project of its name, `ontologies/<name>/` of the repository
 //! (`tilde deploy` runs at the repository's root), built here, on the client: Tilde never builds
-//! a project. `prepare` changes nothing: it checks every project, environment, connection and
-//! secret the specs name (each missing one is a required action with a link, reported with the
-//! agents' own before anything changes), then builds each ontology into an artifact with the
-//! project's own `@trytilde/ontology` and `@trytilde/spaces` ([`build`]): the IR, the errors or
-//! the contract Tilde compiles for it (`VersionService.CompileOntology`), the handler module, the
-//! spaces. `execute` then, per ontology: uploads the artifact as a version
+//! a project. `prepare` changes nothing: it checks every connection and secret the specs name
+//! (each missing one is a required action with a link, reported with the agents' own before
+//! anything changes), then builds each ontology into an artifact with the project's own
+//! `@trytilde/ontology` and `@trytilde/spaces` ([`build`]): the IR, the errors or the contract
+//! Tilde compiles for it (`VersionService.CompileOntology`), the handler module, the spaces.
+//! `execute` then, per ontology: uploads the artifact as a version
 //! (`VersionService.CreateVersion`), checks that the version declares exactly what the spec binds,
 //! and binds and rolls out one environment at a time. Agents are applied after (`apply.rs`).
+//!
+//! A first deploy needs nothing set up by hand: a project or an environment the server does not
+//! have is part of the plan, and `execute` creates it (`ProjectService.CreateProject` in the
+//! deploy's team, `EnvironmentService.CreateEnvironment` with the storage the IR declares and the
+//! spec's `live`). Compiling needs the project, so a new project's ontology is built in `execute`,
+//! once the project exists, rather than in `prepare`.
 //!
 //! The ontology control plane is Tilde Cloud's: its RPCs are called as Connect JSON (this CLI
 //! does not depend on its contract), and a server without them answers 404, which becomes a
@@ -37,6 +43,10 @@ pub struct EnvironmentSpec {
     /// The ontology's secret name -> the Tilde secret's name.
     #[serde(default)]
     pub secrets: BTreeMap<String, String>,
+    /// Whether the environment is live (`LiveService` serves its spaces): set when the deploy
+    /// creates it. No RPC changes it afterwards, so a difference from an existing environment is
+    /// reported and left.
+    pub live: Option<bool>,
 }
 #[derive(Debug, Deserialize)]
 pub struct ConnectionSpec {
@@ -99,14 +109,29 @@ const ENVIRONMENTS: &str = "tilde.ontology_control.v1.EnvironmentService";
 /// What preflight found for one environment: ids to bind and deploy with.
 struct Resolved {
     environment: String,
-    environment_id: String,
+    /// None: the deploy creates it.
+    id: Option<String>,
+    /// The spec's `live`, for an environment the deploy creates.
+    live: bool,
+    /// The spec's `live` when the existing environment's differs.
+    live_differs: Option<bool>,
     connections: Vec<(String, String)>,
     secrets: Vec<(String, String)>,
 }
 struct Project {
     name: String,
-    id: String,
+    /// None: the deploy creates it, in `team`.
+    id: Option<String>,
+    team: String,
     environments: Vec<Resolved>,
+}
+
+/// An ontology built on the client: its artifact, the tools it serves and the storage its IR
+/// declares (what a new environment is created with).
+struct Built {
+    artifact: Vec<u8>,
+    handlers: BTreeSet<String>,
+    storage: &'static str,
 }
 
 /// The largest artifact Tilde Cloud takes (its `versions::MAX_ARTIFACT`).
@@ -116,8 +141,9 @@ const MAX_ARTIFACT: usize = 32 * 1024 * 1024;
 pub struct Plan {
     client: Client,
     projects: Vec<Project>,
-    /// Each project's artifact, by project name.
-    artifacts: BTreeMap<String, Vec<u8>>,
+    /// Each existing project's build, by project name; a new project's is built once it exists.
+    built: BTreeMap<String, Built>,
+    dir: PathBuf,
     commit: String,
     branch: String,
 }
@@ -126,11 +152,13 @@ fn encode(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
-/// Every project, environment, connection and secret the specs name; what is missing becomes an
-/// action. Nothing is changed.
+/// Every project, environment, connection and secret the specs name. A missing project or
+/// environment is created by the deploy (in `team`, a slug, or the organization); a missing
+/// connection or secret becomes an action. Nothing is changed.
 async fn preflight(
     client: &Client,
     ontologies: &BTreeMap<String, &OntologySpec>,
+    team: Option<&str>,
     actions: &mut Vec<Action>,
 ) -> Result<Vec<Project>> {
     let projects = match client
@@ -158,27 +186,47 @@ async fn preflight(
         .as_array()
         .cloned()
         .unwrap_or_default();
+    let missing = |name: &String| !projects.iter().any(|p| p["name"] == name.as_str());
+    // The team new projects are created in: its id, asked for only when one is created.
+    let mut new_team = String::new();
+    if let Some(slug) = team.filter(|_| ontologies.keys().any(missing)) {
+        let teams = client
+            .ok("tilde.management.v1.IamService/ListTeams", json!({}))
+            .await?;
+        let found = teams["teams"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|t| t["slug"] == slug);
+        match found {
+            Some(found) => new_team = found["id"].as_str().unwrap_or_default().to_string(),
+            None => actions.push(Action {
+                subject: format!("team {slug}"),
+                message: format!("The team {slug} does not exist; create it"),
+                url: "/settings/teams".into(),
+            }),
+        }
+    }
     let mut out = Vec::new();
     for (name, spec) in ontologies {
-        let Some(project) = projects.iter().find(|p| p["name"] == name.as_str()) else {
-            actions.push(Action {
-                subject: format!("ontology {name}"),
-                message: format!("The ontology project {name} does not exist; create it"),
-                url: format!("/ontology/projects?new={}", encode(name)),
-            });
-            continue;
+        let project = projects.iter().find(|p| p["name"] == name.as_str());
+        let id = project.map(|p| p["id"].as_str().unwrap_or_default().to_string());
+        let team = match project {
+            Some(p) => p["teamId"].as_str().unwrap_or_default().to_string(),
+            None => new_team.clone(),
         };
-        let id = project["id"].as_str().unwrap_or_default().to_string();
-        let team = project["teamId"].as_str().unwrap_or_default().to_string();
-        let environments = client
-            .ok(
-                &format!("{ENVIRONMENTS}/ListEnvironments"),
-                json!({"projectId": id}),
-            )
-            .await?["environments"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
+        let environments = match &id {
+            Some(id) => client
+                .ok(
+                    &format!("{ENVIRONMENTS}/ListEnvironments"),
+                    json!({"projectId": id}),
+                )
+                .await?["environments"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
         let secrets = client
             .ok(
                 "tilde.management.v1.SecretService/ListSecrets",
@@ -191,16 +239,7 @@ async fn preflight(
         let mut resolved = Vec::new();
         for (env_name, env) in &spec.environments {
             let subject = format!("ontology {name}/{env_name}");
-            let Some(found) = environments.iter().find(|e| e["name"] == env_name.as_str()) else {
-                actions.push(Action {
-                    subject,
-                    message: format!(
-                        "The environment {env_name} of {name} does not exist; create it"
-                    ),
-                    url: format!("/ontology/projects/{}/environments", encode(&id)),
-                });
-                continue;
-            };
+            let found = environments.iter().find(|e| e["name"] == env_name.as_str());
             let mut bindings = Vec::new();
             for (name, connection) in &env.connections {
                 let (provider, connection_name) = connection
@@ -289,9 +328,13 @@ async fn preflight(
                     found["id"].as_str().unwrap_or_default().to_string(),
                 ));
             }
+            // Protobuf JSON leaves a false `live` out.
+            let current = found.map(|e| e["live"] == true);
             resolved.push(Resolved {
                 environment: env_name.clone(),
-                environment_id: found["id"].as_str().unwrap_or_default().to_string(),
+                id: found.map(|e| e["id"].as_str().unwrap_or_default().to_string()),
+                live: env.live.unwrap_or(false),
+                live_differs: env.live.filter(|live| current.is_some_and(|c| c != *live)),
                 connections: bindings,
                 secrets: bound,
             });
@@ -299,6 +342,7 @@ async fn preflight(
         out.push(Project {
             name: name.clone(),
             id,
+            team,
             environments: resolved,
         });
     }
@@ -357,10 +401,10 @@ fn node(cli: &Path, args: &[&std::ffi::OsStr]) -> Result<Vec<u8>> {
 /// the package's client build, its runtime, the IR and Tilde's answer (its contract).
 async fn compile(
     client: &Client,
-    project: &Project,
+    name: &str,
+    project_id: &str,
     folder: &Path,
 ) -> Result<(PathBuf, u64, Vec<u8>, Value)> {
-    let name = &project.name;
     let package = installed(folder, "@trytilde/ontology").with_context(|| {
         format!(
             "ontologies/{name} needs @trytilde/ontology installed (pnpm add @trytilde/ontology)"
@@ -379,7 +423,7 @@ async fn compile(
     let compiled = client
         .ok(
             &format!("{VERSIONS}/CompileOntology"),
-            json!({"projectId": project.id, "ir": String::from_utf8(ir.clone())?}),
+            json!({"projectId": project_id, "ir": String::from_utf8(ir.clone())?}),
         )
         .await?;
     if let Some(errors) = compiled["errors"].as_array().filter(|e| !e.is_empty()) {
@@ -411,13 +455,13 @@ fn handlers(compiled: &Value) -> Result<BTreeSet<String>> {
 }
 
 /// Build an ontology into its artifact (and its handlers, `handlers`).
-async fn build(
-    client: &Client,
-    project: &Project,
-    folder: &Path,
-) -> Result<(Vec<u8>, BTreeSet<String>)> {
-    let name = &project.name;
-    let (cli, runtime, ir, compiled) = compile(client, project, folder).await?;
+async fn build(client: &Client, name: &str, project_id: &str, folder: &Path) -> Result<Built> {
+    let (cli, runtime, ir, compiled) = compile(client, name, project_id, folder).await?;
+    // The IR's `storage`: `postgres`, or cells (the default).
+    let storage = match serde_json::from_slice::<Value>(&ir)?["storage"].as_str() {
+        Some("postgres") => "STORAGE_POSTGRES",
+        _ => "STORAGE_CELL",
+    };
     let out = folder.join(".tilde/build");
     let _ = std::fs::remove_dir_all(&out);
     std::fs::create_dir_all(&out)?;
@@ -488,7 +532,11 @@ async fn build(
             MAX_ARTIFACT / (1024 * 1024)
         );
     }
-    Ok((artifact, handlers(&compiled)?))
+    Ok(Built {
+        artifact,
+        handlers: handlers(&compiled)?,
+        storage,
+    })
 }
 
 /// Until `read` says the value is no longer in progress (`waiting` is its in-progress status).
@@ -519,6 +567,7 @@ async fn poll(
 pub async fn prepare(
     args: &Deploy,
     ontologies: &BTreeMap<String, OntologySpec>,
+    team: Option<&str>,
     tools: bool,
 ) -> Result<(Vec<Action>, Option<Plan>, BTreeSet<String>)> {
     let Some(url) = &args.url else {
@@ -555,7 +604,20 @@ pub async fn prepare(
         key: args.api_key.clone(),
     };
     let mut actions = Vec::new();
-    let projects = preflight(&client, &selected, &mut actions).await?;
+    let projects = preflight(&client, &selected, team, &mut actions).await?;
+    // A check deploys nothing, and Tilde compiles an ontology for its project.
+    if args.check {
+        for p in projects.iter().filter(|p| p.id.is_none()) {
+            actions.push(Action {
+                subject: format!("ontology {}", p.name),
+                message: format!(
+                    "The ontology project {} does not exist yet, so Tilde cannot compile it: its first `tilde deploy` creates it",
+                    p.name
+                ),
+                url: "/ontology/projects".into(),
+            });
+        }
+    }
     if !actions.is_empty() {
         return Ok((actions, None, BTreeSet::new()));
     }
@@ -564,8 +626,9 @@ pub async fn prepare(
         let mut served = BTreeSet::new();
         if tools {
             for p in &projects {
+                let Some(id) = &p.id else { continue };
                 let folder = dir.join("ontologies").join(&p.name);
-                served.extend(handlers(&compile(&client, p, &folder).await?.3)?);
+                served.extend(handlers(&compile(&client, &p.name, id, &folder).await?.3)?);
             }
         }
         return Ok((Vec::new(), None, served));
@@ -575,14 +638,15 @@ pub async fn prepare(
         true => Default::default(),
         false => head(&dir, args.allow_dirty)?,
     };
-    let mut artifacts = BTreeMap::new();
+    let mut built = BTreeMap::new();
     let mut served = BTreeSet::new();
     for p in &projects {
+        let Some(id) = &p.id else { continue };
         eprintln!("Ontology {}: building", p.name);
         let folder = dir.join("ontologies").join(&p.name);
-        let (artifact, handlers) = build(&client, p, &folder).await?;
-        artifacts.insert(p.name.clone(), artifact);
-        served.extend(handlers);
+        let b = build(&client, &p.name, id, &folder).await?;
+        served.extend(b.handlers.iter().cloned());
+        built.insert(p.name.clone(), b);
     }
     if args.check {
         eprintln!("Checked (nothing deployed): each ontology compiles and builds");
@@ -593,7 +657,8 @@ pub async fn prepare(
         Some(Plan {
             client,
             projects,
-            artifacts,
+            built,
+            dir,
             commit,
             branch,
         }),
@@ -610,8 +675,9 @@ fn binding_name(binding: &Value) -> &str {
         .unwrap_or_default()
 }
 
-/// The dry run's plan: each connection whose binding changes as `connection name: current → new`
-/// (from what the environment has bound now), and a count of the unchanged ones.
+/// The dry run's plan: a project or environment the deploy creates, each connection whose binding
+/// changes as `connection name: current → new` (from what the environment has bound now), a count
+/// of the unchanged ones, and the optional connections left unbound.
 async fn plan_text(
     client: &Client,
     projects: &[Project],
@@ -619,24 +685,34 @@ async fn plan_text(
 ) -> Result<String> {
     let mut out = String::from("Plan (dry run, nothing deployed):\n");
     for p in projects {
+        if p.id.is_none() {
+            out.push_str(&format!("  ontology {}: create the project\n", p.name));
+        }
         out.push_str(&format!(
             "  ontology {}: build HEAD into a version\n",
             p.name
         ));
         for env in &p.environments {
             let e = &env.environment;
-            let bound = match env.connections.is_empty() {
-                true => Vec::new(),
-                false => client
+            let bound = match &env.id {
+                None => {
+                    let live = if env.live { " (live)" } else { "" };
+                    out.push_str(&format!("    {e}: create the environment{live}\n"));
+                    Vec::new()
+                }
+                Some(id) => client
                     .ok(
                         &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
-                        json!({"environmentId": env.environment_id}),
+                        json!({"environmentId": id}),
                     )
                     .await?["connections"]
                     .as_array()
                     .cloned()
                     .unwrap_or_default(),
             };
+            if let Some(live) = env.live_differs {
+                out.push_str(&format!("    {e}: {}\n", live_differs(live)));
+            }
             let mut unchanged = 0;
             for (name, connection) in &env.connections {
                 let current = bound.iter().find(|b| binding_name(b) == name.as_str());
@@ -657,6 +733,14 @@ async fn plan_text(
                     "    {e}: {unchanged} connection{plural} unchanged\n"
                 ));
             }
+            // What the project's newest version declares: the version this deploy builds decides.
+            for b in bound.iter().filter(|b| {
+                b["optional"] == true
+                    && b["connectionId"].as_str().is_none_or(str::is_empty)
+                    && !env.connections.iter().any(|(n, _)| n == binding_name(b))
+            }) {
+                out.push_str(&format!("    {e}: {}\n", skipped(binding_name(b))));
+            }
             for (secret, _) in &env.secrets {
                 out.push_str(&format!("    {e}: bind secret {secret}\n"));
             }
@@ -664,6 +748,21 @@ async fn plan_text(
         }
     }
     Ok(out)
+}
+
+/// An environment's `live` is set when it is created; no RPC changes it.
+fn live_differs(live: bool) -> String {
+    format!(
+        "live stays {}: the spec says {live}, and an environment's live is set when it is created",
+        !live
+    )
+}
+
+/// An optional connection nothing binds: the rollout leaves out what needs it.
+fn skipped(name: &str) -> String {
+    format!(
+        "connection {name}: skipped (optional and unbound: its pipelines do not run until it is bound)"
+    )
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String> {
@@ -684,27 +783,38 @@ fn git(dir: &Path, args: &[&str]) -> Result<String> {
 
 /// That the version declares every connection and secret the environment binds, and that each one it
 /// declares is bound (by the spec or already): checked for every environment before any binding.
-async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result<()> {
-    let names = |field: &str, key: Option<&str>| -> Vec<String> {
-        version[field]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|v| key.map_or(v, |k| &v[k]).as_str().map(str::to_string))
-            .collect()
-    };
+/// An optional connection (`slot(provider, { optional: true })`) may stay unbound: it is reported
+/// as skipped.
+async fn check_declared(
+    client: &Client,
+    p: &Project,
+    environments: &[String],
+    version: &Value,
+) -> Result<()> {
     // Servers before the rename list them as `slots`.
-    let declared = match version.get("connections").is_some_and(|c| c.is_array()) {
-        true => names("connections", Some("name")),
-        false => names("slots", Some("name")),
+    let field = match version.get("connections").is_some_and(|c| c.is_array()) {
+        true => "connections",
+        false => "slots",
     };
-    let secrets = names("secrets", None);
+    // Each declared connection's name, and whether it is optional.
+    let declared: Vec<(&str, bool)> = version[field]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|c| Some((c["name"].as_str()?, c["optional"] == true)))
+        .collect();
+    let secrets: Vec<&str> = version["secrets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
     let mut problems = Vec::new();
-    for env in &p.environments {
+    for (env, environment_id) in p.environments.iter().zip(environments) {
         let bindings = client
             .ok(
                 &format!("{ENVIRONMENTS}/ListEnvironmentConnections"),
-                json!({"environmentId": env.environment_id}),
+                json!({"environmentId": environment_id}),
             )
             .await?["connections"]
             .as_array()
@@ -713,26 +823,36 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
         let set = client
             .ok(
                 &format!("{ENVIRONMENTS}/ListEnvironmentSecrets"),
-                json!({"environmentId": env.environment_id}),
+                json!({"environmentId": environment_id}),
             )
             .await?["secrets"]
             .as_array()
             .cloned()
             .unwrap_or_default();
         for (name, _) in &env.connections {
-            if !declared.contains(name) {
+            if !declared.iter().any(|(d, _)| d == name) {
                 problems.push(format!(
                     "{}: the version declares no connection {name}",
                     env.environment
                 ));
             }
         }
-        for name in &declared {
+        for (name, optional) in &declared {
             let bound = bindings.iter().any(|b| {
-                binding_name(b) == name.as_str()
+                binding_name(b) == *name
                     && b["connectionId"].as_str().is_some_and(|c| !c.is_empty())
             });
-            if !bound && !env.connections.iter().any(|(n, _)| n == name) {
+            if bound || env.connections.iter().any(|(n, _)| n == name) {
+                continue;
+            }
+            if *optional {
+                eprintln!(
+                    "Ontology {}: {}: {}",
+                    p.name,
+                    env.environment,
+                    skipped(name)
+                );
+            } else {
                 problems.push(format!(
                     "{}: connection {name} is neither bound nor in the spec",
                     env.environment
@@ -740,7 +860,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             }
         }
         for (name, _) in &env.secrets {
-            if !secrets.contains(name) {
+            if !secrets.contains(&name.as_str()) {
                 problems.push(format!(
                     "{}: the version declares no secret {name}",
                     env.environment
@@ -748,9 +868,7 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
             }
         }
         for name in &secrets {
-            let already = set
-                .iter()
-                .any(|s| s["name"] == name.as_str() && s["set"] == true);
+            let already = set.iter().any(|s| s["name"] == *name && s["set"] == true);
             if !already && !env.secrets.iter().any(|(s, _)| s == name) {
                 problems.push(format!(
                     "{}: secret {name} is neither set nor in the spec",
@@ -769,16 +887,14 @@ async fn check_declared(client: &Client, p: &Project, version: &Value) -> Result
     Ok(())
 }
 
-/// Build, check, then bind and roll out one environment at a time, ontology by ontology. On a
-/// failure, says which environments of that ontology run the new version, which is bound to it
+/// Create what is new, build, check, then bind and roll out one environment at a time, ontology
+/// by ontology. On a failure, says which environments of that ontology run the new version, which is bound to it
 /// but not running it, and which are as they were; every rollout that completed before it, of any
 /// ontology; and that the agents were not applied.
 pub async fn execute(args: &Deploy, plan: Plan) -> Result<()> {
-    use base64::Engine;
     let mut completed = Vec::new();
     for p in &plan.projects {
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&plan.artifacts[&p.name]);
-        if let Err(e) = deploy_one(args, &plan, p, &encoded, &mut completed).await {
+        if let Err(e) = deploy_one(args, &plan, p, &mut completed).await {
             let before = if completed.is_empty() {
                 "none".to_string()
             } else {
@@ -797,11 +913,40 @@ async fn deploy_one(
     args: &Deploy,
     plan: &Plan,
     p: &Project,
-    encoded: &str,
     completed: &mut Vec<String>,
 ) -> Result<()> {
+    use base64::Engine;
     let client = &plan.client;
     {
+        let project_id = match &p.id {
+            Some(id) => id.clone(),
+            None => {
+                let mut body = json!({"name": p.name});
+                if !p.team.is_empty() {
+                    body["teamId"] = json!(p.team);
+                }
+                let created = client
+                    .ok(&format!("{PROJECTS}/CreateProject"), body)
+                    .await?;
+                eprintln!("Ontology {}: created the project", p.name);
+                created["project"]["id"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string()
+            }
+        };
+        // A new project's ontology compiles only now that the project exists.
+        let new;
+        let built = match plan.built.get(&p.name) {
+            Some(built) => built,
+            None => {
+                eprintln!("Ontology {}: building", p.name);
+                let folder = plan.dir.join("ontologies").join(&p.name);
+                new = build(client, &p.name, &project_id, &folder).await?;
+                &new
+            }
+        };
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&built.artifact);
         eprintln!(
             "Ontology {}: uploading {}",
             p.name,
@@ -810,7 +955,7 @@ async fn deploy_one(
         let created = client
             .ok(
                 &format!("{VERSIONS}/CreateVersion"),
-                json!({"projectId": p.id, "commitSha": plan.commit, "ref": plan.branch, "artifact": encoded}),
+                json!({"projectId": project_id, "commitSha": plan.commit, "ref": plan.branch, "artifact": encoded}),
             )
             .await?;
         let version_id = created["version"]["id"]
@@ -832,9 +977,39 @@ async fn deploy_one(
                 version["error"].as_str().unwrap_or("no detail")
             );
         }
-        check_declared(client, p, &version).await?;
-        let mut done: Vec<&str> = Vec::new();
+        let mut environments = Vec::new();
         for env in &p.environments {
+            if let Some(live) = env.live_differs {
+                eprintln!(
+                    "Ontology {}: {}: {}",
+                    p.name,
+                    env.environment,
+                    live_differs(live)
+                );
+            }
+            environments.push(match &env.id {
+                Some(id) => id.clone(),
+                None => {
+                    let created = client
+                        .ok(
+                            &format!("{ENVIRONMENTS}/CreateEnvironment"),
+                            json!({"projectId": project_id, "name": env.environment, "target": "TARGET_CLOUDFLARE", "storage": built.storage, "live": env.live}),
+                        )
+                        .await?;
+                    eprintln!(
+                        "Ontology {}: created the environment {}",
+                        p.name, env.environment
+                    );
+                    created["environment"]["id"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string()
+                }
+            });
+        }
+        check_declared(client, p, &environments, &version).await?;
+        let mut done: Vec<&str> = Vec::new();
+        for (env, environment_id) in p.environments.iter().zip(&environments) {
             let state = |bound: bool| {
                 let untouched: Vec<&str> = p
                     .environments
@@ -863,20 +1038,23 @@ async fn deploy_one(
             };
             for (name, connection) in &env.connections {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": env.environment_id, "name": name, "slot": name, "connectionId": connection}))
+                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentConnection"), json!({"environmentId": environment_id, "name": name, "slot": name, "connectionId": connection}))
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
             for (name, secret) in &env.secrets {
                 client
-                    .ok(&format!("{ENVIRONMENTS}/SetEnvironmentSecretBinding"), json!({"environmentId": env.environment_id, "name": name, "secretId": secret}))
+                    .ok(
+                        &format!("{ENVIRONMENTS}/SetEnvironmentSecretBinding"),
+                        json!({"environmentId": environment_id, "name": name, "secretId": secret}),
+                    )
                     .await
                     .map_err(|e| e.context(state(false)))?;
             }
             let started = client
                 .ok(
                     &format!("{ENVIRONMENTS}/Deploy"),
-                    json!({"environmentId": env.environment_id, "versionId": version_id, "acceptRebuild": args.accept_rebuild}),
+                    json!({"environmentId": environment_id, "versionId": version_id, "acceptRebuild": args.accept_rebuild}),
                 )
                 .await
                 .map_err(|e| e.context(state(true)))?;
@@ -887,7 +1065,7 @@ async fn deploy_one(
             let finished = poll(
                 client,
                 &format!("{ENVIRONMENTS}/ListDeployments"),
-                json!({"environmentId": env.environment_id}),
+                json!({"environmentId": environment_id}),
                 |listed| {
                     listed["deployments"]
                         .as_array()
@@ -1003,7 +1181,7 @@ mod tests {
     const CLIENT: &str = r#"import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 const [command, root, out] = process.argv.slice(2);
-if (command === "ir") process.stdout.write(JSON.stringify({ root }));
+if (command === "ir") process.stdout.write(JSON.stringify({ root, storage: "postgres" }));
 else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export default {};\n"); }
 "#;
 
@@ -1053,6 +1231,10 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         ontology_unserved: bool,
         /// A server before the rename: `slots`/`slot` fields, and binding requires `slot`.
         old_server: bool,
+        /// An organization with no project or environment yet.
+        fresh: bool,
+        /// The declared connections the version marks optional.
+        optional: &'static [&'static str],
     }
 
     impl Default for World {
@@ -1070,6 +1252,8 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                 compile_errors: None,
                 ontology_unserved: false,
                 old_server: false,
+                fresh: false,
+                optional: &[],
             }
         }
     }
@@ -1116,6 +1300,10 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                     calls.lock().unwrap().push((method.clone(), body.clone()));
                     let env = body["environmentId"].as_str().unwrap_or_default().to_string();
                     let answer = match method.as_str() {
+                        "ListProjects" | "ListEnvironments" if world.fresh => json!({}),
+                        "ListTeams" => json!({"teams": [{"id": "t1", "slug": "factory"}]}),
+                        "CreateProject" => json!({"project": {"id": "p1", "name": body["name"], "teamId": body["teamId"]}}),
+                        "CreateEnvironment" => json!({"environment": {"id": format!("e-{}", body["name"].as_str().unwrap())}}),
                         "ListProjects" => json!({"projects": [{"id": "p1", "name": "shop", "teamId": "t1"}, {"id": "p2", "name": "warehouse", "teamId": "t1"}]}),
                         "ListEnvironments" if body["projectId"] == "p1" => {
                             json!({"environments": [{"id": "e1", "name": "production"}, {"id": "e2", "name": "staging"}]})
@@ -1129,7 +1317,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
                         },
                         "CreateVersion" => json!({"version": {"id": "v1", "status": "VERSION_STATUS_BUILDING"}}),
                         "GetVersion" => {
-                            let declared: Vec<Value> = world.declared.as_array().unwrap().iter().map(|name| json!({"name": name, "provider": name})).collect();
+                            let declared: Vec<Value> = world.declared.as_array().unwrap().iter().map(|name| json!({"name": name, "provider": name, "optional": world.optional.contains(&name.as_str().unwrap())})).collect();
                             let field = if world.old_server { "slots" } else { "connections" };
                             json!({"version": {"id": "v1", "status": "VERSION_STATUS_READY", "secrets": ["PG_PASSWORD"], field: declared}})
                         }
@@ -1478,7 +1666,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         let specs = spec();
         let shop = BTreeMap::from([("shop".to_string(), &specs["shop"])]);
         let mut actions = Vec::new();
-        let projects = preflight(&client, &shop, &mut actions).await.unwrap();
+        let projects = preflight(&client, &shop, None, &mut actions).await.unwrap();
         assert!(actions.is_empty());
         let plan = plan_text(&client, &projects, &shop).await.unwrap();
         assert!(
@@ -1492,6 +1680,201 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         assert!(!plan.contains("production: connection linear"), "{plan}");
         assert!(
             plan.contains("staging: connection linear: unbound → linear/acme\n"),
+            "{plan}"
+        );
+    }
+
+    /// A first deploy into an organization with nothing yet: the project is created in the
+    /// deploy's team, compiled and built once it exists, then each environment is created with the
+    /// IR's storage and the spec's `live`, bound and rolled out. A team that does not exist blocks
+    /// it before anything changes.
+    #[tokio::test]
+    async fn a_first_deploy_creates_the_project_and_its_environments() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            fresh: true,
+            ..World::default()
+        })
+        .await;
+        let mut a = args(url.clone(), repo.path());
+        a.ontology = vec!["shop".into()];
+        a.team = Some("factory".into());
+        let mut d = declarations(false);
+        d.ontologies
+            .get_mut("shop")
+            .unwrap()
+            .environments
+            .get_mut("production")
+            .unwrap()
+            .live = Some(true);
+
+        let mut nowhere = args(url, repo.path());
+        nowhere.ontology = vec!["shop".into()];
+        nowhere.team = Some("nope".into());
+        let (actions, _) = crate::deploy::ontologies_first(&nowhere, &d, false)
+            .await
+            .unwrap();
+        assert_eq!(actions.len(), 1, "{actions:?}");
+        assert!(actions[0].message.contains("team nope does not exist"));
+        assert!(changes(&calls).is_empty(), "{:?}", changes(&calls));
+
+        let (actions, _) = crate::deploy::ontologies_first(&a, &d, false)
+            .await
+            .unwrap();
+        assert!(actions.is_empty(), "{actions:?}");
+        assert_eq!(
+            changes(&calls),
+            [
+                "CreateProject",
+                "CreateVersion",
+                "CreateEnvironment",
+                "CreateEnvironment",
+                "SetEnvironmentConnection e-production",
+                "SetEnvironmentConnection e-production",
+                "SetEnvironmentSecretBinding e-production",
+                "Deploy e-production",
+                "SetEnvironmentConnection e-staging",
+                "SetEnvironmentConnection e-staging",
+                "SetEnvironmentSecretBinding e-staging",
+                "Deploy e-staging",
+            ]
+        );
+        let calls = calls.lock().unwrap().clone();
+        let body = |method: &str, nth: usize| {
+            let mut found = calls.iter().filter(|(m, _)| m == method);
+            found.nth(nth).unwrap().1.clone()
+        };
+        assert_eq!(
+            body("CreateProject", 0),
+            json!({"name": "shop", "teamId": "t1"})
+        );
+        // Tilde compiles for a project: only once it was created.
+        let order: Vec<&str> = calls.iter().map(|(m, _)| m.as_str()).collect();
+        let at = |method: &str| order.iter().position(|m| *m == method).unwrap();
+        assert!(at("CreateProject") < at("CompileOntology"), "{order:?}");
+        assert_eq!(body("CompileOntology", 0)["projectId"], "p1");
+        assert_eq!(
+            body("CreateEnvironment", 0),
+            json!({"projectId": "p1", "name": "production", "target": "TARGET_CLOUDFLARE",
+                   "storage": "STORAGE_POSTGRES", "live": true})
+        );
+        assert_eq!(body("CreateEnvironment", 1)["live"], false);
+    }
+
+    /// The plan names what a first deploy creates. An existing environment whose `live` differs
+    /// from the spec keeps its own (no RPC changes it), and the plan says so.
+    #[tokio::test]
+    async fn the_plan_shows_what_is_created_and_a_live_that_stays() {
+        let specs: BTreeMap<String, OntologySpec> =
+            serde_json::from_value(json!({"shop": {"environments": {
+                "production": {"live": true},
+                "staging": {}}}}))
+            .unwrap();
+        let shop = BTreeMap::from([("shop".to_string(), &specs["shop"])]);
+        let plan = |fresh: bool| {
+            let shop = &shop;
+            async move {
+                let (url, calls) = cloud(World {
+                    fresh,
+                    ..World::default()
+                })
+                .await;
+                let client = Client {
+                    base: url,
+                    http: reqwest::Client::new(),
+                    key: None,
+                };
+                let mut actions = Vec::new();
+                let projects = preflight(&client, shop, None, &mut actions).await.unwrap();
+                assert!(actions.is_empty());
+                let plan = plan_text(&client, &projects, shop).await.unwrap();
+                assert!(changes(&calls).is_empty());
+                plan
+            }
+        };
+        let first = plan(true).await;
+        assert!(
+            first.contains("ontology shop: create the project\n"),
+            "{first}"
+        );
+        assert!(
+            first.contains("production: create the environment (live)\n")
+                && first.contains("staging: create the environment\n"),
+            "{first}"
+        );
+        let existing = plan(false).await;
+        assert!(!existing.contains("create the"), "{existing}");
+        assert!(
+            existing.contains("production: live stays false: the spec says true"),
+            "{existing}"
+        );
+        assert!(!existing.contains("staging: live"), "{existing}");
+    }
+
+    /// A connection the version declares that is neither bound nor in the spec stops the deploy
+    /// before any binding, unless the version marks it optional: then it rolls out without it, and
+    /// the plan lists it as skipped.
+    #[tokio::test]
+    async fn an_unbound_connection_is_refused_unless_optional() {
+        let repo = repository();
+        let (url, calls) = cloud(World {
+            declared: json!(["github", "linear", "datadog"]),
+            ..Default::default()
+        })
+        .await;
+        let mut a = args(url, repo.path());
+        a.ontology = vec!["shop".into()];
+        let error = format!(
+            "{:#}",
+            crate::deploy::ontologies_first(&a, &declarations(false), false)
+                .await
+                .unwrap_err()
+        );
+        assert!(
+            error.contains("production: connection datadog is neither bound nor in the spec"),
+            "{error}"
+        );
+        assert_eq!(changes(&calls), ["CreateVersion"]);
+
+        let repo = repository();
+        let unbound = json!({"connections": [
+            {"name": "github", "declared": true}, {"name": "linear", "declared": true},
+            {"name": "datadog", "declared": true, "optional": true}]});
+        let (url, calls) = cloud(World {
+            declared: json!(["github", "linear", "datadog"]),
+            optional: &["datadog"],
+            bound: BTreeMap::from([("e1", unbound.clone()), ("e2", unbound)]),
+            ..Default::default()
+        })
+        .await;
+        let mut a = args(url.clone(), repo.path());
+        a.ontology = vec!["shop".into()];
+        crate::deploy::ontologies_first(&a, &declarations(false), false)
+            .await
+            .unwrap();
+        let changed = changes(&calls);
+        assert!(changed.contains(&"Deploy e2".to_string()), "{changed:?}");
+        assert!(
+            !calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(m, b)| { m == "SetEnvironmentConnection" && b["name"] == "datadog" })
+        );
+
+        let client = Client {
+            base: url,
+            http: reqwest::Client::new(),
+            key: None,
+        };
+        let specs = spec();
+        let shop = BTreeMap::from([("shop".to_string(), &specs["shop"])]);
+        let projects = preflight(&client, &shop, None, &mut Vec::new())
+            .await
+            .unwrap();
+        let plan = plan_text(&client, &projects, &shop).await.unwrap();
+        assert!(
+            plan.contains("production: connection datadog: skipped (optional and unbound"),
             "{plan}"
         );
     }
@@ -1747,7 +2130,7 @@ else { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, "export 
         tokio::spawn(async move {
             let _ = axum::serve(listener, Router::new()).await;
         });
-        let (actions, plan, _) = prepare(&args(url, repo.path()), &spec(), false)
+        let (actions, plan, _) = prepare(&args(url, repo.path()), &spec(), None, false)
             .await
             .unwrap();
         assert!(plan.is_none());

@@ -282,16 +282,24 @@ export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[
  */
 export type OntologyConnections = { readonly [name: string]: { readonly provider: string } };
 /** What one environment of the ontology binds: its connections to the organization's, secret
- * names to secrets. */
+ * names to secrets. An optional connection (`slot(provider, { optional: true })`) may be left
+ * out: the environment deploys without it and its pipelines wait until it is bound. */
 export type OntologyEnvironment<C extends OntologyConnections = OntologyConnections> = {
   connections?: { readonly [K in keyof C]?: ConnectionRef<string, C[K]["provider"]> };
   /** The ontology's secret name to a Tilde secret of the project's team (or the organization). */
   secrets?: { readonly [name: string]: SecretRef };
+  /**
+   * Whether the environment is live: Tilde serves its spaces to the organization
+   * (`LiveService`). Set when `tilde deploy` creates the environment; an existing environment
+   * keeps its own, and the deploy says so when the two differ.
+   */
+  live?: boolean;
 };
 /**
  * An ontology of the project (Tilde Cloud), in the repository's `ontologies/<name>/`: per
- * environment, its bindings. `tilde deploy` builds it into a version, binds each environment, rolls the
- * version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
+ * environment, its bindings. `tilde deploy` creates the project and each environment the
+ * organization does not have yet, builds the ontology into a version, binds each environment,
+ * rolls the version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
  * its project's in Tilde.
  */
 export type Ontology<C extends OntologyConnections = OntologyConnections> = {
@@ -317,6 +325,7 @@ const ontologyJson = (spec: Ontology) => ({
           secrets: Object.fromEntries(
             Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
           ),
+          ...(env.live === undefined ? {} : { live: env.live }),
         },
       ];
     }),
