@@ -26,9 +26,7 @@ export function ConnectionUsages({ usages }: { usages: ConnectionUsage[] }) {
           <Badge variant="secondary" className="shrink-0">
             {KINDS[usage.kind] ?? usage.kind}
           </Badge>
-          <span className="truncate font-medium">
-            {usage.name}
-          </span>
+          <span className="truncate font-medium">{usage.name}</span>
           {usage.detail && <span className="truncate text-muted-foreground">{usage.detail}</span>}
         </li>
       ))}
