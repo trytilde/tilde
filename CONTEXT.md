@@ -42,10 +42,10 @@ server validation. Rust serves the setup host/assets and proxies Vite during dev
 Opaque-origin frames use a scoped MessagePort bridge; only the host holds the setup token.
 
 Connection usage: a connection in use is never disconnected or deleted. Its uses
-(`queries/connections/usages.sql`, `ConnectionsService.usages`; `Connection.usages` on
+(`queries/connections/usages.sql`, `Connections::usages`; `Connection.usages` on
 GetConnection and ListConnections) are agent assignments, the agents a personal connection allows
 by name, agents' and sandbox blueprints' tool sources, routines on its signals, sandbox blueprints
-and their egress grants, live sandboxes left on it by a blueprint that no longer names it, the
+and their egress grants, sandboxes left on it by a blueprint that no longer names it, the
 memory embeddings and memory banks' synthesis.
 `Disconnect` (and deleting a tool host, whose instances go with it) refuses with
 `failed_precondition` naming every use; the person removes each first.

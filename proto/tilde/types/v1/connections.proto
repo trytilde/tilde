@@ -122,7 +122,7 @@ message Connection {
 // `personal_agent` (an agent a personal connection allows), `tool_source` (an agent's; `detail`
 // its slug), `sandbox_tool_source` (a sandbox blueprint's; `detail` its slug), `routine` (fired
 // by its signals; `detail` its agent and signal), `sandbox_blueprint`,
-// `sandbox` (a live sandbox on it its blueprint no longer names; `detail` its status),
+// `sandbox` (a sandbox on it its blueprint no longer names; `detail` its status),
 // `sandbox_egress` (a blueprint's egress grant; `detail` its slug), `memory` (the memory
 // embeddings; `detail` the model) or `memory_synthesis` (a memory bank's).
 // `id` is the agent, routine, blueprint, sandbox or memory bank.

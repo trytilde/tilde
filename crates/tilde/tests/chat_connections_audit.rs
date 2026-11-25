@@ -131,16 +131,20 @@ async fn assignment_is_atomic_exclusive_by_chat_capability_and_paginated_with_ag
         .await
         .unwrap();
     assert!(available.is_empty());
+    // Still A's channel, it is in use: unassigned first, it disconnects.
+    let refused = service.disconnect(second.connection.id).await.unwrap_err();
+    assert!(
+        matches!(&refused, tilde::error::Error::InUse(message) if message.contains("agent A (channel)")),
+        "{refused:?}"
+    );
+    service
+        .unassign(second.connection.id, &assignment)
+        .await
+        .unwrap();
     service.disconnect(second.connection.id).await.unwrap();
     assert_eq!(
-        service
-            .get(second.connection.id)
-            .await
-            .unwrap()
-            .associated_agents
-            .0[0]
-            .id,
-        a
+        service.get(second.connection.id).await.unwrap().status,
+        "disconnected"
     );
     db.close().await;
 }

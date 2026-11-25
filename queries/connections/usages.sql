@@ -34,11 +34,11 @@ FROM (
  SELECT b.connection_id,'sandbox_blueprint',b.id,b.name,'','sandbox_blueprint',b.id
  FROM sandbox_blueprints b WHERE b.connection_id=ANY(:ids::UUID[])
  UNION ALL
- -- A live sandbox left on a connection its blueprint no longer names (otherwise the blueprint is
- -- the use): it sleeps, wakes and terminates through it.
+ -- A sandbox left on a connection its blueprint no longer names (otherwise the blueprint is the
+ -- use): it sleeps, wakes and is terminated through it, a failed one by the sweeper too.
  SELECT s.connection_id,'sandbox',s.id,b.name,s.status,'sandbox_blueprint',b.id
  FROM sandboxes s JOIN sandbox_blueprints b ON b.id=s.blueprint_id
- WHERE s.connection_id=ANY(:ids::UUID[]) AND s.status<>'failed' AND b.connection_id<>s.connection_id
+ WHERE s.connection_id=ANY(:ids::UUID[]) AND b.connection_id<>s.connection_id
  UNION ALL
  SELECT g.connection_id,'sandbox_egress',b.id,b.name,g.slug,'sandbox_blueprint',b.id
  FROM sandbox_blueprint_egress g JOIN sandbox_blueprints b ON b.id=g.blueprint_id WHERE g.connection_id=ANY(:ids::UUID[])

@@ -1086,52 +1086,29 @@ pub(super) fn terminal(step: &str) -> bool {
 }
 /// The refusal of a connection still in use, naming each use so its users can be unbound first.
 pub(crate) fn in_use(usages: &[crate::connections::db::Usage]) -> Error {
-    let named: Vec<String> = usages
-        .iter()
-        .map(|u| {
-            let visible = true;
-            let (noun, what) = match u.kind.as_str() {
-                "agent" => ("an agent", format!("agent {} ({})", u.name, u.detail)),
-                "personal_agent" => ("an agent", format!("agent {} (personal use)", u.name)),
-                "tool_source" => (
-                    "an agent",
-                    format!("agent {} (tool source `{}`)", u.name, u.detail),
-                ),
-                "sandbox_tool_source" => (
-                    "a sandbox blueprint",
-                    format!("sandbox blueprint {} (tool source `{}`)", u.name, u.detail),
-                ),
-                "routine" => ("a routine", format!("routine {} ({})", u.name, u.detail)),
-                "sandbox_blueprint" => (
-                    "a sandbox blueprint",
-                    format!("sandbox blueprint {}", u.name),
-                ),
-                "sandbox" => (
-                    "a sandbox",
-                    format!("a {} sandbox of blueprint {}", u.detail, u.name),
-                ),
-                "sandbox_egress" => (
-                    "a sandbox blueprint",
-                    format!("sandbox blueprint {} (egress `{}`)", u.name, u.detail),
-                ),
-                "memory" => ("memory", format!("memory embeddings ({})", u.detail)),
-                "memory_synthesis" => (
-                    "a memory bank",
-                    format!("memory bank {} (synthesis)", u.name),
-                ),
-                other => ("something", other.to_string()),
-            };
-            if visible {
-                what
-            } else {
-                format!("{noun} you cannot view")
-            }
-        })
-        .collect();
+    let named: Vec<String> = usages.iter().map(describe).collect();
     Error::InUse(format!(
         "The connection is in use; remove it from these first: {}",
         named.join("; ")
     ))
+}
+/// One use, as the refusal names it.
+fn describe(u: &crate::connections::db::Usage) -> String {
+    match u.kind.as_str() {
+        "agent" => format!("agent {} ({})", u.name, u.detail),
+        "personal_agent" => format!("agent {} (personal use)", u.name),
+        "tool_source" => format!("agent {} (tool source `{}`)", u.name, u.detail),
+        "sandbox_tool_source" => {
+            format!("sandbox blueprint {} (tool source `{}`)", u.name, u.detail)
+        }
+        "routine" => format!("routine {} ({})", u.name, u.detail),
+        "sandbox_blueprint" => format!("sandbox blueprint {}", u.name),
+        "sandbox" => format!("a {} sandbox of blueprint {}", u.detail, u.name),
+        "sandbox_egress" => format!("sandbox blueprint {} (egress `{}`)", u.name, u.detail),
+        "memory" => format!("memory embeddings ({})", u.detail),
+        "memory_synthesis" => format!("memory bank {} (synthesis)", u.name),
+        other => other.to_string(),
+    }
 }
 /// Tilde connections live and die with their agent; clients cannot disconnect or unassign them.
 fn system_managed(row: &Connection) -> Result<(), Error> {
