@@ -1,3 +1,0 @@
-kind: Changed
-body: "`tilde deploy` and `@trytilde/iac` send and read only `name`/`connections`: they need Tilde Cloud with the connections rename, and `slots` is no longer read."
-time: 2026-11-24T15:30:00+00:00

@@ -1,3 +1,0 @@
-kind: Added
-body: "`@trytilde/chat-ui`'s `Chat` (also `@trytilde/embed/react`'s) takes `header={false}` to show only the transcript and the message bar. The chat pane no longer draws a right border, and its hover washes (message actions, header actions, the attach button and its menu rows) come from the palette's `--hover`, which a theme derives from `ink`, instead of a fixed grey."
-time: 2026-11-24T18:30:00+00:00

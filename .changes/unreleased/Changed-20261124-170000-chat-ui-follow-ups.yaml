@@ -1,3 +1,0 @@
-kind: Changed
-body: '`@trytilde/chat-ui`: a refused proxy request shows its Connect error message instead of "Sign in to chat" or "Unable to load agents"; `ListSessions` takes `fetch` like `Chat` (both must be stable or memoised); a viewer who is not yet in the thread posts naming no participant, for the server to bind (Tilde Cloud spaces join the viewer on their first post).'
-time: 2026-11-24T17:00:00+00:00

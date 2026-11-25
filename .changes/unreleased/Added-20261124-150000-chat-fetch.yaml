@@ -1,3 +1,0 @@
-kind: Added
-body: "`@trytilde/chat-ui`: `Chat.fetch` replaces the cookie-carrying fetch for agent discovery and every ChatService call, so a host can send a bearer token instead (Tilde Cloud spaces' `<AgentChat>`) or answer from fixtures in tests and Storybook."
-time: 2026-11-24T15:00:00+00:00
