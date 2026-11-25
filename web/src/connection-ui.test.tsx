@@ -170,3 +170,75 @@ it("takes the host's theme through the setup handshake, and a later change", asy
     root.classList.remove("dark");
   }
 });
+
+it("prefills schema fields from the page's URL, never secrets, with saved drafts winning", async () => {
+  const { create } = await import("@bufbuild/protobuf");
+  const { BrokeringSchema, AuthDriver } =
+    await import("@trytilde/contracts/tilde/setup/v1/connections_pb.js");
+  const { CredentialForm } = await import("@trytilde/connection-ui");
+  const submit = vi.fn().mockResolvedValue(undefined);
+  const accountNameForm = renderHook(() => useForm<{ name: string }>()).result.current;
+  const setup = {
+    formId: "provider-form",
+    accountNameForm,
+    state: undefined,
+    error: "",
+    busy: false,
+    submit,
+    cancel: vi.fn(),
+    saveDraft: vi.fn(),
+    startOAuth: vi.fn(),
+    saveCredentials: vi.fn(),
+    executeProviderAction: vi.fn(),
+  } satisfies Setup;
+  const state = create(BrokeringSchema, {
+    actionId: "act_1",
+    authDriver: AuthDriver.STATIC,
+    draft: [{ key: "site", value: "drafted.example" }],
+    action: { case: "form", value: {} },
+    inputSchemaJson: JSON.stringify({
+      type: "object",
+      properties: {
+        region: { type: "string", title: "Region", enum: ["eu", "us"] },
+        tier: { type: "string", title: "Tier", enum: ["free", "pro"] },
+        enabled: { type: "boolean", title: "Enabled" },
+        site: { type: "string", title: "Site" },
+        account: { type: "string", title: "Account" },
+        passphrase: { type: "string", title: "Passphrase", writeOnly: true },
+        api_key: { type: "string", title: "API key" },
+      },
+    }),
+  });
+  const previous = window.location.href;
+  window.history.replaceState(
+    null,
+    "",
+    "/catalog/_standard/ui?field.region=eu&field.tier=enterprise&field.enabled=true" +
+      "&field.site=from-url.example&field.account=acme&field.passphrase=p&field.api_key=k",
+  );
+  try {
+    render(<CredentialForm setup={setup} state={state} />);
+    const value = (label: string) => (screen.getByLabelText(label) as HTMLInputElement).value;
+    expect(value("Region")).toBe('"eu"');
+    // Not one of the field's choices: ignored.
+    expect(value("Tier")).toBe("");
+    expect(value("Enabled")).toBe("true");
+    await waitFor(() => expect(value("Site")).toBe("drafted.example"));
+    expect(value("Account")).toBe("acme");
+    expect(value("Passphrase")).toBe("");
+    expect(value("API key")).toBe("");
+    // Prefilled values stay editable.
+    fireEvent.change(screen.getByLabelText("Account"), { target: { value: "acme-2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() =>
+      expect(submit).toHaveBeenCalledWith({
+        region: "eu",
+        enabled: "true",
+        site: "drafted.example",
+        account: "acme-2",
+      }),
+    );
+  } finally {
+    window.history.replaceState(null, "", previous);
+  }
+});
