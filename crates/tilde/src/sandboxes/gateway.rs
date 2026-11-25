@@ -7,8 +7,9 @@
 //! forwarded) against its rules and the grant's config. The client's credentials are dropped,
 //! the narrowest credential the grant needs is minted and attached, and the request streams to
 //! the provider's upstream (fixed, or the connection's own instance or cluster). The path is
-//! checked and forwarded as the client sent it, still percent-encoded. Redirects are not
-//! followed: a same-host `Location` is rewritten to the route, any other passes to the client,
+//! checked and forwarded as the client sent it, still percent-encoded, except that escapes of
+//! unreserved characters are decoded first, so no rule is sidestepped by escaping a letter of
+//! it. Redirects are not followed: a same-host `Location` is rewritten to the route, any other passes to the client,
 //! which follows it without a credential. The one exception is a git upstream that redirects to
 //! replica nodes under its own host (`replicas`), which the gateway follows with the credential.
 //! Each request is a `sandbox.egress` span on the sandbox's latest invocation.
@@ -108,6 +109,12 @@ async fn egress(
         .and_then(|rest| rest.split_once('/'))
         .map(|(_, path)| format!("/{path}"))
         .unwrap_or_default();
+    let Some(path) = normalised(&path) else {
+        return refuse(
+            StatusCode::BAD_REQUEST,
+            "Malformed percent-encoding in the path",
+        );
+    };
     let Some(token) = presented(request.headers()) else {
         return refuse(StatusCode::UNAUTHORIZED, "Egress token required");
     };
@@ -477,6 +484,31 @@ fn forwarded(name: &str) -> bool {
             | "x-forwarded-host"
             | "x-forwarded-proto"
     )
+}
+
+/// The path with the escapes of unreserved characters decoded (RFC 3986 section 6.2.2.2: the
+/// same resource upstream), so a rule is not sidestepped by escaping one of its letters
+/// (`%76ariables`). Other escapes, an encoded slash among them, stay as sent. `None` when a `%`
+/// starts no escape: decoding around it could spell a new one.
+fn normalised(path: &str) -> Option<String> {
+    let mut out = String::with_capacity(path.len());
+    let mut rest = path;
+    while let Some(at) = rest.find('%') {
+        out.push_str(&rest[..at]);
+        let escape = rest.get(at..at + 3)?;
+        let byte = u8::from_str_radix(&escape[1..], 16).ok()?;
+        if !escape[1..].bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            out.push(byte as char);
+        } else {
+            out.push_str(escape);
+        }
+        rest = &rest[at + 3..];
+    }
+    out.push_str(rest);
+    Some(out)
 }
 
 /// The minted credential as the protocol takes it: a git upstream that authenticates with Basic

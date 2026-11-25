@@ -616,7 +616,9 @@ templates and filters name paths of a signal's context: its data below plus
   refused. A GitLab client's `PRIVATE-TOKEN` header also carries the egress token and never
   travels upstream. Git smart-HTTP paths (`<repository>[.git]/info/refs|git-upload-pack|git-receive-pack`,
   the repository any number of plain segments) are git, anything else HTTP; the path is checked
-  and forwarded as sent, still percent-encoded. A push is read whole first (at most 100 MiB): its pkt-line ref
+  and forwarded as sent, still percent-encoded, except that escapes of unreserved characters
+  are decoded first (`%76ariables` is `variables` to the rules too) and a `%` that starts no
+  escape is refused. A push is read whole first (at most 100 MiB): its pkt-line ref
   updates, whether its pack proves each update a fast-forward (commits walked from new to old
   through the pack, offset deltas resolved; anything unprovable is not), and, for a protocol that
   protects it, the default branch

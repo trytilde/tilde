@@ -821,6 +821,17 @@ async fn sandbox_reaches_a_gitlab_project_through_egress_within_its_grant() {
             format!("/api/v4/projects/{project}/variables"),
             StatusCode::FORBIDDEN,
         ),
+        // Escaping a letter of a denied path names the same resource upstream.
+        (
+            Method::GET,
+            format!("/api/v4/projects/{project}/%76ariables"),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            format!("/api/v4/projects/{project}/%%376ariables"),
+            StatusCode::BAD_REQUEST,
+        ),
         (
             Method::GET,
             "/api/v4/projects/acme%2Fsecrets/merge_requests".to_owned(),
