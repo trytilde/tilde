@@ -1,4 +1,9 @@
-import { ChatService } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
+import { create, fromJson, toBinary, toJson, type JsonValue } from "@bufbuild/protobuf";
+import {
+  ChatService,
+  ListAgentsResponseSchema,
+  type ChatAgent,
+} from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 
 export interface ChatAgentConfig {
   agentId: string;
@@ -19,6 +24,11 @@ export interface ChatProxy {
   handle(request: Request, path?: readonly string[]): Promise<Response>;
 }
 const methods = new Set(ChatService.methods.map((method) => method.name));
+const CONNECT_TYPE = /^application\/(?:json|proto|connect\+json|connect\+proto)(?:;|$)/i;
+/** A unary call's content types (ListAgents is answered here, unenveloped). */
+const UNARY_TYPE = /^application\/(json|proto)(?:;|$)/i;
+/** An agent's ingress refusing this user: that agent is left out, not the whole list. */
+const REFUSED = new Set([401, 403, 404]);
 const failure = (status: number, code: string, message: string) =>
   Response.json({ code, message }, { status, headers: { "cache-control": "no-store" } });
 const identityHeader = (identity: string) =>
@@ -89,8 +99,16 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
           )
         )
           return failure(404, "not_found", "Unknown chat route");
-        if (path.length === 1 && path[0] === "agents" && request.method === "GET") {
-          const listed = [];
+        const [service, method] = path.slice(-2);
+        const contentType = request.headers.get("content-type") ?? "";
+        // `ChatService/ListAgents` at the mount itself: every configured agent this user may
+        // chat with, each asked of its own ingress (the proxy's own answer, not one agent's).
+        if (path.length === 2 && service === ChatService.typeName && method === "ListAgents") {
+          if (request.method !== "POST")
+            return failure(405, "unimplemented", "Use ConnectRPC POST");
+          const codec = UNARY_TYPE.exec(contentType)?.[1]?.toLowerCase();
+          if (!codec) return failure(415, "invalid_argument", "Connect content type required");
+          const listed: ChatAgent[] = [];
           for (const agent of upstream.values()) {
             const auth = await headers(request, agent.agentId);
             if (!auth) continue;
@@ -104,14 +122,27 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
               redirect: "manual",
               cache: "no-store",
             });
+            if (REFUSED.has(response.status)) continue;
             if (!response.ok) return failure(502, "unavailable", "Chat provider is unavailable");
-            const data = (await response.json()) as { agents?: { id: string; name: string }[] };
-            for (const entry of data.agents ?? [])
-              if (entry.id === agent.agentId) listed.push({ id: entry.id, name: entry.name });
+            const data = fromJson(ListAgentsResponseSchema, (await response.json()) as JsonValue, {
+              ignoreUnknownFields: true,
+            });
+            for (const entry of data.agents) if (entry.id === agent.agentId) listed.push(entry);
           }
-          return listed.length
-            ? Response.json({ agents: listed }, { headers: { "cache-control": "no-store" } })
-            : failure(401, "unauthenticated", "Sign in to chat");
+          if (!listed.length) return failure(401, "unauthenticated", "Sign in to chat");
+          const answer = create(ListAgentsResponseSchema, { agents: listed });
+          const binary = codec === "proto";
+          return new Response(
+            binary
+              ? toBinary(ListAgentsResponseSchema, answer)
+              : JSON.stringify(toJson(ListAgentsResponseSchema, answer)),
+            {
+              headers: {
+                "content-type": binary ? "application/proto" : "application/json",
+                "cache-control": "no-store",
+              },
+            },
+          );
         }
         const agent =
           path.length === 3
@@ -119,7 +150,6 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
             : agents.length === 1
               ? upstream.get(agents[0].agentId)
               : undefined;
-        const [service, method] = path.slice(-2);
         if (
           !agent ||
           ![2, 3].includes(path.length) ||
@@ -128,11 +158,7 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
         )
           return failure(404, "not_found", "Unknown chat route");
         if (request.method !== "POST") return failure(405, "unimplemented", "Use ConnectRPC POST");
-        if (
-          !/^application\/(?:json|proto|connect\+json|connect\+proto)(?:;|$)/i.test(
-            request.headers.get("content-type") ?? "",
-          )
-        )
+        if (!CONNECT_TYPE.test(contentType))
           return failure(415, "invalid_argument", "Connect content type required");
         const auth = await headers(request, agent.agentId);
         if (!auth) return failure(401, "unauthenticated", "Sign in to chat");

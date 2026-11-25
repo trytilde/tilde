@@ -217,7 +217,7 @@ It only forwards declared methods, replaces browser credentials with the server-
 sets the base64url `x-tilde-identity` header from `resolve_identity(request, agent_id)`, keeps
 cookies at the host, rejects cross-origin browser requests and upstream redirects, streams
 request and response bodies without buffering, and never exposes upstream error details.
-`GET /api/chat/agents` lists the agents the caller may use. The same-origin check honors
+`/api/chat/tilde.provider.tilde.v1.ChatService/ListAgents` (ConnectRPC, at the mount) lists the agents the caller may use. The same-origin check honors
 `X-Forwarded-Proto`/`X-Forwarded-Host` from a TLS-terminating reverse proxy; pass
 `trust_forwarded_headers=False` when the ASGI server is exposed directly. Multi-agent proxies take
 `agents=[ChatAgentConfig(agent_id, api_key, base_url=...), ...]` and route

@@ -263,9 +263,14 @@ try {
       request.headers.get("cookie") === "session=alice" ? "application:user:alice" : null,
   });
   const routes = createChatRouteHandlers(proxy);
-  const response = await routes.GET(
-    new Request("http://app.test/api/chat/agents", { headers: { cookie: "session=alice" } }),
-    { params: Promise.resolve({ path: ["agents"] }) },
+  // Discovery: the proxy's own `ChatService/ListAgents`, at the mount.
+  const response = await routes.POST(
+    new Request(`http://app.test/api/chat/${ChatService.typeName}/ListAgents`, {
+      method: "POST",
+      headers: { cookie: "session=alice", "content-type": "application/json" },
+      body: "{}",
+    }),
+    { params: Promise.resolve({ path: [ChatService.typeName, "ListAgents"] }) },
   );
   assert.equal(response.status, 200);
   assert.equal((await response.json()).agents[0].id, agent.id);

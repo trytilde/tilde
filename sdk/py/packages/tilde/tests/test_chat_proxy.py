@@ -9,13 +9,17 @@ import pyqwest
 from support import serve_app
 
 from tilde.chat_proxy import CHAT_SERVICE, ChatAgentConfig, create_chat_proxy
+from tilde.provider.tilde.v1 import chat_pb2
 
 
 class Upstream:
     """Records what reaches the provider and streams a framed reply back."""
 
-    def __init__(self) -> None:
+    def __init__(self, agent_id: str = "agent-1", list_status: int = 200) -> None:
         self.requests: list[dict] = []
+        self.agent_id = agent_id
+        # What ListAgents answers: 200 lists this agent, anything else refuses.
+        self.list_status = list_status
 
     async def __call__(self, scope, receive, send) -> None:
         if scope["type"] == "lifespan":
@@ -38,14 +42,16 @@ class Upstream:
             await send(
                 {
                     "type": "http.response.start",
-                    "status": 200,
+                    "status": self.list_status,
                     "headers": [(b"content-type", b"application/json")],
                 }
             )
+            listed = {"agents": [{"id": self.agent_id, "name": "Helper"}]}
+            refused = {"code": "permission_denied", "message": "Not allowed"}
             await send(
                 {
                     "type": "http.response.body",
-                    "body": json.dumps({"agents": [{"id": "agent-1", "name": "Helper"}]}).encode(),
+                    "body": json.dumps(listed if self.list_status == 200 else refused).encode(),
                 }
             )
             return
@@ -162,8 +168,90 @@ async def test_proxy_forwards_allowed_methods_with_server_identity(served):
     )
     assert ignored.status == 403
 
-    agents = await http.get(f"{base}/agents", headers={"cookie": "session=ok"})
+    # ListAgents at the mount itself, in the caller's codec: Connect's JSON, or binary.
+    list_agents = f"{base}/{CHAT_SERVICE}/ListAgents"
+    agents = await http.post(
+        list_agents,
+        headers={"cookie": "session=ok", "content-type": "application/json"},
+        content=b"{}",
+    )
     assert agents.status == 200 and json.loads(agents.content) == {
         "agents": [{"id": "agent-1", "name": "Helper"}]
     }
+    binary = await http.post(
+        list_agents,
+        headers={"cookie": "session=ok", "content-type": "application/proto"},
+        content=b"",
+    )
+    assert binary.status == 200
+    assert binary.headers["content-type"] == "application/proto"
+    decoded = chat_pb2.ListAgentsResponse.FromString(binary.content)
+    assert [(a.id, a.name) for a in decoded.agents] == [("agent-1", "Helper")]
     assert seen[0] == ("", "agent-1") and seen[1] == ("session=ok", "agent-1")
+
+
+async def test_list_agents_lists_only_the_agents_this_user_may_chat_with(served):
+    """A multi-agent proxy asks each agent's own ingress: an agent `resolve_identity` denies is
+    never asked, one whose ingress refuses the user is left out, and an ingress failure fails
+    the list."""
+    ingresses = {
+        "open": Upstream("open"),
+        "private": Upstream("private", list_status=403),
+        "hidden": Upstream("hidden"),
+    }
+    for upstream in ingresses.values():
+        served.append(await serve_app(upstream))
+    urls = {name: served[i].url for i, name in enumerate(ingresses)}
+
+    async def resolve_identity(request, agent_id):
+        return None if agent_id == "hidden" else "user-42"
+
+    def proxy_of(names):
+        return create_chat_proxy(
+            agents=[
+                ChatAgentConfig(name, "tilde_chat_secret", base_url_override=urls[name])
+                for name in names
+            ],
+            resolve_identity=resolve_identity,
+        )
+
+    http = pyqwest.Client(pyqwest.HTTPTransport(follow_redirects=False))
+    host = await serve_app(proxy_of(["open", "private", "hidden"]))
+    served.append(host)
+    list_agents = f"{host.url}/api/chat/{CHAT_SERVICE}/ListAgents"
+    answer = await http.post(
+        list_agents, headers={"content-type": "application/json"}, content=b"{}"
+    )
+    assert answer.status == 200
+    assert json.loads(answer.content) == {"agents": [{"id": "open", "name": "Helper"}]}
+    assert ingresses["hidden"].requests == [], "a denied agent is never asked"
+    assert ingresses["private"].requests[-1]["headers"]["x-tilde-identity"]
+    # Only streaming calls are enveloped: this unary answer takes a unary content type.
+    streaming = await http.post(
+        list_agents, headers={"content-type": "application/connect+json"}, content=b"{}"
+    )
+    assert streaming.status == 415
+
+    # Nobody to chat with: unauthenticated, in Connect's error shape.
+    alone = await serve_app(proxy_of(["private", "hidden"]))
+    served.append(alone)
+    refused = await http.post(
+        f"{alone.url}/api/chat/{CHAT_SERVICE}/ListAgents",
+        headers={"content-type": "Application/Proto"},
+        content=b"",
+    )
+    assert refused.status == 401
+    assert json.loads(refused.content)["code"] == "unauthenticated"
+
+    # An ingress that fails (not a refusal) fails the list.
+    broken = Upstream("broken", list_status=500)
+    served.append(await serve_app(broken))
+    urls["broken"] = served[-1].url
+    failing = await serve_app(proxy_of(["open", "broken"]))
+    served.append(failing)
+    answer = await http.post(
+        f"{failing.url}/api/chat/{CHAT_SERVICE}/ListAgents",
+        headers={"content-type": "application/json"},
+        content=b"{}",
+    )
+    assert answer.status == 502
