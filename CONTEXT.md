@@ -1972,7 +1972,7 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
   (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
   connections and secrets the spec binds (else nothing is bound; a connection the ontology
-  declares optional, `slot(provider, { optional: true })`, may stay unbound and is reported as
+  declares optional, `{ provider, optional: true }`, may stay unbound and is reported as
   skipped: its pipelines do not run until it is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
