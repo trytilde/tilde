@@ -186,8 +186,17 @@ impl Sandboxes {
                             ));
                         }
                     }
-                    egress::EgressProtocol::Git { upstream, .. } => {
-                        wiring.git.push((format!("{url}/"), format!("{upstream}/")));
+                    // The remotes to rewrite depend on the connection's upstream; a connection
+                    // that names none gets no rewrite, and its requests are refused anyway.
+                    egress::EgressProtocol::Git { .. } => {
+                        let upstream = match self.connections.access(row.connection_id).await {
+                            Ok(access) => hook.upstream(protocol, &access),
+                            Err(error) => Err(error),
+                        };
+                        let Ok(upstream) = upstream else { continue };
+                        for remote in hook.git_remotes(&upstream) {
+                            wiring.git.push((format!("{url}/"), remote));
+                        }
                     }
                 }
             }

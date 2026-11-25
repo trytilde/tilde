@@ -56,6 +56,98 @@ pub fn definition(
         ..Default::default()
     }
 }
+/// A row of a provider's tool table: the call and its input fields.
+pub struct Tool {
+    pub rest: Rest,
+    /// Space-separated input fields beside the path placeholders; `!` marks required ones.
+    pub fields: &'static str,
+}
+pub const fn tool(
+    name: &'static str,
+    summary: &'static str,
+    description: &'static str,
+    verb: Verb,
+    path: &'static str,
+    fields: &'static str,
+) -> Tool {
+    Tool {
+        rest: Rest {
+            name,
+            summary,
+            description,
+            verb,
+            path,
+            query: &[],
+        },
+        fields,
+    }
+}
+impl Tool {
+    /// The definition of a table tool: its path placeholders (required) and fields, each with
+    /// the schema `property` gives its name. Other fields pass through to the call.
+    pub fn definition(
+        &self,
+        provider: &str,
+        property: impl Fn(&str) -> Value,
+    ) -> types::ToolDefinition {
+        let mut properties = Map::new();
+        let mut required = vec![];
+        let placeholders = self
+            .rest
+            .path
+            .split('{')
+            .skip(1)
+            .filter_map(|part| part.split_once('}'))
+            .map(|(name, _)| format!("!{}", name.trim_end_matches('*')));
+        for field in placeholders.chain(self.fields.split_whitespace().map(str::to_owned)) {
+            let name = field.trim_start_matches('!');
+            if field.starts_with('!') {
+                required.push(name.to_owned());
+            }
+            properties.insert(name.to_owned(), property(name));
+        }
+        definition(
+            provider,
+            self.rest.name,
+            self.rest.summary,
+            self.rest.description,
+            json!({"type":"object","properties":properties,"required":required,"additionalProperties":true}),
+            self.rest.verb.hints(),
+        )
+    }
+}
+/// Drops `field` from a definition's input: the provider fills it in from the connection.
+pub fn hide(mut definition: types::ToolDefinition, field: &str) -> types::ToolDefinition {
+    if let Ok(mut schema) = serde_json::from_str::<Value>(&definition.input_schema_json) {
+        if let Some(properties) = schema["properties"].as_object_mut() {
+            properties.remove(field);
+        }
+        if let Some(required) = schema["required"].as_array_mut() {
+            required.retain(|name| name != field);
+        }
+        definition.input_schema_json = schema.to_string();
+    }
+    definition
+}
+/// The row named `name`.
+pub fn find<'t>(tools: &'t [Tool], name: &str) -> ToolResult<&'t Tool> {
+    tools
+        .iter()
+        .find(|tool| tool.rest.name == name)
+        .ok_or_else(|| ConnectError::not_found("Unsupported tool"))
+}
+/// A base URL the connection configures (a self-managed instance) must be https, so the
+/// credential never travels in the clear. Endpoint overrides (tests) replace it later.
+pub fn https(url: &str) -> ToolResult<&str> {
+    if url.starts_with("https://") {
+        Ok(url.trim_end_matches('/'))
+    } else {
+        Err(ConnectError::failed_precondition(
+            "The connection's URL must use https",
+        ))
+    }
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct Hints {
     pub read_only: bool,
@@ -183,6 +275,22 @@ pub fn request(
     } else {
         builder.json(&Value::Object(fields))
     })
+}
+/// `value` without its null members and the objects that leaves empty, for request bodies
+/// assembled from optional inputs.
+pub fn without_nulls(value: Value) -> Value {
+    match value {
+        Value::Object(fields) => Value::Object(
+            fields
+                .into_iter()
+                .map(|(key, value)| (key, without_nulls(value)))
+                .filter(|(_, value)| {
+                    !value.is_null() && value.as_object().is_none_or(|o| !o.is_empty())
+                })
+                .collect(),
+        ),
+        other => other,
+    }
 }
 fn scalar(value: Value) -> String {
     match value {

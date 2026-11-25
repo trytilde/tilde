@@ -3,7 +3,8 @@
 //!
 //! A provider declares the protocols its upstream speaks (`Egress`): HTTP with deny-by-default
 //! allow and deny rules (deny wins), and git smart-HTTP with the services it allows and which ref
-//! updates it refuses. Upstreams are fixed by the provider, never by a grant. A grant (a sandbox
+//! updates it refuses. Upstreams are fixed by the provider or read from the connection (a
+//! self-managed instance, a regional cluster), never by a grant. A grant (a sandbox
 //! blueprint's, `sandboxes::egress`) carries a config typed by the provider's JSON Schema that can
 //! only narrow what the rules allow. The provider's hook (`EgressHook`) checks each request
 //! against the rules and that config, and names the narrowest credential the grant needs.
@@ -36,10 +37,14 @@ pub enum EgressProtocol {
         /// the sandbox's egress token.
         wiring: Vec<EnvTemplate>,
     },
-    /// Git smart-HTTP. Paths are `<repository>.git/info/refs`, `.../git-upload-pack` and
+    /// Git smart-HTTP. Paths are `<repository>[.git]/info/refs`, `.../git-upload-pack` and
     /// `.../git-receive-pack` under the upstream.
     Git {
         upstream: &'static str,
+        auth: GitAuth,
+        /// Upstream answers with redirects to replica nodes under its own host: the gateway
+        /// follows those itself, with the credential, instead of handing them to the client.
+        replicas: bool,
         services: Vec<GitService>,
         deny_delete: bool,
         deny_force: bool,
@@ -58,6 +63,15 @@ impl EgressProtocol {
             Self::Git { .. } => "git",
         }
     }
+}
+
+/// How a git upstream takes the minted token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GitAuth {
+    /// Basic, the token as the password of this user (`x-access-token` on GitHub, `oauth2` on
+    /// GitLab).
+    Basic(&'static str),
+    Bearer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,7 +129,8 @@ pub enum EgressRequest<'a> {
     },
     Git {
         protocol: &'a EgressProtocol,
-        /// `owner/repo`, without `.git`.
+        /// The repository path under the upstream, without `.git`: `owner/repo`,
+        /// `group/subgroup/project`, `et/project/repo`.
         repository: &'a str,
         service: GitService,
         /// The ref updates a push's body starts with; empty for discovery and fetches.
@@ -150,6 +165,15 @@ pub trait EgressHook: Send + Sync {
     fn scope(&self, _config: &Value) -> MintScope {
         MintScope::default()
     }
+    /// The protocol's upstream for this connection: the provider's fixed one unless the
+    /// connection names its own (a self-managed instance, a regional cluster).
+    fn upstream(&self, protocol: &EgressProtocol, _access: &Access) -> Result<String, Error> {
+        Ok(protocol.upstream().to_owned())
+    }
+    /// The remote URL prefixes a sandbox's git rewrites to the route, given the git upstream.
+    fn git_remotes(&self, upstream: &str) -> Vec<String> {
+        vec![format!("{upstream}/")]
+    }
     /// Choices for a config field (`x-tilde-options`), from the connection's upstream.
     async fn setup_query(&self, access: &Access, name: &str, input: Value) -> Result<Value, Error>;
 }
@@ -158,6 +182,8 @@ pub trait EgressHook: Send + Sync {
 pub fn hook(provider: &str) -> Option<&'static dyn EgressHook> {
     match provider {
         "github" => Some(crate::connections::catalog::github::egress::hook()),
+        "gitlab" => Some(crate::connections::catalog::gitlab::hook()),
+        "entire" => Some(crate::connections::catalog::entire::hook()),
         _ => None,
     }
 }
@@ -198,6 +224,75 @@ fn with_defaults(schema: &Value, mut value: Value) -> Value {
         }
     }
     value
+}
+
+/// What git forges' grants share: narrowing to repositories and to the branches pushes update.
+pub mod forge {
+    use super::*;
+    use serde_json::json;
+
+    pub fn strings(value: Option<&Value>) -> Vec<&str> {
+        value
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default()
+    }
+    /// The `push` property of a forge grant's config schema.
+    pub fn push_schema(note: &str) -> Value {
+        json!({
+            "type": "object",
+            "title": "Push",
+            "properties": {
+                "branches": {
+                    "type": "array",
+                    "title": "Branches",
+                    "items": {"type": "string", "pattern": "^[A-Za-z0-9_./*-]+$"},
+                    "default": ["factory/*"],
+                    "description": format!("Branches pushes may create and update (`*` matches within a path segment). Empty: no pushes. {note}")
+                }
+            },
+            "additionalProperties": false
+        })
+    }
+    /// `*` matches any run of characters except `/`.
+    pub fn glob(pattern: &str, name: &str) -> bool {
+        match pattern.split_once('*') {
+            None => pattern == name,
+            Some((prefix, rest)) => {
+                let Some(tail) = name.strip_prefix(prefix) else {
+                    return false;
+                };
+                (0..=tail.find('/').unwrap_or(tail.len()))
+                    .filter(|&i| tail.is_char_boundary(i))
+                    .any(|i| glob(rest, &tail[i..]))
+            }
+        }
+    }
+    /// A git request against a grant: the repository must be granted, a push needs granted
+    /// branches (`branches` are globs; empty: no push) and may only update those.
+    pub fn check_git(
+        granted: bool,
+        repository: &str,
+        branches: &[&str],
+        service: GitService,
+        updates: &[RefUpdate],
+    ) -> Decision {
+        if !granted {
+            return Decision::deny(format!("{repository} is not granted"));
+        }
+        if service == GitService::ReceivePack && branches.is_empty() {
+            return Decision::deny("Pushing is not granted");
+        }
+        for update in updates {
+            match update.name.strip_prefix("refs/heads/") {
+                Some(branch) if branches.iter().any(|pattern| glob(pattern, branch)) => {}
+                _ => {
+                    return Decision::deny(format!("Pushing to {} is not granted", update.name));
+                }
+            }
+        }
+        Decision::Allow
+    }
 }
 
 pub mod rules {
