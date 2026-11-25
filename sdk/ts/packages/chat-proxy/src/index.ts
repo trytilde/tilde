@@ -25,6 +25,10 @@ export interface ChatProxy {
 }
 const methods = new Set(ChatService.methods.map((method) => method.name));
 const CONNECT_TYPE = /^application\/(?:json|proto|connect\+json|connect\+proto)(?:;|$)/i;
+/** A unary call's content types (ListAgents is answered here, unenveloped). */
+const UNARY_TYPE = /^application\/(json|proto)(?:;|$)/i;
+/** An agent's ingress refusing this user: that agent is left out, not the whole list. */
+const REFUSED = new Set([401, 403, 404]);
 const failure = (status: number, code: string, message: string) =>
   Response.json({ code, message }, { status, headers: { "cache-control": "no-store" } });
 const identityHeader = (identity: string) =>
@@ -101,8 +105,8 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
         // chat with, each asked of its own ingress (the proxy's own answer, not one agent's).
         if (path.length === 2 && service === ChatService.typeName && method === "ListAgents") {
           if (request.method !== "POST") return failure(405, "unimplemented", "Use ConnectRPC POST");
-          if (!CONNECT_TYPE.test(contentType))
-            return failure(415, "invalid_argument", "Connect content type required");
+          const codec = UNARY_TYPE.exec(contentType)?.[1]?.toLowerCase();
+          if (!codec) return failure(415, "invalid_argument", "Connect content type required");
           const listed: ChatAgent[] = [];
           for (const agent of upstream.values()) {
             const auth = await headers(request, agent.agentId);
@@ -117,6 +121,7 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
               redirect: "manual",
               cache: "no-store",
             });
+            if (REFUSED.has(response.status)) continue;
             if (!response.ok) return failure(502, "unavailable", "Chat provider is unavailable");
             const data = fromJson(ListAgentsResponseSchema, (await response.json()) as JsonValue, {
               ignoreUnknownFields: true,
@@ -125,7 +130,7 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
           }
           if (!listed.length) return failure(401, "unauthenticated", "Sign in to chat");
           const answer = create(ListAgentsResponseSchema, { agents: listed });
-          const binary = /^application\/(?:connect\+)?proto/i.test(contentType);
+          const binary = codec === "proto";
           return new Response(
             binary
               ? toBinary(ListAgentsResponseSchema, answer)

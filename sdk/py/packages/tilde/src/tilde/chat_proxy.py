@@ -29,6 +29,9 @@ _SEGMENT = re.compile(r"^[a-zA-Z0-9_.-]+$")
 _CONTENT_TYPE = re.compile(
     r"^application/(?:json|proto|connect\+json|connect\+proto)(?:;|$)", re.IGNORECASE
 )
+# A unary call's content types (ListAgents is answered by the proxy, unenveloped).
+_UNARY_TYPE = re.compile(r"^application/(json|proto)(?:;|$)", re.IGNORECASE)
+_REFUSED = frozenset({401, 403, 404})
 _FORWARDED_REQUEST = (
     "content-type",
     "connect-protocol-version",
@@ -164,12 +167,12 @@ class ChatProxy:
             # At the mount itself: every configured agent this user may chat with.
             if request.method != "POST":
                 return await _failure(send, 405, "unimplemented", "Use ConnectRPC POST")
-            content_type = request.headers.get("content-type", "")
-            if not _CONTENT_TYPE.match(content_type):
+            unary = _UNARY_TYPE.match(request.headers.get("content-type", ""))
+            if not unary:
                 return await _failure(
                     send, 415, "invalid_argument", "Connect content type required"
                 )
-            return await self._list_agents(request, send, "proto" in content_type)
+            return await self._list_agents(request, send, unary.group(1).lower() == "proto")
         agent = None
         if len(path) == 3:
             agent = self._agents.get(path[0])
@@ -221,6 +224,9 @@ class ChatProxy:
             response = await self._http.post(
                 f"{base}/{CHAT_SERVICE}/ListAgents", headers=auth, content=b"{}"
             )
+            if response.status in _REFUSED:
+                # The agent refuses this user: it is left out, not the whole list.
+                continue
             if response.status != 200:
                 return await _failure(send, 502, "unavailable", "Chat provider is unavailable")
             data = json_format.Parse(

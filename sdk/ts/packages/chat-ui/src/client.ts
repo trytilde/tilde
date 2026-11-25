@@ -39,8 +39,9 @@ export async function listAgents(
     return agents.map((agent) => ({ id: agent.id, name: agent.name }));
   } catch (error) {
     if (signal.aborted) throw error;
-    // A Connect error's own words say why: a sign-in, a refused space.
-    if (error instanceof ConnectError && error.rawMessage) throw new Error(error.rawMessage);
+    // A Connect error the proxy sent says why in its own words: a sign-in, a refused space.
+    if (error instanceof ConnectError && error.isWireError && error.rawMessage)
+      throw new Error(error.rawMessage);
     const unauthenticated = error instanceof ConnectError && error.code === Code.Unauthenticated;
     throw new Error(unauthenticated ? "Sign in to chat" : "Unable to load agents");
   }

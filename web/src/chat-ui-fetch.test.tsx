@@ -4,6 +4,8 @@ import { createFetchHandler } from "@connectrpc/connect/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Chat, type ChatFetch, ListSessions } from "../../sdk/ts/packages/chat-ui/src/index";
+import { listAgents } from "../../sdk/ts/packages/chat-ui/src/client";
+import { createChatProxy } from "../../sdk/ts/packages/chat-proxy/src/index";
 import { ChatService, SessionSchema } from "@trytilde/contracts/tilde/provider/tilde/v1/chat_pb.js";
 import {
   MessageSchema,
@@ -166,4 +168,44 @@ it("lists sessions through the given fetch too", async () => {
   render(<ListSessions identity="viewer" proxy={space} fetch={send} onSelectSession={() => {}} />);
   await screen.findByText("Fix checkout");
   expect(global).not.toHaveBeenCalled();
+});
+it("discovers through chat-proxy only the agents this user may chat with", async () => {
+  // Each agent's ingress: `open` lists itself, `private` refuses this user.
+  const ingress: Record<string, () => Response> = {
+    "open.test": () => Response.json({ agents: [{ id: "open", name: "Open" }] }),
+    "private.test": () =>
+      Response.json({ code: "permission_denied", message: "Not allowed" }, { status: 403 }),
+  };
+  const asked: string[] = [];
+  const agent = (agentId: string) => ({
+    agentId,
+    apiKey: `tilde_chat_${agentId}`,
+    baseUrlOverride: `https://${agentId}.test`,
+  });
+  const proxy = createChatProxy({
+    agents: [agent("open"), agent("private"), agent("hidden")],
+    // `hidden` is not this user's: it is never asked.
+    resolveIdentity: (_request, agentId) => (agentId === "hidden" ? null : "user-42"),
+    fetch: async (input) => {
+      const host = new URL(String(input)).host;
+      asked.push(host);
+      return ingress[host]();
+    },
+  });
+  const send: ChatFetch = (input, init) => proxy.handle(new Request(input, init));
+  // chat-ui's own binary Connect client, end to end through the proxy.
+  const agents = await listAgents("https://app.test/api/chat", new AbortController().signal, send);
+  expect(agents).toEqual([{ id: "open", name: "Open" }]);
+  expect(asked.sort()).toEqual(["open.test", "private.test"]);
+  // Nobody to chat with: the proxy's own words reach the page.
+  const alone = createChatProxy({
+    agents: [agent("private")],
+    resolveIdentity: () => "user-42",
+    fetch: async () => ingress["private.test"](),
+  });
+  await expect(
+    listAgents("https://app.test/api/chat", new AbortController().signal, (input, init) =>
+      alone.handle(new Request(input, init)),
+    ),
+  ).rejects.toThrow("Sign in to chat");
 });
