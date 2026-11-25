@@ -36,6 +36,8 @@ message RegisterDeploymentRequest {
   reserved 4; optional string target_reference = 5; optional string repository = 6;
   optional string commit_sha = 7; optional string external_id = 8; optional string label = 9;
   optional string commit_message = 10; optional string branch = 11; optional string commit_author = 12;
+  // Lambda: the IAM role Tilde assumes to invoke the function (see DeploymentSpec.target_role).
+  optional string target_role = 14;
   // What the agent's code declares, read by `tilde deploy` from the entry module. A repeat of an
   // existing external id ignores it: a deployment's contents never change.
   DeploymentDeclarations declarations = 13;

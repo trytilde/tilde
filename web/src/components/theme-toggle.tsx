@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -34,6 +34,18 @@ export function useTheme() {
     }
   };
   return { theme, toggle };
+}
+
+const watchScheme = (changed: () => void) => {
+  const observer = new MutationObserver(changed);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+};
+/** The scheme the document is showing now, for frames that should follow it. */
+export function useScheme(): Theme {
+  return useSyncExternalStore(watchScheme, () =>
+    document.documentElement.classList.contains("dark") ? "dark" : "light",
+  );
 }
 
 export function ThemeToggle() {

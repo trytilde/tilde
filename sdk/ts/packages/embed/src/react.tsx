@@ -6,9 +6,11 @@ import {
   type ConnectionSetupOptions,
   type SpaceOptions,
   type MountedSpace,
+  type MountedConnectionSetup,
 } from "./index.js";
 
 export * from "./index.js";
+// `Chat` and `ListSessions` take the same `theme` as `Space` and `ConnectionSetup`.
 export { Chat, ListSessions, type ChatProps, type ListSessionsProps } from "@trytilde/chat-ui";
 
 /** The chat proxy `@trytilde/embed-server` mounts: pass it as `<Chat proxy={...}>`. */
@@ -53,15 +55,24 @@ export function ConnectionSetup({ className, style, ...options }: ConnectionSetu
   const element = useRef<HTMLDivElement>(null);
   const latest = useRef(options);
   latest.current = options;
+  const mounted = useRef<MountedConnectionSetup | null>(null);
   const { url, connectionId } = options;
   useEffect(() => {
-    const mounted = mountConnectionSetup(element.current!, {
+    const current = mountConnectionSetup(element.current!, {
       ...latest.current,
       onComplete: (id) => latest.current.onComplete?.(id),
       onCancel: (id) => latest.current.onCancel?.(id),
       onError: (error) => latest.current.onError?.(error),
     });
-    return () => mounted.close();
+    mounted.current = current;
+    return () => {
+      current.close();
+      mounted.current = null;
+    };
   }, [url, connectionId]);
+  const theme = JSON.stringify(options.theme ?? null);
+  useEffect(() => {
+    if (latest.current.theme) mounted.current?.setTheme(latest.current.theme);
+  }, [theme]);
   return <div ref={element} className={className} style={style} />;
 }

@@ -8,7 +8,9 @@
 //! them the checks here are the only narrowing.
 use crate::chat::providers::Access;
 use crate::connections::egress::{
-    Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, GitService, rules,
+    Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, GitAuth, GitService,
+    forge::{self, strings},
+    rules,
 };
 use crate::connections::mints::{self, MintScope};
 use crate::error::Error;
@@ -27,6 +29,8 @@ fn definition() -> Egress {
         protocols: vec![
             EgressProtocol::Git {
                 upstream: "https://github.com",
+                auth: GitAuth::Basic("x-access-token"),
+                replicas: false,
                 services: vec![GitService::UploadPack, GitService::ReceivePack],
                 deny_delete: true,
                 deny_force: true,
@@ -84,20 +88,7 @@ fn definition() -> Egress {
                     "x-tilde-options": "github.list_repositories",
                     "description": "Empty: every repository the connection can reach"
                 },
-                "push": {
-                    "type": "object",
-                    "title": "Push",
-                    "properties": {
-                        "branches": {
-                            "type": "array",
-                            "title": "Branches",
-                            "items": {"type": "string", "pattern": "^[A-Za-z0-9_./*-]+$"},
-                            "default": ["factory/*"],
-                            "description": "Branches pushes may create and update (`*` matches within a path segment). Empty: no pushes. Never the default branch."
-                        }
-                    },
-                    "additionalProperties": false
-                },
+                "push": forge::push_schema("Never the default branch."),
                 "pull_requests": {
                     "type": "boolean",
                     "title": "Pull requests",
@@ -116,12 +107,6 @@ struct Config<'a> {
     repositories: Vec<&'a str>,
     branches: Vec<&'a str>,
     pull_requests: bool,
-}
-fn strings(value: Option<&Value>) -> Vec<&str> {
-    value
-        .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default()
 }
 fn config(value: &Value) -> Config<'_> {
     Config {
@@ -142,23 +127,6 @@ impl Config<'_> {
                     o.eq_ignore_ascii_case(owner) && n.eq_ignore_ascii_case(repo)
                 })
             })
-    }
-    fn branch(&self, name: &str) -> bool {
-        self.branches.iter().any(|pattern| glob(pattern, name))
-    }
-}
-/// `*` matches any run of characters except `/`.
-fn glob(pattern: &str, name: &str) -> bool {
-    match pattern.split_once('*') {
-        None => pattern == name,
-        Some((prefix, rest)) => {
-            let Some(tail) = name.strip_prefix(prefix) else {
-                return false;
-            };
-            (0..=tail.find('/').unwrap_or(tail.len()))
-                .filter(|&i| tail.is_char_boundary(i))
-                .any(|i| glob(rest, &tail[i..]))
-        }
     }
 }
 
@@ -199,24 +167,13 @@ impl EgressHook for Github {
                 else {
                     return Decision::deny("Not a repository");
                 };
-                if !config.repository(owner, repo) {
-                    return Decision::deny(format!("{repository} is not granted"));
-                }
-                if *service == GitService::ReceivePack && config.branches.is_empty() {
-                    return Decision::deny("Pushing is not granted");
-                }
-                for update in *updates {
-                    match update.name.strip_prefix("refs/heads/") {
-                        Some(branch) if config.branch(branch) => {}
-                        _ => {
-                            return Decision::deny(format!(
-                                "Pushing to {} is not granted",
-                                update.name
-                            ));
-                        }
-                    }
-                }
-                Decision::Allow
+                forge::check_git(
+                    config.repository(owner, repo),
+                    repository,
+                    &config.branches,
+                    *service,
+                    updates,
+                )
             }
         }
     }

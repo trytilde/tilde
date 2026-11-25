@@ -52,12 +52,13 @@ export type AwsTool =
   | "aws_get_presigned_url"
   | "aws_get_regional_availability"
   | "aws_get_tasks"
+  | "aws_list_accounts"
   | "aws_list_regions"
   | "aws_read_documentation"
   | "aws_retrieve_skill"
   | "aws_run_script"
   | "aws_search_documentation";
-export type AwsType = "iam";
+export type AwsType = "iam" | "oidc";
 export const aws = catalogProvider<AwsTool, AwsType, "aws">("aws");
 
 /** AWS Knowledge: connections `aws-knowledge/<name>`. */
@@ -114,14 +115,27 @@ export const clay = catalogProvider<ClayTool, ClayType, "clay">("clay");
 /** Cloudflare Documentation: connections `cloudflare-docs/<name>`. */
 export type CloudflareDocsTool = never;
 export type CloudflareDocsType = "public";
-export const cloudflareDocs = catalogProvider<CloudflareDocsTool, CloudflareDocsType>(
-  "cloudflare-docs",
-);
+export const cloudflareDocs = catalogProvider<
+  CloudflareDocsTool,
+  CloudflareDocsType,
+  "cloudflare-docs"
+>("cloudflare-docs");
 
 /** Cohere: connections `cohere/<name>`. */
 export type CohereTool = never;
 export type CohereType = "api";
 export const cohere = catalogProvider<CohereTool, CohereType, "cohere">("cohere");
+
+/** Datadog: connections `datadog/<name>`. */
+export type DatadogTool =
+  | "get_monitor"
+  | "list_monitors"
+  | "query_metrics"
+  | "search_events"
+  | "search_logs"
+  | "search_monitors";
+export type DatadogType = "api" | "mcp_oauth";
+export const datadog = catalogProvider<DatadogTool, DatadogType, "datadog">("datadog");
 
 /** E2B: connections `e2b/<name>`. */
 export type E2bTool =
@@ -161,6 +175,18 @@ export type E2bTool =
   | "e2b_write_file";
 export type E2bType = "api";
 export const e2b = catalogProvider<E2bTool, E2bType, "e2b">("e2b");
+
+/** Entire: connections `entire/<name>`. */
+export type EntireTool =
+  | "create_repository"
+  | "get_file"
+  | "get_repository"
+  | "list_branches"
+  | "list_commits"
+  | "list_projects"
+  | "list_repositories";
+export type EntireType = "service_account";
+export const entire = catalogProvider<EntireTool, EntireType, "entire">("entire");
 
 /** Firecrawl: connections `firecrawl/<name>`. */
 export type FirecrawlTool =
@@ -276,6 +302,31 @@ export type GithubTool =
 export type GithubType = "github_app" | "oauth" | "pat";
 export const github = catalogProvider<GithubTool, GithubType, "github">("github");
 
+/** GitLab: connections `gitlab/<name>`. */
+export type GitlabTool =
+  | "create_issue"
+  | "create_issue_note"
+  | "create_merge_request"
+  | "create_merge_request_note"
+  | "get_file"
+  | "get_issue"
+  | "get_job_log"
+  | "get_merge_request"
+  | "get_pipeline"
+  | "get_project"
+  | "list_issue_notes"
+  | "list_issues"
+  | "list_merge_request_diffs"
+  | "list_merge_request_notes"
+  | "list_merge_requests"
+  | "list_pipeline_jobs"
+  | "list_pipelines"
+  | "list_projects"
+  | "update_issue"
+  | "update_merge_request";
+export type GitlabType = "mcp_oauth" | "oauth" | "token";
+export const gitlab = catalogProvider<GitlabTool, GitlabType, "gitlab">("gitlab");
+
 /** Google AI Studio: connections `google_ai/<name>`. */
 export type GoogleAiTool = never;
 export type GoogleAiType = "api";
@@ -358,9 +409,11 @@ export type GoogleAnalyticsTool =
   | "google_analytics_update_property"
   | "google_analytics_validate_events";
 export type GoogleAnalyticsType = "oauth";
-export const googleAnalytics = catalogProvider<GoogleAnalyticsTool, GoogleAnalyticsType>(
-  "google_analytics",
-);
+export const googleAnalytics = catalogProvider<
+  GoogleAnalyticsTool,
+  GoogleAnalyticsType,
+  "google_analytics"
+>("google_analytics");
 
 /** Google Calendar: connections `google_calendar/<name>`. */
 export type GoogleCalendarTool =
@@ -374,8 +427,17 @@ export type GoogleCalendarTool =
   | "google_calendar_rsvp_event"
   | "google_calendar_update_event";
 export type GoogleCalendarType = "oauth";
-export const googleCalendar = catalogProvider<GoogleCalendarTool, GoogleCalendarType>(
-  "google_calendar",
+export const googleCalendar = catalogProvider<
+  GoogleCalendarTool,
+  GoogleCalendarType,
+  "google_calendar"
+>("google_calendar");
+
+/** Google Chat: connections `google_chat/<name>`. */
+export type GoogleChatTool = never;
+export type GoogleChatType = "app";
+export const googleChat = catalogProvider<GoogleChatTool, GoogleChatType, "google_chat">(
+  "google_chat",
 );
 
 /** Google Docs: connections `google_docs/<name>`. */
@@ -450,7 +512,8 @@ export type GoogleSearchConsoleTool =
 export type GoogleSearchConsoleType = "oauth";
 export const googleSearchConsole = catalogProvider<
   GoogleSearchConsoleTool,
-  GoogleSearchConsoleType
+  GoogleSearchConsoleType,
+  "google_search_console"
 >("google_search_console");
 
 /** Google Sheets: connections `google_sheets/<name>`. */
@@ -470,10 +533,35 @@ export const googleSheets = catalogProvider<GoogleSheetsTool, GoogleSheetsType, 
   "google_sheets",
 );
 
+/** Grafana: connections `grafana/<name>`. */
+export type GrafanaTool =
+  | "get_alert_rule"
+  | "get_dashboard"
+  | "list_alert_rules"
+  | "list_alert_states"
+  | "list_datasources"
+  | "list_firing_alerts"
+  | "query_datasource"
+  | "search_dashboards";
+export type GrafanaType = "api";
+export const grafana = catalogProvider<GrafanaTool, GrafanaType, "grafana">("grafana");
+
 /** Granola: connections `granola/<name>`. */
 export type GranolaTool = never;
 export type GranolaType = "oauth";
 export const granola = catalogProvider<GranolaTool, GranolaType, "granola">("granola");
+
+/** Honeycomb: connections `honeycomb/<name>`. */
+export type HoneycombTool =
+  | "get_slo"
+  | "get_trigger"
+  | "list_columns"
+  | "list_datasets"
+  | "list_slos"
+  | "list_triggers"
+  | "run_query";
+export type HoneycombType = "api" | "mcp_oauth";
+export const honeycomb = catalogProvider<HoneycombTool, HoneycombType, "honeycomb">("honeycomb");
 
 /** HubSpot: connections `hubspot/<name>`. */
 export type HubspotTool = never;
@@ -485,9 +573,57 @@ export type IntercomTool = never;
 export type IntercomType = "oauth";
 export const intercom = catalogProvider<IntercomTool, IntercomType, "intercom">("intercom");
 
+/** Jira: connections `jira/<name>`. */
+export type JiraTool =
+  | "add_comment"
+  | "create_issue"
+  | "get_issue"
+  | "list_projects"
+  | "list_transitions"
+  | "search_issues"
+  | "transition_issue";
+export type JiraType = "api_token" | "mcp_oauth" | "oauth";
+export const jira = catalogProvider<JiraTool, JiraType, "jira">("jira");
+
 /** Linear: connections `linear/<name>`. */
-export type LinearTool = never;
-export type LinearType = "oauth";
+export type LinearTool =
+  | "create_attachment"
+  | "create_comment"
+  | "create_document"
+  | "create_issue"
+  | "create_issue_label"
+  | "create_project"
+  | "create_project_milestone"
+  | "delete_attachment"
+  | "delete_project_milestone"
+  | "extract_images"
+  | "get_attachment"
+  | "get_cycle"
+  | "get_document"
+  | "get_issue"
+  | "get_issue_status"
+  | "get_project"
+  | "get_team"
+  | "get_user"
+  | "list_comments"
+  | "list_cycles"
+  | "list_documents"
+  | "list_issue_labels"
+  | "list_issue_statuses"
+  | "list_issues"
+  | "list_project_milestones"
+  | "list_projects"
+  | "list_teams"
+  | "list_users"
+  | "save_issue"
+  | "save_project"
+  | "search_issues"
+  | "update_document"
+  | "update_issue"
+  | "update_issue_state"
+  | "update_project"
+  | "update_project_milestone";
+export type LinearType = "api_key" | "mcp_oauth" | "oauth";
 export const linear = catalogProvider<LinearTool, LinearType, "linear">("linear");
 
 /** Linq: connections `linq/<name>`. */
@@ -546,6 +682,15 @@ export type NeonTool = never;
 export type NeonType = "oauth";
 export const neon = catalogProvider<NeonTool, NeonType, "neon">("neon");
 
+/** New Relic: connections `newrelic/<name>`. */
+export type NewrelicTool =
+  | "list_alert_incidents"
+  | "list_alert_policies"
+  | "query_nrql"
+  | "search_entities";
+export type NewrelicType = "api" | "mcp_oauth";
+export const newrelic = catalogProvider<NewrelicTool, NewrelicType, "newrelic">("newrelic");
+
 /** Notion: connections `notion/<name>`. */
 export type NotionTool = never;
 export type NotionType = "oauth";
@@ -556,12 +701,26 @@ export type OpenaiTool = never;
 export type OpenaiType = "api";
 export const openai = catalogProvider<OpenaiTool, OpenaiType, "openai">("openai");
 
+/** PagerDuty: connections `pagerduty/<name>`. */
+export type PagerdutyTool =
+  | "create_incident_note"
+  | "get_incident"
+  | "list_incident_alerts"
+  | "list_incident_notes"
+  | "list_incidents"
+  | "list_oncalls"
+  | "list_services";
+export type PagerdutyType = "api_token" | "oauth";
+export const pagerduty = catalogProvider<PagerdutyTool, PagerdutyType, "pagerduty">("pagerduty");
+
 /** Parallel Search: connections `parallel-search/<name>`. */
 export type ParallelSearchTool = never;
 export type ParallelSearchType = "public";
-export const parallelSearch = catalogProvider<ParallelSearchTool, ParallelSearchType>(
-  "parallel-search",
-);
+export const parallelSearch = catalogProvider<
+  ParallelSearchTool,
+  ParallelSearchType,
+  "parallel-search"
+>("parallel-search");
 
 /** Parallel Task: connections `parallel-task/<name>`. */
 export type ParallelTaskTool = never;
@@ -652,6 +811,20 @@ export type PosthogTool =
   | "update_survey";
 export type PosthogType = "api";
 export const posthog = catalogProvider<PosthogTool, PosthogType, "posthog">("posthog");
+
+/** Prometheus: connections `prometheus/<name>`. */
+export type PrometheusTool =
+  | "find_series"
+  | "list_alerts"
+  | "list_label_values"
+  | "list_rules"
+  | "list_targets"
+  | "query"
+  | "query_range";
+export type PrometheusType = "api";
+export const prometheus = catalogProvider<PrometheusTool, PrometheusType, "prometheus">(
+  "prometheus",
+);
 
 /** Salesforce: connections `salesforce/<name>`. */
 export type SalesforceTool = never;
@@ -972,7 +1145,7 @@ export type SlackTool =
   | "slack_unpin_message"
   | "slack_update_message"
   | "update_canvas";
-export type SlackType = "mcp_oauth_app" | "slack_app";
+export type SlackType = "mcp_oauth_app" | "slack_app" | "user_oauth";
 export const slack = catalogProvider<SlackTool, SlackType, "slack">("slack");
 
 /** Stripe: connections `stripe/<name>`. */
@@ -1017,6 +1190,19 @@ export type TelnyxTool =
 export type TelnyxType = "whatsapp";
 export const telnyx = catalogProvider<TelnyxTool, TelnyxType, "telnyx">("telnyx");
 
+/** Terraform: connections `terraform/<name>`. */
+export type TerraformTool =
+  | "get_current_state_version"
+  | "get_plan"
+  | "get_plan_json"
+  | "get_run"
+  | "get_workspace"
+  | "list_runs"
+  | "list_state_versions"
+  | "list_workspaces";
+export type TerraformType = "api";
+export const terraform = catalogProvider<TerraformTool, TerraformType, "terraform">("terraform");
+
 /** Tilde: connections `tilde/<name>`. */
 export type TildeTool = never;
 export type TildeType = "application";
@@ -1037,9 +1223,11 @@ export const vercel = catalogProvider<VercelTool, VercelType, "vercel">("vercel"
 /** Vercel AI Gateway: connections `vercel_ai_gateway/<name>`. */
 export type VercelAiGatewayTool = never;
 export type VercelAiGatewayType = "api";
-export const vercelAiGateway = catalogProvider<VercelAiGatewayTool, VercelAiGatewayType>(
-  "vercel_ai_gateway",
-);
+export const vercelAiGateway = catalogProvider<
+  VercelAiGatewayTool,
+  VercelAiGatewayType,
+  "vercel_ai_gateway"
+>("vercel_ai_gateway");
 
 /** Voyage AI: connections `voyage/<name>`. */
 export type VoyageTool = never;

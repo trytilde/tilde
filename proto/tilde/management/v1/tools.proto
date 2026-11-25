@@ -52,6 +52,8 @@ message ToolHost {
   repeated tilde.types.v1.AgentHealthHour health_history = 8;
   // Names of the provider's credential methods; empty when the host needs no credentials.
   repeated string auth_methods = 9;
+  // Lambda hosts: the IAM role Tilde assumes to invoke the function.
+  optional string function_role = 10;
 }
 // `search` matches the name case-insensitively; `with_provider` keeps only hosts that publish a
 // provider (true) or only those that do not (false).
@@ -64,6 +66,9 @@ message RegisterToolHostRequest {
   string name = 1;
   ToolHostType type = 2;
   optional string function_arn = 3;
+  // Lambda hosts: the IAM role Tilde assumes to invoke the function. Tilde Cloud requires one and
+  // assumes it with the organization's ID as its external ID.
+  optional string function_role = 5;
 }
 // `token` is set once, for connected hosts only; only its digest is stored.
 message RegisterToolHostResponse { ToolHost tool_host = 1; optional string token = 2 [debug_redact = true]; }

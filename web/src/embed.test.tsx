@@ -171,8 +171,26 @@ it("starts a connection setup for the user and reports completion from Tilde's p
     url: setup.setupUrl,
     connectionId: setup.connectionId,
     onComplete: (id) => completed.push(id),
+    theme: { tokens: { accent: "#ff0000" }, scheme: "dark" },
   });
   const frame = mounted.target as HTMLIFrameElement;
+  // The setup page asks for the theme once it listens; only its own window is answered.
+  const themes: any[] = [];
+  vi.spyOn(frame.contentWindow!, "postMessage").mockImplementation((message: any) =>
+    themes.push(message),
+  );
+  const ready = (source: Window | null) =>
+    window.dispatchEvent(
+      new MessageEvent("message", { data: { type: "tilde.connection.ready" }, source }),
+    );
+  ready(window);
+  expect(themes).toEqual([]);
+  ready(frame.contentWindow);
+  mounted.setTheme({ scheme: "light" });
+  expect(themes).toEqual([
+    { type: "tilde.connection.theme", theme: { tokens: { accent: "#ff0000" }, scheme: "dark" } },
+    { type: "tilde.connection.theme", theme: { scheme: "light" } },
+  ]);
   const notify = (source: Window | null, connectionId: string) =>
     window.dispatchEvent(
       new MessageEvent("message", {

@@ -23,6 +23,10 @@
       "types": "./dist/connection-setup.d.ts",
       "import": "./dist/connection-setup.js"
     },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "import": "./dist/theme.js"
+    },
     "./connection-provider": {
       "types": "./dist/connection-provider.d.ts",
       "import": "./dist/connection-provider.js"

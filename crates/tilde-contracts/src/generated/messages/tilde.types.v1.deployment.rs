@@ -1158,6 +1158,16 @@ pub struct AgentDeployment {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub routable: bool,
+    /// Lambda: the IAM role Tilde assumes to invoke the function.
+    ///
+    /// Field 21: `target_role`
+    #[serde(
+        rename = "targetRole",
+        alias = "target_role",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub target_role: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1184,6 +1194,7 @@ impl ::core::fmt::Debug for AgentDeployment {
             .field("commit_author", &self.commit_author)
             .field("traffic_weight", &self.traffic_weight)
             .field("routable", &self.routable)
+            .field("target_role", &self.target_role)
             .finish()
     }
 }
@@ -1296,6 +1307,9 @@ impl ::buffa::Message for AgentDeployment {
         if self.routable {
             size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if !self.target_role.is_empty() {
+            size += 2u64 + ::buffa::types::string_encoded_len(&self.target_role) as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -1381,6 +1395,9 @@ impl ::buffa::Message for AgentDeployment {
         }
         if self.routable {
             ::buffa::types::put_bool_field(20u32, self.routable, buf);
+        }
+        if !self.target_role.is_empty() {
+            ::buffa::types::put_string_field(21u32, &self.target_role, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1542,6 +1559,13 @@ impl ::buffa::Message for AgentDeployment {
                 )?;
                 self.routable = ::buffa::types::decode_bool(buf)?;
             }
+            21u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.target_role, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1569,6 +1593,7 @@ impl ::buffa::Message for AgentDeployment {
         self.commit_author.clear();
         self.traffic_weight = 0u32;
         self.routable = false;
+        self.target_role.clear();
         self.__buffa_unknown_fields.clear();
     }
 }

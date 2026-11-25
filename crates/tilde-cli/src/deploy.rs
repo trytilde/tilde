@@ -30,6 +30,12 @@ pub struct Deploy {
     /// Required for, and only for, a Lambda target.
     #[arg(long)]
     pub function_arn: Option<String>,
+    /// A Lambda target's invoke role: the IAM role Tilde assumes to invoke the function. Tilde
+    /// Cloud requires one (`arn:aws:iam::<account>:role/tilde-org-<name>`), assumed with the
+    /// organization's ID as the external ID; open-source Tilde without one uses its own
+    /// credentials.
+    #[arg(long)]
+    pub role: Option<String>,
     /// Stable release id. Registration is idempotent on it, so retries never double-register.
     #[arg(long)]
     pub external_id: Option<String>,
@@ -111,8 +117,10 @@ pub async fn ontologies_first(
     specs: bool,
 ) -> Result<(Vec<crate::ontology::Action>, BTreeSet<String>)> {
     let agents = specs && args.only.is_none();
+    // A project the deploy creates belongs to the deploy's team, as its agents do.
+    let team = args.team.as_deref().or(declarations.team.as_deref());
     let (mut actions, plan, mut served) =
-        crate::ontology::prepare(args, &declarations.ontologies, agents).await?;
+        crate::ontology::prepare(args, &declarations.ontologies, team, agents).await?;
     // Only all of the project's ontologies say which tools their connections serve: a selection
     // that leaves some out has nothing to check against.
     if declarations
@@ -200,6 +208,9 @@ pub async fn run(args: Deploy) -> Result<()> {
     if (target == "lambda") != args.function_arn.is_some() {
         bail!("--function-arn is required for a lambda target, and only for lambda");
     }
+    if target != "lambda" && args.role.is_some() {
+        bail!("--role is only for a lambda target");
+    }
 
     if args.dry_run {
         println!("{}", serde_json::to_string_pretty(&declarations.value)?);
@@ -214,6 +225,7 @@ pub async fn run(args: Deploy) -> Result<()> {
     let mut request = ci_metadata();
     request.target = target_of(target).into();
     request.target_reference = args.function_arn.clone();
+    request.target_role = args.role.clone();
     request.label = args.label.clone();
     // A GitHub run is the natural release id: stable across reruns of the same run.
     request.external_id = args.external_id.clone().or_else(|| {

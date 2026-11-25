@@ -1,0 +1,3 @@
+kind: Changed
+body: "The sandbox egress route checks and forwards a request's path as the client sent it, still percent-encoded, instead of decoding it first: an encoded slash (`%2F`) in a GitHub REST path is now refused rather than read as a path separator. Escapes of unreserved characters are decoded before the rules are checked, so escaping a letter of a denied path (`%61ctions/secrets`) does not sidestep the rule, and a `%` that starts no escape is refused."
+time: 2026-11-24T19:00:00+00:00

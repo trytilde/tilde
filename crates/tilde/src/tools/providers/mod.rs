@@ -8,21 +8,31 @@ use serde_json::Value;
 
 pub mod agentmail;
 pub mod aws;
+pub mod datadog;
 pub mod e2b;
+pub mod entire;
 pub mod firecrawl;
 pub mod github;
+pub mod gitlab;
 pub mod google;
+pub mod grafana;
+pub mod honeycomb;
+pub mod jira;
 pub mod linear;
 pub mod linq;
 pub mod modal;
+pub mod newrelic;
+pub mod pagerduty;
 pub mod payload;
 pub mod posthog;
+pub mod prometheus;
 pub mod rest;
 pub mod sandbox_patch;
 pub mod sentry;
 pub mod slack;
 pub mod stripe;
 pub mod tavily;
+pub mod terraform;
 pub mod whatsapp;
 
 pub trait ToolProvider: Send + Sync {
@@ -72,6 +82,19 @@ pub(crate) fn provider(provider: &str, typ: &str) -> Option<&'static dyn ToolPro
         ("aws", "iam") => Some(&aws::IAM),
         ("aws", "oidc") => Some(&aws::OIDC),
         ("modal", "api") => Some(&modal::Modal),
+        ("gitlab", "token") => Some(&gitlab::TOKEN),
+        ("gitlab", "oauth") => Some(&gitlab::OAUTH),
+        ("jira", "api_token") => Some(&jira::API_TOKEN),
+        ("jira", "oauth") => Some(&jira::OAUTH),
+        ("entire", "service_account") => Some(&entire::Entire),
+        ("datadog", "api") => Some(&datadog::Datadog),
+        ("grafana", "api") => Some(&grafana::Grafana),
+        ("prometheus", "api") => Some(&prometheus::Prometheus),
+        ("pagerduty", "api_token") => Some(&pagerduty::API_TOKEN),
+        ("pagerduty", "oauth") => Some(&pagerduty::OAUTH),
+        ("newrelic", "api") => Some(&newrelic::Newrelic),
+        ("honeycomb", "api") => Some(&honeycomb::Honeycomb),
+        ("terraform", "api") => Some(&terraform::Terraform),
         _ => None,
     }
 }

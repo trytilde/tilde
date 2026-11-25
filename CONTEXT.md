@@ -73,6 +73,12 @@ The outer frame is the trusted broker; provider code remains in its opaque-origi
 Completion/cancellation notifications are checked against the frame window, origin and
 connection ID. Embedded authorization redirects and manifest posts open a separate window;
 the original provider UI polls setup state through its existing bridge to follow callbacks.
+A host's `Theme` (`@trytilde/sdk/theme`: the spaces preset's tokens plus a scheme) styles every
+embedded UI. Chat derives its palette from it on its `.tilde-chat` root. For setup it travels two
+hops: the embedding page answers the broker's `tilde.connection.ready` with
+`tilde.connection.theme`, and the broker hands it to the provider frame with `tilde.setup.port`
+and, on change, over that port; each page applies it to its shadcn variables. Without one the
+provider frame follows the broker's scheme.
 A connection setup token authorizes only its setup session. Browser clients open the
 returned brokering URL; the setup client does not send management bearer credentials.
 OAuth callback state is separate from the connection setup token.
@@ -138,8 +144,9 @@ Mints (`connections::mints`) turn a connection's stored credential into what a c
 an OAuth access token the connection keeps refreshed, else a `token` or `api_key`; the scope cannot
 narrow it) or `Custom` (provider code). Custom mints: a GitHub App installation token limited to a
 `MintScope` of `owner/repo` resources of the installation's account and App permissions (an
-unscoped GitHub consumer gets the installation token the connection keeps), and AWS STS sessions in
-the scope's account. Network mints are cached in memory by connection, a fingerprint of its stored
+unscoped GitHub consumer gets the installation token the connection keeps), AWS STS sessions in
+the scope's account, and Entire service account tokens (the connection's secret exchanged at its
+region's auth host for a bearer token that lives at most ten minutes; no scope narrows it). Network mints are cached in memory by connection, a fingerprint of its stored
 values and the scope digest until five minutes before expiry, single-flight per key, emptied with
 the credential cache on every `tilde_sidecar_configuration` notification, and traced as
 `credential.mint` spans. Which strategy a type uses is built-in catalog code (`mints::strategy`).
@@ -214,6 +221,28 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   account) are simply several tool sources (`aws_prod.*`, `aws_staging.*`); Linear
   (personal API key or OAuth app) over its GraphQL API: `get_issue`, `search_issues`,
   `create_comment` and `update_issue_state` (by state name or ID within the issue's team).
+  The software factory's providers are tables of REST tools too (`rest::Tool`: a call, its path
+  placeholders and its fields; fields beside the listed ones pass through), mostly read-only:
+  GitLab (`token`: a personal, group or project access token, with `base_url` for a
+  self-managed instance; `oauth`: an OAuth app on gitlab.com) for projects, issues, merge
+  requests, pipelines and job logs, a project named by ID or path; Jira Cloud (`api_token`:
+  site URL, email and API token as Basic; `oauth`: 3LO, whose calls go to
+  `api.atlassian.com/ex/jira/{cloud id}` with the cloud ID read from accessible-resources) over
+  REST v2, whose text fields are plain text; Entire (`service_account`: the secret and the
+  cluster host) for projects, repositories (list, get, create) on its Core and branches, commits
+  and files on the region API of the repository's processing placement; Datadog (`api`: site,
+  API key, application key) for monitors, metric queries and event and log search; Grafana
+  (`api`: URL and service account token) for dashboards, alert rules and their state and data
+  source queries; Prometheus (`api`: URL and optional bearer token) for instant and range
+  queries, alerts, rules, targets and series; PagerDuty (`api_token` or `oauth`, US or EU) for
+  incidents, their alerts and notes, services and on-calls; New Relic (`api`: account ID, user
+  API key, region) over NerdGraph for NRQL, alert incidents (`NrAiIncident`) and policies and
+  entity search; Honeycomb (`api`: API key, region) for datasets, columns, triggers, SLOs and
+  `run_query`, which creates the query and polls its result; Terraform (`api`: organization,
+  team or user token, optional Terraform Enterprise hostname) for workspaces, runs, plans (JSON
+  output read through its redirect without the token) and state version metadata. A URL a
+  connection configures must be https. Atlassian, GitLab, Datadog, New Relic and Honeycomb also
+  have their hosted MCP servers as `mcp_oauth` types of the same providers.
 - Tool host: a customer-hosted tool backend. Like an agent host it is never dialed. A
   connected host opens `tilde.tool_host.v1.ToolHostService.Watch` with its token, publishes its
   tools and answers calls through `Respond`; a Lambda host is its function ARN, invoked
@@ -564,36 +593,56 @@ templates and filters name paths of a signal's context: its data below plus
   enabled). Its slug (`^[a-z][a-z0-9_]{0,31}$`) names it in the route; a blueprint grants a
   connection once. The connection must be ready, installation-owned and of a type with the
   `egress` capability, which a provider offers when it declares egress (`connections::egress`,
-  built-in catalog code: GitHub first). A provider's egress is its protocols (HTTP with
+  built-in catalog code: the git forges GitHub, GitLab and Entire). A provider's egress is its protocols (HTTP with
   deny-by-default `METHOD /path` allow and deny rules, deny winning; git smart-HTTP with its
-  services and whether pushes may delete refs, rewrite them or touch the default branch), its
-  fixed upstreams, and the JSON Schema of a grant's config. A grant's config is validated against
+  services, how the upstream takes the token (Basic as a provider's user, or bearer) and whether
+  pushes may delete refs, rewrite them or touch the default branch), its
+  upstreams (fixed, or read from the connection by the hook: a self-managed GitLab's `base_url`,
+  an Entire `cluster` host; never from a grant), and the JSON Schema of a grant's config. A grant's config is validated against
   that schema and stored with its defaults (`config_version` records the schema it was saved
   under); it can only narrow the rules. The provider's `EgressHook` checks each request against
   the rules and the config and names the narrowest credential to mint (`MintScope`). Setup queries
   (RunSetupQuery, e.g. `github.list_repositories`) fill config choices marked
   `x-tilde-options`. GitHub grants narrow to repositories, push branches (globs, default
   `factory/*`; empty: no push) and pull request writes; App connections mint tokens limited to
-  them, personal access and OAuth tokens rely on the gateway's checks alone.
+  them, personal access and OAuth tokens rely on the gateway's checks alone. Forge grants share
+  their narrowing (`egress::forge`). GitLab grants narrow to projects (`group/project`, nested
+  groups included), push branches and merge request writes; its REST allowlist is under
+  `/api/v4/projects/{project}`, where a grant limited to projects only admits a project named
+  by its encoded path (`group%2Fproject`), never by ID. Entire grants narrow to repositories
+  (`project/repo`, served under `et/`) and push branches; pushes never delete or rewrite refs,
+  and the default branch is pushable when the grant names it, since a tenant's repository is
+  the agent's own. Entire has no HTTP protocol: its API is reached with tools.
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
   enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process
   gets a new one) authenticates as Bearer, `token` or a Basic password (git). The token's
   sandbox's blueprint's enabled grant `slug` names the connection (still ready,
   installation-owned and egress-capable); a grant saved under an older config version is
-  refused. Git smart-HTTP paths (`<owner>/<repo>.git/info/refs|git-upload-pack|git-receive-pack`)
-  are git, anything else HTTP. A push is read whole first (at most 100 MiB): its pkt-line ref
+  refused. A GitLab client's `PRIVATE-TOKEN` header also carries the egress token and never
+  travels upstream. Git smart-HTTP paths (`<repository>[.git]/info/refs|git-upload-pack|git-receive-pack`,
+  the repository any number of plain segments) are git, anything else HTTP; the path is checked
+  and forwarded as sent, still percent-encoded, except that escapes of unreserved characters
+  are decoded first (`%76ariables` is `variables` to the rules too) and a `%` that starts no
+  escape is refused. A push is read whole first (at most 100 MiB): its pkt-line ref
   updates, whether its pack proves each update a fast-forward (commits walked from new to old
-  through the pack, offset deltas resolved; anything unprovable is not), and the default branch
+  through the pack, offset deltas resolved; anything unprovable is not), and, for a protocol that
+  protects it, the default branch
   from upstream's upload-pack advertisement (unknown refuses the push). The hook decides; the
   client's credentials, cookies and hop-by-hop headers are dropped, the scoped credential minted
-  (git sends it as Basic `x-access-token`), and the request streams to the provider's fixed
-  upstream. Redirects are not followed: a same-host `Location` is rewritten to the route. 20
+  (git sends it as Basic `x-access-token` to GitHub, Basic `oauth2` to GitLab and as a bearer
+  to Entire), and the request streams to the provider's
+  upstream. Redirects are not followed: a same-host `Location` is rewritten to the route. The
+  exception is a git upstream with replicas (Entire's entry host redirects to nodes under its
+  own host): the gateway buffers the request and follows up to three such redirects itself,
+  with the credential, to the upstream's origin or a host under it only. 20
   requests a second per sandbox (burst 200). Each request is a `sandbox.egress {slug}` span on the
   sandbox's latest invocation (slug, protocol, method and path or git service and repository,
   decision and reason, status, ref updates as events). Registration carries `egress_token` (with
   the session only), `egress_env` (`TILDE_EGRESS_<SLUG>_URL` and the provider's HTTP templates,
-  `{token}` filled in by the process) and `git` rewrites of each git upstream to the route;
+  `{token}` filled in by the process) and `git` rewrites of each git upstream to the route
+  (the connection's upstream; for Entire both `entire://<cluster>/` and `https://<cluster>/`, so
+  `git clone entire://...` works in a sandbox without Entire's remote helper);
   `tilde sandbox connect` writes them to the shell environment and `/etc/gitconfig` with
   `tilde sandbox credential` as the gateway's only credential helper.
 
@@ -1891,18 +1940,29 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   generated slug's `.tools(...)` and `type` are checked at compile time; any other slug takes
   plain strings, which preflight checks. No enums or runtime name lists: `ALL` is the only runtime constant.
 - Ontologies in a project (Tilde Cloud): `defineProject({ ontologies: { <name>: ontology({
-  environments: { <env>: { connections, secrets } } }) } })`, each in the repository's
+  environments: { <env>: { connections, secrets, live } } }) } })`, each in the repository's
   `ontologies/<name>/` (`tilde deploy` runs at the repository root). A project is a pnpm
   workspace with one root lockfile and no `tilde.toml` (the root `tilde.config.ts` is the project); each ontology is the Tilde
   project of its name. `ontology<typeof connections>()` takes the ontology's own `connections` type
   (a type-only import), so binding a connection of another provider does not compile
   (`ConnectionRef`'s `provider`: a catalog ref's provider, a `connection.ref` slug's prefix);
-  `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`). `tilde deploy` deploys
+  `secrets` binds an ontology secret name to a Tilde secret (`secret.ref`); `live` is whether
+  Tilde serves the environment's spaces to the organization, set when the deploy creates the
+  environment (no RPC changes it later: a difference from an existing environment is reported in
+  the plan and left). `tilde deploy` deploys
   them before the agents (`tilde-cli` `ontology.rs`). Nothing changes until everything is
-  checked: the ontologies' preflight (projects, environments, connections and secrets exist;
+  checked: the ontologies' preflight (connections and secrets exist;
   each missing one is a required action with its link, the secret's naming the project's team; a
   server without the ontology control plane answers "Ontologies need Tilde Cloud") and the
-  agents' dry-run `Apply`, reported together (exit 2). Then each ontology is built here, on the
+  agents' dry-run `Apply`, reported together (exit 2). A first deploy needs nothing set up by
+  hand: a project or environment Tilde does not have is part of the plan and the deploy creates
+  it, the project (`ProjectService.CreateProject`) in the deploy's team (`--team` or
+  `defineProject({ team })`, a slug resolved with `IamService.ListTeams`; none: the
+  organization), each environment (`EnvironmentService.CreateEnvironment`, on Cloudflare) once
+  the version is ready, with the storage its IR declares and the spec's `live`. Tilde compiles
+  an ontology for its project, so a new project's ontology is built after the project is
+  created rather than before anything changes, its tools are not checked against the agents'
+  specs on that first deploy, and `--check` refuses a project that does not exist yet. Then each ontology is built here, on the
   client (Tilde never builds a project), with the project's own `@trytilde/ontology` and
   `@trytilde/spaces` (Tilde Cloud's packages, run with `node`): its IR (`tilde-ontology-build ir`),
   sent to `VersionService.CompileOntology`, whose errors fail the deploy and whose contract is
@@ -1911,7 +1971,9 @@ Lambda ARN, a version-qualified one recommended, or a dial-in host). `crate::app
   runtime the package declares, `ontology.ir.json`, `worker.js`, `spaces/`; uncommitted changes
   refused without `--allow-dirty`; over 32 MiB refused). Then, per ontology: a version
   (`VersionService.CreateVersion` with the artifact), a check that it declares exactly the
-  connections and secrets the spec binds (else nothing is bound), then each environment bound and
+  connections and secrets the spec binds (else nothing is bound; a connection the ontology
+  declares optional, `slot(provider, { optional: true })`, may stay unbound and is reported as
+  skipped: its pipelines do not run until it is bound), then each environment bound and
   rolled out in turn (`--accept-rebuild <model>` passed to `Deploy`); a failed rollout stops and
   names the environments running the version, bound only, and untouched. `--only ontologies|agents` and
   `--ontology <name>` narrow it; `--dry-run` prints the plan. The ontology control plane is

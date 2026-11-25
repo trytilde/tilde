@@ -11,6 +11,7 @@ import { createRoot } from "react-dom/client";
 import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
 
 import { createConnectionSetupClient } from "@trytilde/sdk/connection-setup";
+import { applyTheme } from "./theme.js";
 // Iframe widths stay narrow even on desktop, so use the primary input's capabilities.
 const continueClass =
   "h-11 w-full gap-2 px-5 [@media(hover:hover)_and_(pointer:fine)]:h-12 [@media(hover:hover)_and_(pointer:fine)]:w-auto [@media(hover:hover)_and_(pointer:fine)]:px-6 [@media(hover:hover)_and_(pointer:fine)]:text-base";
@@ -57,7 +58,7 @@ export function useSetup() {
     }
   }
   useEffect(() => {
-    client.current = createConnectionSetupClient();
+    client.current = createConnectionSetupClient({ onTheme: applyTheme });
     void run((client) => client.getSetup());
     return () => {
       client.current?.dispose();

@@ -1,7 +1,10 @@
 import type { Brokering } from "@trytilde/contracts/tilde/setup/v1/connections_pb.js";
+import type { Theme } from "./theme.js";
+export type { Theme, ThemeTokens } from "./theme.js";
 export type SetupValues = Record<string, string>;
-type Reply = { id: number; state?: Brokering; error?: string };
+type Reply = { id: number; state?: Brokering; error?: string; theme?: Theme };
 /** Browser-only client for an isolated provider iframe. The host owns all credentials and scope.
+ * The host may send a theme with the port and again, unasked, whenever it changes (`onTheme`).
  * @example
  * const client = createConnectionSetupClient();
  * let setup = await client.getSetup();
@@ -9,7 +12,7 @@ type Reply = { id: number; state?: Brokering; error?: string };
  * await client.saveCredentials(setup.actionId, { api_key: userSuppliedKey });
  * client.dispose();
  */
-export function createConnectionSetupClient() {
+export function createConnectionSetupClient(options: { onTheme?: (theme: Theme) => void } = {}) {
   let port: MessagePort | undefined;
   let nextId = 0;
   let closed = false;
@@ -36,7 +39,9 @@ export function createConnectionSetupClient() {
     )
       return;
     port = event.ports[0];
+    if (event.data.theme) options.onTheme?.(event.data.theme);
     port.onmessage = ({ data }: MessageEvent<Reply>) => {
+      if (data.theme) return options.onTheme?.(data.theme);
       const request = pending.get(data.id);
       if (!request) return;
       pending.delete(data.id);

@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LoadingReveal } from "@trytilde/connection-ui";
 import { Button } from "@/components/ui/button";
+import { useScheme } from "@/components/theme-toggle";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export type Brokering = { title: string; url: string };
@@ -18,6 +19,26 @@ export function ConnectionSetupDialog({
 }) {
   const [loaded, setLoaded] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
+  // The setup page asks for a theme when it loads; it follows the app's light or dark.
+  const scheme = useScheme();
+  const url = setup?.url;
+  useEffect(() => {
+    const post = () =>
+      frame.current?.contentWindow?.postMessage(
+        { type: "tilde.connection.theme", theme: { scheme } },
+        "*",
+      );
+    const ready = (event: MessageEvent) => {
+      if (
+        event.source === frame.current?.contentWindow &&
+        event.data?.type === "tilde.connection.ready"
+      )
+        post();
+    };
+    window.addEventListener("message", ready);
+    post();
+    return () => window.removeEventListener("message", ready);
+  }, [scheme, url]);
   return (
     <Dialog
       open={!!setup}

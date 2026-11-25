@@ -119,9 +119,19 @@ export type Channel = {
  */
 export type Deploy =
   | { target: "gateway" | "sidecar" | "hosted" }
-  | { target: "lambda"; functionArn: string };
-/** A Lambda function; a version-qualified ARN keeps the deployment fixed. */
-export const lambda = (functionArn: string): Deploy => ({ target: "lambda", functionArn });
+  | { target: "lambda"; functionArn: string; role?: string };
+/**
+ * A Lambda function; a version-qualified ARN keeps the deployment fixed. `role` is the IAM role
+ * Tilde assumes to invoke it, allowed `lambda:InvokeFunction` on the function. Tilde Cloud requires
+ * one, named `tilde-org-<name>`, and assumes it with your organization's ID as the external ID, so
+ * its trust policy names Tilde's role and `sts:ExternalId`; a self-hosted Tilde without one uses
+ * its own credentials.
+ */
+export const lambda = (functionArn: string, role?: string): Deploy => ({
+  target: "lambda",
+  functionArn,
+  ...(role ? { role } : {}),
+});
 /** A host that dials in to Tilde's gateway with its deployment token. */
 export const gateway = (): Deploy => ({ target: "gateway" });
 export const sidecar = (): Deploy => ({ target: "sidecar" });
@@ -272,16 +282,24 @@ export function defineTeam(spec: { team: string; users?: User[]; groups?: Group[
  */
 export type OntologyConnections = { readonly [name: string]: { readonly provider: string } };
 /** What one environment of the ontology binds: its connections to the organization's, secret
- * names to secrets. */
+ * names to secrets. An optional connection (`{ provider, optional: true }`) may be left
+ * out: the environment deploys without it and its pipelines wait until it is bound. */
 export type OntologyEnvironment<C extends OntologyConnections = OntologyConnections> = {
   connections?: { readonly [K in keyof C]?: ConnectionRef<string, C[K]["provider"]> };
   /** The ontology's secret name to a Tilde secret of the project's team (or the organization). */
   secrets?: { readonly [name: string]: SecretRef };
+  /**
+   * Whether the environment is live: Tilde serves its spaces to the organization
+   * (`LiveService`). Set when `tilde deploy` creates the environment; an existing environment
+   * keeps its own, and the deploy says so when the two differ.
+   */
+  live?: boolean;
 };
 /**
  * An ontology of the project (Tilde Cloud), in the repository's `ontologies/<name>/`: per
- * environment, its bindings. `tilde deploy` builds it into a version, binds each environment, rolls the
- * version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
+ * environment, its bindings. `tilde deploy` creates the project and each environment the
+ * organization does not have yet, builds the ontology into a version, binds each environment,
+ * rolls the version out, then applies the agents. Its name, the key in `defineProject({ ontologies })`, is
  * its project's in Tilde.
  */
 export type Ontology<C extends OntologyConnections = OntologyConnections> = {
@@ -303,6 +321,7 @@ const ontologyJson = (spec: Ontology) => ({
         secrets: Object.fromEntries(
           Object.entries(env.secrets ?? {}).map(([secret, value]) => [secret, value.secret]),
         ),
+        ...(env.live === undefined ? {} : { live: env.live }),
       },
     ]),
   ),
@@ -412,7 +431,12 @@ export function defineAgent(spec: Agent): AgentSpec {
       ? {
           deployment: {
             target: `DEPLOYMENT_TARGET_${deploy.target.toUpperCase()}`,
-            ...(deploy.target === "lambda" ? { targetReference: deploy.functionArn } : {}),
+            ...(deploy.target === "lambda"
+              ? {
+                  targetReference: deploy.functionArn,
+                  ...(deploy.role ? { targetRole: deploy.role } : {}),
+                }
+              : {}),
           },
         }
       : {}),

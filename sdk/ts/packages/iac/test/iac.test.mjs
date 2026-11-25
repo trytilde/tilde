@@ -67,7 +67,10 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
       { connection: connection.ref("google_chat/support"), access: "private" },
       { connection: connection.ref("slack/old"), delete: true },
     ],
-    deploy: lambda("arn:aws:lambda:us-east-1:1:function:triage:3"),
+    deploy: lambda(
+      "arn:aws:lambda:us-east-1:1:function:triage:3",
+      "arn:aws:iam::1:role/tilde-org-invoke",
+    ),
   });
   assert.equal(agent[SPEC], "agent");
   // The server's own contract parses it: field names and enum values are right.
@@ -99,6 +102,7 @@ test("an agent spec is AgentSpec protobuf JSON the server accepts", () => {
   assert.equal(parsed.routines[1].trigger.kind.value.filters[0].values[0], "ENG");
   assert.equal(parsed.routines[2].delete, true);
   assert.equal(parsed.deployment.targetReference, "arn:aws:lambda:us-east-1:1:function:triage:3");
+  assert.equal(parsed.deployment.targetRole, "arn:aws:iam::1:role/tilde-org-invoke");
   // Without a connection, the agent's own Tilde chat.
   assert.deepEqual(
     parsed.channels.map((c) => [c.connection?.slug, c.access, c.delete]),
@@ -194,7 +198,7 @@ test("a project carries its team and agents", () => {
   assert.equal(project.agents[0], a);
 });
 
-test("a project's ontologies carry each environment's bindings, by slug and secret name", () => {
+test("a project's ontologies carry each environment's bindings and live, by slug and secret name", () => {
   const project = defineProject({
     team: "factory",
     ontologies: {
@@ -203,6 +207,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
           production: {
             connections: { github: github.ref("faroai", { type: "github_app" }), linear },
             secrets: { PG_PASSWORD: secret.ref("FARO_PG_PASSWORD") },
+            live: true,
           },
           staging: {},
         },
@@ -220,6 +225,7 @@ test("a project's ontologies carry each environment's bindings, by slug and secr
             linear: { slug: "linear/acme", type: "api_key" },
           },
           secrets: { PG_PASSWORD: "FARO_PG_PASSWORD" },
+          live: true,
         },
         staging: { connections: {}, secrets: {} },
       },
