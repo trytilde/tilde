@@ -1,6 +1,6 @@
 {
   "name": "@trytilde/contracts",
-  "version": "5.6.0",
+  "version": "5.7.0",
   "description": "Generated TypeScript Protobuf and ConnectRPC contracts for Tilde",
   "license": "Apache-2.0",
   "repository": {
