@@ -32,7 +32,11 @@ export async function listAgents(
 ): Promise<ChatAgent[]> {
   const client = createClient(
     ChatService,
-    createConnectTransport({ baseUrl: proxy.replace(/\/$/, ""), useBinaryFormat: true, fetch: send }),
+    createConnectTransport({
+      baseUrl: proxy.replace(/\/$/, ""),
+      useBinaryFormat: true,
+      fetch: send,
+    }),
   );
   try {
     const { agents } = await client.listAgents({}, { signal });

@@ -104,7 +104,8 @@ export function createChatProxy(options: ChatProxyOptions): ChatProxy {
         // `ChatService/ListAgents` at the mount itself: every configured agent this user may
         // chat with, each asked of its own ingress (the proxy's own answer, not one agent's).
         if (path.length === 2 && service === ChatService.typeName && method === "ListAgents") {
-          if (request.method !== "POST") return failure(405, "unimplemented", "Use ConnectRPC POST");
+          if (request.method !== "POST")
+            return failure(405, "unimplemented", "Use ConnectRPC POST");
           const codec = UNARY_TYPE.exec(contentType)?.[1]?.toLowerCase();
           if (!codec) return failure(415, "invalid_argument", "Connect content type required");
           const listed: ChatAgent[] = [];
