@@ -917,3 +917,22 @@ pub async fn connection_by_slug_all(
             .await?,
     )
 }
+
+pub use tilde_queries::queries::connections::usages::Record as Usage;
+
+/// Everything that uses each of `ids` (`queries/connections/usages.sql`).
+pub async fn usages_all(db: &impl GenericClient, ids: &[uuid::Uuid]) -> DbResult<Vec<Usage>> {
+    Ok(tilde_queries::queries::connections::usages::run()
+        .bind(db, &ids)
+        .all()
+        .await?)
+}
+
+/// Hold the connection's row until commit (`queries/connections/connection_hold.sql`).
+pub async fn connection_hold(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<()> {
+    tilde_queries::queries::connections::connection_hold::run()
+        .bind(db, &p1)
+        .opt()
+        .await?;
+    Ok(())
+}

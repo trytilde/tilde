@@ -204,6 +204,15 @@ pub async fn unassign_execute(db: &impl GenericClient, p1: uuid::Uuid) -> DbResu
         .await?)
 }
 
+pub async fn connection_uses_delete_execute(
+    db: &impl GenericClient,
+    p1: uuid::Uuid,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::agent::connection_uses_delete::run()
+        .bind(db, &p1)
+        .await?)
+}
+
 fn update_row(r: tilde_queries::queries::agent::update::Record) -> DbResult<crate::agent::Agent> {
     Ok(crate::agent::Agent {
         id: r.id,

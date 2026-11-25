@@ -163,8 +163,10 @@ impl ConnectionsService for Rpc {
             .get(id(request.id)?)
             .await
             .map_err(|_| connectrpc::ConnectError::not_found("Not found"))?;
+        let usages = self.0.usages(&[connection.id]).await?;
         Response::ok(management::GetConnectionResponse {
-            connection: connection_wire(connection, &self.0.public_event_ingress_url).into(),
+            connection: connection_wire_used(connection, &self.0.public_event_ingress_url, &usages)
+                .into(),
             ..Default::default()
         })
     }
@@ -213,10 +215,14 @@ impl ConnectionsService for Rpc {
             .transpose()
             .map_err(|_| m::invalid("Unable to encode page token"))?
             .unwrap_or_default();
+        let usages = self
+            .0
+            .usages(&connections.iter().map(|c| c.id).collect::<Vec<_>>())
+            .await?;
         Response::ok(management::ListConnectionsResponse {
             connections: connections
                 .into_iter()
-                .map(|c| connection_wire(c, &self.0.public_event_ingress_url))
+                .map(|c| connection_wire_used(c, &self.0.public_event_ingress_url, &usages))
                 .collect(),
             next_page_token: next,
             ..Default::default()

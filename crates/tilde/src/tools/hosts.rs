@@ -310,10 +310,21 @@ impl ToolHosts {
             _ => Ok(token),
         }
     }
-    /// Its provider and every instance go with it.
+    /// Its provider and every instance go with it; refused while an instance is in use.
     pub async fn delete(&self, id: Uuid) -> Result<(), Error> {
         let mut client = self.connections.pool.get().await?;
         let tx = client.transaction().await?;
+        // Its instances are held while it checks, as a disconnect holds its connection.
+        let instances = db::host_connections_all(&tx, id).await?;
+        #[rustfmt::skip]
+        let usages = crate::connections::db::usages_all(
+            &tx,
+            &instances,
+        )
+        .await?;
+        if !usages.is_empty() {
+            return Err(crate::connections::service::in_use(&usages));
+        }
         db::host_provider_remove_execute(&tx, id).await?;
         if db::host_delete_execute(&tx, id).await? == 0 {
             return Err(Error::NotFound);

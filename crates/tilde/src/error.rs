@@ -38,6 +38,9 @@ pub enum Error {
     Database(#[from] crate::database::DbError),
     #[error("database migration failed")]
     Migration(String),
+    /// Something still uses what this would remove; the message names each use.
+    #[error("{0}")]
+    InUse(String),
     #[error("encryption operation failed")]
     Encryption,
     #[error("configured encryption backend does not match the database")]
@@ -73,6 +76,11 @@ impl From<Error> for connectrpc::ConnectError {
             }
             Error::Stale(message) => Self::aborted(message),
             Error::Exists(message) => Self::already_exists(message),
+            Error::InUse(message) => Self::failed_precondition(message),
+            // A disconnected connection put to use (the `connection_usable` trigger).
+            Error::Database(e) if e.is_unusable_connection() => Self::failed_precondition(
+                "The connection is disconnected: reconnect it before using it",
+            ),
             other => {
                 tracing::error!(error = ?other, "engine operation failed");
                 Self::internal("Engine operation failed")

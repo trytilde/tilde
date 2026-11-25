@@ -14,6 +14,7 @@ import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog
 import { AccountSetupDialog } from "./tool-account-setup";
 import { loadToolConnections, message, statusLabel } from "./tool-connections";
 import { ToolTable } from "./tool-catalog";
+import { ConnectionUsages, DisconnectDescription } from "./connection-usages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -116,6 +117,8 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
     }
   }
   const name = source?.kind === "connection" ? source.connection.name : source?.host.name;
+  // What keeps the connection from being disconnected.
+  const usages = source?.kind === "connection" ? source.connection.usages : [];
   const parent =
     kind === "connection"
       ? ({ label: "Connections", to: "/registry/tools/connections" } as const)
@@ -230,6 +233,16 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
               </Button>
             </div>
           </header>
+
+          {source.kind === "connection" && source.connection.usages.length > 0 && (
+            <section className="space-y-3" aria-label="In use by">
+              <h2 className="m-0 text-base font-semibold">In use by</h2>
+              <p className="m-0 text-sm text-muted-foreground">
+                The connection cannot be disconnected while any of these uses it.
+              </p>
+              <ConnectionUsages usages={source.connection.usages} />
+            </section>
+          )}
 
           {source.kind === "host" && source.host.providerId ? (
             <section className="space-y-3" aria-label="Instances">
@@ -347,13 +360,16 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
                   : `Delete ${name}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirm === "rotate"
-                ? "The current token stops working: the host loses access at its next call until it is restarted with the new token."
-                : kind === "connection"
-                  ? "Its credentials are removed and its tools disappear from every agent using it."
-                  : "Its tools disappear from every agent using it and its token stops working."}
+              {confirm === "rotate" ? (
+                "The current token stops working: the host loses access at its next call until it is restarted with the new token."
+              ) : kind === "connection" ? (
+                <DisconnectDescription usages={usages} />
+              ) : (
+                "Its tools disappear from every agent using it and its token stops working."
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirm === "delete" && usages.length > 0 && <ConnectionUsages usages={usages} />}
           {error && (
             <p role="alert" className="m-0 text-sm text-destructive">
               {error}
@@ -363,7 +379,7 @@ export function ToolConnectionDetail({ id, kind }: { id: string; kind: Kind }) {
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={busy}
+              disabled={busy || (confirm === "delete" && usages.length > 0)}
               onClick={() =>
                 confirm === "rotate"
                   ? void act(async () => {

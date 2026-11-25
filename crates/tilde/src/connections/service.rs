@@ -876,22 +876,38 @@ impl Connections {
         drop(tx_client);
         self.view(id, connection_setup_token).await
     }
+    /// Everything that uses each of `ids`, ordered by connection.
+    pub async fn usages(&self, ids: &[Uuid]) -> Result<Vec<crate::connections::db::Usage>, Error> {
+        Ok(crate::connections::db::usages_all(&self.pool.get().await?, ids).await?)
+    }
     /// Revoke local use immediately. User-owned provider apps are not deleted by this operation.
+    /// Refused while anything uses the connection, naming each use: what uses it is unbound first.
     pub async fn disconnect(&self, id: Uuid) -> Result<(), Error> {
         let mut tx_client = self.pool.get().await?;
         let tx = tx_client.transaction().await?;
         crate::connections::db::connection_lock_execute(&tx, &(id.to_string())).await?;
+        // Held to commit: a concurrent bind waits, then finds the connection disconnected.
+        crate::connections::db::connection_hold(&tx, id).await?;
         let row = crate::connections::db::connection_get_opt(&tx, id)
             .await?
             .ok_or_else(|| invalid("Connection not found"))?;
         system_managed(&row)?;
-        crate::connections::db::setup_cancel_execute(&tx, id).await?;
-        self.forget_credential(id);
-        crate::connections::db::connection_disconnect_execute(&tx, id).await?;
-        crate::connections::db::values_delete_execute(&tx, id).await?;
-        crate::connections::db::setup_discard_execute(&tx, id).await?;
+        self.revoke(&tx, id).await?;
         tx.commit().await?;
         drop(tx_client);
+        Ok(())
+    }
+    /// Disconnect a held connection (`connection_hold`) in `tx`, unless something still uses it.
+    async fn revoke(&self, tx: &crate::database::Transaction<'_>, id: Uuid) -> Result<(), Error> {
+        let usages = crate::connections::db::usages_all(tx, &[id]).await?;
+        if !usages.is_empty() {
+            return Err(in_use(&usages));
+        }
+        crate::connections::db::setup_cancel_execute(tx, id).await?;
+        self.forget_credential(id);
+        crate::connections::db::connection_disconnect_execute(tx, id).await?;
+        crate::connections::db::values_delete_execute(tx, id).await?;
+        crate::connections::db::setup_discard_execute(tx, id).await?;
         Ok(())
     }
     /// Recover expired or interrupted attempts without blindly repeating external app creation.
@@ -1067,6 +1083,55 @@ fn binding(id: Uuid, key: &str) -> SecretBinding<'_> {
 }
 pub(super) fn terminal(step: &str) -> bool {
     matches!(step, "complete" | "failed" | "cancelled")
+}
+/// The refusal of a connection still in use, naming each use so its users can be unbound first.
+pub(crate) fn in_use(usages: &[crate::connections::db::Usage]) -> Error {
+    let named: Vec<String> = usages
+        .iter()
+        .map(|u| {
+            let visible = true;
+            let (noun, what) = match u.kind.as_str() {
+                "agent" => ("an agent", format!("agent {} ({})", u.name, u.detail)),
+                "personal_agent" => ("an agent", format!("agent {} (personal use)", u.name)),
+                "tool_source" => (
+                    "an agent",
+                    format!("agent {} (tool source `{}`)", u.name, u.detail),
+                ),
+                "sandbox_tool_source" => (
+                    "a sandbox blueprint",
+                    format!("sandbox blueprint {} (tool source `{}`)", u.name, u.detail),
+                ),
+                "routine" => ("a routine", format!("routine {} ({})", u.name, u.detail)),
+                "sandbox_blueprint" => (
+                    "a sandbox blueprint",
+                    format!("sandbox blueprint {}", u.name),
+                ),
+                "sandbox" => (
+                    "a sandbox",
+                    format!("a {} sandbox of blueprint {}", u.detail, u.name),
+                ),
+                "sandbox_egress" => (
+                    "a sandbox blueprint",
+                    format!("sandbox blueprint {} (egress `{}`)", u.name, u.detail),
+                ),
+                "memory" => ("memory", format!("memory embeddings ({})", u.detail)),
+                "memory_synthesis" => (
+                    "a memory bank",
+                    format!("memory bank {} (synthesis)", u.name),
+                ),
+                other => ("something", other.to_string()),
+            };
+            if visible {
+                what
+            } else {
+                format!("{noun} you cannot view")
+            }
+        })
+        .collect();
+    Error::InUse(format!(
+        "The connection is in use; remove it from these first: {}",
+        named.join("; ")
+    ))
 }
 /// Tilde connections live and die with their agent; clients cannot disconnect or unassign them.
 fn system_managed(row: &Connection) -> Result<(), Error> {

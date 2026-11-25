@@ -28,6 +28,7 @@ pub mod host_call_insert;
 pub mod host_call_take;
 pub mod host_calls_expire;
 pub mod host_connected;
+pub mod host_connections;
 pub mod host_delete;
 pub mod host_disconnected;
 pub mod host_health_cleanup;

@@ -278,13 +278,26 @@ async fn signals_and_schedules_start_runs_in_new_threads() {
         .await
         .unwrap();
     assert_eq!(paused.next_run_at, None);
-    db.pool
-        .get()
+    // A connection its routines fire on is never deleted from under them.
+    let client = db.pool.get().await.unwrap();
+    assert!(
+        client
+            .execute("DELETE FROM connections WHERE id=$1", &[&connection])
+            .await
+            .is_err()
+    );
+    client
+        .execute(
+            "DELETE FROM routines WHERE connection_id=$1",
+            &[&connection],
+        )
         .await
-        .unwrap()
+        .unwrap();
+    client
         .execute("DELETE FROM connections WHERE id=$1", &[&connection])
         .await
         .unwrap();
+    drop(client);
     assert_eq!(routines.list(agent).await.unwrap().len(), 1);
     db.close().await;
 }

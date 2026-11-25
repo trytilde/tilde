@@ -40,6 +40,8 @@ impl Agents {
         // their assignment. Asserted identities are forgotten, their chat users remain.
         let tilde = crate::connections::db::tilde_connection_opt(&tx, id).await?;
         crate::agent::db::unassign_execute(&tx, id).await?;
+        // Nor does it keep any other connection in use (tool sources, routines, personal ones).
+        crate::agent::db::connection_uses_delete_execute(&tx, id).await?;
         if let Some(tilde) = tilde {
             crate::connections::db::tilde_identities_delete_execute(&tx, tilde.id).await?;
             crate::connections::db::tilde_delete_execute(&tx, tilde.id).await?;
