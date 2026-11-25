@@ -1,3 +1,3 @@
 kind: Added
-body: '`tilde deploy` deploys a project whose agents use its own ontology''s tools and signals in one run when the environment does not exist yet: its dry-run `Apply` names the environments it creates (`ApplyRequest.new_ontology_environments`), and the CLI checks the tools and routine signals on their connections (`tilde_ontology/<project>-<environment>`) against the compiled ontology, refusing an undeclared signal with the object and the signals it declares.'
+body: "`tilde deploy` deploys a project whose agents use its own ontology's tools and signals in one run when the environment does not exist yet: its dry-run `Apply` names the environments it creates (`ApplyRequest.new_ontology_environments`), and the CLI checks the tools and routine signals on their connections (`tilde_ontology/<project>-<environment>`) against the compiled ontology, refusing an undeclared signal with the object and the signals it declares."
 time: 2026-11-25T18:00:00.000000+00:00
