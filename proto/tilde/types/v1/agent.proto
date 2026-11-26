@@ -111,6 +111,9 @@ message Capabilities {
   TargetPermission skills_read = 16;
   // Tools on the conversing user's own connections. SELECTED ids are provider IDs.
   TargetPermission tools_personal = 17;
+  // Give the targeted agents, itself excluded, wikis this agent is linked to (read-write only
+  // when its own link is), and take them away.
+  TargetPermission agents_edit_wikis = 18;
 }
 
 enum BinaryPermission {

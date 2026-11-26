@@ -28,6 +28,9 @@ pub enum Capability {
     /// `skills.read` on them. Targets are skill source ids.
     #[serde(rename = "skills.edit")]
     SkillsEdit,
+    /// Link wikis the agent holds to the targeted agents, and unlink them.
+    #[serde(rename = "agents.edit_wikis")]
+    AgentsEditWikis,
     #[serde(rename = "thread.read")]
     ThreadRead,
     #[serde(rename = "work.read")]
@@ -223,6 +226,7 @@ impl Capabilities {
             (Capability::AgentsEditSkills, value.agents_edit_skills),
             (Capability::SkillsRead, value.skills_read),
             (Capability::SkillsEdit, value.skills_edit),
+            (Capability::AgentsEditWikis, value.agents_edit_wikis),
             (Capability::ToolsInvoke, value.tools_invoke),
             (Capability::ToolsPersonal, value.tools_personal),
         ] {
@@ -286,6 +290,7 @@ impl Capabilities {
             agents_edit_skills: target(Capability::AgentsEditSkills),
             skills_read: target(Capability::SkillsRead),
             skills_edit: target(Capability::SkillsEdit),
+            agents_edit_wikis: target(Capability::AgentsEditWikis),
             thread_read: binary(Capability::ThreadRead),
             work_read: binary(Capability::WorkRead),
             work_write: binary(Capability::WorkWrite),

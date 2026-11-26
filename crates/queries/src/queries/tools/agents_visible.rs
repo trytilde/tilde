@@ -3,16 +3,19 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
     pub id: uuid::Uuid,
+    pub key: Option<String>,
     pub name: String,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
+    pub key: Option<&'a str>,
     pub name: &'a str,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
-    fn from(RecordBorrowed { id, name }: RecordBorrowed<'a>) -> Self {
+    fn from(RecordBorrowed { id, key, name }: RecordBorrowed<'a>) -> Self {
         Self {
             id,
+            key: key.map(|v| v.into()),
             name: name.into(),
         }
     }
@@ -86,7 +89,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id,name FROM agents WHERE deleted_at IS NULL AND NOT paused ORDER BY name,id LIMIT 500",
+        "SELECT id,key,name FROM agents WHERE deleted_at IS NULL AND NOT paused ORDER BY name,id LIMIT 500",
         None,
     )
 }
@@ -111,7 +114,8 @@ impl RunStmt {
                 |row: &tokio_postgres::Row| -> Result<RecordBorrowed, tokio_postgres::Error> {
                     Ok(RecordBorrowed {
                         id: row.try_get(0)?,
-                        name: row.try_get(1)?,
+                        key: row.try_get(1)?,
+                        name: row.try_get(2)?,
                     })
                 },
             mapper: |it| Record::from(it),

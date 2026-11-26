@@ -104,6 +104,9 @@ impl Registry {
                 providers.push(Arc::new(crate::wikis::tools::WikiTools(
                     tools.wikis.clone(),
                 )));
+                if let Ok(skills) = chat.skills() {
+                    providers.push(Arc::new(crate::skills::tools::SkillTools(skills)));
+                }
             }
             return Self::new(providers);
         }

@@ -15,6 +15,19 @@ use uuid::Uuid;
 
 pub struct Builtin(pub Tools);
 
+/// The agent a built-in tool acts on, named by its `agent_id` input: one `capability` reaches.
+pub(crate) async fn acted_on(
+    _pool: &crate::database::Pool,
+    scope: &Scope,
+    agent_id: &str,
+    capability: Capability,
+) -> ToolResult<Uuid> {
+    let agent = Uuid::parse_str(agent_id)
+        .map_err(|_| ConnectError::invalid_argument("agent_id is not an agent's ID"))?;
+    scope.capabilities.require(capability, &agent.to_string())?;
+    Ok(agent)
+}
+
 pub(super) fn definition(
     name: &str,
     summary: &str,
@@ -67,7 +80,7 @@ impl Builtin {
                 .map_err(Error::from)?;
         Ok(json!({"agents": rows.into_iter()
             .filter(|a| a.id != scope.agent_id && scope.capabilities.permits(Capability::AgentsRead, &a.id.to_string()))
-            .map(|a| json!({"agent_id": a.id, "name": a.name}))
+            .map(|a| json!({"agent_id": a.id, "key": a.key, "name": a.name}))
             .collect::<Vec<_>>()}))
     }
     async fn message(&self, context: &Context, input: &Value) -> ToolResult<Value> {
@@ -192,7 +205,7 @@ impl Provider for Builtin {
                 out.push(definition(
                     "agents.list",
                     "Looked up agents",
-                    "List the agents you may see, with the IDs used to message them.",
+                    "List the agents you may see, with the IDs used to message them and the keys a deploy gave them.",
                     json!({}),
                     &[],
                     true,
