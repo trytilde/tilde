@@ -55,7 +55,7 @@ export function convertToOpenAIAgentsTools(
           if (!toolCallId) throw new Error("Tool call ID is required");
           // A routed tools.execute hands the run context to the bundled tool it names.
           const frameworkContext: RoutedContext = { runContext, signal: details?.signal };
-          return channel.execute(input, { toolCallId, frameworkContext });
+          return channel.execute(input, { toolCallId, frameworkContext, suspendable: true });
         },
       }),
     );

@@ -7,6 +7,7 @@ import {
   invocationTools,
   type ConvertToOpenAIAgentsToolsOptions,
 } from "./tools.js";
+import { restore, toJson } from "./suspension.js";
 
 /** Options for the channel's tools, plus the agent's bundled tools (`defineTools`). */
 export type TildeToolsOptions = ConvertToOpenAIAgentsToolsOptions & {
@@ -52,7 +53,10 @@ async function registrySkills(ctx: AgentContext) {
  * - `options.signal`: the invocation's signal, so a stop or suspension ends the run.
  * - `options.callModelInputFilter`: before every model call, steering input sent while the agent
  *   works is added as user messages (kept at that point for later turns), and the running
- *   agent's dynamic instructions stamp this invocation's model calls.
+ *   agent's dynamic instructions stamp this invocation's model calls. A Tilde tool call still
+ *   running after about a minute, or Tilde's deadline, suspends the run there (its items are
+ *   saved and the invocation ends); the run's next invocation continues from those items with the
+ *   call's outcome in place of its pending answer.
  *
  * Agents used as tools (`agent.asTool()`) run nested runs with their own options: they keep
  * their tools and receive no steering.
@@ -116,17 +120,30 @@ export async function tildeOpenAIAgents<TAgent extends AnyAgent>(
 
   const steered: AgentInputItem[] = [];
   const positions: number[] = [];
-  const callModelInputFilter: CallModelInputFilter = ({ modelData, agent: running }) => {
+  let initial: number | undefined;
+  let restored: AgentInputItem[] | undefined;
+  let latest: AgentInputItem[] = [];
+  ctx.enableSuspension(() => toJson(latest));
+  const callModelInputFilter: CallModelInputFilter = async ({ modelData, agent: running }) => {
     const stamp = stamps.get(running.name);
     if (stamp) ctx.activatePrompt(stamp);
+    // A resumed run continues its saved items instead of the run's own input.
+    if (initial === undefined) {
+      initial = modelData.input.length;
+      const resumed = ctx.takeResumed();
+      if (resumed) restored = restore(resumed);
+    }
+    const own = restored ? [...restored, ...modelData.input.slice(initial)] : modelData.input;
     // The runner rebuilds the input each turn without filter additions, so earlier steering is
     // put back where it arrived; the input only grows at its end between turns.
     for (const input of ctx.takeInputs()) {
-      positions.push(modelData.input.length + steered.length);
+      positions.push(own.length + steered.length);
       steered.push({ role: "user", content: input.text });
     }
-    const input = [...modelData.input];
+    const input = [...own];
     steered.forEach((item, i) => input.splice(Math.min(positions[i], input.length), 0, item));
+    latest = input;
+    if (ctx.shouldSuspend) await ctx.suspend(toJson(input));
     return { ...modelData, input };
   };
   return {

@@ -40,6 +40,7 @@ export function convertToLangChainTools(
           // BaseTool.invoke places on config.toolCall. Direct calls without one get a fresh ID.
           // A routed tools.execute hands this config to the bundled tool it names.
           return channel.execute(input, {
+            suspendable: true,
             toolCallId: config.toolCall?.id ?? randomUUID(),
             frameworkContext: config,
           });

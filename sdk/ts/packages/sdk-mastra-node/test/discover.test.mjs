@@ -89,12 +89,18 @@ test("discover reads what Mastra agents declare without running them", async () 
     signal: new AbortController().signal,
     activatePrompt: (stamp) => stamps.push(stamp),
     takeInputs: () => steering.splice(0),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
   };
   const [processor] = (await tildeMastra(ctx)).inputProcessors;
   const added = [];
   await processor.processInputStep({
     agent: support,
-    messageList: { add: (message, source) => added.push([message, source]) },
+    messageList: {
+      add: (message, source) => added.push([message, source]),
+      get: { all: { db: () => [] } },
+    },
   });
   assert.deepEqual(stamps, [
     { name: "support/instructions", hash: promptHash(instructions.toString(), {}, "{}") },

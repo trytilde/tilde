@@ -93,7 +93,12 @@ async def test_agent_prompts_are_declared_and_dynamic_ones_stamped(project, caps
 
     responder = sys.modules["pydantic_agents"].responder
     stamps: dict[str, str] = {}
-    ctx = SimpleNamespace(activate_prompt=stamps.__setitem__, take_inputs=list)
+    ctx = SimpleNamespace(
+        activate_prompt=stamps.__setitem__,
+        take_inputs=list,
+        take_resumed=lambda: None,
+        should_suspend=False,
+    )
     capability = TildeInvocation(ctx, FunctionToolset([]))  # type: ignore[arg-type]
     model = FunctionModel(lambda _messages, _info: ModelResponse(parts=[TextPart("ok")]))
     await responder.run("hi", model=model, capabilities=[capability])

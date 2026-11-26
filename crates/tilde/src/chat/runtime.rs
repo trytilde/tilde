@@ -170,6 +170,13 @@ impl Chat {
             .await?
             .ok_or(ChatError::Conflict)?;
         crate::chat::db::thread_lock_one(&tx, thread).await?;
+        // Checked again under the thread lock: one invocation of an agent per thread.
+        if crate::chat::db::invocation_active_opt(&tx, thread, agent)
+            .await?
+            .is_some()
+        {
+            return Err(ChatError::Conflict);
+        }
         let row = crate::chat::db::run_resume_opt(&tx, run)
             .await?
             .ok_or(ChatError::Conflict)?;
@@ -200,7 +207,8 @@ impl Chat {
         drop(tx_client);
         self.run(run).await
     }
-    async fn route_pending(&self) -> Result<bool> {
+    /// Route messages to their agents (one pass of the chat worker's); true when more wait.
+    pub async fn route_pending(&self) -> Result<bool> {
         let messages = crate::chat::db::route_pending_all(&self.pg()?.get().await?).await?;
         let more = messages.len() == 50;
         for message in messages {
@@ -240,6 +248,16 @@ impl Chat {
                 continue; // The relay worker delivers the same canonical message to its replica.
             }
             if crate::chat::db::route_claim_execute(&tx, message.id, message.agent_id).await? == 0 {
+                continue;
+            }
+            if let Some(wait) =
+                crate::chat::db::reply_wait_opt(&tx, message.thread_id, message.agent_id).await?
+                && self
+                    .answer_reply_wait(&tx, wait, message.thread_id, message.id, &message.text)
+                    .await?
+            {
+                tx.commit().await?;
+                drop(tx_client);
                 continue;
             }
             if let Some(active) =
@@ -633,11 +651,24 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, existing.thread_id).await?;
-        let suspending = crate::chat::db::run_state_one(&tx, existing.run_id)
+        // A run suspended by hand waits for ResumeRun with its inputs; one that saved its state
+        // for a pending call or its deadline resumes by itself (`suspension`) and hands the
+        // inputs its loop never saw on now, as messages after it start their own runs. Asked to
+        // suspend for its deadline, a loop that finished first saved nothing: its run ends as
+        // any stop does.
+        let suspension = crate::chat::db::invocation_suspension_one(&tx, invocation).await?;
+        let asked = crate::chat::db::run_state_one(&tx, existing.run_id)
             .await?
             .status
             == "suspending";
+        let by_hand = asked && suspension.suspended_for.as_deref() == Some("manual");
+        let suspending = by_hand || (asked && suspension.saved);
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
+            // A checkpoint an earlier invocation saved is stale once this one ran (and, left
+            // behind a manual suspension, would resume by itself).
+            if (!suspending && status != "failed") || (by_hand && !suspension.saved) {
+                crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
+            }
             let run_status = match status {
                 "stopped" => "waiting",
                 "canceled" => "canceled",
@@ -653,7 +684,7 @@ impl Chat {
                 status,
             )
             .await?;
-            if !suspending {
+            if !by_hand {
                 super::agent_lifecycle::requeue_inputs(self.pg()?, &tx, invocation, row.run_id)
                     .await?;
             }
@@ -757,6 +788,12 @@ impl Chat {
                 traceparent: crate::telemetry::tracing::context::capture().0,
                 tracestate: crate::telemetry::tracing::context::capture().1,
                 state: state.into(),
+                resumes: crate::chat::db::checkpoint_get_opt(
+                    &self.pg()?.get().await?,
+                    scope.run_id,
+                )
+                .await?
+                .is_some_and(|saved| saved.invocation_id != invocation),
                 ..Default::default()
             };
             // An agent with a sandbox runs only once its sandbox is up and connected. Starting
@@ -852,6 +889,15 @@ impl Chat {
         }
         if target == Some("lambda") {
             let reference = reference.ok_or(ChatError::Transport)?;
+            // Tilde owns the deadline: the invocation is asked to suspend before Lambda ends it.
+            if let Some(limit) = super::suspension::deadline(target) {
+                crate::chat::db::invocation_deadline_execute(
+                    &self.pg()?.get().await?,
+                    invocation,
+                    chrono::Utc::now() + limit,
+                )
+                .await?;
+            }
             let payload = serde_json::to_vec(&*request).map_err(|_| ChatError::Transport)?;
             crate::deployment::wake::lambda(reference, &payload)
                 .await
@@ -959,6 +1005,31 @@ impl Chat {
         let tx = tx_client.transaction().await?;
         let rows = crate::chat::db::invocation_expire_all(&tx).await?;
         for row in rows {
+            // As in `finish`: a run asked to suspend that saved its state (its host ended before
+            // it reported) waits to resume; any other expired run failed.
+            let suspension = crate::chat::db::invocation_suspension_one(&tx, row.id).await?;
+            let asked = crate::chat::db::run_state_one(&tx, row.run_id)
+                .await?
+                .status
+                == "suspending";
+            if asked && suspension.saved {
+                crate::chat::db::invocation_restop_execute(&tx, row.id).await?;
+                crate::chat::db::run_status_execute(&tx, row.run_id, "waiting").await?;
+                if suspension.suspended_for.as_deref() != Some("manual") {
+                    super::agent_lifecycle::requeue_inputs(self.pg()?, &tx, row.id, row.run_id)
+                        .await?;
+                }
+                activity(
+                    self.pg()?,
+                    &tx,
+                    row.thread_id,
+                    "invocation.ended",
+                    row.id,
+                    "stopped",
+                )
+                .await?;
+                continue;
+            }
             crate::chat::db::run_status_execute(&tx, row.run_id, "failed").await?;
             activity(
                 self.pg()?,
@@ -1012,6 +1083,8 @@ impl Chat {
                     let _ = self.expire_messages().await;
                     let _ = self.expire_typing().await;
                     let _ = self.expire_tool_calls().await;
+                    let _ = self.suspend_due().await;
+                    let _ = self.resume_suspended().await;
                     if let Some(tools) = &self.tools {
                         let _ = tools.hosts.expire().await;
                     }

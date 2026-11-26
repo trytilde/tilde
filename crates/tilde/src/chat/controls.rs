@@ -51,7 +51,9 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, row.thread_id).await?;
-        if crate::chat::db::controls_suspend_execute(&tx, row.run_id, invocation).await? == 0 {
+        if crate::chat::db::controls_suspend_execute(&tx, row.run_id, invocation, "manual").await?
+            == 0
+        {
             return Err(ChatError::Conflict);
         }
         super::activity(
@@ -194,19 +196,23 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
             let mut seen=std::collections::BTreeSet::new();
             let mut ready=false;
             let deadline=tokio::time::sleep(Duration::from_secs((claims.exp-chrono::Utc::now().timestamp()).max(1) as u64));tokio::pin!(deadline);
+            // A fixed cadence: other invocations' changes wake this loop often on a busy gateway
+            // and must not keep postponing the renewal.
+            let mut renew=tokio::time::interval_at(tokio::time::Instant::now()+Duration::from_secs(10),Duration::from_secs(10));
             loop {
                 let commands=chat.control_commands(&claims).await?;
-                if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop|Kind::Suspend))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
+                if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
                 seen.retain(|id|commands.iter().any(|c|&c.id==id));
-                for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop|Kind::Suspend));if seen.insert(command.id.clone()){yield command;}
+                // A suspend is delivered once and the stream stays open, renewing the lease while
+                // the host brings its loop to a step boundary and saves it; a stop ends it.
+                for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop));if seen.insert(command.id.clone()){yield command;}
                     if terminal{return;}}
                 // The open command stream is the host's liveness for this invocation: it
                 // renews the lease that expiry would otherwise reclaim. Each renewal repeats
                 // Ready (hosts ignore a repeat): an idle stream is otherwise cut by proxies
                 // (a load balancer's 60 s idle timeout), and the SDKs give up on reconnecting
                 // when nothing arrived for 15 s.
-                let renew=tokio::time::sleep(Duration::from_secs(10));
-                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value.map(|v|(v,false)),_=renew=>Some((chat.renew_lease(claims.invocation_id).await,true))};
+                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value.map(|v|(v,false)),_=renew.tick()=>Some((chat.renew_lease(claims.invocation_id).await,true))};
                 match update{Some((value,renewed))=>{value?;if renewed{ready=false;}},None=>break}
             }
         })

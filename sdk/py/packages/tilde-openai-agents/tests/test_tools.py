@@ -19,7 +19,9 @@ class FakeChannelTool:
         self.input_schema = SCHEMA
         self.calls: list[tuple[Any, str | None]] = []
 
-    async def execute(self, input: Any, *, tool_call_id: str | None = None) -> Any:
+    async def execute(
+        self, input: Any, *, tool_call_id: str | None = None, suspendable: bool = False
+    ) -> Any:
         self.calls.append((input, tool_call_id))
         return {"ok": True}
 

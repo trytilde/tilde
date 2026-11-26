@@ -121,6 +121,22 @@ unless `set_run_status` says otherwise. Connect tokens are renewed at four minut
 renewal aborts execution. `checkpoint=` receives the context on suspension and must quiesce
 the framework before returning.
 
+### Suspend and resume
+
+Time belongs to Tilde, not to the agent's loop. With a framework adapter driving the loop
+(`tilde_middleware`, `tilde_openai_agents`, `tilde_pydantic_ai`), a Tilde tool call still running
+after about a minute answers "pending" and goes on in Tilde; the adapter saves the conversation
+in its framework's message format (`ctx.suspend`) before the next model call and the invocation
+ends. When the call finishes Tilde starts a new invocation of the same run, the adapter reloads
+the conversation with the call's outcome in place of the pending answer, and the loop goes on.
+Tilde's deadline (two minutes before Lambda's fifteen) suspends the same way, and the built-in
+`thread.wait_for_reply` tool waits for a person's next message like a slow call. Agent code does
+not change; without an adapter that suspends (Agno, CrewAI, or plain `run` code), calls block as
+before, and only calls the adapter's tool wrappers make (`execute(..., suspendable=True)`) can
+answer pending. The adapters' contract on `AgentContext`: `enable_suspension(snapshot)` before the loop,
+`should_suspend` and `await suspend(state)` at each step boundary, and `resumed`
+(`Resumed(state, outcomes)`, outcomes by the model's tool-call ID) on the next invocation.
+
 ## Inference, prompts and skills
 
 ```python

@@ -1,10 +1,12 @@
 import { readdir } from "node:fs/promises";
 import type { AgentContext, BundledTools } from "@trytilde/sdk";
+import type { MastraDBMessage } from "@mastra/core/agent";
 import type { InputProcessor } from "@mastra/core/processors";
 import { RequestContext } from "@mastra/core/request-context";
 import type { AgentSkillsResolver, SkillInput } from "@mastra/core/skills";
 import { invocationTools, type AnyTool, type ConvertToMastraToolsOptions } from "./tools.js";
 import { dynamicInstructionsStamp } from "./discover.js";
+import { restore, toJson } from "./suspension.js";
 
 /** Request context key holding the invocation's registry skills directory, resolved lazily. */
 const SKILLS = "tilde.skills";
@@ -18,7 +20,10 @@ const SKILLS = "tilde.skills";
  *   and published as `withTildeTools` does).
  * - `abortSignal`: the invocation's signal, so a stop or suspension ends the loop.
  * - `inputProcessors`: before every step, steering input sent while the agent works is
- *   added as user messages, and dynamic instructions stamp this invocation's model calls.
+ *   added as user messages, and dynamic instructions stamp this invocation's model calls. A
+ *   Tilde tool call still running after about a minute, or Tilde's deadline, suspends the loop
+ *   there (the message list is saved and the invocation ends); the run's next invocation
+ *   continues that message list with the call's outcome (see `./suspension.ts`).
  *   Per-call processors replace the agent's own configured `inputProcessors` (Mastra's
  *   memory and skills processors stay); add yours to the array when the agent has some.
  * - `requestContext`: carries the skills assigned in Tilde's registry to an agent whose
@@ -34,13 +39,33 @@ export async function tildeMastra(
   const { requestContext = new RequestContext(), bundled, ...channel } = options;
   let directory: Promise<string> | undefined;
   requestContext.set(SKILLS, () => (directory ??= ctx.skills.directory()));
+  let restored = false;
+  // The message list at the last step boundary. A loop that ends at `maxSteps` on a step whose
+  // calls answered pending suspends with this, so that step runs again on resume: Mastra has no
+  // per-call hook after a step's tool results short of replacing the agent's output processors.
+  let latest: MastraDBMessage[] = [];
+  ctx.enableSuspension(() => toJson(latest));
   const invocation: InputProcessor = {
     id: "tilde-invocation",
-    processInputStep({ messageList, agent }) {
+    async processInputStep({ messageList, agent, abort }) {
       const stamp = agent && dynamicInstructionsStamp(agent);
       if (stamp) ctx.activatePrompt(stamp);
+      // A resumed run continues its saved conversation instead of the call's own messages.
+      const resumed = restored ? undefined : ctx.takeResumed();
+      restored = true;
+      if (resumed) {
+        messageList.clear.all.db();
+        messageList.add(restore(resumed), "memory");
+      }
       for (const input of ctx.takeInputs())
         messageList.add({ role: "user", content: input.text }, "input");
+      latest = messageList.get.all.db();
+      if (ctx.shouldSuspend)
+        await ctx.suspend(toJson(latest)).catch((error: unknown) => {
+          // Saved: end the loop as a tripwire does, which Mastra treats as a normal end.
+          if (ctx.signal.aborted) abort("Suspended until a Tilde tool call finishes");
+          throw error;
+        });
       return messageList;
     },
   };

@@ -9,7 +9,7 @@ import re
 import uuid
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
 from connectrpc.code import Code
 from connectrpc.errors import ConnectError
@@ -24,6 +24,7 @@ from tilde._tools import (
     ToolCatalog,
     as_object,
     as_string,
+    suspendable_call,
     tool_id,
 )
 from tilde._tools import ToolDisplay as ToolDisplayName
@@ -75,6 +76,28 @@ class SteeringInput:
     id: str
     text: str
     message: Message | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ToolOutcome:
+    """What became of a tool call that answered pending: its ``output``, or its ``error``."""
+
+    output: Any = None
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Resumed:
+    """The state a run's previous invocation suspended with: the framework adapter's ``state``
+    (its conversation in its model's message format) and the outcomes of the tool calls it waited
+    for, by the model's tool-call ID."""
+
+    state: Any
+    outcomes: dict[str, ToolOutcome]
+
+
+# How long a loop asked to suspend (its deadline) has to reach a step boundary by itself.
+_SUSPEND_GRACE_SECONDS = 60
 
 
 @dataclass(slots=True)
@@ -239,6 +262,12 @@ class AgentContext:
         self._report_worker = asyncio.create_task(self._drain_reports())
         self._stopped_reported = False
         self._suspension: asyncio.Task[None] | None = None
+        self._snapshot: Callable[[], Any] | None = None
+        # Tool calls of this invocation that answered pending: Tilde's call ID to the model's.
+        self._pending: dict[str, tuple[str, str]] = {}
+        self._suspend_requested = False
+        self._suspended: asyncio.Future[None] | None = None
+        self._resumed: Resumed | None = None
         self._renewal = asyncio.create_task(self._renew_tokens())
         cancellation.on_abort(self._renewal.cancel)
         self.goals = _Goals(self)
@@ -711,6 +740,8 @@ class AgentContext:
         self.check()
         call_id = tool_id(self.invocation_id, tool_call_id, name)
 
+        suspendable = self._snapshot is not None and chunks is None and suspendable_call.get()
+
         async def frames() -> AsyncIterator[chat_pb2.InvokeToolRequest]:
             yield chat_pb2.InvokeToolRequest(
                 name=name,
@@ -718,6 +749,7 @@ class AgentContext:
                 sequence=0,
                 input_json=_encode(input),
                 finish=chunks is None,
+                suspendable=suspendable,
             )
             if chunks is None:
                 return
@@ -734,8 +766,95 @@ class AgentContext:
         # Heartbeat frames keep proxies with idle timeouts from cutting long tool calls.
         async for response in self._session.invoke_tool_stream(frames(), **self._rpc()):
             if response.WhichOneof("frame") == "result":
+                # Still running: the adapter suspends at its next step boundary and the outcome
+                # replaces this answer when the run resumes.
+                if response.result.pending:
+                    self._pending[call_id] = (tool_call_id, name)
                 return json.loads(response.result.output_json)
         raise ConnectError(Code.INTERNAL, "Tool call ended without a result")
+
+    # ----- suspension -----------------------------------------------------------------------
+    def enable_suspension(self, snapshot: Callable[[], Any | None]) -> None:
+        """The suspension contract of framework adapters (internal). An adapter that can stop
+        its loop at a step boundary and continue it from saved state calls this before the loop
+        runs, with the loop's state at its last step boundary (the conversation in the
+        framework's message format, as JSON). From then on a Tilde tool call its tool wrappers
+        make (``execute(..., suspendable=True)``) that runs long answers pending instead of
+        blocking; at each step boundary the adapter checks
+        ``should_suspend`` and, when set, calls ``suspend`` with the conversation so far, pending
+        answers included. ``snapshot`` returns None once the loop has ended (its last step called
+        no tool): there is nothing to resume. On the run's next invocation ``take_resumed()``
+        returns that state and the calls' outcomes once, and the adapter continues from it."""
+        self._snapshot = snapshot
+
+    def take_resumed(self) -> Resumed | None:
+        """The state a suspended run continues from, handed out once (internal): the first
+        framework loop of a resumed invocation continues it, later loops start from their own
+        messages."""
+        resumed, self._resumed = self._resumed, None
+        return resumed
+
+    @property
+    def should_suspend(self) -> bool:
+        """A tool call answered pending, or Tilde asked this invocation to suspend."""
+        return bool(self._pending) or self._suspend_requested
+
+    async def suspend(self, state: Any) -> NoReturn:
+        """Save ``state`` and this invocation's pending calls to the run and end the invocation
+        (raises ``StopLoop``). The run continues in a new invocation once every pending call has
+        finished, at once when none is pending."""
+        if self._suspended is None:
+            self._suspended = asyncio.ensure_future(self._save(state))
+        await asyncio.shield(self._suspended)
+        raise StopLoop()
+
+    async def _save(self, state: Any) -> None:
+        pending = [
+            {"toolCallId": model, "callId": call, "name": name}
+            for call, (model, name) in self._pending.items()
+        ]
+        await self._session.suspend_run(
+            chat_pb2.SuspendRunRequest(
+                state_json=json.dumps({"state": state, "pending": pending}),
+                pending_call_ids=list(self._pending),
+            ),
+            **self._rpc(),
+        )
+        self.cancellation.abort(StopLoop())
+
+    async def settle_pending(self) -> None:
+        """Host hook: a loop that ended with calls still pending suspends with its last state."""
+        state = self._snapshot() if self._snapshot is not None else None
+        if state is None or self._suspended is not None or not self._pending:
+            return
+        try:
+            await self.suspend(state)
+        except StopLoop:
+            pass
+
+    async def load_checkpoint(self) -> None:
+        """Host hook: read the state the run suspended with."""
+        try:
+            checkpoint = await self._session.get_checkpoint(
+                chat_pb2.GetCheckpointRequest(), **self._rpc()
+            )
+        except ConnectError as error:
+            if error.code == Code.NOT_FOUND:
+                return
+            raise
+        saved = json.loads(checkpoint.state_json)
+        calls = {call.id: call for call in checkpoint.results}
+        outcomes: dict[str, ToolOutcome] = {}
+        for pending in saved.get("pending", []):
+            call = calls.get(pending["callId"])
+            if call is None:
+                continue
+            outcomes[pending["toolCallId"]] = (
+                ToolOutcome(output=json.loads(call.output_json or "null"))
+                if call.status == "completed"
+                else ToolOutcome(error=call.error or f"Tool call {call.status}")
+            )
+        self._resumed = Resumed(state=saved.get("state"), outcomes=outcomes)
 
     async def send_native_message(
         self,
@@ -957,6 +1076,19 @@ class AgentContext:
                 controls_pb2.AcknowledgeCommandRequest(id=command.id), **self._rpc()
             )
             return False
+        if kind == controls_pb2.INVOCATION_COMMAND_KIND_SUSPEND and self._snapshot is not None:
+            # Tilde's deadline: the adapter suspends at its next step boundary; a loop still
+            # mid-step after the grace is suspended with its last boundary's state. The stream
+            # stays open meanwhile and keeps the invocation's lease.
+            self._suspend_requested = True
+            timer = asyncio.get_running_loop().call_later(
+                _SUSPEND_GRACE_SECONDS, self._force_suspend
+            )
+            self.cancellation.on_abort(timer.cancel)
+            await self._controls.acknowledge_command(
+                controls_pb2.AcknowledgeCommandRequest(id=command.id), **self._rpc()
+            )
+            return False
         if kind not in (
             controls_pb2.INVOCATION_COMMAND_KIND_STOP,
             controls_pb2.INVOCATION_COMMAND_KIND_SUSPEND,
@@ -986,6 +1118,18 @@ class AgentContext:
         finally:
             self.cancellation.abort(StopLoop())
         return True
+
+    def _force_suspend(self) -> None:
+        if self._snapshot is None or self._suspended is not None or self.cancellation.aborted:
+            return
+        # Not once the loop ended: its run is done, and resuming it would answer twice.
+        state = self._snapshot()
+        if state is not None:
+            self._suspended = asyncio.ensure_future(self._save(state))
+
+    def end_suspension(self) -> None:
+        """Host hook: ``run`` returned, so no framework loop runs any more."""
+        self._snapshot = None
 
 
 def _encode(value: Any) -> str:

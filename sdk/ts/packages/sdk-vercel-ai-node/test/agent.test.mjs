@@ -31,6 +31,9 @@ test("a ToolLoopAgent call carries channel tools, skills and steering that stays
   const ctx = {
     signal: new AbortController().signal,
     takeInputs: () => steering.splice(0),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
     channel: {
       current: {
         sendMessage: {

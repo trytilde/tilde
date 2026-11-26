@@ -47,6 +47,7 @@ export function convertToMastraTools(
       execute: async (input, context) => {
         context.abortSignal?.throwIfAborted();
         return channel.execute(input, {
+          suspendable: true,
           toolCallId: context.agent?.toolCallId || randomUUID(),
           frameworkContext: context,
         });

@@ -182,6 +182,22 @@ pub type OwnedSetRunStatusRequestView = ::buffa::view::OwnedView<
 pub type OwnedSetRunStatusResponseView = ::buffa::view::OwnedView<
     crate::proto::tilde::runtime::v1::__buffa::view::SetRunStatusResponseView<'static>,
 >;
+///Shorthand for `OwnedView<SuspendRunRequestView<'static>>`.
+pub type OwnedSuspendRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SuspendRunResponseView<'static>>`.
+pub type OwnedSuspendRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetCheckpointRequestView<'static>>`.
+pub type OwnedGetCheckpointRequestView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetCheckpointResponseView<'static>>`.
+pub type OwnedGetCheckpointResponseView = ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::GetThreadResponse>
 for crate::proto::tilde::runtime::v1::__buffa::view::GetThreadResponseView<'_> {
     fn encode(
@@ -898,6 +914,74 @@ for ::buffa::view::OwnedView<
         )
     }
 }
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::SuspendRunResponse>
+for crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::SuspendRunResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::GetCheckpointResponse>
+for crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::tilde::runtime::v1::GetCheckpointResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+    /// An `OwnedView` still holds the buffer it was decoded from, so
+    /// its large fields can be handed to the response body by
+    /// reference count instead of copied. The bare view impl above
+    /// cannot do this: it has borrows but no buffer to name.
+    fn encode_segments(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::connectrpc::EncodedBody, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body_segments(
+            self.reborrow(),
+            self.bytes(),
+            codec,
+        )
+    }
+}
 /// Full service name for this service.
 pub const CHAT_SERVICE_SERVICE_NAME: &str = "tilde.runtime.v1.ChatService";
 /// Static [`Spec`](::connectrpc::Spec) for the `GetThread` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
@@ -1017,6 +1101,18 @@ pub const CHAT_SERVICE_UPDATE_TASK_SPEC: ::connectrpc::Spec = ::connectrpc::Spec
 /// Static [`Spec`](::connectrpc::Spec) for the `SetRunStatus` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
 pub const CHAT_SERVICE_SET_RUN_STATUS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/tilde.runtime.v1.ChatService/SetRunStatus",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `SuspendRun` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_SUSPEND_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.ChatService/SuspendRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the `GetCheckpoint` RPC, as seen by the server; the generated client passes it with [`origin`](::connectrpc::Spec::origin) `Client` (compare across sides with [`Spec::same_method`](::connectrpc::Spec::same_method)).
+pub const CHAT_SERVICE_GET_CHECKPOINT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/tilde.runtime.v1.ChatService/GetCheckpoint",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -1532,6 +1628,56 @@ pub trait ChatService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::tilde::runtime::v1::SetRunStatusResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Saves the invocation's framework state (its conversation in the model's message format) and
+    /// the tool calls it waits for, and suspends the run: the invocation then ends, and once every
+    /// pending call has finished Tilde starts the run's next invocation (`InvokeRequest.resumes`),
+    /// which reads them back with GetCheckpoint. Gateway invocations only.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn suspend_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::runtime::v1::SuspendRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::runtime::v1::SuspendRunResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// The state the run's previous invocation suspended with and the outcomes of the calls it
+    /// waited for.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_checkpoint<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::tilde::runtime::v1::GetCheckpointResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -2139,6 +2285,64 @@ impl<S: ChatService> ChatServiceExt for S {
                 },
             )
             .with_spec(CHAT_SERVICE_SET_RUN_STATUS_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "SuspendRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::runtime::v1::SuspendRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.suspend_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::runtime::v1::SuspendRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_SUSPEND_RUN_SPEC)
+            .route_view(
+                CHAT_SERVICE_SERVICE_NAME,
+                "GetCheckpoint",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_checkpoint(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::tilde::runtime::v1::GetCheckpointResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHAT_SERVICE_GET_CHECKPOINT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -2311,6 +2515,18 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(CHAT_SERVICE_SET_RUN_STATUS_SPEC),
+                )
+            }
+            "SuspendRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_SUSPEND_RUN_SPEC),
+                )
+            }
+            "GetCheckpoint" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CHAT_SERVICE_GET_CHECKPOINT_SPEC),
                 )
             }
             _ => None,
@@ -2743,6 +2959,50 @@ impl<T: ChatService> ::connectrpc::Dispatcher for ChatServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::tilde::runtime::v1::SetRunStatusResponse,
+                        >(format)
+                })
+            }
+            "SuspendRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::runtime::v1::SuspendRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::runtime::v1::SuspendRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.suspend_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::runtime::v1::SuspendRunResponse,
+                        >(format)
+                })
+            }
+            "GetCheckpoint" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                        ctx.decode_options(),
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_checkpoint(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::tilde::runtime::v1::GetCheckpointResponse,
                         >(format)
                 })
             }
@@ -3781,6 +4041,96 @@ where
                 &self.transport,
                 &self.config,
                 CHAT_SERVICE_SET_RUN_STATUS_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SuspendRun RPC. Sends a request to /tilde.runtime.v1.ChatService/SuspendRun.
+    pub async fn suspend_run(
+        &self,
+        request: crate::proto::tilde::runtime::v1::SuspendRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.suspend_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SuspendRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn suspend_run_with_options(
+        &self,
+        request: crate::proto::tilde::runtime::v1::SuspendRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::SuspendRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_SUSPEND_RUN_SPEC
+                    .with_origin(::connectrpc::SpecOrigin::Client),
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetCheckpoint RPC. Sends a request to /tilde.runtime.v1.ChatService/GetCheckpoint.
+    pub async fn get_checkpoint(
+        &self,
+        request: crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_checkpoint_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetCheckpoint RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_checkpoint_with_options(
+        &self,
+        request: crate::proto::tilde::runtime::v1::GetCheckpointRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::tilde::runtime::v1::__buffa::view::GetCheckpointResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHAT_SERVICE_GET_CHECKPOINT_SPEC
                     .with_origin(::connectrpc::SpecOrigin::Client),
                 request,
                 options,

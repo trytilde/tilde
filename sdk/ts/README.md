@@ -366,6 +366,29 @@ honor the signal.
 A wake is not a result channel: every host reports acceptance, reasoning and the end of
 the run through `tilde.run.v1.RunService.Report`; see "Connected hosts".
 
+## Suspend and resume
+
+Time belongs to Tilde, not to the agent's loop. With a framework adapter driving the loop
+(`prepareTildeCall`/`tildeAiSdk`, `tildeMastra`, `tildeMiddleware`, `tildeOpenAIAgents`), a
+Tilde tool call still running after about a minute answers "pending" and goes on in Tilde; the
+adapter saves the conversation in its framework's message format (`ctx.suspend`) before the
+next model call and the invocation ends. When the call finishes, Tilde starts a new invocation
+of the same run, the adapter reloads the conversation with the call's outcome in place of the
+pending answer, and the loop continues. Tilde also knows each invocation's runtime limit: a
+Lambda invocation is asked to suspend two minutes before Lambda's fifteen, and calls in
+flight then answer pending. Waiting for a person works the same way with the built-in
+`thread.wait_for_reply` tool (thread.read), whose output is the next message. Agent code does
+not change; without an adapter, tool calls block as before, and only calls the adapter's tool
+wrappers make can answer pending (calls your code makes on `ctx.tools` wait). A suspension asked
+by hand (`SuspendInvocation`) waits for `ResumeRun`; an invocation that never made a
+suspendable call is not asked to suspend and runs to Lambda's own limit, as before. A loop that reaches no step boundary within a
+minute of Tilde's deadline is suspended at its last one, so a call that already finished in the
+step in flight (and did not answer pending) runs again on resume.
+
+Adapters implement a small contract on `AgentContext` (marked internal): `enableSuspension(snapshot)`
+before the loop, `shouldSuspend` and `suspend(state)` at each step boundary, and `resumed`
+(`{ state, outcomes }`, outcomes by the model's tool-call ID) on the next invocation.
+
 ## Connected hosts
 
 A long-running process dials in with a deployment token (from the Deployments tab or `RegisterDeployment`) and
@@ -457,7 +480,8 @@ forwarding the model's tool-call ID to audited channel execution. LangChain read
 `details.toolCall.callId`, and Mastra from `context.agent.toolCallId`. OpenAI Agents items carry
 no Tilde `id` because the Responses API rejects foreign ids; the id lives only in the cached
 representation. Each adapter has a private example under `sdk/ts/examples/<framework>-example-agent` that
-mirrors `sdk/ts/examples/vercel-ai-example-agent`.
+mirrors `sdk/ts/examples/vercel-ai-example-agent`. Every adapter suspends and resumes its loop
+as "Suspend and resume" describes.
 
 ## Python SDK
 

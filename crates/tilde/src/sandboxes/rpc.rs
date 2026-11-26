@@ -144,7 +144,7 @@ impl Runtime {
         }
         .with_context(cx.clone())
         .await;
-        crate::chat::tools::finish(&cx, &result);
+        crate::chat::tools::finish(&cx, result.as_ref());
         result
     }
     async fn session(&self, ctx: &RequestContext) -> Result<db::SessionRow, ConnectError> {

@@ -94,6 +94,10 @@ class FakeGateway(ChatService, InvocationControlService, RunService, SkillServic
     skill_reads: list[tuple[str, str]] = field(default_factory=list)
     skill_lists: int = 0
     blobs: dict[str, bytes] = field(default_factory=dict)
+    # Tools that answer pending to a caller that can suspend, and what SuspendRun saved.
+    pending_tools: set[str] = field(default_factory=set)
+    suspensions: list[chat_pb2.SuspendRunRequest] = field(default_factory=list)
+    outcomes: dict[str, str] = field(default_factory=dict)
 
     def _auth(self, ctx) -> None:
         authorization = ctx.request_headers.get("authorization", "")
@@ -127,6 +131,13 @@ class FakeGateway(ChatService, InvocationControlService, RunService, SkillServic
         for _ in range(2):
             yield chat_pb2.InvokeToolStreamResponse(heartbeat=Heartbeat())
             await asyncio.sleep(0.02)
+        if frames[0].suspendable and frames[0].name in self.pending_tools:
+            yield chat_pb2.InvokeToolStreamResponse(
+                result=chat_pb2.InvokeToolResponse(
+                    output_json=json.dumps({"status": "pending"}), pending=True
+                )
+            )
+            return
         if frames[0].name == "sendMessage":
             text = "".join(json.loads(f.chunk_json)["textDelta"] for f in frames if f.chunk_json)
             output = {"id": "m-1", "threadId": "thread-1", "text": text, "status": "complete"}
@@ -134,6 +145,22 @@ class FakeGateway(ChatService, InvocationControlService, RunService, SkillServic
             output = {"ok": True, "input": json.loads(frames[0].input_json)}
         yield chat_pb2.InvokeToolStreamResponse(
             result=chat_pb2.InvokeToolResponse(output_json=json.dumps(output))
+        )
+
+    async def suspend_run(self, request, ctx):
+        self._auth(ctx)
+        self.suspensions.append(request)
+        return chat_pb2.SuspendRunResponse()
+
+    async def get_checkpoint(self, request, ctx):
+        self._auth(ctx)
+        saved = self.suspensions[-1]
+        return chat_pb2.GetCheckpointResponse(
+            state_json=saved.state_json,
+            results=[
+                types.ToolCall(id=call, status="completed", output_json=self.outcomes[call])
+                for call in saved.pending_call_ids
+            ],
         )
 
     async def list_goals(self, request, ctx):
@@ -314,11 +341,22 @@ class FakeGateway(ChatService, InvocationControlService, RunService, SkillServic
         return router
 
 
+DEPLOY = types.ToolDefinition(
+    name="ops.deploy",
+    provider_id="ops",
+    description="Deploy.",
+    input_schema_json=json.dumps({"type": "object", "properties": {}}),
+)
+
+
 @asynccontextmanager
-async def invocation_context() -> AsyncIterator[tuple[AgentContext, FakeGateway]]:
+async def invocation_context(
+    gateway: FakeGateway | None = None, *, resumes: bool = False
+) -> AsyncIterator[tuple[AgentContext, FakeGateway]]:
     """A live invocation context against a served fake gateway, without a host. The gateway
-    publishes the native send tool and Tilde's ``tools.execute``."""
-    gateway = FakeGateway(tools=[NATIVE_SEND, TOOLS_EXECUTE])
+    publishes the native send tool and Tilde's ``tools.execute`` unless one is given (as a
+    suspended run's next invocation reuses its gateway, ``resumes`` reading the checkpoint)."""
+    gateway = gateway or FakeGateway(tools=[NATIVE_SEND, TOOLS_EXECUTE])
     served = await serve_app(gateway.app())
     request = InvokeRequest(
         invocation_id=str(uuid.uuid4()),
@@ -331,6 +369,8 @@ async def invocation_context() -> AsyncIterator[tuple[AgentContext, FakeGateway]
     ctx = AgentContext(request, Cancellation(), lambda _error=None: None)
     try:
         await ctx.refresh_tools()
+        if resumes:
+            await ctx.load_checkpoint()
         yield ctx, gateway
     finally:
         ctx.cancellation.abort()

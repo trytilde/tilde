@@ -109,6 +109,7 @@ import {
   type Message as ChatMessage,
 } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 export * from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
+export type { JsonValue } from "@bufbuild/protobuf";
 export { RuntimeChatService, RunService };
 export {
   BinaryPermission,
@@ -215,6 +216,11 @@ export type ToolExecution = {
    * RunContext). A `tools.execute` naming a bundled tool hands it to that tool's native runner.
    */
   frameworkContext?: unknown;
+  /**
+   * Set by framework adapters' tool wrappers: the call may answer pending (it then goes on in
+   * Tilde) when the adapter suspends its loop. Calls agent code makes itself always wait.
+   */
+  suspendable?: boolean;
 };
 /** How calls of the agent's bundled tools show in end-user chats. Traces keep full detail. */
 export type ToolDisplayMode = "full" | "summary" | "hidden";
@@ -259,6 +265,18 @@ export type BundledTool = {
 };
 export type ToolCatalog = Record<string, Tool>;
 export type SteeringInput = { id: string; text: string; message?: ChatMessage };
+/** What became of a tool call that answered pending, as the resumed invocation is given it. */
+export type ToolOutcome = { output: JsonValue } | { error: string };
+/**
+ * The state a run's previous invocation suspended with: the framework adapter's `state` (its
+ * conversation in its model's message format) and the outcomes of the tool calls it waited for,
+ * by the model's tool-call ID.
+ */
+export type Resumed = { state: JsonValue; outcomes: ReadonlyMap<string, ToolOutcome> };
+/** A tool call of this invocation that answered pending: the model's ID and Tilde's. */
+type PendingCall = { toolCallId: string; callId: string; name: string };
+/** How long a loop asked to suspend (its deadline) has to reach a step boundary by itself. */
+const SUSPEND_GRACE_MS = 60_000;
 
 const DISPLAY = {
   full: ToolDisplay.FULL,
@@ -392,6 +410,21 @@ export class AgentContext {
   private suspension?: Promise<void>;
   async settleSuspension() {
     await this.suspension;
+  }
+  private snapshot?: () => JsonValue | undefined;
+  private readonly pendingCalls = new Map<string, PendingCall>();
+  private suspendRequested = false;
+  private suspended?: Promise<void>;
+  private resumed?: Resumed;
+  /**
+   * @internal The state a suspended run continues from, handed out once: the first framework
+   * loop of a resumed invocation continues it, later loops (a second `generate`) start from their
+   * own messages.
+   */
+  takeResumed(): Resumed | undefined {
+    const resumed = this.resumed;
+    this.resumed = undefined;
+    return resumed;
   }
   constructor(
     request: InvokeRequest,
@@ -710,7 +743,13 @@ export class AgentContext {
             // The adapter's executor audits the call; the outer tools.execute is not audited.
             if (bundled) return bundled.execute(inner ?? {}, execution);
           }
-          return this.invokeProviderTool(definition.name, input, undefined, execution.toolCallId);
+          return this.invokeProviderTool(
+            definition.name,
+            input,
+            undefined,
+            execution.toolCallId,
+            execution.suspendable,
+          );
         },
       };
       if (chunkSchema)
@@ -790,6 +829,7 @@ export class AgentContext {
     input: unknown,
     chunks: AsyncIterable<unknown> | undefined,
     toolCallId: string,
+    allowPending = false,
   ) {
     this.signal.throwIfAborted();
     const callId = toolId(this.invocationId, toolCallId, name);
@@ -798,8 +838,9 @@ export class AgentContext {
       if (encoded === undefined) throw new Error("Tool inputs must be JSON values");
       return encoded;
     };
+    const suspendable = allowPending && !!this.snapshot && !chunks;
     async function* frames() {
-      yield { name, callId, sequence: 0, inputJson: encode(input), finish: !chunks };
+      yield { name, callId, sequence: 0, inputJson: encode(input), finish: !chunks, suspendable };
       if (!chunks) return;
       let sequence = 1;
       for await (const chunk of chunks)
@@ -812,9 +853,89 @@ export class AgentContext {
       signal: this.signal,
     });
     for await (const response of responses)
-      if (response.frame.case === "result")
+      if (response.frame.case === "result") {
+        // Still running: the adapter suspends at its next step boundary and the outcome
+        // replaces this answer when the run resumes.
+        if (response.frame.value.pending)
+          this.pendingCalls.set(callId, { toolCallId, callId, name });
         return JSON.parse(response.frame.value.outputJson) as JsonValue;
+      }
     throw new ConnectError("Tool call ended without a result", Code.Internal);
+  }
+  /**
+   * @internal The suspension contract of framework adapters. An adapter that can stop its loop
+   * at a step boundary and continue it from saved state calls this before the loop runs, with
+   * the loop's state at its last step boundary (the conversation in the framework's message
+   * format, as JSON). From then on a Tilde tool call its tool wrappers make (`suspendable` on the
+   * execution) that runs long answers pending instead of blocking, and at each step boundary the adapter checks `shouldSuspend` and, when it is set,
+   * calls `suspend` with the conversation so far, pending answers included. `snapshot` returns
+   * undefined once the loop has ended (its last step called no tool): there is nothing to resume. On the run's next
+   * invocation `takeResumed()` returns that state and the calls' outcomes once; the adapter
+   * continues from it.
+   */
+  enableSuspension(snapshot: () => JsonValue | undefined) {
+    this.snapshot = snapshot;
+  }
+  /** @internal A tool call answered pending, or Tilde asked this invocation to suspend. */
+  get shouldSuspend(): boolean {
+    return this.pendingCalls.size > 0 || this.suspendRequested;
+  }
+  /**
+   * @internal Save `state` and this invocation's pending calls to the run and end the
+   * invocation (throws the loop's stop). The run continues in a new invocation once every
+   * pending call has finished, at once when none is pending.
+   */
+  async suspend(state: JsonValue): Promise<never> {
+    this.suspended ??= this.session
+      .suspendRun(
+        {
+          stateJson: JSON.stringify({ state, pending: [...this.pendingCalls.values()] }),
+          pendingCallIds: [...this.pendingCalls.keys()],
+        },
+        { headers: this.#headers, signal: this.signal },
+      )
+      .then(() => this.controller.abort(new StopLoop()));
+    await this.suspended;
+    throw new StopLoop();
+  }
+  /** Internal host hook: `run` returned, so no framework loop runs any more. */
+  endSuspension() {
+    this.snapshot = undefined;
+  }
+  /** Internal host hook: a loop that ended with calls still pending suspends with its last state. */
+  async settlePending() {
+    const state = this.snapshot?.();
+    if (state === undefined || this.suspended || !this.pendingCalls.size) return;
+    await this.suspend(state).catch((error: unknown) => {
+      if (!(error instanceof StopLoop)) throw error;
+    });
+  }
+  /** Internal host hook: read the state the run suspended with. */
+  async loadCheckpoint() {
+    let checkpoint;
+    try {
+      checkpoint = await this.session.getCheckpoint(
+        {},
+        { headers: this.#headers, signal: this.signal },
+      );
+    } catch (error) {
+      if (ConnectError.from(error).code === Code.NotFound) return;
+      throw error;
+    }
+    const saved = JSON.parse(checkpoint.stateJson) as { state: JsonValue; pending: PendingCall[] };
+    const byCall = new Map(checkpoint.results.map((call) => [call.id, call]));
+    const outcomes = new Map<string, ToolOutcome>();
+    for (const pending of saved.pending ?? []) {
+      const call = byCall.get(pending.callId);
+      if (!call) continue;
+      outcomes.set(
+        pending.toolCallId,
+        call.status === "completed"
+          ? { output: JSON.parse(call.outputJson || "null") as JsonValue }
+          : { error: call.error || `Tool call ${call.status}` },
+      );
+    }
+    this.resumed = { state: saved.state, outcomes };
   }
   /** Native-thread convenience only. Other providers expose their own sendMessage tool/schema. */
   async sendNativeMessage(
@@ -1001,6 +1122,22 @@ export class AgentContext {
               { id: command.id },
               { headers: this.#headers, signal: this.signal },
             );
+          } else if (command.kind === InvocationCommandKind.SUSPEND && this.snapshot) {
+            // Tilde's deadline: the adapter suspends at its next step boundary; a loop still
+            // mid-step after the grace is suspended with its last boundary's state. The stream
+            // stays open meanwhile and keeps the invocation's lease.
+            this.suspendRequested = true;
+            const forced = setTimeout(() => {
+              // Not once the loop ended: its run is done, and resuming it would answer twice.
+              const state = this.snapshot?.();
+              if (state !== undefined) void this.suspend(state).catch(() => {});
+            }, SUSPEND_GRACE_MS);
+            forced.unref();
+            this.signal.addEventListener("abort", () => clearTimeout(forced), { once: true });
+            await this.controls.acknowledgeCommand(
+              { id: command.id },
+              { headers: this.#headers, signal: this.signal },
+            );
           } else if (
             command.kind === InvocationCommandKind.STOP ||
             command.kind === InvocationCommandKind.SUSPEND
@@ -1100,7 +1237,11 @@ export class AgentContext {
 
 /** Options shared by every host shape: what to run and how to checkpoint it. */
 export type InvocationOptions = {
-  /** Persist framework state before suspension; resume loads it in run(). */
+  /**
+   * Persist framework state before suspension; resume loads it in run(). For code that keeps
+   * framework state itself: a framework adapter that suspends (`enableSuspension`) saves its own,
+   * and then this is not called.
+   */
   checkpoint?: (context: AgentContext) => Promise<void>;
   /** Existing OTel provider must include agentSpanProcessor. */
   tracing?: "existing";
@@ -1200,9 +1341,13 @@ async function runInvocation(
     try {
       await ready;
       await context.refreshTools();
+      if (request.resumes) await context.loadCheckpoint();
       controller.signal.throwIfAborted();
       // Module-level `inference()` and prompt renders resolve this invocation.
       await runWithContext(context, () => options.run(context));
+      await context.settlePending();
+      // The loops are over: a forced suspension must not resume a finished conversation.
+      context.endSuspension();
       await context.settleSuspension();
       settle();
     } catch (error) {

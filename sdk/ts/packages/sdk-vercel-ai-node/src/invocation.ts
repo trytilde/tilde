@@ -7,6 +7,7 @@ import {
   type ToolSet,
 } from "ai";
 import { convertToAiSdkTools, invocationTools, type ConvertToAiSdkToolsOptions } from "./tools.js";
+import { restore, toJson } from "./suspension.js";
 
 /** Options for the channel's tools, plus the agent's bundled tools (`defineTools`). */
 export type TildeToolsOptions = ConvertToAiSdkToolsOptions & { bundled?: BundledTools<ToolSet> };
@@ -19,6 +20,7 @@ type Settings = {
   instructions?: Instructions;
   system?: Instructions;
   prepareStep?: PrepareStepFunction<any>;
+  onStepFinish?: (step: Step) => unknown;
 };
 
 function withSummary(instructions: Instructions | undefined, summary: string) {
@@ -33,21 +35,82 @@ function withSummary(instructions: Instructions | undefined, summary: string) {
 }
 
 /**
- * Before every step, hand steering input sent while the agent works to the model as user
- * messages. The AI SDK rebuilds each step's messages from the call's messages and the
- * responses so far, so inputs already handed over are re-inserted where they arrived.
+ * Before every step: continue a suspended run, hand steering input to the model and suspend when
+ * Tilde asks. The AI SDK rebuilds each step's messages from the call's messages and the responses
+ * so far, so every step re-applies what earlier ones changed:
+ *
+ * - Resumed (`ctx.takeResumed()`, the invocation's first loop): the saved conversation replaces the call's own messages, with each
+ *   pending tool result replaced by the call's outcome (see `./suspension.ts`).
+ * - Steering sent while the agent works becomes user messages where it arrived.
+ * - Suspension: a Tilde tool call that answered pending, or Tilde's deadline, saves the
+ *   conversation so far (`ctx.suspend`) and ends the invocation; the run resumes with the
+ *   outcome in a new invocation.
  */
-function steer(ctx: AgentContext, inner?: PrepareStepFunction<any>): PrepareStepFunction<any> {
+type Step = { response: { messages: ModelMessage[] }; toolCalls: unknown[] };
+type Loop = {
+  prepareStep: PrepareStepFunction<any>;
+  onStepFinish: (step: Step) => void;
+  /** The conversation at the last step boundary or step end, as the model saw it. */
+  latest: ModelMessage[];
+  /** The last step called no tool: the loop is over and nothing is left to resume. */
+  ended: boolean;
+};
+/** Each invocation's current loop, which `tildeAiSdk`'s `onStepFinish` and `conversation` reach. */
+const loops = new WeakMap<AgentContext, Loop>();
+
+function invocationStep(ctx: AgentContext, inner?: PrepareStepFunction<any>): Loop {
   const steering: { at: number; message: ModelMessage }[] = [];
-  return async (step) => {
-    for (const input of ctx.takeInputs())
-      steering.push({ at: step.messages.length, message: { role: "user", content: input.text } });
-    if (!steering.length) return inner?.(step);
-    const messages = [...step.messages];
-    steering.forEach((input, i) => messages.splice(input.at + i, 0, input.message));
-    const own = await inner?.({ ...step, messages });
-    return { ...own, messages: own?.messages ?? messages };
+  let first: ModelMessage[] | undefined;
+  let restored: ModelMessage[] | undefined;
+  // The conversation for the responses so far (cumulative in the AI SDK): the call's messages
+  // (or the saved ones), the responses and steering where it arrived.
+  const assemble = (responses: ModelMessage[]) => {
+    const own = [...(restored ?? first ?? []), ...responses];
+    steering.forEach((input, i) => own.splice(input.at + i, 0, input.message));
+    return own;
   };
+  const loop: Loop = {
+    latest: [],
+    ended: false,
+    prepareStep: async (step) => {
+      if (first === undefined) {
+        first = step.messages;
+        const resumed = ctx.takeResumed();
+        if (resumed) restored = restore(resumed);
+      }
+      const responses = step.messages.slice(first.length);
+      for (const input of ctx.takeInputs())
+        steering.push({
+          at: (restored ?? first).length + responses.length,
+          message: { role: "user", content: input.text },
+        });
+      const messages = assemble(responses);
+      loop.latest = messages;
+      loop.ended = false;
+      if (ctx.shouldSuspend) await ctx.suspend(toJson(messages));
+      if (!restored && !steering.length) return inner?.(step);
+      const result = await inner?.({ ...step, messages });
+      return { ...result, messages: result?.messages ?? messages };
+    },
+    // A loop that ends on a step whose calls answered pending suspends with that step, so
+    // resuming does not call them again. Only a snapshot: steering waits for the next step.
+    onStepFinish: (step) => {
+      loop.latest = assemble(step.response.messages);
+      loop.ended = step.toolCalls.length === 0;
+    },
+  };
+  loops.set(ctx, loop);
+  ctx.enableSuspension(() => (loop.ended ? undefined : toJson(loop.latest)));
+  return loop;
+}
+
+/**
+ * The conversation the invocation's last `prepareTildeCall` loop ended with, as its model saw
+ * it: on a resumed invocation that is the saved conversation and what followed, which the
+ * call's own messages do not hold. Continue from it for a second loop in the same invocation.
+ */
+export function tildeConversation(ctx: AgentContext): ModelMessage[] | undefined {
+  return loops.get(ctx)?.latest;
 }
 
 /**
@@ -55,8 +118,9 @@ function steer(ctx: AgentContext, inner?: PrepareStepFunction<any>): PrepareStep
  * agent's other Tilde tools (`ctx.agentTools`), its bundled tools (`tools.bundled`, audited and
  * published as `withTildeTools` does), the agent's Tilde skills (the AI SDK has no native skills: `list_skills`/`read_skill` tools and
  * `ctx.skills.summary()` appended to `instructions`, or `system` for `generateText`), and a
- * `prepareStep` that hands steering input to the model at every step (wrapping the settings'
- * own). ToolLoopAgent instructions are static text the gateway matches, so nothing is stamped.
+ * `prepareStep` (wrapping the settings' own) that hands steering input to the model at every
+ * step, suspends the loop when a Tilde tool call is still running after about a minute or Tilde's
+ * deadline comes, and continues a resumed run from its saved conversation. ToolLoopAgent instructions are static text the gateway matches, so nothing is stamped.
  *
  * `tildeCallOptions` calls this from a `ToolLoopAgent`'s `prepareCall`; call it yourself for
  * `generateText`/`streamText`:
@@ -70,6 +134,7 @@ export async function prepareTildeCall<S extends object>(
   const own = settings as S & Settings;
   const { bundled, ...channel } = tools;
   const summary = await ctx.skills.summary();
+  const step = invocationStep(ctx, own.prepareStep);
   const key = "system" in own && !("instructions" in own) ? "system" : "instructions";
   return {
     ...own,
@@ -79,7 +144,12 @@ export async function prepareTildeCall<S extends object>(
       ...(summary ? convertToAiSdkTools(ctx.skills.tools()) : {}),
     },
     [key]: withSummary(own[key], summary),
-    prepareStep: steer(ctx, own.prepareStep),
+    prepareStep: step.prepareStep,
+    // generateText/streamText; a ToolLoopAgent's call takes it from `tildeAiSdk`.
+    onStepFinish: async (finished: Step) => {
+      await own.onStepFinish?.(finished);
+      step.onStepFinish(finished);
+    },
   };
 }
 
@@ -110,5 +180,7 @@ export function tildeAiSdk(ctx: AgentContext, tools?: TildeToolsOptions) {
   return {
     options: { tilde: { context: ctx, tools } } satisfies TildeCallOptions,
     abortSignal: ctx.signal,
+    // `prepareCall` cannot set it: records each step for suspension (see `prepareTildeCall`).
+    onStepFinish: (step: Step) => loops.get(ctx)?.onStepFinish(step),
   };
 }

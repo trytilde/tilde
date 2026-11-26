@@ -151,3 +151,11 @@ the API still validates the schema and invocation authorization. Programmatic
 calls may supply `{ toolCallId }`; the runtime rejects repeated IDs to prevent
 duplicate execution. Provider result bodies remain their original JSON, serialized
 into the `ToolMessage` content, instead of being coerced into a generic message type.
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tildeMiddleware`'s `beforeModel` suspends the run: the agent state's messages are saved (stored-message JSON) and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

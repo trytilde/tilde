@@ -98,6 +98,10 @@ pub mod __buffa {
         reg.register_json_any(super::__UPDATE_TASK_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SET_RUN_STATUS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_RUN_STATUS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SUSPEND_RUN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SUSPEND_RUN_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_CHECKPOINT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_CHECKPOINT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__WATCH_COMMANDS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__WATCH_COMMANDS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACKNOWLEDGE_COMMAND_REQUEST_JSON_ANY);
@@ -339,6 +343,22 @@ pub use self::__buffa::view::SetRunStatusRequestOwnedView;
 pub use self::__buffa::view::SetRunStatusResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetRunStatusResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendRunRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendRunRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendRunResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SuspendRunResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCheckpointRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCheckpointRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCheckpointResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetCheckpointResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::WatchCommandsRequestView;
 #[doc(inline)]

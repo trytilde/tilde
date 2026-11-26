@@ -40,7 +40,7 @@ class ChannelToolAdapter(BaseTool):
         raise NotImplementedError("Channel tools run on the agent's event loop; use ainvoke")
 
     async def _arun(self, input: Any, tool_call_id: str | None = None) -> Any:
-        return await self.channel.execute(input, tool_call_id=tool_call_id)
+        return await self.channel.execute(input, tool_call_id=tool_call_id, suspendable=True)
 
 
 def convert_to_langchain_tools(

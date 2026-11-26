@@ -9,10 +9,17 @@ invocation it does nothing.
 Tools added to a model request in ``wrap_model_call`` are not registered with the graph's
 ``ToolNode``; ``create_agent`` allows that only when some middleware executes them in
 ``wrap_tool_call`` (its "dynamic tools" contract), which this middleware does.
+
+Suspension: before each model call, a Tilde tool call still running after about a minute (it
+answered pending) or Tilde's deadline saves the agent state's messages (``messages_to_dict``)
+and ends the invocation; the run's next invocation replaces the call's messages with them
+(``RemoveMessage(REMOVE_ALL_MESSAGES)``), each pending tool message replaced by the call's
+outcome, and the graph continues.
 """
 
 from __future__ import annotations
 
+import json
 import weakref
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -24,13 +31,23 @@ from langchain.agents.middleware import (
     ModelRequest,
     ModelResponse,
 )
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    RemoveMessage,
+    SystemMessage,
+    ToolMessage,
+    messages_from_dict,
+    messages_to_dict,
+)
 from langchain_core.tools import BaseTool
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.prebuilt.tool_node import ToolCallRequest
 from langgraph.runtime import Runtime
 from langgraph.types import Command
 
-from tilde import AgentContext, BundledTools, current_invocation
+from tilde import AgentContext, BundledTools, Resumed, current_invocation
 from tilde_langchain.discover import dynamic_stamp, reachable_middleware
 from tilde_langchain.tools import convert_to_langchain_tools, with_tilde_tools
 
@@ -43,6 +60,47 @@ class _Invocation:
 
 # One entry per running invocation; it goes when the invocation's context does.
 _invocations: weakref.WeakKeyDictionary[AgentContext, _Invocation] = weakref.WeakKeyDictionary()
+
+
+@dataclass(slots=True)
+class _Loop:
+    """The graph's messages at its last step boundary, for suspending it."""
+
+    restored: bool = False
+    latest: list[BaseMessage] | None = None
+    # The model's last answer called no tool: the graph is done, nothing is left to resume.
+    ended: bool = False
+
+
+_loops: weakref.WeakKeyDictionary[AgentContext, _Loop] = weakref.WeakKeyDictionary()
+
+
+def _loop(ctx: AgentContext) -> _Loop:
+    found = _loops.get(ctx)
+    if found is None:
+        found = _loops[ctx] = _Loop()
+        ctx.enable_suspension(lambda: None if found.ended else messages_to_dict(found.latest or []))
+    return found
+
+
+def _restore(resumed: Resumed) -> list[BaseMessage]:
+    """The saved messages, each pending tool message replaced by the call's outcome."""
+    messages = messages_from_dict(resumed.state)
+    for index, message in enumerate(messages):
+        outcome = (
+            resumed.outcomes.get(message.tool_call_id) if isinstance(message, ToolMessage) else None
+        )
+        if outcome is None:
+            continue
+        failed = outcome.error is not None
+        messages[index] = ToolMessage(
+            id=message.id,
+            name=message.name,
+            tool_call_id=message.tool_call_id,
+            content=outcome.error if failed else json.dumps(outcome.output),
+            status="error" if failed else "success",
+        )
+    return messages
 
 
 async def _invocation(ctx: AgentContext, bundled: BundledTools | None) -> _Invocation:
@@ -62,11 +120,12 @@ async def _invocation(ctx: AgentContext, bundled: BundledTools | None) -> _Invoc
 
 
 class TildeMiddleware(AgentMiddleware[AgentState[Any], Any]):
-    """Before each model call: check cancellation and add steering input as user messages
-    (kept in the graph state). Around it: stamp the ``@dynamic_prompt`` middleware listed
-    after this one, add the channel's tools, the agent's other Tilde tools, its bundled tools
-    (audited and published as ``with_tilde_tools`` does) and, when skills are assigned, the
-    skill tools and their summary. Around tool calls: execute those tools."""
+    """Before each model call: check cancellation, continue a resumed run, add steering input as
+    user messages (kept in the graph state) and suspend when Tilde asks. Around it: stamp the
+    ``@dynamic_prompt`` middleware listed after this one, add the channel's tools, the agent's
+    other Tilde tools, its bundled tools (audited and published as ``with_tilde_tools`` does)
+    and, when skills are assigned, the skill tools and their summary. Around tool calls: execute
+    those tools."""
 
     def __init__(self, bundled: BundledTools | None = None) -> None:
         super().__init__()
@@ -79,10 +138,30 @@ class TildeMiddleware(AgentMiddleware[AgentState[Any], Any]):
         if ctx is None:
             return None
         ctx.check()
-        inputs = ctx.take_inputs()
-        if not inputs:
-            return None
-        return {"messages": [HumanMessage(content=input.text) for input in inputs]}
+        loop = _loop(ctx)
+        # A resumed run continues its saved conversation instead of the call's own messages.
+        restored = None
+        resumed = None if loop.restored else ctx.take_resumed()
+        loop.restored = True
+        if resumed is not None:
+            restored = _restore(resumed)
+        inputs = [HumanMessage(content=input.text) for input in ctx.take_inputs()]
+        loop.latest = [*(restored if restored is not None else state["messages"]), *inputs]
+        loop.ended = False
+        if ctx.should_suspend:
+            await ctx.suspend(messages_to_dict(loop.latest))
+        if restored is not None:
+            return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *loop.latest]}
+        return {"messages": inputs} if inputs else None
+
+    async def aafter_model(
+        self, state: AgentState[Any], runtime: Runtime[Any]
+    ) -> dict[str, Any] | None:
+        ctx = current_invocation()
+        if ctx is not None:
+            last = state["messages"][-1] if state["messages"] else None
+            _loop(ctx).ended = not (isinstance(last, AIMessage) and last.tool_calls)
+        return None
 
     async def awrap_model_call(
         self,

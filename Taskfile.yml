@@ -294,7 +294,7 @@ tasks:
       - scripts/with-postgres.sh node scripts/test-services.mjs
       - scripts/with-postgres.sh node .github/actions/register-deployment/integration.mjs
       - pnpm --dir sdk/ts build
-      - node --test sdk/ts/packages/sdk/test/agent-lifecycle.test.mjs
+      - node --test sdk/ts/packages/sdk/test/agent-lifecycle.test.mjs sdk/ts/packages/sdk/test/suspension.test.mjs
       - scripts/with-postgres.sh pnpm --dir sdk/ts test
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/concurrency.integration.mjs
       - scripts/with-postgres.sh node sdk/ts/packages/sdk/test/tool-host.integration.mjs

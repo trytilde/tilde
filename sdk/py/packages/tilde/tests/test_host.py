@@ -7,7 +7,7 @@ import json
 import uuid
 
 import pytest
-from fake_gateway import FakeGateway
+from fake_gateway import DEPLOY, FakeGateway
 from support import serve_app
 
 from tilde import (
@@ -564,3 +564,83 @@ async def test_skill_directory_keeps_registry_skills_per_agent_and_updates_by_ve
     await wake_with([shipped], "cmd-5")
     assert sorted(os.listdir(root)) == [".versions.json"]
     assert json.loads((root / ".versions.json").read_text()) == {}
+
+
+async def test_a_pending_call_suspends_the_run_and_the_next_invocation_reads_its_outcome(dial_in):
+    seen: dict[str, object] = {}
+    latest: list[object] = []
+
+    async def run(ctx: AgentContext) -> None:
+        resumed = ctx.take_resumed()
+        if resumed is not None:
+            seen["resumed"] = resumed
+            assert ctx.take_resumed() is None, "handed out once"
+            return
+        # An adapter's loop: a tool call per step, checking for suspension at each boundary.
+        ctx.enable_suspension(lambda: latest)
+        latest.append({"role": "user", "content": "Deploy"})
+        output = await ctx.tools["ops.deploy"].execute({}, tool_call_id="c1", suspendable=True)
+        latest.append({"role": "tool", "toolCallId": "c1", "output": output})
+        assert ctx.should_suspend
+        await ctx.suspend(latest)
+
+    gateway, url, _host = await dial_in(run)
+    gateway.tools = [DEPLOY]
+    gateway.pending_tools = {"ops.deploy"}
+    first = wake(url, "deploy")
+    gateway.wakes.put_nowait(first)
+    stopped = await gateway.stopped(first.invocation_id)
+    assert stopped.stopped.error == "", "a suspension is not a failure"
+    assert gateway.tool_calls[0][0].suspendable
+    (saved,) = gateway.suspensions
+    (call,) = saved.pending_call_ids
+    assert json.loads(saved.state_json) == {
+        "state": latest,
+        "pending": [{"toolCallId": "c1", "callId": call, "name": "ops.deploy"}],
+    }
+
+    gateway.outcomes[call] = json.dumps({"version": 7})
+    second = wake(url, "deploy", command_id="cmd-2")
+    second.resumes = True
+    gateway.wakes.put_nowait(second)
+    await gateway.stopped(second.invocation_id)
+    resumed = seen["resumed"]
+    assert resumed.state == latest
+    assert resumed.outcomes["c1"].output == {"version": 7}
+
+
+async def test_the_deadline_asks_the_loop_to_suspend_and_a_loop_that_cannot_never_sees_pending(
+    dial_in,
+):
+    outputs: list[object] = []
+
+    async def run(ctx: AgentContext) -> None:
+        if ctx.objective == "blocking":
+            outputs.append(await ctx.tools["ops.deploy"].execute({}, tool_call_id="c2"))
+            return
+        ctx.enable_suspension(lambda: ["boundary"])
+        for _ in range(500):
+            if ctx.should_suspend:
+                await ctx.suspend(["deadline"])
+            await asyncio.sleep(0.02)
+
+    gateway, url, _host = await dial_in(run)
+    gateway.tools = [DEPLOY]
+    gateway.pending_tools = {"ops.deploy"}
+    first = wake(url, "work")
+    gateway.wakes.put_nowait(first)
+    await asyncio.sleep(0.2)
+    gateway.commands.put_nowait(
+        controls_pb2.WatchCommandsResponse(
+            id="suspend-1", kind=controls_pb2.INVOCATION_COMMAND_KIND_SUSPEND
+        )
+    )
+    await gateway.stopped(first.invocation_id)
+    assert "suspend-1" in gateway.acknowledged
+    assert json.loads(gateway.suspensions[0].state_json) == {"state": ["deadline"], "pending": []}
+
+    blocking = wake(url, "blocking", command_id="cmd-3")
+    gateway.wakes.put_nowait(blocking)
+    await gateway.stopped(blocking.invocation_id)
+    assert not gateway.tool_calls[-1][0].suspendable
+    assert outputs == [{"ok": True, "input": {}}]

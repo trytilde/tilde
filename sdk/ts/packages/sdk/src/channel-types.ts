@@ -1,6 +1,6 @@
 import type { Tool } from "./index.js";
 
-export type ChannelExecution = { toolCallId?: string };
+export type ChannelExecution = { toolCallId?: string; suspendable?: boolean };
 /** Callable programmatically; its provider-authored descriptor can also be given to a model. */
 export type ChannelTool<Input = unknown> = Omit<Tool, "execute" | "stream"> & {
   (input: Input, execution?: ChannelExecution): Promise<unknown>;

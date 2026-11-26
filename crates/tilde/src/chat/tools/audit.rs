@@ -24,7 +24,7 @@ pub fn display_value(text: &str) -> types::ToolDisplay {
 }
 
 impl Chat {
-    pub async fn report_tool_call(&self, scope: &Scope, mut tool: types::ToolCall) -> Result<()> {
+    pub async fn report_tool_call(&self, scope: &Scope, tool: types::ToolCall) -> Result<()> {
         if let Some(local) = self.local() {
             return local.report_tool_call(scope, tool).await;
         }
@@ -43,6 +43,20 @@ impl Chat {
                 return Err(ChatError::Invalid("Invalid tool JSON".into()));
             }
         }
+        let mut tx_client = self.pg()?.get().await?;
+        let tx = tx_client.transaction().await?;
+        self.write_tool_call(&tx, scope, tool).await?;
+        tx.commit().await?;
+        drop(tx_client);
+        Ok(())
+    }
+    /// `report_tool_call` inside the caller's transaction, after its validation.
+    pub(crate) async fn write_tool_call(
+        &self,
+        tx: &crate::database::Transaction<'_>,
+        scope: &Scope,
+        mut tool: types::ToolCall,
+    ) -> Result<()> {
         let call = id(&tool.id)?;
         let kind = match tool.status.as_str() {
             "running" if tool.input_delta.is_empty() => "tool.started",
@@ -54,11 +68,9 @@ impl Chat {
         };
         let valid_start =
             kind == "tool.started" && !tool.input_json.is_empty() && tool.output_json.is_empty();
-        let mut tx_client = self.pg()?.get().await?;
-        let tx = tx_client.transaction().await?;
-        let (sequence, at) = crate::chat::audit::lock(&tx, scope.thread_id).await?;
+        let (sequence, at) = crate::chat::audit::lock(tx, scope.thread_id).await?;
         let result = crate::chat::db::tool_write_one(
-            &tx,
+            tx,
             call,
             scope.thread_id,
             scope.id,
@@ -102,8 +114,6 @@ impl Chat {
                 event,
             )?;
         }
-        tx.commit().await?;
-        drop(tx_client);
         Ok(())
     }
     pub(crate) async fn expire_tool_calls(&self) -> Result<()> {
@@ -166,6 +176,29 @@ impl Execution {
             tool,
             armed: true,
         })
+    }
+    /// The call answered "pending" and goes on past its invocation, as a background call does:
+    /// invocation expiry leaves it running (aborting it after an hour if nothing finishes it).
+    pub async fn detach(&mut self) -> ToolResult<()> {
+        let call = id(&self.tool.id)?;
+        let client = self.chat.pg()?.get().await.map_err(ChatError::from)?;
+        crate::chat::db::tool_detach_execute(&client, call)
+            .await
+            .map_err(ChatError::from)?;
+        self.tool.detached = true;
+        Ok(())
+    }
+    /// A pending call still running here (see `tool_interrupted.sql`).
+    pub async fn heartbeat(&self) -> ToolResult<()> {
+        let client = self.chat.pg()?.get().await.map_err(ChatError::from)?;
+        crate::chat::db::tool_heartbeat_execute(&client, id(&self.tool.id)?)
+            .await
+            .map_err(ChatError::from)?;
+        Ok(())
+    }
+    /// Leave the running record to whatever finishes it elsewhere (a reply to a wait).
+    pub fn release(mut self) {
+        self.armed = false;
     }
     /// Records the outcome. An output too large to record replaces `result` with that failure,
     /// so the caller (or a background call's delivery) reports what was recorded.

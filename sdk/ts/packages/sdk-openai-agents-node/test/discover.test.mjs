@@ -93,6 +93,9 @@ test("discover follows handoffs and agent tools without running instructions", a
     signal: new AbortController().signal,
     activatePrompt: (stamp) => stamps.push(stamp),
     takeInputs: () => steering.splice(0),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
     setBundledTools: async () => {},
     skills: {
       list: async () => [

@@ -151,3 +151,11 @@ The core SDK exposes typed callable tools on `ctx.channel.slack`, `github`,
 `ctx.channel.connections()` and `ctx.channel.forConnection(id)` when multiple
 connections use a provider. `ctx.channel.current` never falls back to a different
 connection when the inbound connection has no available tools.
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tildeMastra(ctx)`'s input processor suspends the run: its message list is saved and the loop ends as a tripwire does and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

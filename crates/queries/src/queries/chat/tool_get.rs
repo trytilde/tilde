@@ -18,6 +18,7 @@ pub struct Record {
     pub detached: bool,
     pub display: String,
     pub personal_connection_id: Option<uuid::Uuid>,
+    pub heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
@@ -36,6 +37,7 @@ pub struct RecordBorrowed<'a> {
     pub detached: bool,
     pub display: &'a str,
     pub personal_connection_id: Option<uuid::Uuid>,
+    pub heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -56,6 +58,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             detached,
             display,
             personal_connection_id,
+            heartbeat_at,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -75,6 +78,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             detached,
             display: display.into(),
             personal_connection_id,
+            heartbeat_at,
         }
     }
 }
@@ -185,6 +189,7 @@ impl RunStmt {
                         detached: row.try_get(13)?,
                         display: row.try_get(14)?,
                         personal_connection_id: row.try_get(15)?,
+                        heartbeat_at: row.try_get(16)?,
                     })
                 },
             mapper: |it| Record::from(it),

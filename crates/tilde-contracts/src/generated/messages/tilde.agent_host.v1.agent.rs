@@ -148,6 +148,15 @@ pub struct InvokeRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub state: ::buffa::MessageField<InvocationState, ::buffa::Inline<InvocationState>>,
+    /// This invocation continues a suspended run: read its checkpoint (ChatService.GetCheckpoint).
+    ///
+    /// Field 19: `resumes`
+    #[serde(
+        rename = "resumes",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub resumes: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -173,6 +182,7 @@ impl ::core::fmt::Debug for InvokeRequest {
             .field("thread", &self.thread)
             .field("cached_messages", &self.cached_messages)
             .field("state", &self.state)
+            .field("resumes", &self.resumes)
             .finish()
     }
 }
@@ -286,6 +296,9 @@ impl ::buffa::Message for InvokeRequest {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.resumes {
+            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -369,6 +382,9 @@ impl ::buffa::Message for InvokeRequest {
                 buf,
             );
             self.state.write_to(__cache, buf);
+        }
+        if self.resumes {
+            ::buffa::types::put_bool_field(19u32, self.resumes, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -527,6 +543,13 @@ impl ::buffa::Message for InvokeRequest {
                     ctx,
                 )?;
             }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.resumes = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -553,6 +576,7 @@ impl ::buffa::Message for InvokeRequest {
         self.traceparent.clear();
         self.tracestate.clear();
         self.state = ::buffa::MessageField::none();
+        self.resumes = false;
         self.__buffa_unknown_fields.clear();
     }
 }

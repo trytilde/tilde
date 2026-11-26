@@ -8,10 +8,14 @@ import hashlib
 import re
 import uuid
 from collections.abc import AsyncIterable, Awaitable, Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 ExecuteFn = Callable[[Any, str], Awaitable[Any]]
+# Set for a call made through a framework adapter's tool wrapper: it may answer pending when the
+# adapter suspends its loop (`AgentContext.enable_suspension`). Calls agent code makes wait.
+suspendable_call: ContextVar[bool] = ContextVar("tilde_suspendable_call", default=False)
 #: How calls of one of the agent's own tools show in end-user chats; traces keep full detail.
 ToolDisplay = Literal["full", "summary", "hidden"]
 StreamFn = Callable[[Any, AsyncIterable[Any], str], Awaitable[Any]]
@@ -45,9 +49,16 @@ class Tool:
     background: bool = False
     display: ToolDisplay = "full"
 
-    async def execute(self, input: Any, *, tool_call_id: str | None = None) -> Any:
-        """Send completed input; ``tool_call_id`` is the framework's call ID for auditing."""
-        return await self._execute(input, tool_call_id or str(uuid.uuid4()))
+    async def execute(
+        self, input: Any, *, tool_call_id: str | None = None, suspendable: bool = False
+    ) -> Any:
+        """Send completed input; ``tool_call_id`` is the framework's call ID for auditing.
+        ``suspendable``: set by framework adapters' wrappers (see ``suspendable_call``)."""
+        token = suspendable_call.set(suspendable)
+        try:
+            return await self._execute(input, tool_call_id or str(uuid.uuid4()))
+        finally:
+            suspendable_call.reset(token)
 
     @property
     def can_stream(self) -> bool:

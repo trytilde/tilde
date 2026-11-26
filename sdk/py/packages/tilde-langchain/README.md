@@ -161,3 +161,11 @@ is audited once with the model's call id. `options={"roll_dice": BundledOptions(
 `metadata["tilde"]`. LangChain has no output schema and audits record the tool message content;
 a `ToolException` handled for the model is audited as failed. Tools that need `ToolRuntime` or
 `InjectedState` only get them from `ToolNode`, so they cannot run through `tools.execute`.
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tilde_middleware()`'s `abefore_model` suspends the run: the agent state's messages are saved (`messages_to_dict`) and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

@@ -46,6 +46,8 @@ class InvocationOptions:
     """What to run and how to checkpoint it, shared by every host shape."""
 
     run: RunFn
+    # Called on a suspend command for code that keeps framework state itself; a framework
+    # adapter that suspends (``enable_suspension``) saves its own and this is not called.
     checkpoint: CheckpointFn | None = None
     tracing: Literal["existing"] | None = None
     logging: Literal["existing"] | None = None
@@ -180,8 +182,13 @@ async def run_invocation(
         try:
             await asyncio.shield(ready)
             await context.refresh_tools()
+            if request.resumes:
+                await context.load_checkpoint()
             context.check()
             await options.run(context)
+            await context.settle_pending()
+            # The loops are over: a forced suspension must not resume a finished conversation.
+            context.end_suspension()
             await context.settle_suspension()
             settle()
         except BaseException as error:  # noqa: BLE001 - every outcome is reported, never raised
