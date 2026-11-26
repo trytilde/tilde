@@ -196,6 +196,9 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
             let mut seen=std::collections::BTreeSet::new();
             let mut ready=false;
             let deadline=tokio::time::sleep(Duration::from_secs((claims.exp-chrono::Utc::now().timestamp()).max(1) as u64));tokio::pin!(deadline);
+            // A fixed cadence: other invocations' changes wake this loop often on a busy gateway
+            // and must not keep postponing the renewal.
+            let mut renew=tokio::time::interval_at(tokio::time::Instant::now()+Duration::from_secs(10),Duration::from_secs(10));
             loop {
                 let commands=chat.control_commands(&claims).await?;
                 if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
@@ -209,8 +212,7 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
                 // Ready (hosts ignore a repeat): an idle stream is otherwise cut by proxies
                 // (a load balancer's 60 s idle timeout), and the SDKs give up on reconnecting
                 // when nothing arrived for 15 s.
-                let renew=tokio::time::sleep(Duration::from_secs(10));
-                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value.map(|v|(v,false)),_=renew=>Some((chat.renew_lease(claims.invocation_id).await,true))};
+                let update=tokio::select!{_= &mut deadline=>None,value=changed.next()=>value.map(|v|(v,false)),_=renew.tick()=>Some((chat.renew_lease(claims.invocation_id).await,true))};
                 match update{Some((value,renewed))=>{value?;if renewed{ready=false;}},None=>break}
             }
         })
