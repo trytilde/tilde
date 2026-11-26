@@ -1010,6 +1010,26 @@ impl Chat {
         let tx = tx_client.transaction().await?;
         let rows = crate::chat::db::invocation_expire_all(&tx).await?;
         for row in rows {
+            // As in `finish`: a run asked to suspend that saved its state (its host ended before
+            // it reported) waits to resume; any other expired run failed.
+            let suspension = crate::chat::db::invocation_suspension_one(&tx, row.id).await?;
+            let asked = crate::chat::db::run_state_one(&tx, row.run_id)
+                .await?
+                .status
+                == "suspending";
+            if asked && suspension.saved {
+                crate::chat::db::run_status_execute(&tx, row.run_id, "waiting").await?;
+                activity(
+                    self.pg()?,
+                    &tx,
+                    row.thread_id,
+                    "invocation.ended",
+                    row.id,
+                    "failed",
+                )
+                .await?;
+                continue;
+            }
             crate::chat::db::run_status_execute(&tx, row.run_id, "failed").await?;
             activity(
                 self.pg()?,

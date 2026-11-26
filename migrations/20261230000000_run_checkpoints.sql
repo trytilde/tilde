@@ -15,6 +15,9 @@ CREATE TABLE chat_run_checkpoints (
 -- minutes), with a margin to save. NULL where the host has no limit.
 ALTER TABLE chat_invocations ADD COLUMN suspend_at TIMESTAMPTZ;
 CREATE INDEX chat_invocations_suspend_at ON chat_invocations(suspend_at) WHERE status = 'running' AND suspend_at IS NOT NULL;
+-- Whether the invocation's loop can suspend (it made a suspendable call): only such an
+-- invocation is asked to at its deadline; any other runs to its host's own limit, as before.
+ALTER TABLE chat_invocations ADD COLUMN suspendable BOOLEAN NOT NULL DEFAULT FALSE;
 -- Why the run was asked to suspend: a person or an operator (`manual`, which waits for
 -- ResumeRun), the invocation's deadline, or a call that answered pending. Only the last two
 -- resume by themselves.

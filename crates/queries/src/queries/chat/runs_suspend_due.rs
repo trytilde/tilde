@@ -74,7 +74,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "WITH due AS ( UPDATE chat_runs r SET status = 'suspending' FROM chat_invocations i WHERE i.run_id = r.id AND i.status = 'running' AND i.suspend_at <= NOW() AND r.status = 'active' RETURNING i.id, i.thread_id ) UPDATE chat_invocations i SET suspended_for = COALESCE(i.suspended_for, 'deadline') FROM due WHERE i.id = due.id RETURNING i.id, i.thread_id",
+        "WITH due AS ( UPDATE chat_runs r SET status = 'suspending' FROM chat_invocations i WHERE i.run_id = r.id AND i.status = 'running' AND i.suspendable AND i.suspend_at <= NOW() AND r.status = 'active' RETURNING i.id, i.thread_id ) UPDATE chat_invocations i SET suspended_for = COALESCE(i.suspended_for, 'deadline') FROM due WHERE i.id = due.id RETURNING i.id, i.thread_id",
         None,
     )
 }

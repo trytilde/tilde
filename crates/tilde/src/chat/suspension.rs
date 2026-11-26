@@ -72,11 +72,13 @@ pub(crate) async fn pending_after(
     if !first.suspendable || !first.finish || definition.detached || chat.local().is_some() {
         return Ok(None);
     }
+    let client = chat.pg()?.get().await?;
+    // From now on the invocation is asked to suspend at its deadline.
+    crate::chat::db::invocation_suspendable_execute(&client, scope.id).await?;
     if waits_for_reply(definition) {
         return Ok(Some(Duration::ZERO));
     }
-    let suspend_at =
-        crate::chat::db::invocation_suspend_at_opt(&chat.pg()?.get().await?, scope.id).await?;
+    let suspend_at = crate::chat::db::invocation_suspend_at_opt(&client, scope.id).await?;
     let until_deadline =
         suspend_at.map(|at| (at - chrono::Utc::now()).to_std().unwrap_or_default());
     Ok(Some(
@@ -112,11 +114,8 @@ impl Chat {
         crate::chat::db::thread_lock_one(&tx, scope.thread_id).await?;
         // Calls of this run only: another's outcome is not this agent's to read, and an unknown
         // ID would keep the run waiting forever.
-        if crate::chat::db::checkpoint_results_all(&tx, &pending, scope.run_id)
-            .await?
-            .len()
-            != pending.len()
-        {
+        let calls = crate::chat::db::checkpoint_results_all(&tx, &pending, scope.run_id).await?;
+        if calls.len() != pending.len() {
             return Err(ChatError::Invalid(
                 "A pending call is not this run's".into(),
             ));
@@ -128,6 +127,34 @@ impl Chat {
         }
         crate::chat::db::checkpoint_save_execute(&tx, scope.run_id, scope.id, state_json, &pending)
             .await?;
+        // A reply that arrived while the loop was still deciding to wait is queued on this
+        // invocation, unseen: it answers the wait, so the run resumes now rather than at the
+        // person's next message.
+        if let Some(wait) = calls
+            .iter()
+            .find(|call| call.name == REPLY_WAIT && call.status == "running")
+        {
+            let replies = crate::chat::db::input_answers_all(&tx, scope.id).await?;
+            if let Some(first) = replies.first() {
+                let text = replies
+                    .iter()
+                    .map(|r| r.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let tool = types::ToolCall {
+                    id: wait.id.to_string(),
+                    name: wait.name.clone(),
+                    provider_id: wait.provider_id.clone(),
+                    status: "completed".into(),
+                    output_json: json!({"message_id": first.id, "text": text}).to_string(),
+                    ..Default::default()
+                };
+                self.write_tool_call(&tx, scope, tool).await?;
+                for reply in &replies {
+                    crate::chat::db::input_accept_execute(&tx, scope.id, reply.id).await?;
+                }
+            }
+        }
         activity(
             self.pg()?,
             &tx,

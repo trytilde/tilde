@@ -412,7 +412,8 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   objective), `thread.participants` and `thread.search` (thread.read), `tools.result` (when the
   agent has async tools), `thread.wait_for_reply` (thread.read: answers pending at once, and its
   output is the next message routed to the agent in the thread, which then starts no run of its
-  own, written in the transaction that claims the message; a wait is answered only while its
+  own, written in the transaction that claims the message (a reply that was queued on the
+  invocation before it called the tool answers it when the invocation suspends); a wait is answered only while its
   invocation runs or a checkpoint names it, and one left behind otherwise is aborted; a caller
   that cannot suspend is refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
   `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
@@ -1252,7 +1253,10 @@ models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, 
 - Invocation deadline: Tilde, not the agent, owns the host's runtime limit. A Lambda or hosted
   wake sets `chat_invocations.suspend_at` to Lambda's fifteen minutes less a two-minute margin;
   at it the run moves to `suspending` (activity `invocation.suspend_requested`, `deadline`), the
-  control stream delivers a suspend command and calls in flight answer pending. Dial-in hosts
+  control stream delivers a suspend command and calls in flight answer pending. Only an
+  invocation that can suspend is asked (`chat_invocations.suspendable`, set by its first
+  suspendable call); any other runs to its host's own limit, as before. An invocation whose
+  lease expires after it saved a checkpoint it was asked for still resumes. Dial-in hosts
   have no limit.
 - Steering input: a durable API event, scheduled into a fresh invocation according to the agent's concurrency policy.
 - Agent host: an SDK process that dials in to Tilde (`RunService.Watch`) with a deployment token, receives wakes as frames and opens outbound invocation control subscriptions. Tilde and its sidecars never call an agent.

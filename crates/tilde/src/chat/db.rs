@@ -1635,3 +1635,24 @@ pub async fn tool_heartbeat_execute(db: &impl GenericClient, call: uuid::Uuid) -
         .bind(db, &call)
         .await?)
 }
+
+pub async fn invocation_suspendable_execute(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::invocation_suspendable::run()
+        .bind(db, &invocation)
+        .await?)
+}
+
+pub use tilde_queries::queries::chat::input_answers::Record as InputAnswerRow;
+
+pub async fn input_answers_all(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<Vec<InputAnswerRow>> {
+    Ok(tilde_queries::queries::chat::input_answers::run()
+        .bind(db, &invocation)
+        .all()
+        .await?)
+}

@@ -538,8 +538,8 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     assert!(seventh.wake.resumes);
     assert_eq!(seventh.checkpoint().await.0, json!({"turn":6}));
 
-    // Asked to suspend at its deadline, an invocation that saves nothing (a framework that
-    // cannot suspend) loses its run, as Lambda ending it would have.
+    // The deadline reaches only an invocation that can suspend (it made a suspendable call):
+    // any other runs to its host's own limit, as before.
     let seventh_id = Uuid::parse_str(&seventh.wake.invocation_id).unwrap();
     pg.execute(
         "UPDATE chat_invocations SET suspend_at=NOW() WHERE id=$1",
@@ -547,6 +547,13 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     )
     .await
     .unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    assert_eq!(chat.run(run_id).await.unwrap().status, "active");
+    // Asked once it can suspend, an invocation that saves nothing (a framework that cannot)
+    // loses its run, as Lambda ending it would have.
+    seventh
+        .call("ops.restart", Uuid::new_v4(), json!({"service":"cache"}))
+        .await;
     tokio::time::timeout(Duration::from_secs(5), async {
         while chat.run(run_id).await.unwrap().status != "suspending" {
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -595,6 +602,50 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         .await
         .unwrap();
     assert_eq!(refused.status(), 400);
+
+    // A reply sent while the loop was still deciding to wait is queued, unseen, on the
+    // invocation: it answers the wait when the invocation suspends, and the run resumes at once.
+    let quick = Uuid::new_v4();
+    chat.post(PostMessage {
+        id: quick.to_string(),
+        thread_id: thread.id.clone(),
+        participant_id: person.id.clone(),
+        text: "Go ahead".into(),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let fresh_id = Uuid::parse_str(&fresh.wake.invocation_id).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while pg
+            .query_opt(
+                "SELECT 1 FROM chat_inputs WHERE invocation_id=$1 AND id=$2",
+                &[&fresh_id, &quick],
+            )
+            .await
+            .unwrap()
+            .is_none()
+        {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the reply is queued on the running invocation");
+    let wait = Uuid::new_v4();
+    let answer = fresh.call("thread.wait_for_reply", wait, json!({})).await;
+    assert_eq!(answer["pending"], true, "{answer}");
+    fresh.suspend(json!({"turn":"wait"}), &[wait]).await;
+    fresh.stopped().await;
+    let resumed = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "the quick reply's resume").await,
+    };
+    assert_eq!(resumed.wake.run_id, fresh.wake.run_id);
+    let (_, results) = resumed.checkpoint().await;
+    assert_eq!(
+        serde_json::from_str::<Value>(results[0]["outputJson"].as_str().unwrap()).unwrap(),
+        json!({"message_id": quick, "text": "Go ahead"})
+    );
 
     drop(pg);
     let _ = stop.send(true);
