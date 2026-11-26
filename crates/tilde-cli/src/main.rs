@@ -2,6 +2,7 @@
 //! `trytilde-cli` packages, which install this same binary under the name `tilde`.
 mod api;
 mod apply;
+mod build;
 mod chat;
 mod deploy;
 mod dev;
@@ -33,6 +34,9 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Build an agent's deployable artifacts as `tilde deploy` would (a Hosted agent's bundle,
+    /// its declarations, its spec) into a folder, contacting no server.
+    Build(build::Build),
     /// Run this project's agent against a gateway and chat with it locally.
     Dev(dev::Dev),
     /// Apply the `@trytilde/iac` specs the code exports (the project's ontologies first, then its
@@ -54,6 +58,7 @@ enum Command {
 async fn main() {
     let args = Args::parse();
     let outcome = match args.command {
+        Command::Build(args) => build::run(args).await,
         Command::Dev(args) => dev::run(args).await,
         Command::Deploy(args) => deploy::run(args).await,
         Command::Doctor(args) => doctor::run(args).await,

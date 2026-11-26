@@ -504,6 +504,7 @@ npx tilde dev                                       # register, run and chat wit
 TOKEN=$(npx tilde deploy dist/index.js)             # TILDE_URL, TILDE_AGENT_ID (+ TILDE_API_KEY on Tilde Cloud)
 npx tilde deploy dist/index.js --dry-run            # the declarations as JSON; contacts nothing
 npx tilde-declarations dist/index.js                # the same JSON, straight from this package
+npx tilde build --agent manager --out out --version 1.4.0  # deploy's build, written to out/; contacts nothing
 ```
 
 Flags: `[ENTRY] --agent-id --url --api-key --target gateway|sidecar|lambda --function-arn
@@ -513,6 +514,13 @@ built JavaScript; a `.ts` entry only loads when Node's type stripping can run it
 files up to 256 KiB travel inline, other skill files are uploaded first by digest. The
 same name with different content is an error; stdout carries only the token (`--json`
 prints `{deploymentId, token, created}`).
+
+`tilde build [ENTRY] [--agent <key>] [--out <dir>] [--version <v>] [--target …]` runs the build
+`tilde deploy` would and writes it to `--out` (default `tilde-build`) instead: `declarations.json`,
+`agent.json` (the agent's spec as Apply receives it; specs only), a Hosted agent's `bundle.zip`
+(the same sources give the same digest) and, with `--version`, `manifest.json`
+(`{ version, sha256, declarations }`). No server and no credentials are needed, so CI can publish a
+prebuilt agent.
 
 In `run(ctx)`, `ctx.prompt(triage).render(vars)` (or `triage.render(vars)` inside an
 invocation) inlines sections, substitutes variables (a missing one throws) and marks the

@@ -1432,6 +1432,17 @@ with text imports of prompts inlined and the project's own files followed; `prom
 `skills/` beside it; a `package.json` with the SDK's version), folds the bundle's digest into the external ID so changed
 code is a new deployment, and once the deployment is registered publishes the bundle
 (`PublishHostedDeployment`). An open-source Tilde server refuses to publish.
+The zip is reproducible (entries in path order, one fixed time), so the same sources give the same
+digest.
+
+`tilde build` is the same build without the deploy, for CI that publishes a prebuilt agent (Tilde
+Cloud's Factory Manager). It picks the agent as `tilde deploy` finds them (the entry's specs, one or
+`--agent <key>`, each agent's code in `agents/<key>/` or its `code`; an entry without specs with
+`--target`), contacts no server, and writes `declarations.json` (the code's declarations as the
+reader prints them), `agent.json` (the agent's `AgentSpec` from the Apply request `tilde deploy`
+would send, external ID included), a Hosted agent's `bundle.zip`, and with `--version`
+`manifest.json` (`{ version, sha256, declarations }`, what Tilde Cloud installs a published bundle
+from).
 
 `tilde dev` resolves the agent by exact name (or `--agent-id`) and fails with the gateway's
 `/agent/new` link when there is none: it never creates one, because an agent without
