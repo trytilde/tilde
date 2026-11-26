@@ -393,9 +393,14 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
 - Annotations and output schema: optional hints on a tool definition (read-only, destructive,
   idempotent, open-world); hints for frameworks, never authorization.
 - Built-in tools: offered only when the agent's existing capabilities make them usable.
-  `agents.list` (agents.read), `agents.message` and `agents.wait` (agents.invoke: the target
-  joins the thread if needed and runs with the message as its objective), `thread.participants`
-  and `thread.search` (thread.read), `tools.result` (when the agent has async tools).
+  `agents.list` (agents.read; each agent's ID, key and name), `agents.message` and `agents.wait`
+  (agents.invoke: the target joins the thread if needed and runs with the message as its
+  objective), `thread.participants` and `thread.search` (thread.read), `tools.result` (when the
+  agent has async tools), the skill tools (`skills::tools`: `skills.write` with skills.edit,
+  `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
+  agents.edit_skills; see Skills) and the wiki link tools (`wiki.link`, `wiki.unlink`; see
+  Wikis). A tool acting on another agent takes its `agent_id` and checks the capability on it,
+  as the runtime RPC does.
 - Personal tool federation: a person connects their own account through a setup link the agent
   obtains with `user.connect_tool`; the connection is owned by that chat user
   (`connections.owner_user_id`) and can never be an agent's tool source. An agent holding
@@ -1004,7 +1009,11 @@ knowledge is kept up to date (ADR-0014).
   `wiki.list` (optionally under a path `prefix`; at most 500 pages, with `more` asking to narrow),
   and with a read-write link `wiki.write`
   (create, or at the revision read change the content by `edits` or replace it) and
-  `wiki.delete`. As for memory, a wiki is chosen by name only when there is
+  `wiki.delete`; with `agents.edit_wikis` on another agent, `wiki.link` (give it one of the
+  caller's linked wikis other than its own, read, or read_write only when the caller's link is,
+  linking again sets the access) and `wiki.unlink` (take it away), never on the caller itself.
+  They are `SetAgentWiki` and `RemoveAgentWiki` for agents, the caller's own link standing for
+  its access to the wiki. As for memory, a wiki is chosen by name only when there is
   a choice, the tool text describes the linked wikis, listing and calling share one gate, and
   sidecar-hosted agents reach them through the relayed `KnowledgeService`.
 
@@ -1127,7 +1136,11 @@ agent (itself included) plus read on the source; unassigning needs only `agents.
 `skills.edit` on a source it writes skills into an editor source and re-syncs git and catalog
 sources. Runtime file info carries the executable bit, which `ctx.skills.directory()` restores.
 The SDK exposes this as `ctx.skills.list/read/summary/materialize/sources/assign/unassign/
-write/sync`. Sidecars relay the RPCs to the gateway.
+write/sync`. Sidecars relay the RPCs to the gateway. The same writes are built-in tools for
+models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, files, message?}`
+(text files, the whole skill; the same files again change nothing), `skills.assign` and
+`skills.unassign` `{agent_id, source | skill}` (`skill` as `source/name`), authorized like
+`WriteSkill`, `AssignSkill` and `UnassignSkill`.
 
 ## Chat
 

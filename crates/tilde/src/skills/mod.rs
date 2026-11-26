@@ -20,6 +20,7 @@ pub mod db;
 pub mod github;
 pub mod package;
 pub mod rpc;
+pub mod tools;
 use crate::proto::tilde::management::v1 as management;
 use crate::{agent::avatar::ObjectStore, database::Pool, error::Error};
 use futures::{StreamExt, TryStreamExt};

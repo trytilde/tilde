@@ -1,12 +1,18 @@
 //! The built-in wiki tools, offered to an agent with at least one linked wiki; the write tools
 //! only with a read-write link. Wikis are named, never chosen by id, and resolved here from the
 //! agent's links.
+//!
+//! `wiki.link` and `wiki.unlink` are `SetAgentWiki` and `RemoveAgentWiki` for agents, offered
+//! with `agents.edit_wikis` on the other agent. The wiki side is the agent's own link, as a
+//! person's is their access to the wiki: it shares only wikis it is linked to (never its own),
+//! read-write only when its link is.
 use super::{
     AGENT_LIST_PAGES, Body, CONTENT_MAX, GREP_LINES, PATH_MAX, PATTERN_MAX, QUERY_MAX,
     SEARCH_RESULTS, TITLE_MAX, Wikis, Write, db,
 };
 use crate::chat::Scope;
 use crate::chat::tools::{Context, InputStream, Provider, ToolResult};
+use crate::iam::capabilities::Capability;
 use crate::proto::tilde::types::v1 as types;
 use crate::tools::providers::rest::{Hints, definition};
 use connectrpc::ConnectError;
@@ -67,9 +73,15 @@ fn revision() -> Value {
     json!({"type":"integer","minimum":0,"description":"The revision you read (wiki.read returns it); 0 to create a page. A write is refused when the page changed since: read it again and reapply your change."})
 }
 
+/// The wikis an agent may give others: those linked to it, except its own.
+fn shareable(links: &[db::AgentWikiRow]) -> Vec<&db::AgentWikiRow> {
+    links.iter().filter(|l| !l.own).collect()
+}
+
 /// The agent's wiki tools: none without a linked wiki, the write tools only with a read-write
-/// link. Listing and calling both go through here.
-fn definitions(links: &[db::AgentWikiRow]) -> Vec<types::ToolDefinition> {
+/// link, the link tools only with `agents.edit_wikis` and a wiki to share. Listing and calling
+/// both go through here.
+fn definitions(links: &[db::AgentWikiRow], scope: &Scope) -> Vec<types::ToolDefinition> {
     if links.is_empty() {
         return vec![];
     }
@@ -138,6 +150,49 @@ fn definitions(links: &[db::AgentWikiRow]) -> Vec<types::ToolDefinition> {
             READ,
         ),
     ];
+    let shared = shareable(links);
+    if scope.capabilities.grants(Capability::AgentsEditWikis) && !shared.is_empty() {
+        let agent = json!({"type":"string","format":"uuid","description":"The agent, by its ID (agents.list)."});
+        let mut link = json!({
+            "agent_id":agent,
+            "access":{"type":"string","enum":["read","read_write"],"description":"read, or read_write to let it write pages too (only for a wiki you may write)."}
+        });
+        let mut unlink = json!({"agent_id":agent});
+        let mut required = vec!["agent_id"];
+        if shared.len() > 1 {
+            link["wiki"] = names(&shared);
+            unlink["wiki"] = names(&shared);
+            required.push("wiki");
+        }
+        let mut link_required = required.clone();
+        link_required.push("access");
+        let shared_wikis = wikis_text(&shared);
+        out.extend([
+            definition(
+                "tilde",
+                "wiki.link",
+                "Gave an agent a wiki",
+                &format!(
+                    "Give another agent one of your wikis, to read or to read and write, from its next invocation. Linking again sets the access. {shared_wikis}"
+                ),
+                schema(link, &link_required),
+                WRITE,
+            ),
+            definition(
+                "tilde",
+                "wiki.unlink",
+                "Took a wiki from an agent",
+                &format!(
+                    "Take one of your wikis away from another agent; its pages stay. Unlinking a wiki it does not have changes nothing. {shared_wikis}"
+                ),
+                schema(unlink, &required),
+                Hints {
+                    read_only: false,
+                    destructive: true,
+                },
+            ),
+        ]);
+    }
     if writable.is_empty() {
         return out;
     }
@@ -212,8 +267,11 @@ fn missing(path: &str) -> ConnectError {
 }
 
 impl WikiTools {
-    pub async fn list(&self, agent: Uuid) -> ToolResult<Vec<types::ToolDefinition>> {
-        Ok(definitions(&self.0.agent_wikis(agent).await?))
+    pub async fn list(&self, scope: &Scope) -> ToolResult<Vec<types::ToolDefinition>> {
+        Ok(definitions(
+            &self.0.agent_wikis(scope.agent_id).await?,
+            scope,
+        ))
     }
     /// One call in an already authorized invocation scope; `call_id` keys a created page.
     pub async fn call(
@@ -225,7 +283,7 @@ impl WikiTools {
     ) -> ToolResult<Value> {
         let links = self.0.agent_wikis(scope.agent_id).await?;
         // Listing and calling share one gate: a tool absent from the list cannot be called.
-        let definition = definitions(&links)
+        let definition = definitions(&links, scope)
             .into_iter()
             .find(|d| d.name == name)
             .ok_or_else(|| ConnectError::not_found("Tool is not available to this agent"))?;
@@ -401,6 +459,36 @@ impl WikiTools {
                     })?;
                 Ok(json!({"deleted": at}))
             }
+            "wiki.link" | "wiki.unlink" => {
+                let wiki = one(shareable(&links).into_iter(), &input)?;
+                let agent = crate::tools::builtin::acted_on(
+                    &self.0.connections.pool,
+                    scope,
+                    input["agent_id"].as_str().unwrap_or_default(),
+                    Capability::AgentsEditWikis,
+                )
+                .await?;
+                if agent == scope.agent_id {
+                    return Err(ConnectError::invalid_argument(
+                        "These tools change other agents' wikis, not your own",
+                    ));
+                }
+                if name == "wiki.unlink" {
+                    self.0.remove_link(agent, wiki.wiki_id).await?;
+                    return Ok(
+                        json!({"agent_id": agent, "wiki": wiki.wiki_name, "unlinked": true}),
+                    );
+                }
+                let access = input["access"].as_str().unwrap_or_default();
+                if access == "read_write" && wiki.access != "read_write" {
+                    return Err(ConnectError::permission_denied(format!(
+                        "You may only read {}, so you can only give it to read",
+                        wiki.wiki_name
+                    )));
+                }
+                let link = self.0.set_link(agent, wiki.wiki_id, access).await?;
+                Ok(json!({"agent_id": agent, "wiki": link.wiki_name, "access": link.access}))
+            }
             _ => Err(ConnectError::not_found("Unknown wiki tool")),
         }
     }
@@ -411,7 +499,7 @@ impl Provider for WikiTools {
         &'a self,
         scope: &'a Scope,
     ) -> BoxFuture<'a, ToolResult<Vec<types::ToolDefinition>>> {
-        Box::pin(self.list(scope.agent_id))
+        Box::pin(self.list(scope))
     }
     fn invoke<'a>(
         &'a self,

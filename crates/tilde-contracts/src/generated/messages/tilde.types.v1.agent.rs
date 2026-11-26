@@ -2378,6 +2378,19 @@ pub struct Capabilities {
         TargetPermission,
         ::buffa::Inline<TargetPermission>,
     >,
+    /// Give the targeted agents, itself excluded, wikis this agent is linked to (read-write only
+    /// when its own link is), and take them away.
+    ///
+    /// Field 18: `agents_edit_wikis`
+    #[serde(
+        rename = "agentsEditWikis",
+        alias = "agents_edit_wikis",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub agents_edit_wikis: ::buffa::MessageField<
+        TargetPermission,
+        ::buffa::Inline<TargetPermission>,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2400,6 +2413,7 @@ impl ::core::fmt::Debug for Capabilities {
             .field("skills_edit", &self.skills_edit)
             .field("skills_read", &self.skills_read)
             .field("tools_personal", &self.tools_personal)
+            .field("agents_edit_wikis", &self.agents_edit_wikis)
             .finish()
     }
 }
@@ -2540,6 +2554,14 @@ impl ::buffa::Message for Capabilities {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.agents_edit_wikis.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_edit_wikis.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2659,6 +2681,14 @@ impl ::buffa::Message for Capabilities {
                 buf,
             );
             self.tools_personal.write_to(__cache, buf);
+        }
+        if self.agents_edit_wikis.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                18u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_edit_wikis.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2828,6 +2858,17 @@ impl ::buffa::Message for Capabilities {
                     ctx,
                 )?;
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.agents_edit_wikis.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2851,6 +2892,7 @@ impl ::buffa::Message for Capabilities {
         self.skills_edit = ::buffa::MessageField::none();
         self.skills_read = ::buffa::MessageField::none();
         self.tools_personal = ::buffa::MessageField::none();
+        self.agents_edit_wikis = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }

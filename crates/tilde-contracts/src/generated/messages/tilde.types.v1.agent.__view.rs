@@ -2298,6 +2298,13 @@ pub struct CapabilitiesView<'a> {
     pub tools_personal: ::buffa::MessageFieldView<
         super::super::__buffa::view::TargetPermissionView<'a>,
     >,
+    /// Give the targeted agents, itself excluded, wikis this agent is linked to (read-write only
+    /// when its own link is), and take them away.
+    ///
+    /// Field 18: `agents_edit_wikis`
+    pub agents_edit_wikis: ::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'a>,
+    >,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
@@ -2583,6 +2590,27 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
                     }
                 }
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __sub_ctx = ctx.descend()?;
+                let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                match view.agents_edit_wikis.as_mut() {
+                    Some(existing) => {
+                        ::buffa::MessageView::merge_into_view(existing, sub, __sub_ctx)?
+                    }
+                    None => {
+                        view.agents_edit_wikis = ::buffa::MessageFieldView::set(
+                            <super::super::__buffa::view::TargetPermissionView as ::buffa::MessageView>::decode_view_ctx(
+                                sub,
+                                __sub_ctx,
+                            )?,
+                        );
+                    }
+                }
+            }
             _ => {
                 ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                 let span_len = before_tag.len() - cur.len();
@@ -2692,6 +2720,15 @@ impl<'a> ::buffa::MessageView<'a> for CapabilitiesView<'a> {
                 None => ::buffa::MessageField::none(),
             },
             tools_personal: match self.tools_personal.as_option() {
+                Some(v) => {
+                    ::buffa::MessageField::<
+                        super::super::TargetPermission,
+                        ::buffa::Inline<super::super::TargetPermission>,
+                    >::some(v.to_owned_from_source(__buffa_src)?)
+                }
+                None => ::buffa::MessageField::none(),
+            },
+            agents_edit_wikis: match self.agents_edit_wikis.as_option() {
                 Some(v) => {
                     ::buffa::MessageField::<
                         super::super::TargetPermission,
@@ -2821,6 +2858,14 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.agents_edit_wikis.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.agents_edit_wikis.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -2942,6 +2987,14 @@ impl<'a> ::buffa::ViewEncode<'a> for CapabilitiesView<'a> {
             );
             self.tools_personal.write_to(__cache, buf);
         }
+        if self.agents_edit_wikis.is_set() {
+            ::buffa::types::put_len_delimited_header(
+                18u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            self.agents_edit_wikis.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
 }
@@ -3032,6 +3085,12 @@ impl<'__a> ::serde::Serialize for CapabilitiesView<'__a> {
         {
             if let ::core::option::Option::Some(__v) = self.tools_personal.as_option() {
                 __map.serialize_entry("toolsPersonal", __v)?;
+            }
+        }
+        {
+            if let ::core::option::Option::Some(__v) = self.agents_edit_wikis.as_option()
+            {
+                __map.serialize_entry("agentsEditWikis", __v)?;
             }
         }
         __map.end()
@@ -3248,6 +3307,18 @@ impl CapabilitiesOwnedView {
         super::super::__buffa::view::TargetPermissionView<'_>,
     > {
         &self.0.reborrow().tools_personal
+    }
+    /// Give the targeted agents, itself excluded, wikis this agent is linked to (read-write only
+    /// when its own link is), and take them away.
+    ///
+    /// Field 18: `agents_edit_wikis`
+    #[must_use]
+    pub fn agents_edit_wikis(
+        &self,
+    ) -> &::buffa::MessageFieldView<
+        super::super::__buffa::view::TargetPermissionView<'_>,
+    > {
+        &self.0.reborrow().agents_edit_wikis
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<CapabilitiesView<'static>>>

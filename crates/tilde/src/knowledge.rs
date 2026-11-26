@@ -51,7 +51,7 @@ impl KnowledgeService for Runtime {
     ) -> ServiceResult<impl Encodable<runtime::ListKnowledgeToolsResponse> + Send + use<'a>> {
         let scope = crate::chat::rpc::invocation_scope(&self.chat, &ctx).await?;
         let mut tools = self.memory.list(scope.agent_id).await?;
-        tools.extend(self.wikis.list(scope.agent_id).await?);
+        tools.extend(self.wikis.list(&scope).await?);
         Response::ok(runtime::ListKnowledgeToolsResponse {
             tools,
             ..Default::default()

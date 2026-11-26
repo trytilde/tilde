@@ -53,6 +53,7 @@ type TargetKey =
   | "agentsEditSkills"
   | "skillsRead"
   | "skillsEdit"
+  | "agentsEditWikis"
   | "toolsInvoke"
   | "toolsPersonal";
 type CapabilityOption = { label: string; description: string } & (
@@ -113,6 +114,12 @@ const capabilityOptions: readonly CapabilityOption[] = [
     label: "Edit skill sources",
     targeted: true,
     description: "Write skills into editor skill sources and sync git sources.",
+  },
+  {
+    key: "agentsEditWikis",
+    label: "Share wikis",
+    targeted: true,
+    description: "Give these agents wikis this agent is linked to, or take them away.",
   },
   {
     key: "threadRead",

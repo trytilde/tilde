@@ -65,7 +65,7 @@ async fn agent_and_thread_tools_follow_the_agents_capabilities() {
     let listed = fx.output("agents.list", json!({})).await;
     assert_eq!(
         listed["agents"],
-        json!([{"agent_id": specialist, "name": "Specialist"}]),
+        json!([{"agent_id": specialist, "key": null, "name": "Specialist"}]),
         "never lists the caller"
     );
 
