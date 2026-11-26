@@ -642,15 +642,12 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, existing.thread_id).await?;
-        // A run suspended with a checkpoint resumes by itself (`suspension`); one asked to suspend
-        // that saved nothing hands its inputs on as any ended invocation does.
+        // A suspended run keeps its inputs: a checkpoint resumes it by itself (`suspension`),
+        // otherwise ResumeRun carries them forward.
         let suspending = crate::chat::db::run_state_one(&tx, existing.run_id)
             .await?
             .status
-            == "suspending"
-            && crate::chat::db::checkpoint_get_opt(&tx, existing.run_id)
-                .await?
-                .is_some_and(|saved| saved.invocation_id == invocation);
+            == "suspending";
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
             if !suspending && status != "failed" {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
