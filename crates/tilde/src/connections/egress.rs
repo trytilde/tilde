@@ -10,7 +10,11 @@
 //! against the rules and that config, and names the narrowest credential the grant needs.
 //!
 //! Definitions are built-in catalog code (`hook`), like mint strategies: registered providers
-//! cannot declare egress yet.
+//! cannot declare egress yet. Besides the git forges, the API providers agents read from
+//! sandboxes declare HTTP egress (`catalog::apis`: Linear, Sentry, Jira, PagerDuty, Datadog,
+//! Grafana, Prometheus, New Relic, Honeycomb, Terraform; `catalog::aws::egress`: AWS, re-signed
+//! with SigV4). How the credential travels is the connection type's mint (`mints`): a bearer
+//! token, the provider's own headers, Basic, or SigV4 signing credentials.
 use crate::chat::providers::Access;
 use crate::connections::mints::MintScope;
 use crate::error::Error;
@@ -126,6 +130,10 @@ pub enum EgressRequest<'a> {
         method: &'a str,
         /// The upstream path, starting with `/`, without the query.
         path: &'a str,
+        query: Option<&'a str>,
+        headers: &'a http::HeaderMap,
+        /// The whole request body (bounded by the gateway).
+        body: &'a [u8],
     },
     Git {
         protocol: &'a EgressProtocol,
@@ -170,6 +178,12 @@ pub trait EgressHook: Send + Sync {
     fn upstream(&self, protocol: &EgressProtocol, _access: &Access) -> Result<String, Error> {
         Ok(protocol.upstream().to_owned())
     }
+    /// Where an allowed HTTP request goes, given the connection's upstream: there, unless the
+    /// provider addresses requests by what they carry (AWS: the service and region they are
+    /// signed for).
+    fn route(&self, upstream: String, _request: &EgressRequest<'_>) -> Result<String, Decision> {
+        Ok(upstream)
+    }
     /// The remote URL prefixes a sandbox's git rewrites to the route, given the git upstream.
     fn git_remotes(&self, upstream: &str) -> Vec<String> {
         vec![format!("{upstream}/")]
@@ -184,7 +198,8 @@ pub fn hook(provider: &str) -> Option<&'static dyn EgressHook> {
         "github" => Some(crate::connections::catalog::github::egress::hook()),
         "gitlab" => Some(crate::connections::catalog::gitlab::hook()),
         "entire" => Some(crate::connections::catalog::entire::hook()),
-        _ => None,
+        "aws" => Some(crate::connections::catalog::aws::egress::hook()),
+        other => crate::connections::catalog::apis::hook(other).map(|h| h as &dyn EgressHook),
     }
 }
 
@@ -224,6 +239,22 @@ fn with_defaults(schema: &Value, mut value: Value) -> Value {
         }
     }
     value
+}
+
+/// The access key ID, region and service of a SigV4 `Authorization` header
+/// (`AWS4-HMAC-SHA256 Credential=<key>/<date>/<region>/<service>/aws4_request, ...`).
+pub fn sigv4(authorization: &str) -> Option<(&str, &str, &str)> {
+    let (scheme, rest) = authorization.trim().split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("aws4-hmac-sha256") {
+        return None;
+    }
+    let scope = rest
+        .split(',')
+        .find_map(|part| part.trim().strip_prefix("Credential="))?;
+    let mut parts = scope.split('/');
+    let key = parts.next()?;
+    let (_, region, service) = (parts.next()?, parts.next()?, parts.next()?);
+    Some((key, region, service))
 }
 
 /// What git forges' grants share: narrowing to repositories and to the branches pushes update.
@@ -308,6 +339,7 @@ pub mod rules {
                 protocol: EgressProtocol::Http { allow, deny, .. },
                 method,
                 path,
+                ..
             } => {
                 if deny
                     .iter()
@@ -374,9 +406,12 @@ pub mod rules {
         if rule_method != "*" && !rule_method.eq_ignore_ascii_case(method) {
             return None;
         }
-        // Empty, dot and encoded-slash or dot segments could reach another resource upstream.
+        // Empty, dot and encoded-slash or dot segments could reach another resource upstream. One
+        // trailing slash names the same resource (Sentry's paths end with one).
         let rest = path.strip_prefix('/')?;
-        if rest.split('/').any(|segment| {
+        let rest = rest.strip_suffix('/').unwrap_or(rest);
+        let segments = || rest.split('/').filter(|_| !rest.is_empty());
+        if segments().any(|segment| {
             let lower = segment.to_ascii_lowercase();
             segment.is_empty()
                 || segment.trim_matches('.').is_empty()
@@ -388,7 +423,7 @@ pub mod rules {
             return None;
         }
         let mut captures = vec![];
-        let mut segments = rest.split('/');
+        let mut segments = segments();
         for part in rule_path.trim_start_matches('/').split('/') {
             if part == "**" {
                 return Some(captures);
@@ -401,5 +436,253 @@ pub mod rules {
             }
         }
         segments.next().is_none().then_some(captures)
+    }
+}
+
+/// What a GraphQL API's grant checks: the operations a request body carries.
+pub mod graphql {
+    use super::Decision;
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub struct Operation {
+        /// `query`, `mutation` or `subscription`.
+        pub kind: String,
+        /// The top-level fields it selects (aliases resolved); `...` for a fragment spread, which
+        /// could select anything.
+        pub fields: Vec<String>,
+    }
+
+    /// A GraphQL request (`{"query": "..."}`) may only query, and mutate with the fields in
+    /// `mutations`. Batches, subscriptions and anything unparseable are refused.
+    pub fn check(body: &[u8], mutations: &[&str]) -> Decision {
+        let Some(operations) = operations(body) else {
+            return Decision::deny("Not a GraphQL request");
+        };
+        for operation in &operations {
+            match operation.kind.as_str() {
+                "query" => {}
+                "mutation" => {
+                    if let Some(field) = operation
+                        .fields
+                        .iter()
+                        .find(|f| !mutations.contains(&f.as_str()))
+                    {
+                        return Decision::deny(format!("The mutation {field} is not granted"));
+                    }
+                }
+                kind => return Decision::deny(format!("GraphQL {kind}s are not allowed")),
+            }
+        }
+        Decision::Allow
+    }
+
+    /// The operations of a GraphQL request body; `None` when it is not one request with a
+    /// parseable document.
+    pub fn operations(body: &[u8]) -> Option<Vec<Operation>> {
+        let request: serde_json::Value = serde_json::from_slice(body).ok()?;
+        let tokens = tokens(request.get("query")?.as_str()?)?;
+        let mut tokens = tokens.into_iter().peekable();
+        let mut operations = vec![];
+        while let Some(token) = tokens.next() {
+            let kind = match token {
+                Token::Punct(b'{') => "query",
+                Token::Name(name @ ("query" | "mutation" | "subscription" | "fragment")) => {
+                    // The name, variable definitions and directives, up to the selection set.
+                    loop {
+                        match tokens.next()? {
+                            Token::Punct(b'{') => break,
+                            Token::Punct(b'(') => skip(&mut tokens, b'(', b')')?,
+                            _ => {}
+                        }
+                    }
+                    name
+                }
+                _ => return None,
+            };
+            if kind == "fragment" {
+                skip(&mut tokens, b'{', b'}')?;
+                continue;
+            }
+            operations.push(Operation {
+                kind: kind.into(),
+                fields: selection(&mut tokens)?,
+            });
+        }
+        (!operations.is_empty()).then_some(operations)
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Token<'a> {
+        Name(&'a str),
+        /// Punctuation; `.` stands for a spread (`...`).
+        Punct(u8),
+    }
+    type Tokens<'a> = std::iter::Peekable<std::vec::IntoIter<Token<'a>>>;
+
+    /// The top-level fields of a selection set whose `{` was read.
+    fn selection(tokens: &mut Tokens<'_>) -> Option<Vec<String>> {
+        let mut fields = vec![];
+        loop {
+            match tokens.next()? {
+                Token::Punct(b'}') => return Some(fields),
+                Token::Punct(b'(') => skip(tokens, b'(', b')')?,
+                Token::Punct(b'{') => skip(tokens, b'{', b'}')?,
+                // A directive's name is not a field.
+                Token::Punct(b'@') => {
+                    tokens.next()?;
+                }
+                Token::Punct(b'.') => {
+                    fields.push("...".into());
+                    // `...Name` or `... on Type`; an inline fragment's selection is skipped.
+                    if let Some(Token::Name("on")) = tokens.peek() {
+                        tokens.next();
+                        tokens.next()?;
+                    } else if let Some(Token::Name(_)) = tokens.peek() {
+                        tokens.next();
+                    }
+                }
+                Token::Name(name) => {
+                    if tokens.peek() == Some(&Token::Punct(b':')) {
+                        tokens.next();
+                        match tokens.next()? {
+                            Token::Name(field) => fields.push(field.into()),
+                            _ => return None,
+                        }
+                    } else {
+                        fields.push(name.into());
+                    }
+                }
+                _ => return None,
+            }
+        }
+    }
+    /// Past the `close` matching an `open` that was read.
+    fn skip(tokens: &mut Tokens<'_>, open: u8, close: u8) -> Option<()> {
+        let mut depth = 1;
+        while depth > 0 {
+            match tokens.next()? {
+                Token::Punct(c) if c == open => depth += 1,
+                Token::Punct(c) if c == close => depth -= 1,
+                _ => {}
+            }
+        }
+        Some(())
+    }
+    /// Names and punctuation; strings, numbers, commas and comments are dropped.
+    fn tokens(source: &str) -> Option<Vec<Token<'_>>> {
+        let bytes = source.as_bytes();
+        let mut out = vec![];
+        let mut i = 0;
+        while i < bytes.len() {
+            let rest = &bytes[i..];
+            match bytes[i] {
+                b' ' | b'\t' | b'\n' | b'\r' | b',' => i += 1,
+                b'#' => {
+                    while i < bytes.len() && bytes[i] != b'\n' && bytes[i] != b'\r' {
+                        i += 1;
+                    }
+                }
+                b'"' if rest.starts_with(b"\"\"\"") => {
+                    i += 3;
+                    loop {
+                        let rest = bytes.get(i..)?;
+                        if rest.is_empty() {
+                            return None;
+                        } else if rest.starts_with(b"\\\"\"\"") {
+                            i += 4;
+                        } else if rest.starts_with(b"\"\"\"") {
+                            i += 3;
+                            break;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                }
+                b'"' => {
+                    i += 1;
+                    loop {
+                        match bytes.get(i)? {
+                            b'\\' => i += 2,
+                            b'"' => {
+                                i += 1;
+                                break;
+                            }
+                            b'\n' | b'\r' => return None,
+                            _ => i += 1,
+                        }
+                    }
+                }
+                b'.' if rest.starts_with(b"...") => {
+                    out.push(Token::Punct(b'.'));
+                    i += 3;
+                }
+                c if c.is_ascii_alphabetic() || c == b'_' => {
+                    let start = i;
+                    while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_')
+                    {
+                        i += 1;
+                    }
+                    out.push(Token::Name(&source[start..i]));
+                }
+                c if c.is_ascii_digit() || c == b'-' => {
+                    i += 1;
+                    while i < bytes.len()
+                        && (bytes[i].is_ascii_alphanumeric() || b".+-".contains(&bytes[i]))
+                    {
+                        i += 1;
+                    }
+                }
+                c if b"{}()[]:=@$!|&".contains(&c) => {
+                    out.push(Token::Punct(c));
+                    i += 1;
+                }
+                _ => return None,
+            }
+        }
+        Some(out)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn body(query: &str) -> Vec<u8> {
+            serde_json::json!({ "query": query })
+                .to_string()
+                .into_bytes()
+        }
+
+        // The parser is what stands between a sandbox and an ungranted mutation, so its edges
+        // are checked here: aliases, arguments holding braces and strings, comments, fragments.
+        #[test]
+        fn mutations_are_read_through_aliases_arguments_and_fragments() {
+            let granted = ["issueCreate", "commentCreate"];
+            let allowed = [
+                "{ issues(first: 5) { nodes { id title } } }",
+                "query Q($id: String!) { issue(id: $id) { id } }",
+                "mutation M($input: IssueCreateInput!) { issueCreate(input: $input) { success } }",
+                "mutation { a: commentCreate(input: {body: \"} mutation { apiKeyCreate\"}) { success } }",
+                "# mutation { teamDelete }\nquery { viewer { id } }",
+                "fragment F on Issue { id } query { issue(id: \"x\") { ...F } }",
+            ];
+            for query in allowed {
+                assert_eq!(check(&body(query), &granted), Decision::Allow, "{query}");
+            }
+            let denied = [
+                "mutation { issueCreate(input: {}) { success } teamDelete(id: \"x\") { success } }",
+                "mutation { issueCreate: teamDelete(id: \"x\") { success } }",
+                "mutation { ...Everything }",
+                "subscription { issueUpdates { id } }",
+                "{ issues { nodes { id } } } mutation { userDelete { success } }",
+                "mutation { issueCreate(input: {title: \"unterminated) { success } }",
+            ];
+            for query in denied {
+                assert_ne!(check(&body(query), &granted), Decision::Allow, "{query}");
+            }
+            assert_ne!(
+                check(b"[{\"query\":\"{ viewer { id } }\"}]", &granted),
+                Decision::Allow
+            );
+        }
     }
 }

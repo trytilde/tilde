@@ -65,7 +65,7 @@ pub fn definition() -> model::Provider {
                 credential_source: model::CredentialSource::Static {
                     schema: json!({"type":"object","properties":oidc,"required":["role_arn"],"additionalProperties":false}),
                 },
-                capabilities: vec![model::Capability::Tool, model::Capability::Signal],
+                capabilities: vec![model::Capability::Tool, model::Capability::Signal, model::Capability::Egress],
             },
             model::ConnectionType {
                 mcp: None,
@@ -74,7 +74,7 @@ pub fn definition() -> model::Provider {
                 credential_source: model::CredentialSource::Static {
                     schema: json!({"type":"object","properties":iam,"required":["access_key_id","secret_access_key"],"additionalProperties":false}),
                 },
-                capabilities: vec![model::Capability::Tool, model::Capability::Signal],
+                capabilities: vec![model::Capability::Tool, model::Capability::Signal, model::Capability::Egress],
             },
         ],
     }

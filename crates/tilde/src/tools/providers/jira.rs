@@ -62,7 +62,7 @@ pub fn definition() -> model::Provider {
                         "api_token":{"type":"string","title":"API token","minLength":1,"writeOnly":true}
                     },"required":["site_url","email","api_token"],"additionalProperties":false}),
                 },
-                capabilities: vec![model::Capability::Tool],
+                capabilities: vec![model::Capability::Tool, model::Capability::Egress],
             },
             model::ConnectionType {
                 mcp: None,

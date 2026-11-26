@@ -12,7 +12,7 @@ use connectrpc::ConnectError;
 use futures::future::BoxFuture;
 use serde_json::{Value, json};
 
-const SITES: &[&str] = &[
+pub(crate) const SITES: &[&str] = &[
     "datadoghq.com",
     "us3.datadoghq.com",
     "us5.datadoghq.com",
@@ -45,7 +45,7 @@ pub fn definition() -> model::Provider {
                     "app_key":{"type":"string","title":"Application key","minLength":1,"writeOnly":true}
                 },"required":["site","api_key","app_key"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Egress],
         }],
     }
 }

@@ -44,7 +44,7 @@ pub fn definition() -> model::Provider {
                         "webhook_secret":webhook_secret
                     },"required":["api_key"],"additionalProperties":false}),
                 },
-                capabilities: vec![model::Capability::Tool, model::Capability::Signal],
+                capabilities: vec![model::Capability::Tool, model::Capability::Signal, model::Capability::Egress],
             },
             model::ConnectionType {
                 mcp: None,
@@ -57,7 +57,7 @@ pub fn definition() -> model::Provider {
                         "webhook_secret":webhook_secret
                     },"required":[],"additionalProperties":false})),
                 },
-                capabilities: vec![model::Capability::Tool, model::Capability::Signal],
+                capabilities: vec![model::Capability::Tool, model::Capability::Signal, model::Capability::Egress],
             },
         ],
     }

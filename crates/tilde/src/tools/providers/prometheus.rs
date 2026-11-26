@@ -33,7 +33,7 @@ pub fn definition() -> model::Provider {
                     "token":{"type":"string","title":"Bearer token","description":"Optional.","writeOnly":true}
                 },"required":["url"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Egress],
         }],
     }
 }

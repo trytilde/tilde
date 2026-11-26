@@ -286,7 +286,10 @@ function EgressForm({
         <DialogDescription>
           Sandboxes reach the connection at{" "}
           <code>/sandboxes/egress/{form.watch("slug") || "slug"}</code> on the gateway, limited to
-          what this grant allows.
+          what this grant allows. Their shells get the address and a token to present in place of
+          the connection's credential (
+          <code>TILDE_EGRESS_{(form.watch("slug") || "slug").toUpperCase()}_URL</code> and{" "}
+          <code>_TOKEN</code>), and the provider's own client variables.
         </DialogDescription>
       </DialogHeader>
       <form
@@ -363,7 +366,8 @@ function EgressForm({
           />
           {!offered.length && (
             <p className="text-xs text-muted-foreground">
-              No connection that offers egress, such as GitHub, GitLab or Entire, is left to grant.
+              No connection that offers egress, such as GitHub, GitLab, Linear, Sentry or AWS, is
+              left to grant.
             </p>
           )}
         </div>
@@ -389,12 +393,19 @@ function EgressForm({
             </p>
           )}
         </div>
-        {chosen && chosen.typeId !== "github_app" && (
+        {chosen && chosen.typeId !== "github_app" && chosen.providerId !== "aws" && (
           <Warning>
             This connection's token cannot be narrowed to the grant, so only the gateway's checks
             limit what sandboxes do with it.
             {chosen.providerId === "github" &&
               " A GitHub App connection also mints a token limited to the grant."}
+          </Warning>
+        )}
+        {chosen?.providerId === "aws" && (
+          <Warning>
+            The gateway signs each request with this connection's AWS credentials: its IAM policy is
+            the ceiling, and the grant narrows it to services, regions and reads. Point the AWS CLI
+            or an SDK at the route with <code>AWS_ENDPOINT_URL</code>; sandboxes get it set.
           </Warning>
         )}
         {schema && (

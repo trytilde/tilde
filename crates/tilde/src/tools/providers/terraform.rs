@@ -38,7 +38,7 @@ pub fn definition() -> model::Provider {
                     "hostname":{"type":"string","title":"Terraform Enterprise hostname","description":"Only for Terraform Enterprise, e.g. tfe.example.com. Empty: app.terraform.io.","pattern":"^[A-Za-z0-9.-]+(:[0-9]+)?$","maxLength":253}
                 },"required":["organization","token"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Egress],
         }],
     }
 }

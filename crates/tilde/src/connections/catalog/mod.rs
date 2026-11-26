@@ -5,6 +5,7 @@ use crate::error::Error;
 use std::collections::BTreeMap;
 
 pub mod agentmail;
+pub mod apis;
 pub mod aws;
 pub mod entire;
 pub mod github;

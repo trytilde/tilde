@@ -48,7 +48,7 @@ pub fn definition() -> model::Provider {
                         "region":region
                     },"required":["api_token"],"additionalProperties":false}),
                 },
-                capabilities: vec![model::Capability::Tool],
+                capabilities: vec![model::Capability::Tool, model::Capability::Egress],
             },
             model::ConnectionType {
                 mcp: None,
@@ -61,7 +61,7 @@ pub fn definition() -> model::Provider {
                         "region":region
                     },"required":[],"additionalProperties":false})),
                 },
-                capabilities: vec![model::Capability::Tool],
+                capabilities: vec![model::Capability::Tool, model::Capability::Egress],
             },
         ],
     }

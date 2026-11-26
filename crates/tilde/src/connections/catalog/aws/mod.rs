@@ -1,5 +1,7 @@
 //! Setup guidance for an AWS role federated with Tilde's OIDC issuer (`aws`/`oidc`); the
 //! provider definition and tools live in `tools::providers::aws`.
+pub mod egress;
+
 use super::runtime::Runtime;
 use crate::connections::{model::ConnectionType, service::Connections};
 use uuid::Uuid;

@@ -37,7 +37,7 @@ pub fn definition() -> model::Provider {
                     "region":{"type":"string","title":"Region","enum":["us","eu"],"default":"us"}
                 },"required":["api_key"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Egress],
         }],
     }
 }
