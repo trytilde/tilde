@@ -1,3 +1,0 @@
-kind: Added
-body: "`tilde build [ENTRY] [--agent <key>] [--out <dir>] [--version <v>]` builds an agent's deployable artifacts exactly as `tilde deploy` builds them, without deploying: `declarations.json` (the code's DeploymentDeclarations), `agent.json` (the agent's spec as Apply receives it), a Hosted agent's `bundle.zip` and, with `--version`, `manifest.json` (`{ version, sha256, declarations }`). It contacts no Tilde server and needs no credentials. A Hosted bundle is now reproducible: entries in path order with a fixed time, so the same sources give the same digest."
-time: 2026-11-26T12:00:00+00:00

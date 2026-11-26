@@ -1,6 +1,6 @@
 [project]
 name = "trytilde-pydantic-ai"
-version = "5.7.0"
+version = "5.8.0"
 description = "Tilde adapter for Pydantic AI: typed context to model messages, channel tools to Pydantic AI tools"
 readme = "README.md"
 license = "Apache-2.0"
