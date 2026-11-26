@@ -12,11 +12,13 @@
 //!
 //! A grant names the services and regions it reaches and whether it is read-only (the default):
 //! an action named Get, List, Describe, Filter, Search, Lookup, BatchGet, Query, Scan, StartQuery
-//! or StopQuery, read from `X-Amz-Target`, the Query protocol's `Action`, or an RPC v2 path; a
-//! REST API's (S3, Lambda) GET and HEAD. Whatever the grant, actions that return credentials
-//! (STS other than GetCallerIdentity, `*Token*`, `*Credential*`, secret values, access keys)
-//! are refused, so no credential reaches the sandbox through a response. The role's own IAM
-//! policy stays the ceiling.
+//! or StopQuery, read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2 path (every
+//! one the request carries, which must agree; an RPC service's request naming none is refused);
+//! a REST API's (S3, Lambda) GET and HEAD. Whatever the grant, the actions `returns_credentials`
+//! lists (STS sessions, tokens, credentials, secret values, access keys, passwords, SSM
+//! parameters, Lightsail access details, API Gateway key values) are refused. Other stored
+//! secrets a read can return (a Lambda function's environment, an object in S3) are the role's
+//! IAM policy's to guard: it stays the ceiling.
 use crate::chat::providers::Access;
 use crate::connections::egress::{
     Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, forge::strings,
@@ -109,48 +111,69 @@ const READS: &[&str] = &[
     "StopQuery",
 ];
 
-/// The API action a request names, if its protocol names one: JSON (`X-Amz-Target:
-/// Logs_20140328.FilterLogEvents`), RPC v2 (`/service/<name>/operation/<action>`) or Query
-/// (`Action=` in the query or form body). REST APIs name none.
-fn action(
-    path: &str,
-    query: Option<&str>,
-    headers: &http::HeaderMap,
-    body: &[u8],
-) -> Option<String> {
+/// Services whose APIs are REST (the method and path name the operation), not RPC.
+const REST: &[&str] = &["s3", "lambda", "xray", "apigateway", "execute-api"];
+
+/// Every API action a request could be read as naming: `X-Amz-Target` (JSON,
+/// `Logs_20140328.FilterLogEvents`), an RPC v2 path (`/service/<name>/operation/<action>`), and
+/// `Action` in the query or a form body (Query). A service reads only its own protocol's, so all
+/// are checked and they must agree: a read in one place cannot carry a write in another. REST
+/// APIs name none.
+fn actions(path: &str, query: Option<&str>, headers: &http::HeaderMap, body: &[u8]) -> Vec<String> {
+    let mut actions = vec![];
     if let Some(target) = headers.get("x-amz-target").and_then(|v| v.to_str().ok()) {
-        return Some(target.rsplit('.').next().unwrap_or(target).to_owned());
+        actions.push(target.rsplit('.').next().unwrap_or(target).to_owned());
     }
     let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
     if let ["service", _, "operation", action] = segments[..] {
-        return Some(action.to_owned());
+        actions.push(action.to_owned());
     }
+    let named = |pairs: &[u8]| {
+        url::form_urlencoded::parse(pairs)
+            .filter(|(k, _)| k.eq_ignore_ascii_case("action"))
+            .map(|(_, v)| v.into_owned())
+            .collect::<Vec<_>>()
+    };
+    actions.extend(named(query.unwrap_or_default().as_bytes()));
     let form = headers
         .get(http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.starts_with("application/x-www-form-urlencoded"));
-    let named = |pairs: &[u8]| {
-        url::form_urlencoded::parse(pairs)
-            .find(|(k, _)| k == "Action")
-            .map(|(_, v)| v.into_owned())
-    };
-    query
-        .and_then(|q| named(q.as_bytes()))
-        .or_else(|| form.then(|| named(body)).flatten())
+        .is_some_and(|v| {
+            v.trim()
+                .to_ascii_lowercase()
+                .starts_with("application/x-www-form-urlencoded")
+        });
+    if form {
+        actions.extend(named(body));
+    }
+    actions
 }
 
-/// Actions whose answers carry credentials, refused under any grant.
+/// Actions whose answers carry credentials or stored secrets, refused under any grant: STS
+/// other than GetCallerIdentity, names with `Token`, `Credential`, `SecretValue`, `AccessKey`,
+/// `Password` (EC2 password data, database master passwords), SSM parameter reads (decrypted
+/// SecureStrings) and Lightsail access details. Other stored secrets (a Lambda function's
+/// environment, say) are the role's IAM policy's to guard.
 fn returns_credentials(service: &str, action: &str) -> bool {
+    let named = |names: &[&str]| names.contains(&action);
     (service == "sts" && action != "GetCallerIdentity")
         || [
             "Token",
             "Credential",
             "SecretValue",
             "AccessKey",
-            "PasswordData",
+            "Password",
         ]
         .iter()
         .any(|word| action.contains(word))
+        || (service == "ssm"
+            && named(&[
+                "GetParameter",
+                "GetParameters",
+                "GetParametersByPath",
+                "GetParameterHistory",
+            ]))
+        || (service == "lightsail" && action.contains("AccessDetails"))
 }
 
 /// The endpoint of `service` in `region`: regional, except for global services.
@@ -228,22 +251,43 @@ impl EgressHook for Aws {
         if !regions.is_empty() && !regions.contains(&region) {
             return Decision::deny(format!("The {region} region is not granted"));
         }
-        let action = action(path, *query, headers, body);
-        if let Some(action) = &action
+        let actions = actions(path, *query, headers, body);
+        if actions.iter().any(|a| *a != actions[0]) {
+            return Decision::deny(format!(
+                "The request names more than one action: {}",
+                actions.join(", ")
+            ));
+        }
+        let rest = REST.contains(&service);
+        // API Gateway returns API key values when asked to (`includeValue(s)=true`).
+        if service == "apigateway"
+            && url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
+                .any(|(k, v)| k.starts_with("includeValue") && v.eq_ignore_ascii_case("true"))
+        {
+            return Decision::deny("API Gateway key values are not readable");
+        }
+        if let Some(action) = actions.first()
             && returns_credentials(service, action)
         {
             return Decision::deny(format!("{service}:{action} returns credentials"));
+        }
+        let get = method.eq_ignore_ascii_case("GET") || method.eq_ignore_ascii_case("HEAD");
+        if actions.is_empty() && !rest && !get {
+            return Decision::deny(format!("The {service} request names no action"));
         }
         let read_only = config
             .get("read_only")
             .and_then(Value::as_bool)
             .unwrap_or(true);
-        let reads = match &action {
+        let reads = match actions.first() {
             Some(action) => READS.iter().any(|prefix| action.starts_with(prefix)),
-            None => method.eq_ignore_ascii_case("GET") || method.eq_ignore_ascii_case("HEAD"),
+            None => get,
         };
         if read_only && !reads {
-            let what = action.unwrap_or_else(|| format!("{method} {path}"));
+            let what = actions
+                .first()
+                .cloned()
+                .unwrap_or_else(|| format!("{method} {path}"));
             return Decision::deny(format!(
                 "{service}:{what} is not a read; the grant is read-only"
             ));

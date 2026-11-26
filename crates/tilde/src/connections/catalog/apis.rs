@@ -170,11 +170,14 @@ fn linear() -> Api {
             })),
         ),
         upstream: |_| Ok("https://api.linear.app".into()),
-        check: |request, config| graphql::check(body(request), &strings(config.get("mutations"))),
+        check: |request, config| {
+            graphql::check(body(request), &strings(config.get("mutations")), &[])
+        },
     }
 }
 
-/// New Relic's NerdGraph, read-only: queries (NRQL among them), no mutations.
+/// New Relic's NerdGraph, read-only: queries (NRQL among them), no mutations, and nothing under
+/// `apiAccess` (its API keys).
 fn newrelic() -> Api {
     Api {
         egress: egress(
@@ -193,7 +196,8 @@ fn newrelic() -> Api {
                 "https://api.eu.newrelic.com",
             ))
         },
-        check: |request, _| graphql::check(body(request), &[]),
+        // `apiAccess` reads the account's API keys.
+        check: |request, _| graphql::check(body(request), &[], &["apiAccess"]),
     }
 }
 
@@ -530,8 +534,9 @@ fn honeycomb() -> Api {
     }
 }
 
-/// HCP Terraform's (or Terraform Enterprise's) API, read-only: workspaces, runs, plans. State,
-/// variables and tokens are refused: they hold secrets.
+/// HCP Terraform's (or Terraform Enterprise's) API, read-only: workspaces, runs, redacted plans.
+/// State (also through `include`), unredacted plans, variables and tokens are refused: they hold
+/// secrets.
 fn terraform() -> Api {
     Api {
         egress: egress(
@@ -548,6 +553,9 @@ fn terraform() -> Api {
                     "* /api/v2/state-version-outputs/**",
                     "* /api/v2/workspaces/*/current-state-version/**",
                     "* /api/v2/workspaces/*/current-state-version-outputs/**",
+                    // Unredacted plans; `json-output-redacted` stays readable.
+                    "* /api/v2/plans/*/json-output",
+                    "* /api/v2/runs/*/plan/json-output",
                     "* /api/v2/workspaces/*/state-versions/**",
                     "* /api/v2/authentication-tokens/**",
                     "* /api/v2/users/*/authentication-tokens/**",
@@ -564,6 +572,22 @@ fn terraform() -> Api {
                 model::optional(&access.values, "hostname").unwrap_or("app.terraform.io")
             ))
         },
-        check: allowed,
+        // `include` would embed a state version (and its signed download URL) or its outputs.
+        check: |request, _| {
+            let EgressRequest::Http { query, .. } = request else {
+                return Decision::deny("Terraform is reached over HTTP");
+            };
+            let state =
+                url::form_urlencoded::parse(query.unwrap_or_default().as_bytes()).any(|(k, v)| {
+                    k == "include"
+                        && v.to_ascii_lowercase()
+                            .replace('-', "_")
+                            .contains("state_version")
+                });
+            if state {
+                return Decision::deny("State versions and their outputs are not readable");
+            }
+            Decision::Allow
+        },
     }
 }

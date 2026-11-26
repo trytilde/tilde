@@ -453,11 +453,29 @@ pub mod graphql {
     }
 
     /// A GraphQL request (`{"query": "..."}`) may only query, and mutate with the fields in
-    /// `mutations`. Batches, subscriptions and anything unparseable are refused.
-    pub fn check(body: &[u8], mutations: &[&str]) -> Decision {
+    /// `mutations`, and never name a field in `denied` at any depth (as a field, an alias or in
+    /// a fragment: any name in the document). Batches, subscriptions and anything unparseable are
+    /// refused.
+    pub fn check(body: &[u8], mutations: &[&str], denied: &[&str]) -> Decision {
         let Some(operations) = operations(body) else {
             return Decision::deny("Not a GraphQL request");
         };
+        let names = serde_json::from_slice::<serde_json::Value>(body)
+            .ok()
+            .and_then(|r| {
+                r.get("query")?.as_str().and_then(tokens).map(|t| {
+                    t.into_iter()
+                        .filter_map(|t| match t {
+                            Token::Name(name) => Some(name.to_owned()),
+                            Token::Punct(_) => None,
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .unwrap_or_default();
+        if let Some(name) = names.iter().find(|n| denied.contains(&n.as_str())) {
+            return Decision::deny(format!("{name} is not readable"));
+        }
         for operation in &operations {
             match operation.kind.as_str() {
                 "query" => {}
@@ -666,7 +684,11 @@ pub mod graphql {
                 "fragment F on Issue { id } query { issue(id: \"x\") { ...F } }",
             ];
             for query in allowed {
-                assert_eq!(check(&body(query), &granted), Decision::Allow, "{query}");
+                assert_eq!(
+                    check(&body(query), &granted, &[]),
+                    Decision::Allow,
+                    "{query}"
+                );
             }
             let denied = [
                 "mutation { issueCreate(input: {}) { success } teamDelete(id: \"x\") { success } }",
@@ -677,12 +699,28 @@ pub mod graphql {
                 "mutation { issueCreate(input: {title: \"unterminated) { success } }",
             ];
             for query in denied {
-                assert_ne!(check(&body(query), &granted), Decision::Allow, "{query}");
+                assert_ne!(
+                    check(&body(query), &granted, &[]),
+                    Decision::Allow,
+                    "{query}"
+                );
             }
             assert_ne!(
-                check(b"[{\"query\":\"{ viewer { id } }\"}]", &granted),
+                check(b"[{\"query\":\"{ viewer { id } }\"}]", &granted, &[]),
                 Decision::Allow
             );
+            // A denied field at any depth, aliased or in a fragment; a string naming it is data.
+            let keys = ["apiAccess"];
+            for query in [
+                "{ actor { apiAccess { keySearch(query: {}) { keys { key } } } } }",
+                "{ actor { access: apiAccess { key(id: \"1\") { key } } } }",
+                "fragment K on Actor { apiAccess { key { key } } } { actor { ...K } }",
+            ] {
+                assert_ne!(check(&body(query), &[], &keys), Decision::Allow, "{query}");
+            }
+            let nrql =
+                "{ actor { account(id: 1) { nrql(query: \"SELECT apiAccess\") { results } } } }";
+            assert_eq!(check(&body(nrql), &[], &keys), Decision::Allow);
         }
     }
 }

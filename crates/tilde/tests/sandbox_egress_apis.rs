@@ -191,6 +191,14 @@ type Grant = (
     Value,
 );
 
+/// An AWS request naming conflicting actions: service, path and query, headers, body.
+type Confused = (
+    &'static str,
+    &'static str,
+    Vec<(&'static str, &'static str)>,
+    &'static str,
+);
+
 /// How a client presents the egress token.
 #[derive(Clone, Copy)]
 enum Present {
@@ -335,7 +343,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                 ("secret_access_key", AWS_SECRET),
                 ("region", "us-east-1"),
             ],
-            json!({"services": ["logs", "sts"], "regions": ["us-east-1"]}),
+            json!({"services": ["logs", "sts", "ssm"], "regions": ["us-east-1"]}),
         ),
     ];
     let secrets: Vec<&str> = grants
@@ -793,6 +801,56 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             no,
             vec![],
         ),
+        // State reached through `include`, and unredacted plans; the redacted plan is readable.
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/organizations/acme/workspaces?include=current_state_version",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/plans/plan-1/json-output",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/plans/plan-1/json-output-redacted",
+            None,
+            Present::Bearer,
+            ok,
+            vec![("authorization", "Bearer tf_fixture".into())],
+        ),
+        // NerdGraph's API keys, at any depth.
+        (
+            "newrelic",
+            Method::POST,
+            "/graphql",
+            Some(graphql(
+                "{ actor { apiAccess { keySearch(query: {scope: {}}) { keys { key } } } } }",
+            )),
+            Present::Header("api-key"),
+            no,
+            vec![],
+        ),
+        // SSM parameter reads return decrypted secrets.
+        (
+            "aws",
+            Method::POST,
+            "/#AmazonSSM.GetParameter",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "ssm"),
+            no,
+            vec![],
+        ),
         (
             "terraform",
             Method::GET,
@@ -892,6 +950,78 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             _ => assert_eq!(seen.route, format!("{method} {path}")),
         }
     }
+    // An AWS request read as a read in one place cannot carry another action elsewhere: every
+    // action it names must agree, form bodies are read whatever the content type's case, and an
+    // RPC request naming no action is refused.
+    let form = "application/x-www-form-urlencoded; charset=utf-8";
+    // (service, path and query, headers, body)
+    let confused: [Confused; 5] = [
+        (
+            "sts",
+            "/",
+            vec![
+                (
+                    "x-amz-target",
+                    "AWSSecurityTokenServiceV20110615.GetCallerIdentity",
+                ),
+                ("content-type", form),
+            ],
+            "Action=AssumeRole&Version=2011-06-15",
+        ),
+        (
+            "logs",
+            "/service/Logs_20140328/operation/DeleteLogGroup",
+            vec![
+                ("x-amz-target", "Logs_20140328.FilterLogEvents"),
+                ("content-type", "application/x-amz-json-1.1"),
+            ],
+            "{}",
+        ),
+        (
+            "sts",
+            "/?Action=GetCallerIdentity&Version=2011-06-15",
+            vec![("content-type", form)],
+            "Action=AssumeRole&Version=2011-06-15",
+        ),
+        (
+            "sts",
+            "/",
+            vec![("content-type", "Application/X-WWW-Form-Urlencoded")],
+            "Action=GetSessionToken&Version=2011-06-15",
+        ),
+        ("sts", "/", vec![("content-type", "application/json")], "{}"),
+    ];
+    for (service, path, headers, body) in confused {
+        let before = upstream.seen.lock().unwrap().len();
+        let mut request = http
+            .post(format!("{}{path}", route("aws")))
+            .body(body.to_owned())
+            .build()
+            .unwrap();
+        for (name, value) in &headers {
+            request.headers_mut().insert(*name, value.parse().unwrap());
+        }
+        let credentials = Credentials {
+            access_key_id: token.clone(),
+            secret_access_key: "tilde-egress".into(),
+            session_token: None,
+        };
+        Signer::new(credentials, "us-east-1", service)
+            .sign_request_at(&mut request, body.as_bytes(), std::time::SystemTime::now())
+            .unwrap();
+        let response = http.execute(request).await.unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "{service} {path} {headers:?} {body}"
+        );
+        assert_eq!(
+            upstream.seen.lock().unwrap().len(),
+            before,
+            "{service} {path} reached upstream"
+        );
+    }
+
     // One refresh, with the stored refresh token; the new tokens are kept.
     let refreshes = upstream.refreshes.lock().unwrap().clone();
     assert_eq!(refreshes.len(), 1, "{refreshes:?}");
