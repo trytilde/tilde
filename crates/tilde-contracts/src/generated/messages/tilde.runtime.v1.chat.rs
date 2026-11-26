@@ -3339,6 +3339,18 @@ pub struct InvokeToolRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub finish: bool,
+    /// Set on the first frame by a framework adapter that can suspend its loop. A call still running
+    /// after the gateway's threshold (about a minute), or at the invocation's deadline, then answers
+    /// `pending` and finishes in the background; its outcome is the next invocation's
+    /// (GetCheckpoint) once the adapter suspended with it.
+    ///
+    /// Field 7: `suspendable`
+    #[serde(
+        rename = "suspendable",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub suspendable: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3352,6 +3364,7 @@ impl ::core::fmt::Debug for InvokeToolRequest {
             .field("input_json", &::core::format_args!("[REDACTED]"))
             .field("chunk_json", &::core::format_args!("[REDACTED]"))
             .field("finish", &self.finish)
+            .field("suspendable", &self.suspendable)
             .finish()
     }
 }
@@ -3400,6 +3413,9 @@ impl ::buffa::Message for InvokeToolRequest {
         if self.finish {
             size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
         }
+        if self.suspendable {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3427,6 +3443,9 @@ impl ::buffa::Message for InvokeToolRequest {
         }
         if self.finish {
             ::buffa::types::put_bool_field(6u32, self.finish, buf);
+        }
+        if self.suspendable {
+            ::buffa::types::put_bool_field(7u32, self.suspendable, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3483,6 +3502,13 @@ impl ::buffa::Message for InvokeToolRequest {
                 )?;
                 self.finish = ::buffa::types::decode_bool(buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.suspendable = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3497,6 +3523,7 @@ impl ::buffa::Message for InvokeToolRequest {
         self.input_json.clear();
         self.chunk_json.clear();
         self.finish = false;
+        self.suspendable = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3541,6 +3568,15 @@ pub struct InvokeToolResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub output_json: ::buffa::alloc::string::String,
+    /// The call goes on in the background: suspend the loop (SuspendRun naming this call).
+    ///
+    /// Field 2: `pending`
+    #[serde(
+        rename = "pending",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub pending: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3549,6 +3585,7 @@ impl ::core::fmt::Debug for InvokeToolResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("InvokeToolResponse")
             .field("output_json", &::core::format_args!("[REDACTED]"))
+            .field("pending", &self.pending)
             .finish()
     }
 }
@@ -3582,6 +3619,9 @@ impl ::buffa::Message for InvokeToolResponse {
         if !self.output_json.is_empty() {
             size += 1u64 + ::buffa::types::string_encoded_len(&self.output_json) as u64;
         }
+        if self.pending {
+            size += 1u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -3594,6 +3634,9 @@ impl ::buffa::Message for InvokeToolResponse {
         use ::buffa::Enumeration as _;
         if !self.output_json.is_empty() {
             ::buffa::types::put_string_field(1u32, &self.output_json, buf);
+        }
+        if self.pending {
+            ::buffa::types::put_bool_field(2u32, self.pending, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3615,6 +3658,13 @@ impl ::buffa::Message for InvokeToolResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.output_json, buf)?;
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.pending = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3624,6 +3674,7 @@ impl ::buffa::Message for InvokeToolResponse {
     }
     fn clear(&mut self) {
         self.output_json.clear();
+        self.pending = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5889,5 +5940,533 @@ pub const __SET_RUN_STATUS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     type_url: "type.googleapis.com/tilde.runtime.v1.SetRunStatusResponse",
     to_json: ::buffa::type_registry::any_to_json::<SetRunStatusResponse>,
     from_json: ::buffa::type_registry::any_from_json::<SetRunStatusResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SuspendRunRequest {
+    /// Field 1: `state_json`
+    #[serde(
+        rename = "stateJson",
+        alias = "state_json",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub state_json: ::buffa::alloc::string::String,
+    /// Tool call IDs (as Tilde records them) whose outcomes the run waits for; none resumes at once.
+    ///
+    /// Field 2: `pending_call_ids`
+    #[serde(
+        rename = "pendingCallIds",
+        alias = "pending_call_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub pending_call_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SuspendRunRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SuspendRunRequest")
+            .field("state_json", &::core::format_args!("[REDACTED]"))
+            .field("pending_call_ids", &self.pending_call_ids)
+            .finish()
+    }
+}
+impl SuspendRunRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.SuspendRunRequest";
+}
+::buffa::impl_default_instance!(SuspendRunRequest);
+impl ::buffa::MessageName for SuspendRunRequest {
+    const PACKAGE: &'static str = "tilde.runtime.v1";
+    const NAME: &'static str = "SuspendRunRequest";
+    const FULL_NAME: &'static str = "tilde.runtime.v1.SuspendRunRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.SuspendRunRequest";
+}
+impl ::buffa::Message for SuspendRunRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.state_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.state_json) as u64;
+        }
+        for v in &self.pending_call_ids {
+            size += 1u64 + ::buffa::types::string_encoded_len(v) as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.state_json.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.state_json, buf);
+        }
+        for v in &self.pending_call_ids {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.state_json, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let __elem = ::buffa::types::decode_string(buf)?;
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&__elem),
+                )?;
+                self.pending_call_ids.push(__elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.state_json.clear();
+        self.pending_call_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SuspendRunRequest {
+    const PROTO_FQN: &'static str = "tilde.runtime.v1.SuspendRunRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SuspendRunRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUSPEND_RUN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.runtime.v1.SuspendRunRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SuspendRunRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SuspendRunRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SuspendRunResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SuspendRunResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SuspendRunResponse").finish()
+    }
+}
+impl SuspendRunResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.SuspendRunResponse";
+}
+::buffa::impl_default_instance!(SuspendRunResponse);
+impl ::buffa::MessageName for SuspendRunResponse {
+    const PACKAGE: &'static str = "tilde.runtime.v1";
+    const NAME: &'static str = "SuspendRunResponse";
+    const FULL_NAME: &'static str = "tilde.runtime.v1.SuspendRunResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.SuspendRunResponse";
+}
+impl ::buffa::Message for SuspendRunResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SuspendRunResponse {
+    const PROTO_FQN: &'static str = "tilde.runtime.v1.SuspendRunResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SuspendRunResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SUSPEND_RUN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.runtime.v1.SuspendRunResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SuspendRunResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SuspendRunResponse>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCheckpointRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCheckpointRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCheckpointRequest").finish()
+    }
+}
+impl GetCheckpointRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.GetCheckpointRequest";
+}
+::buffa::impl_default_instance!(GetCheckpointRequest);
+impl ::buffa::MessageName for GetCheckpointRequest {
+    const PACKAGE: &'static str = "tilde.runtime.v1";
+    const NAME: &'static str = "GetCheckpointRequest";
+    const FULL_NAME: &'static str = "tilde.runtime.v1.GetCheckpointRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.GetCheckpointRequest";
+}
+impl ::buffa::Message for GetCheckpointRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCheckpointRequest {
+    const PROTO_FQN: &'static str = "tilde.runtime.v1.GetCheckpointRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCheckpointRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CHECKPOINT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.runtime.v1.GetCheckpointRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetCheckpointRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetCheckpointRequest>,
+    is_wkt: false,
+};
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetCheckpointResponse {
+    /// Field 1: `state_json`
+    #[serde(
+        rename = "stateJson",
+        alias = "state_json",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub state_json: ::buffa::alloc::string::String,
+    /// The pending calls' records: completed with their output, or failed or aborted with an error.
+    ///
+    /// Field 2: `results`
+    #[serde(
+        rename = "results",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub results: ::buffa::alloc::vec::Vec<super::super::types::v1::ToolCall>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetCheckpointResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetCheckpointResponse")
+            .field("state_json", &::core::format_args!("[REDACTED]"))
+            .field("results", &self.results)
+            .finish()
+    }
+}
+impl GetCheckpointResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.GetCheckpointResponse";
+}
+::buffa::impl_default_instance!(GetCheckpointResponse);
+impl ::buffa::MessageName for GetCheckpointResponse {
+    const PACKAGE: &'static str = "tilde.runtime.v1";
+    const NAME: &'static str = "GetCheckpointResponse";
+    const FULL_NAME: &'static str = "tilde.runtime.v1.GetCheckpointResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/tilde.runtime.v1.GetCheckpointResponse";
+}
+impl ::buffa::Message for GetCheckpointResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// Accumulates in `u64` (which cannot overflow for in-memory
+    /// data) and saturates to `u32` at return, so a message whose
+    /// encoded size exceeds the 2 GiB protobuf limit yields a value
+    /// above [`::buffa::MAX_MESSAGE_BYTES`] that the encode entry
+    /// points reject, never a silently wrapped size.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u64;
+        if !self.state_json.is_empty() {
+            size += 1u64 + ::buffa::types::string_encoded_len(&self.state_json) as u64;
+        }
+        for v in &self.results {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
+                    + inner_size as u64;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u64;
+        ::buffa::saturate_size(size)
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::EncodeSink,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.state_json.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.state_json, buf);
+        }
+        for v in &self.results {
+            ::buffa::types::put_len_delimited_header(
+                2u32,
+                u64::from(__cache.consume_next()),
+                buf,
+            );
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.state_json, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ctx.register_element_memory(
+                    ::buffa::__private::element_footprint(&elem),
+                )?;
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.results.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.state_json.clear();
+        self.results.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetCheckpointResponse {
+    const PROTO_FQN: &'static str = "tilde.runtime.v1.GetCheckpointResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetCheckpointResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_CHECKPOINT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/tilde.runtime.v1.GetCheckpointResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetCheckpointResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetCheckpointResponse>,
     is_wkt: false,
 };

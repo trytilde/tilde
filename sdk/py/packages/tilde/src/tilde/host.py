@@ -180,8 +180,11 @@ async def run_invocation(
         try:
             await asyncio.shield(ready)
             await context.refresh_tools()
+            if request.resumes:
+                await context.load_checkpoint()
             context.check()
             await options.run(context)
+            await context.settle_pending()
             await context.settle_suspension()
             settle()
         except BaseException as error:  # noqa: BLE001 - every outcome is reported, never raised

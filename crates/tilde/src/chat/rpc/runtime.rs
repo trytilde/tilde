@@ -12,15 +12,17 @@ use secrecy::SecretString;
 use std::sync::Arc;
 struct Rpc(Chat, Arc<crate::chat::tools::Registry>);
 fn tool_response(
-    output: serde_json::Value,
+    answer: crate::chat::tools::Answer,
 ) -> Result<runtime_pb::InvokeToolResponse, ConnectError> {
-    let output_json = serde_json::to_string(&output)
+    let pending = matches!(answer, crate::chat::tools::Answer::Pending(_));
+    let output_json = serde_json::to_string(answer.output())
         .map_err(|_| ConnectError::internal("Invalid tool result"))?;
     if output_json.len() > 1024 * 1024 {
         return Err(ConnectError::resource_exhausted("Tool result is too large"));
     }
     Ok(runtime_pb::InvokeToolResponse {
         output_json,
+        pending,
         ..Default::default()
     })
 }
@@ -251,6 +253,32 @@ impl ChatService for Rpc {
         scope.capabilities.require(Capability::RunUpdate, "")?;
         self.0.set_run_status(&scope, request.status).await?;
         Response::ok(runtime_pb::SetRunStatusResponse::default())
+    }
+    async fn suspend_run<'a>(
+        &'a self,
+        ctx: RequestContext,
+        request: ServiceRequest<'_, runtime_pb::SuspendRunRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<runtime_pb::SuspendRunResponse> + Send + use<'a>>
+    {
+        let scope = self.scope(&ctx).await?;
+        let pending = request
+            .pending_call_ids
+            .iter()
+            .map(|call| id(call))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.0
+            .suspend_run(&scope, request.state_json, &pending)
+            .await?;
+        Response::ok(runtime_pb::SuspendRunResponse::default())
+    }
+    async fn get_checkpoint<'a>(
+        &'a self,
+        ctx: RequestContext,
+        _: ServiceRequest<'_, runtime_pb::GetCheckpointRequest>,
+    ) -> ServiceResult<impl connectrpc::Encodable<runtime_pb::GetCheckpointResponse> + Send + use<'a>>
+    {
+        let scope = self.scope(&ctx).await?;
+        Response::ok(self.0.checkpoint(&scope).await?)
     }
     async fn list_tools<'a>(
         &'a self,

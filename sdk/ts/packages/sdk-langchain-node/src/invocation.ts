@@ -1,5 +1,5 @@
 import type { AgentContext, BundledTools } from "@trytilde/sdk";
-import { HumanMessage } from "@langchain/core/messages";
+import { HumanMessage, RemoveMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { createMiddleware } from "langchain";
 import {
@@ -7,6 +7,7 @@ import {
   invocationTools as tildeTools,
   type ConvertToLangChainToolsOptions,
 } from "./tools.js";
+import { REMOVE_ALL_MESSAGES, restore, toJson } from "./suspension.js";
 
 /** Options for the channel's tools, plus the agent's bundled tools (`defineTools`). */
 export type TildeToolsOptions = ConvertToLangChainToolsOptions & {
@@ -41,7 +42,10 @@ function current(runtime: { configurable?: Record<string, unknown> }): AgentCont
  *   when the model calls them (LangChain executes tools added in `wrapModelCall` through
  *   `wrapToolCall`);
  * - before each model call, adds steering input sent while the agent works as user messages
- *   to the agent state;
+ *   to the agent state, and suspends the run when a Tilde tool call is still running after about
+ *   a minute or Tilde's deadline comes: the messages are saved and the invocation ends; the run's
+ *   next invocation replaces the call's messages with them, the call's outcome in place of its
+ *   pending answer;
  * - offers the invocation's skills (LangChain has no native skills): Tilde's `list_skills` and
  *   `read_skill` tools, with the skill summary appended to the system message.
  */
@@ -65,13 +69,31 @@ export function tildeMiddleware(tools: TildeToolsOptions = {}) {
       );
     return added.get(ctx)!;
   };
+  // The loop's state at its last step boundary, for suspending it (see `./suspension.ts`).
+  const loops = new WeakMap<AgentContext, { restored: boolean; latest: BaseMessage[] }>();
+  const loop = (ctx: AgentContext) => {
+    let run = loops.get(ctx);
+    if (!run) {
+      const created = { restored: false, latest: [] as BaseMessage[] };
+      ctx.enableSuspension?.(() => toJson(created.latest));
+      loops.set(ctx, (run = created));
+    }
+    return run;
+  };
   return createMiddleware({
     name: "tilde",
-    beforeModel: (_state, runtime) => {
-      const inputs = current(runtime).takeInputs();
-      return inputs.length
-        ? { messages: inputs.map((input) => new HumanMessage(input.text)) }
-        : undefined;
+    beforeModel: async (state, runtime) => {
+      const ctx = current(runtime);
+      const run = loop(ctx);
+      // A resumed run continues its saved conversation instead of the call's own messages.
+      const restored = ctx.resumed && !run.restored ? restore(ctx.resumed) : undefined;
+      if (restored) run.restored = true;
+      const inputs = ctx.takeInputs().map((input) => new HumanMessage(input.text));
+      run.latest = [...(restored ?? state.messages), ...inputs];
+      if (ctx.shouldSuspend) await ctx.suspend(toJson(run.latest));
+      if (restored)
+        return { messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...run.latest] };
+      return inputs.length ? { messages: inputs } : undefined;
     },
     wrapModelCall: async (request, handler) => {
       const ctx = current(request.runtime);

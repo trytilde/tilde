@@ -54,6 +54,10 @@ pub struct InvokeRequestView<'a> {
     pub state: ::buffa::MessageFieldView<
         super::super::__buffa::view::InvocationStateView<'a>,
     >,
+    /// This invocation continues a suspended run: read its checkpoint (ChatService.GetCheckpoint).
+    ///
+    /// Field 19: `resumes`
+    pub resumes: bool,
     pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
 }
 impl<'a> ::core::fmt::Debug for InvokeRequestView<'a> {
@@ -77,6 +81,7 @@ impl<'a> ::core::fmt::Debug for InvokeRequestView<'a> {
             .field("thread", &self.thread)
             .field("cached_messages", &self.cached_messages)
             .field("state", &self.state)
+            .field("resumes", &self.resumes)
             .finish()
     }
 }
@@ -248,6 +253,13 @@ impl<'a> ::buffa::MessageView<'a> for InvokeRequestView<'a> {
                     }
                 }
             }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                view.resumes = ::buffa::types::decode_bool(&mut cur)?;
+            }
             8u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -352,6 +364,7 @@ impl<'a> ::buffa::MessageView<'a> for InvokeRequestView<'a> {
                 }
                 None => ::buffa::MessageField::none(),
             },
+            resumes: self.resumes,
             __buffa_unknown_fields: self.__buffa_unknown_fields.to_owned()?.into(),
             ..::core::default::Default::default()
         })
@@ -446,6 +459,9 @@ impl<'a> ::buffa::ViewEncode<'a> for InvokeRequestView<'a> {
                 += 2u64 + ::buffa::encoding::varint_len(inner_size as u64) as u64
                     + inner_size as u64;
         }
+        if self.resumes {
+            size += 2u64 + ::buffa::types::BOOL_ENCODED_LEN as u64;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u64;
         ::buffa::saturate_size(size)
     }
@@ -530,6 +546,9 @@ impl<'a> ::buffa::ViewEncode<'a> for InvokeRequestView<'a> {
                 buf,
             );
             self.state.write_to(__cache, buf);
+        }
+        if self.resumes {
+            ::buffa::types::put_bool_field(19u32, self.resumes, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -617,6 +636,9 @@ impl<'__a> ::serde::Serialize for InvokeRequestView<'__a> {
             if let ::core::option::Option::Some(__v) = self.state.as_option() {
                 __map.serialize_entry("state", __v)?;
             }
+        }
+        if self.resumes {
+            __map.serialize_entry("resumes", &self.resumes)?;
         }
         __map.end()
     }
@@ -818,6 +840,13 @@ impl InvokeRequestOwnedView {
         super::super::__buffa::view::InvocationStateView<'_>,
     > {
         &self.0.reborrow().state
+    }
+    /// This invocation continues a suspended run: read its checkpoint (ChatService.GetCheckpoint).
+    ///
+    /// Field 19: `resumes`
+    #[must_use]
+    pub fn resumes(&self) -> bool {
+        self.0.reborrow().resumes
     }
 }
 impl ::core::convert::From<::buffa::OwnedView<InvokeRequestView<'static>>>

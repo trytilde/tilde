@@ -198,7 +198,9 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
                 let commands=chat.control_commands(&claims).await?;
                 if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop|Kind::Suspend))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
                 seen.retain(|id|commands.iter().any(|c|&c.id==id));
-                for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop|Kind::Suspend));if seen.insert(command.id.clone()){yield command;}
+                // A suspend is delivered once and the stream stays open, renewing the lease while
+                // the host brings its loop to a step boundary and saves it; a stop ends it.
+                for command in commands {let terminal=matches!(command.kind.as_known(),Some(Kind::Stop));if seen.insert(command.id.clone()){yield command;}
                     if terminal{return;}}
                 // The open command stream is the host's liveness for this invocation: it
                 // renews the lease that expiry would otherwise reclaim. Each renewal repeats

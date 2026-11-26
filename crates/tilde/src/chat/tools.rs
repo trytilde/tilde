@@ -36,6 +36,19 @@ use std::{
 };
 use uuid::Uuid;
 pub type ToolResult<T> = Result<T, ConnectError>;
+/// A call's answer to the caller: its output, or "pending" while it goes on in the background
+/// (see `super::suspension`).
+pub enum Answer {
+    Done(Value),
+    Pending(Value),
+}
+impl Answer {
+    pub fn output(&self) -> &Value {
+        match self {
+            Self::Done(output) | Self::Pending(output) => output,
+        }
+    }
+}
 pub type InputStream = Pin<Box<dyn Stream<Item = ToolResult<Value>> + Send>>;
 
 /// Constructed from the invocation capability, not model-supplied thread/agent identifiers.
@@ -228,7 +241,7 @@ impl Registry {
         scope: Scope,
         capability: SecretString,
         mut requests: InboundStream<runtime_pb::InvokeToolRequest>,
-    ) -> ToolResult<Value> {
+    ) -> ToolResult<Answer> {
         // The RPC entry point supplies its validated scope. Later effects and streamed
         // input still check token expiry after waiting on the caller, without database reads.
         let mut first = next(&mut requests)
@@ -280,7 +293,8 @@ impl Registry {
                     &input,
                     entries,
                 )
-                .await;
+                .await
+                .map(Answer::Done);
             }
             let inner = input["name"]
                 .as_str()
@@ -305,7 +319,7 @@ impl Registry {
         }
         .with_context(cx.clone())
         .await;
-        finish(&cx, &result);
+        finish(&cx, result.as_ref().map(Answer::output));
         result
     }
     /// One tool call in its own `execute_tool` span, child of the current context.
@@ -319,7 +333,7 @@ impl Registry {
         first: runtime_pb::InvokeToolRequest,
         entries: Vec<(types::ToolDefinition, Arc<dyn Provider>, bool)>,
         call_id: Uuid,
-    ) -> ToolResult<Value> {
+    ) -> ToolResult<Answer> {
         let (definition, provider, _) = entries
             .into_iter()
             .find(|(d, _, _)| d.name == first.name)
@@ -353,7 +367,7 @@ impl Registry {
         ))
         .with_context(cx.clone())
         .await;
-        finish(&cx, &result);
+        finish(&cx, result.as_ref().map(Answer::output));
         result
     }
     #[allow(clippy::too_many_arguments)]
@@ -367,7 +381,7 @@ impl Registry {
         provider: Arc<dyn Provider>,
         context: Context,
         input: Value,
-    ) -> ToolResult<Value> {
+    ) -> ToolResult<Answer> {
         let consumed = Arc::new(AtomicBool::new(false));
         // Native complete input has only database effects: its call claim, message and
         // terminal result can commit together. External effects and streams retain the
@@ -383,9 +397,13 @@ impl Registry {
                     "Unexpected input after finish",
                 ));
             }
-            return native::invoke_complete(&context, input).await;
+            return native::invoke_complete(&context, input)
+                .await
+                .map(Answer::Done);
         }
-        let execution = audit::Execution::begin(&context, &definition, &input).await?;
+        let pending_after =
+            super::suspension::pending_after(&chat, context.scope(), &first, &definition).await?;
+        let mut execution = audit::Execution::begin(&context, &definition, &input).await?;
         let audit_chat = chat.clone();
         let audit_scope = context.scope().clone();
         let audit_provider = definition.provider_id.clone();
@@ -446,7 +464,7 @@ impl Registry {
                     .with_context(background.clone())
                     .await;
                 let recorded = execution.finish(&mut result).await;
-                finish(&background, &result);
+                finish(&background, result.as_ref());
                 if recorded.is_ok()
                     && let Err(error) = chat
                         .deliver_detached_result(&scope, ticket, &name, &result)
@@ -457,11 +475,41 @@ impl Registry {
                 }
             };
             tokio::spawn(task);
-            return Ok(serde_json::json!({
+            return Ok(Answer::Done(serde_json::json!({
                 "ticket": ticket,
                 "status": "processing",
                 "message": "Running in the background. You will be told when it finishes; read the outcome with tools.result.",
-            }));
+            })));
+        }
+        if let Some(after) = pending_after {
+            let call = context.call_id;
+            if super::suspension::waits_for_reply(&definition) {
+                // Nothing runs: the next message routed to the agent is its output.
+                execution.detach().await?;
+                execution.release();
+                return Ok(Answer::Pending(super::suspension::pending_output(call)));
+            }
+            let name = definition.name.clone();
+            let mut work =
+                Box::pin(async move { provider.invoke(context, &name, input, stream).await });
+            let mut result = tokio::select! {
+                result = &mut work => result,
+                () = tokio::time::sleep(after) => {
+                    // Slow: the call goes on past this answer, and its record is the outcome the
+                    // run's next invocation reads once the caller suspended with it.
+                    execution.detach().await?;
+                    let task = async move {
+                        let mut result = work.await;
+                        if let Err(error) = execution.finish(&mut result).await {
+                            tracing::warn!(%call, %error, "Recording a pending tool call's outcome failed");
+                        }
+                    };
+                    tokio::spawn(task);
+                    return Ok(Answer::Pending(super::suspension::pending_output(call)));
+                }
+            };
+            execution.finish(&mut result).await?;
+            return result.map(Answer::Done);
         }
         let mut result = provider.invoke(context, &first.name, input, stream).await;
         if result.is_ok() && !consumed.load(Ordering::Acquire) {
@@ -470,7 +518,7 @@ impl Registry {
             ));
         }
         execution.finish(&mut result).await?;
-        result
+        result.map(Answer::Done)
     }
 }
 /// Trace payloads are a view of the call; the durable record keeps the full input and output.
@@ -520,7 +568,7 @@ fn span(
     )
 }
 /// Record a call's output, or its error as the span's status.
-pub(crate) fn finish(cx: &opentelemetry::Context, result: &ToolResult<Value>) {
+pub(crate) fn finish(cx: &opentelemetry::Context, result: Result<&Value, &ConnectError>) {
     match result {
         Ok(output) => cx.span().set_attribute(KeyValue::new(
             "tilde.observation.output",

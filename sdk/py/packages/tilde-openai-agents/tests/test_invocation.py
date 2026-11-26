@@ -109,6 +109,12 @@ class Invocation:
         self.agent_tools: dict[str, object] = {}
         self.skills = Skills()
 
+    resumed = None
+    should_suspend = False
+
+    def enable_suspension(self, snapshot) -> None:
+        return None
+
     def trace_authorization(self) -> str:
         return "Bearer invocation-token"
 

@@ -127,3 +127,11 @@ naming one validates and runs it here within the run's `RunContext`; every call 
 with the model's call id. `options={"roll_dice": BundledOptions(...)}` overrides
 `metadata["tilde"]`. A `ModelRetry` is audited as a failed call. Tools registered with
 `@agent.tool` are outside the toolset and are neither published nor audited.
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tilde_pydantic_ai`'s `before_model_request` hook suspends the run: the message history is saved (`ModelMessagesTypeAdapter`) and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

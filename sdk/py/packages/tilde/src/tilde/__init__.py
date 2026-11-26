@@ -25,7 +25,7 @@ from tilde.clients import (
     create_runtime_client,
     create_tilde_chat_client,
 )
-from tilde.context import AgentContext, DownloadedAttachment, SteeringInput
+from tilde.context import AgentContext, DownloadedAttachment, Resumed, SteeringInput, ToolOutcome
 from tilde.host import (
     ConnectedAgent,
     HostState,
@@ -82,6 +82,7 @@ __all__ = [
     "MessageHistory",
     "ObjectiveMessage",
     "PromptDefinition",
+    "Resumed",
     "RuntimeClient",
     "SkillDefinition",
     "SkillFile",
@@ -94,6 +95,7 @@ __all__ = [
     "Tool",
     "ToolAnnotations",
     "ToolCatalog",
+    "ToolOutcome",
     "Wake",
     "agent_log_processor",
     "agent_span_processor",

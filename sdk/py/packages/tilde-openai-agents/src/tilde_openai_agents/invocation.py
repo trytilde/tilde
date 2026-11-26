@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import json
 from pathlib import Path
 from typing import Any
 
 from agents import Agent, RunConfig, RunContextWrapper, ShellTool, TResponseInputItem
 from agents.run_config import CallModelData, CallModelInputFilter, ModelInputData
 
-from tilde import AgentContext, BundledTools
+from tilde import AgentContext, BundledTools, Resumed
 from tilde_openai_agents.discover import instructions_stamp, reachable_agents
 from tilde_openai_agents.tools import convert_to_openai_agents_tools, with_tilde_tools
 
@@ -40,6 +41,10 @@ async def tilde_openai_agents(
     - Before every model call: cancellation is checked, the calling agent's dynamic
       instructions stamp this invocation's inference calls, and steering input sent while the
       agent works becomes user messages. ``run_config``'s own filter, if any, runs first.
+    - Suspension: a Tilde tool call still running after about a minute (it answered pending) or
+      Tilde's deadline saves the items before the next model call and ends the invocation; the
+      run's next invocation continues from them, each pending output replaced by the call's
+      outcome.
 
     Handoff targets and agent tools run as defined; only ``agent`` gets Tilde's tools.
     """
@@ -119,8 +124,15 @@ def _input_filter(
     # assumes the SDK resends the history; with server-managed conversations
     # (`previous_response_id`, `conversation_id`) it sends only new items.
     steered: list[tuple[int, list[TResponseInputItem]]] = []
+    # Suspension: the items at the last model call, and a resumed run's saved items, which
+    # replace the run's own input (the runner keeps its input as the prefix of every later call).
+    initial: int | None = None
+    restored: list[TResponseInputItem] | None = None
+    latest: list[TResponseInputItem] = []
+    ctx.enable_suspension(lambda: _json(latest))
 
     async def filter(data: CallModelData[Any]) -> ModelInputData:
+        nonlocal initial, restored, latest
         if previous is not None:
             updated = previous(data)
             data.model_data = await updated if inspect.isawaitable(updated) else updated
@@ -129,6 +141,12 @@ def _input_filter(
         if stamp is not None:
             ctx.activate_prompt(*stamp)
         items = list(data.model_data.input)
+        if initial is None:
+            initial = len(items)
+            if ctx.resumed is not None:
+                restored = _restore(ctx.resumed)
+        if restored is not None:
+            items = [*restored, *items[initial:]]
         inputs = ctx.take_inputs()
         if inputs:
             steered.append(
@@ -139,6 +157,31 @@ def _input_filter(
             at = min(position + offset, len(items))
             items[at:at] = added
             offset += len(added)
+        latest = items
+        if ctx.should_suspend:
+            await ctx.suspend(_json(items))
         return ModelInputData(input=items, instructions=data.model_data.instructions)
 
     return filter
+
+
+def _json(items: list[TResponseInputItem]) -> Any:
+    # Items the runner generated are plain dicts already; pydantic ones dump themselves.
+    return json.loads(json.dumps(items, default=lambda item: item.model_dump(exclude_unset=True)))
+
+
+def _restore(resumed: Resumed) -> list[TResponseInputItem]:
+    """The saved items, each pending function call output replaced by the call's outcome."""
+    items: list[TResponseInputItem] = []
+    for item in resumed.state:
+        outcome = (
+            resumed.outcomes.get(item.get("call_id", ""))
+            if item.get("type") == "function_call_output"
+            else None
+        )
+        if outcome is not None:
+            failed = outcome.error is not None
+            output = f"Error: {outcome.error}" if failed else json.dumps(outcome.output)
+            item = {**item, "output": output}
+        items.append(item)
+    return items

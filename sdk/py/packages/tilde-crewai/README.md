@@ -178,3 +178,10 @@ here. Every call is audited once on the event loop. CrewAI has no free metadata,
 come from `options`, keyed by the tool's own name. CrewAI never passes the model's tool-call id
 to tools, so direct calls are audited under a generated id; `tools.execute` calls are not counted
 towards the usage limit.
+
+## Suspend and resume
+
+Not supported: CrewAI runs its loop and tools on worker threads, and its `before_llm_call` hook cannot replace the executor's messages from saved state. So this adapter never suspends: its Tilde tool calls block until they
+finish, as before, and when Tilde's deadline asks the invocation to suspend it ends (the run
+waits without saved state; the conversation's messages stay in Tilde). The other adapters
+suspend at a step boundary and continue in a new invocation; see `trytilde`'s README.

@@ -94,7 +94,10 @@ test("discover reads what Mastra agents declare without running them", async () 
   const added = [];
   await processor.processInputStep({
     agent: support,
-    messageList: { add: (message, source) => added.push([message, source]) },
+    messageList: {
+      add: (message, source) => added.push([message, source]),
+      get: { all: { db: () => [] } },
+    },
   });
   assert.deepEqual(stamps, [
     { name: "support/instructions", hash: promptHash(instructions.toString(), {}, "{}") },

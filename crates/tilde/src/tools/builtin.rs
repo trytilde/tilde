@@ -246,6 +246,15 @@ impl Provider for Builtin {
                     &["query"],
                     true,
                 ));
+                // A pause for the next message, which it reads: the run suspends and continues with the reply.
+                out.push(definition(
+                    crate::chat::suspension::REPLY_WAIT,
+                    "Waited for a reply",
+                    "Wait for the next message in this conversation and continue with it as this tool's output. Call it after asking a question you need answered to go on: your work is suspended (nothing runs) until someone replies.",
+                    json!({}),
+                    &[],
+                    true,
+                ));
             }
             Ok(out)
         })
@@ -297,6 +306,10 @@ impl Provider for Builtin {
                     )
                 }
                 "thread.search" => self.search(&context, &input).await,
+                // Suspendable callers never get here (`Registry::execute` answers pending).
+                crate::chat::suspension::REPLY_WAIT => Err(ConnectError::failed_precondition(
+                    "This agent cannot suspend to wait; end your turn instead, and the reply starts your next run",
+                )),
                 _ => Err(ConnectError::not_found("Unknown built-in tool")),
             }
         })

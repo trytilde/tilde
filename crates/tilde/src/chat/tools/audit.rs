@@ -167,6 +167,21 @@ impl Execution {
             armed: true,
         })
     }
+    /// The call answered "pending" and goes on past its invocation, as a background call does:
+    /// invocation expiry leaves it running (aborting it after an hour if nothing finishes it).
+    pub async fn detach(&mut self) -> ToolResult<()> {
+        let call = id(&self.tool.id)?;
+        let client = self.chat.pg()?.get().await.map_err(ChatError::from)?;
+        crate::chat::db::tool_detach_execute(&client, call)
+            .await
+            .map_err(ChatError::from)?;
+        self.tool.detached = true;
+        Ok(())
+    }
+    /// Leave the running record to whatever finishes it elsewhere (a reply to a wait).
+    pub fn release(mut self) {
+        self.armed = false;
+    }
     /// Records the outcome. An output too large to record replaces `result` with that failure,
     /// so the caller (or a background call's delivery) reports what was recorded.
     pub async fn finish(mut self, result: &mut ToolResult<serde_json::Value>) -> ToolResult<()> {

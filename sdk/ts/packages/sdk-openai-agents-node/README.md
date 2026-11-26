@@ -157,3 +157,11 @@ being coerced into a generic message type.
 `@openai/agents` exports traces to OpenAI by default, including prompts and tool
 data. Call `setTracingDisabled(true)` (or set `OPENAI_AGENTS_DISABLE_TRACING=1`)
 when Tilde's OTel collection is the system of record, as `sdk/ts/examples/openai-agents-example-agent` does.
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tildeOpenAIAgents`'s `callModelInputFilter` suspends the run: the run's input items are saved and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

@@ -41,6 +41,13 @@ vary them per call is call options (`callOptionsSchema` + `prepareCall`), which
   works to the model as user messages before every step; the AI SDK rebuilds each step's
   messages, so handed-over inputs are re-inserted where they arrived.
 
+Suspend and resume: the same `prepareStep` suspends the loop before a model call when a Tilde
+tool call answered pending (still running after about a minute) or Tilde's deadline came: the
+model messages so far are saved (binary file data as base64) and the invocation ends. The run's
+next invocation, once the call finished, replaces the call's own messages with them, the call's
+outcome in place of the pending tool result, and goes on. Use `prepareTildeCall` (or
+`tildeCallOptions`) for this; `withTildeTools` alone does not suspend, and its tool calls block.
+
 An agent with call options of its own adds `tilde` to its schema and returns
 `prepareTildeCall(options.tilde.context, settings, options.tilde.tools)` from its
 `prepareCall`. With `generateText`/`streamText`, call it directly:

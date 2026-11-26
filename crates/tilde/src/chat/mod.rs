@@ -21,6 +21,7 @@ mod ingress;
 pub mod providers;
 pub mod rpc;
 pub mod runtime;
+pub mod suspension;
 pub mod tools;
 pub mod warm;
 use crate::encryption::Encryption;

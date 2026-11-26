@@ -391,6 +391,14 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   applies the concurrency policy, and `interrupt` would cancel the work that made the call.
   `tools.result` reads it. A detached call abandoned by a crashed process is aborted after an
   hour.
+- Pending call: any server-executed tool call of a caller that can suspend its loop
+  (`InvokeToolRequest.suspendable`, set by the SDKs' framework adapters) that is still running
+  after the threshold (`TILDE_TOOL_PENDING_AFTER_MS`, a minute), or at its invocation's deadline,
+  answers `pending` (`InvokeToolResponse.pending`) and goes on in the background: its record is
+  marked detached so the invocation's end leaves it running, and its outcome is that record. The
+  adapter then suspends the run with the call pending (see Suspended run). Streamed-input calls,
+  background tools and sidecar invocations never answer pending; a caller that cannot suspend
+  waits as before.
 - Summary: a short label for a call, fixed on the tool-call record when the call starts
   (the agent's override, else the tool's own). Agent-local reports may supply their own.
 - Annotations and output schema: optional hints on a tool definition (read-only, destructive,
@@ -399,7 +407,9 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   `agents.list` (agents.read; each agent's ID, key and name), `agents.message` and `agents.wait`
   (agents.invoke: the target joins the thread if needed and runs with the message as its
   objective), `thread.participants` and `thread.search` (thread.read), `tools.result` (when the
-  agent has async tools), the skill tools (`skills::tools`: `skills.write` with skills.edit,
+  agent has async tools), `thread.wait_for_reply` (thread.read: answers pending at once, and its
+  output is the next message routed to the agent in the thread, which then starts no run of its
+  own; a caller that cannot suspend is refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
   `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
   agents.edit_skills; see Skills) and the wiki link tools (`wiki.link`, `wiki.unlink`; see
   Wikis). A tool acting on another agent takes its `agent_id` and checks the capability on it,
@@ -1217,6 +1227,21 @@ models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, 
 - Task: one agent's work item in one thread, optionally linked to a goal and existing dependencies.
 - Run: a durable objective that can wait across invocations.
 - Invocation: one active reasoning loop for an agent in a thread; stop ends only this loop.
+- Suspended run: a run whose invocation saved its framework state and ended so a later one
+  continues it (`chat::suspension`). The SDK adapter saves the conversation in its model's
+  message format with the tool calls it waits for (`SuspendRun`, `chat_run_checkpoints`, one per
+  run, opaque JSON like converted messages); the run moves to `suspending` and, when the
+  invocation ends, to `waiting` without handing its inputs on. Once none of those calls is
+  running and the agent runs nothing else in the thread, the worker resumes it (`ResumeRun`'s
+  path): the next invocation's wake has `resumes`, and `GetCheckpoint` returns the state and the
+  calls' records. A message that arrives meanwhile starts its own run as any message does; the
+  suspended run resumes after it. An invocation that ends without suspending drops the run's
+  checkpoint (a failed one keeps it, so ResumeRun continues from it).
+- Invocation deadline: Tilde, not the agent, owns the host's runtime limit. A Lambda or hosted
+  wake sets `chat_invocations.suspend_at` to Lambda's fifteen minutes less a two-minute margin;
+  at it the run moves to `suspending` (activity `invocation.suspend_requested`, `deadline`), the
+  control stream delivers a suspend command and calls in flight answer pending. Dial-in hosts
+  have no limit.
 - Steering input: a durable API event, scheduled into a fresh invocation according to the agent's concurrency policy.
 - Agent host: an SDK process that dials in to Tilde (`RunService.Watch`) with a deployment token, receives wakes as frames and opens outbound invocation control subscriptions. Tilde and its sidecars never call an agent.
 - Agent session: capability-scoped ConnectRPC callbacks to Tilde for message streaming and work tools.
@@ -1337,10 +1362,13 @@ in-memory change notifications on a sidecar, wake delivery. Input IDs deduplicat
 queue insertion, including retries after interruption. Control subscriptions are renewed with current tokens
 and the SDK aborts work after a prolonged loss of the control connection.
 
-SuspendInvocation transitions the run through `suspending`; the SDK checkpoint hook
-must quiesce and persist framework state before returning. Execution then exits into
-`waiting`. ResumeRun starts a new invocation and carries unconsumed input forward.
-Framework code restores its checkpoint using the stable conversation ID. Hosts expose
+SuspendInvocation (and an invocation's deadline) transitions the run through `suspending`; the
+control stream delivers the suspend command once and stays open, renewing the lease, until the
+invocation ends. A framework adapter that can suspend (see SDK framework adapters) brings its
+loop to its next step boundary and saves it with `SuspendRun`, or is suspended with its last
+boundary's state after a minute; without one, the SDK checkpoint hook persists framework state
+and the invocation ends at once. Execution then exits into `waiting`. ResumeRun starts a new
+invocation and carries unconsumed input forward; a saved checkpoint resumes by itself. Hosts expose
 no service: the inbound Invoke, Healthz, Steer, Cancel and Stop RPCs, per-host stop fences,
 synchronous pause receipt and redundant sidecar push jobs are removed. Dial-in hosts and
 Lambda handlers use the same SDK lifecycle.
@@ -1418,6 +1446,29 @@ model's tool-call ID to audited channel execution. TypeScript: `sdk-vercel-ai-no
 `sdk-langchain-node` (`@langchain/core` 1.x), `sdk-openai-agents-node` (`@openai/agents`) and
 `sdk-mastra-node` (`@mastra/core`, built on the Vercel adapter). Examples live in
 `sdk/ts/examples/*`.
+
+Suspension contract (core `AgentContext`, both SDKs): an adapter that can stop its loop at a
+step boundary and continue it from saved state calls `enableSuspension(snapshot)` /
+`enable_suspension(snapshot)` before the loop runs; from then on its Tilde tool calls are
+suspendable (a long one answers pending). At each step boundary (before every model call) it
+checks `shouldSuspend` / `should_suspend` (a call answered pending, or Tilde's deadline asked)
+and calls `suspend(state)` with the conversation in its framework's message format, pending
+answers included; the core adds the pending calls (model tool-call ID and Tilde's call ID) and
+ends the invocation as a stop. A loop that ends with calls pending is suspended with its last
+snapshot; one asked to suspend that reaches no boundary within a minute likewise. On the run's
+next invocation the core reads the checkpoint, and `resumed` holds the state and each pending
+call's outcome by the model's tool-call ID; at its first step boundary the adapter replaces
+the call's own messages with the saved ones, the outcomes in place of the pending answers, and
+continues. Agent code does not change. Per adapter: Vercel AI SDK, `prepareTildeCall`'s
+`prepareStep` (model messages, binary data as base64); Mastra, `tildeMastra`'s input processor
+(its message list, ended as a tripwire); LangChain, `tildeMiddleware`'s `beforeModel` (stored
+messages; restored through `RemoveMessage(REMOVE_ALL_MESSAGES)`); OpenAI Agents,
+`callModelInputFilter` (input items); Python LangChain `abefore_model`, OpenAI Agents
+`call_model_input_filter`, Pydantic AI `before_model_request` (`ModelMessagesTypeAdapter`;
+Pydantic AI keeps the hook's messages as the run's history). Agno has no per-step message hook
+and CrewAI runs its loop on worker threads with no hook that can replace its messages: neither
+suspends, so their tool calls block as before and a deadline ends the invocation (the run
+waits without a checkpoint).
 
 `sdk/py` is a uv workspace. `trytilde` (import `tilde`) is the Python core: generated Connect
 stubs (`connectrpc` + Google protobuf over `pyqwest` HTTP/2) under the proto package names,

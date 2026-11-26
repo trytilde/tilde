@@ -35,6 +35,14 @@ service ChatService {
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
   rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
   rpc SetRunStatus(SetRunStatusRequest) returns (SetRunStatusResponse);
+  // Saves the invocation's framework state (its conversation in the model's message format) and
+  // the tool calls it waits for, and suspends the run: the invocation then ends, and once every
+  // pending call has finished Tilde starts the run's next invocation (`InvokeRequest.resumes`),
+  // which reads them back with GetCheckpoint. Gateway invocations only.
+  rpc SuspendRun(SuspendRunRequest) returns (SuspendRunResponse);
+  // The state the run's previous invocation suspended with and the outcomes of the calls it
+  // waited for.
+  rpc GetCheckpoint(GetCheckpointRequest) returns (GetCheckpointResponse);
 }
 
 message GetThreadRequest {}
@@ -92,9 +100,18 @@ message InvokeToolRequest {
   string input_json = 4 [debug_redact = true];
   string chunk_json = 5 [debug_redact = true];
   bool finish = 6;
+  // Set on the first frame by a framework adapter that can suspend its loop. A call still running
+  // after the gateway's threshold (about a minute), or at the invocation's deadline, then answers
+  // `pending` and finishes in the background; its outcome is the next invocation's
+  // (GetCheckpoint) once the adapter suspended with it.
+  bool suspendable = 7;
 }
 
-message InvokeToolResponse { string output_json = 1 [debug_redact = true]; }
+message InvokeToolResponse {
+  string output_json = 1 [debug_redact = true];
+  // The call goes on in the background: suspend the loop (SuspendRun naming this call).
+  bool pending = 2;
+}
 
 message InvokeToolStreamResponse {
   oneof frame {
@@ -130,3 +147,19 @@ message UpdateTaskResponse { tilde.types.v1.Task task = 1; }
 message SetRunStatusRequest { string status = 1; }
 
 message SetRunStatusResponse {}
+
+message SuspendRunRequest {
+  string state_json = 1 [debug_redact = true];
+  // Tool call IDs (as Tilde records them) whose outcomes the run waits for; none resumes at once.
+  repeated string pending_call_ids = 2;
+}
+
+message SuspendRunResponse {}
+
+message GetCheckpointRequest {}
+
+message GetCheckpointResponse {
+  string state_json = 1 [debug_redact = true];
+  // The pending calls' records: completed with their output, or failed or aborted with an error.
+  repeated tilde.types.v1.ToolCall results = 2;
+}

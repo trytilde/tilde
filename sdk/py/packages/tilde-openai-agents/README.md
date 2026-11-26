@@ -146,3 +146,11 @@ the model's call id. `FunctionTool` has no free metadata, so summaries come from
 `@function_tool` turns an exception into an error string for the model by default, so such a
 failure is audited as completed with that text; `failure_error_function=None` audits it as
 failed (and fails the run).
+
+## Suspend and resume
+
+A Tilde tool call still running after about a minute answers pending instead of blocking.
+Before the next model call `tilde_openai_agents`'s `call_model_input_filter` suspends the run: the run's input items are saved and the invocation ends. When
+the call finishes Tilde starts the run's next invocation, which continues from the saved
+conversation with the call's outcome in place of the pending answer. Tilde's deadline (two
+minutes before Lambda's fifteen) suspends the same way. Agent code does not change.

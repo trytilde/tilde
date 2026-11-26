@@ -7,6 +7,7 @@ import {
   type ToolSet,
 } from "ai";
 import { convertToAiSdkTools, invocationTools, type ConvertToAiSdkToolsOptions } from "./tools.js";
+import { restore, toJson } from "./suspension.js";
 
 /** Options for the channel's tools, plus the agent's bundled tools (`defineTools`). */
 export type TildeToolsOptions = ConvertToAiSdkToolsOptions & { bundled?: BundledTools<ToolSet> };
@@ -33,20 +34,41 @@ function withSummary(instructions: Instructions | undefined, summary: string) {
 }
 
 /**
- * Before every step, hand steering input sent while the agent works to the model as user
- * messages. The AI SDK rebuilds each step's messages from the call's messages and the
- * responses so far, so inputs already handed over are re-inserted where they arrived.
+ * Before every step: continue a suspended run, hand steering input to the model and suspend when
+ * Tilde asks. The AI SDK rebuilds each step's messages from the call's messages and the responses
+ * so far, so every step re-applies what earlier ones changed:
+ *
+ * - Resumed (`ctx.resumed`): the saved conversation replaces the call's own messages, with each
+ *   pending tool result replaced by the call's outcome (see `./suspension.ts`).
+ * - Steering sent while the agent works becomes user messages where it arrived.
+ * - Suspension: a Tilde tool call that answered pending, or Tilde's deadline, saves the
+ *   conversation so far (`ctx.suspend`) and ends the invocation; the run resumes with the
+ *   outcome in a new invocation.
  */
-function steer(ctx: AgentContext, inner?: PrepareStepFunction<any>): PrepareStepFunction<any> {
+function invocationStep(
+  ctx: AgentContext,
+  inner?: PrepareStepFunction<any>,
+): PrepareStepFunction<any> {
   const steering: { at: number; message: ModelMessage }[] = [];
+  let initial: number | undefined;
+  let restored: ModelMessage[] | undefined;
+  let latest: ModelMessage[] = [];
+  ctx.enableSuspension?.(() => toJson(latest));
   return async (step) => {
+    if (initial === undefined) {
+      initial = step.messages.length;
+      if (ctx.resumed) restored = restore(ctx.resumed);
+    }
+    const own = restored ? [...restored, ...step.messages.slice(initial)] : step.messages;
     for (const input of ctx.takeInputs())
-      steering.push({ at: step.messages.length, message: { role: "user", content: input.text } });
-    if (!steering.length) return inner?.(step);
-    const messages = [...step.messages];
+      steering.push({ at: own.length, message: { role: "user", content: input.text } });
+    const messages = [...own];
     steering.forEach((input, i) => messages.splice(input.at + i, 0, input.message));
-    const own = await inner?.({ ...step, messages });
-    return { ...own, messages: own?.messages ?? messages };
+    latest = messages;
+    if (ctx.shouldSuspend) await ctx.suspend(toJson(messages));
+    if (!restored && !steering.length) return inner?.(step);
+    const result = await inner?.({ ...step, messages });
+    return { ...result, messages: result?.messages ?? messages };
   };
 }
 
@@ -55,8 +77,9 @@ function steer(ctx: AgentContext, inner?: PrepareStepFunction<any>): PrepareStep
  * agent's other Tilde tools (`ctx.agentTools`), its bundled tools (`tools.bundled`, audited and
  * published as `withTildeTools` does), the agent's Tilde skills (the AI SDK has no native skills: `list_skills`/`read_skill` tools and
  * `ctx.skills.summary()` appended to `instructions`, or `system` for `generateText`), and a
- * `prepareStep` that hands steering input to the model at every step (wrapping the settings'
- * own). ToolLoopAgent instructions are static text the gateway matches, so nothing is stamped.
+ * `prepareStep` (wrapping the settings' own) that hands steering input to the model at every
+ * step, suspends the loop when a Tilde tool call is still running after about a minute or Tilde's
+ * deadline comes, and continues a resumed run from its saved conversation. ToolLoopAgent instructions are static text the gateway matches, so nothing is stamped.
  *
  * `tildeCallOptions` calls this from a `ToolLoopAgent`'s `prepareCall`; call it yourself for
  * `generateText`/`streamText`:
@@ -79,7 +102,7 @@ export async function prepareTildeCall<S extends object>(
       ...(summary ? convertToAiSdkTools(ctx.skills.tools()) : {}),
     },
     [key]: withSummary(own[key], summary),
-    prepareStep: steer(ctx, own.prepareStep),
+    prepareStep: invocationStep(ctx, own.prepareStep),
   };
 }
 

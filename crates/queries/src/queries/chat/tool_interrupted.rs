@@ -147,7 +147,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) AND (NOT t.detached OR t.updated_at < NOW() - INTERVAL '1 hour') ORDER BY t.thread_id,t.id LIMIT 100",
+        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) AND (NOT t.detached OR (t.updated_at < NOW() - INTERVAL '1 hour' AND t.name <> 'thread.wait_for_reply')) ORDER BY t.thread_id,t.id LIMIT 100",
         None,
     )
 }

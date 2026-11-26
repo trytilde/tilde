@@ -136,3 +136,10 @@ tool's own hooks; the entrypoint is untouched, so Agno's argument injection keep
 has no free metadata or output schema, so summaries come from `options`. Run with `arun`: the
 audit hooks are async. Agno swallows hook errors, so a failed audit never fails the call, and
 toolkit-level instructions are not carried over.
+
+## Suspend and resume
+
+Not supported: Agno has no hook before each model call that could save and replace the conversation (steering already waits for a tool call). So this adapter never suspends: its Tilde tool calls block until they
+finish, as before, and when Tilde's deadline asks the invocation to suspend it ends (the run
+waits without saved state; the conversation's messages stay in Tilde). The other adapters
+suspend at a step boundary and continue in a new invocation; see `trytilde`'s README.

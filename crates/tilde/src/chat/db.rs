@@ -1512,3 +1512,105 @@ pub async fn user_get_opt(db: &impl GenericClient, p1: uuid::Uuid) -> DbResult<O
         .opt()
         .await?)
 }
+
+pub async fn checkpoint_save_execute(
+    db: &impl GenericClient,
+    run: uuid::Uuid,
+    invocation: uuid::Uuid,
+    state_json: &str,
+    pending_call_ids: &[uuid::Uuid],
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::checkpoint_save::run()
+        .bind(db, &run, &invocation, &state_json, &pending_call_ids)
+        .await?)
+}
+
+pub use tilde_queries::queries::chat::checkpoint_get::Record as CheckpointRow;
+
+pub async fn checkpoint_get_opt(
+    db: &impl GenericClient,
+    run: uuid::Uuid,
+) -> DbResult<Option<CheckpointRow>> {
+    Ok(tilde_queries::queries::chat::checkpoint_get::run()
+        .bind(db, &run)
+        .opt()
+        .await?)
+}
+
+pub async fn checkpoint_clear_execute(db: &impl GenericClient, run: uuid::Uuid) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::checkpoint_clear::run()
+        .bind(db, &run)
+        .await?)
+}
+
+pub use tilde_queries::queries::chat::checkpoint_results::Record as CheckpointResultRow;
+
+pub async fn checkpoint_results_all(
+    db: &impl GenericClient,
+    calls: &[uuid::Uuid],
+    thread: uuid::Uuid,
+) -> DbResult<Vec<CheckpointResultRow>> {
+    Ok(tilde_queries::queries::chat::checkpoint_results::run()
+        .bind(db, &calls, &thread)
+        .all()
+        .await?)
+}
+
+pub async fn runs_resumable_all(db: &impl GenericClient) -> DbResult<Vec<uuid::Uuid>> {
+    Ok(tilde_queries::queries::chat::runs_resumable::run()
+        .bind(db)
+        .all()
+        .await?
+        .into_iter()
+        .map(|row| row.run_id)
+        .collect())
+}
+
+pub async fn invocation_deadline_execute(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+    suspend_at: chrono::DateTime<chrono::Utc>,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::invocation_deadline::run()
+        .bind(db, &suspend_at, &invocation)
+        .await?)
+}
+
+pub async fn invocation_suspend_at_opt(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<Option<chrono::DateTime<chrono::Utc>>> {
+    Ok(tilde_queries::queries::chat::invocation_suspend_at::run()
+        .bind(db, &invocation)
+        .opt()
+        .await?
+        .and_then(|row| row.suspend_at))
+}
+
+pub use tilde_queries::queries::chat::runs_suspend_due::Record as SuspendDueRow;
+
+pub async fn runs_suspend_due_all(db: &impl GenericClient) -> DbResult<Vec<SuspendDueRow>> {
+    Ok(tilde_queries::queries::chat::runs_suspend_due::run()
+        .bind(db)
+        .all()
+        .await?)
+}
+
+pub async fn tool_detach_execute(db: &impl GenericClient, call: uuid::Uuid) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::tool_detach::run()
+        .bind(db, &call)
+        .await?)
+}
+
+pub use tilde_queries::queries::chat::reply_wait::Record as ReplyWaitRow;
+
+pub async fn reply_wait_opt(
+    db: &impl GenericClient,
+    thread: uuid::Uuid,
+    agent: uuid::Uuid,
+) -> DbResult<Option<ReplyWaitRow>> {
+    Ok(tilde_queries::queries::chat::reply_wait::run()
+        .bind(db, &thread, &agent)
+        .opt()
+        .await?)
+}
