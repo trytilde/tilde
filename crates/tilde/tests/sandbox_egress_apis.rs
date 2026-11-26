@@ -356,7 +356,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                 ("secret_access_key", AWS_SECRET),
                 ("region", "us-east-1"),
             ],
-            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway", "s3", "lambda", "cognito-idp", "eks", "monitoring"], "regions": ["us-east-1"]}),
+            json!({"services": ["logs", "sts", "ssm", "s3", "lambda", "monitoring"], "regions": ["us-east-1"]}),
         ),
     ];
     let secrets: Vec<&str> = grants
@@ -390,6 +390,12 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                     .await
                     .unwrap_or_else(|e| panic!("{slug}: {e:?}"));
             }
+            // A grant names supported services only.
+            let aws = connection(&fx, "aws", "iam", &[("access_key_id", AWS_KEY), ("secret_access_key", AWS_SECRET)]).await;
+            let refused = sandboxes
+                .set_egress(blueprint.id, "aws_glue", aws, &json!({"services": ["glue"]}), true)
+                .await;
+            assert!(refused.is_err(), "a grant on an unsupported service was saved");
             let pg = fx.db.pool.get().await.unwrap();
             let hash = <sha2::Sha256 as sha2::Digest>::digest(enrollment.as_bytes());
             pg.execute(
@@ -1110,13 +1116,32 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             no,
             vec![],
         ),
+        // Fifth review: only supported services, each read in its own protocol.
+        (
+            "aws",
+            Method::GET,
+            "/?Action=TerminateEnvironment&EnvironmentName=prod",
+            None,
+            Present::Sigv4("us-east-1", "elasticbeanstalk"),
+            no,
+            vec![],
+        ),
         (
             "aws",
             Method::POST,
-            "/#AWSGlue.GetConnection",
-            Some(r#"{"Name":"warehouse","HidePassword":true}"#.into()),
-            Present::Sigv4("us-east-1", "glue"),
-            ok,
+            "/v1/logs?Action=GetLogEvents",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "logs"),
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::GET,
+            "/reports/2026.csv?Action=ListBuckets",
+            None,
+            Present::Sigv4("us-east-1", "s3"),
+            no,
             vec![],
         ),
         (
@@ -1345,8 +1370,8 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
         ),
         (
             "GET",
-            "apigateway",
-            "/sandboxes/egress/aws/usageplans/u1/x/../keys",
+            "lambda",
+            "/sandboxes/egress/aws/2015-03-31/functions/f/x/../configuration",
         ),
         ("GET", "s3", "/sandboxes/egress/aws/reports/./2026.csv"),
     ] {

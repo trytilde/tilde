@@ -404,8 +404,9 @@ function EgressForm({
         {chosen?.providerId === "aws" && (
           <Warning>
             The gateway signs each request with this connection's AWS credentials: its IAM policy is
-            the ceiling, and the grant narrows it to services, regions and reads. Point the AWS CLI
-            or an SDK at the route with <code>AWS_ENDPOINT_URL</code>; sandboxes get it set.
+            the ceiling, and the grant narrows it to the supported services it names (CloudWatch,
+            ECS, EC2, RDS, S3, Lambda and a few more), regions and reads. Point the AWS CLI or an
+            SDK at the route with <code>AWS_ENDPOINT_URL</code>; sandboxes get it set.
           </Warning>
         )}
         {schema && (

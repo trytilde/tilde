@@ -1,29 +1,33 @@
-//! AWS egress: a sandbox's AWS SDK or CLI calls any AWS API through the route, and the gateway
-//! signs each request with the connection's credentials (its access keys, its web identity
-//! role's session, or the role it lists in the grant's account), which never enter the sandbox.
+//! AWS egress: a sandbox's AWS SDK or CLI calls the supported AWS APIs through the route, and
+//! the gateway signs each request with the connection's credentials (its access keys, its web
+//! identity role's session, or the role it lists in the grant's account), which never enter the
+//! sandbox.
 //!
 //! The sandbox's client is pointed at the route (`AWS_ENDPOINT_URL`) and signs with the egress
 //! token as its access key ID and any secret: the gateway reads the token, and the service and
 //! region the client signed for, from that signature's credential scope, and does not check the
 //! signature itself. The request goes to that service's regional endpoint
-//! (`https://<service>.<region>.amazonaws.com`, a global service's own host), re-signed. The
-//! service is the SigV4 signing name: `logs` (CloudWatch Logs), `monitoring` (CloudWatch
-//! metrics), `s3`, `lambda`.
+//! (`https://<service>.<region>.amazonaws.com`), re-signed.
 //!
-//! A grant names the services and regions it reaches and whether it is read-only (the default).
-//! An RPC service's request reads when its action is named Get, List, Describe, Filter, Search,
-//! Lookup, BatchGet, Query or Scan followed by a word, or exactly StartQuery or StopQuery
-//! (`reads`); the action is read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2
-//! path, every one the request carries must agree, a write naming none is refused, and the
-//! request carries one `X-Amz-Target`, one content type and an unencoded body, so the check reads
-//! what AWS reads. Only the services in `RPC` are read that way; every other is treated as REST,
-//! whose action names are ignored, so only its GET and HEAD read (X-Ray's reads are POSTs: a
-//! read-only grant cannot read it). The path is checked as AWS receives it: empty, `.` and `..`
-//! segments, encoded or not, are refused. Whatever the grant, the actions `returns_credentials`
-//! lists, API Gateway key values, AppSync API keys, Location Service keys and Glue connections
-//! without `HidePassword` are refused. Other stored secrets a read can return (a Lambda
-//! function's environment, an object in S3) are the role's IAM policy's to guard: it stays the
-//! ceiling.
+//! Only the services in `SERVICES` are supported, each with the protocol its requests name their
+//! action in; a grant may name no other (its schema's enum) and a request for any other is
+//! refused. More are added deliberately, after checking what their reads return.
+//! - RPC services: the path is `/` (or exactly `/service/<name>/operation/<action>` for RPC v2)
+//!   and the action is read only where the service's protocol carries it (`X-Amz-Target` for
+//!   JSON, `Action` in the query or a form body for Query, the path for RPC v2); one carried
+//!   anywhere else, none at all, or several that disagree are refused, and the request carries
+//!   one target, one content type and an unencoded body, so the check reads what AWS reads.
+//!   Under a read-only grant (the default) the action must be named Get, List, Describe, Filter,
+//!   Search, Lookup, BatchGet, Query or Scan followed by a word, or exactly StartQuery or
+//!   StopQuery (`reads`).
+//! - REST services (S3, Lambda): a request naming an action anywhere is refused; only GET and
+//!   HEAD read.
+//!
+//! Paths are checked as AWS receives them: empty, `.` and `..` segments, encoded or not, are
+//! refused. Whatever the grant, the actions `returns_credentials` lists are refused (STS but
+//! GetCallerIdentity, SSM parameter reads, names with Token, Credential, SecretValue, AccessKey,
+//! Password or ApiKey). Other stored secrets a read returns (a Lambda function's environment, an
+//! object in S3) are the role's IAM policy's to guard: it stays the ceiling.
 use crate::chat::providers::Access;
 use crate::connections::egress::{
     Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, forge::strings,
@@ -68,11 +72,11 @@ fn definition() -> Egress {
                 "services": {
                     "type": "array",
                     "title": "Services",
-                    "items": {"type": "string", "pattern": "^[a-z0-9-]{2,40}$"},
+                    "items": {"type": "string", "enum": SERVICES.iter().map(|(name, _)| *name).collect::<Vec<_>>()},
                     "minItems": 1,
                     "uniqueItems": true,
                     "default": ["logs", "monitoring"],
-                    "description": "SigV4 signing names: logs (CloudWatch Logs), monitoring (CloudWatch metrics), s3, lambda... X-Ray reads are POSTs, so a read-only grant cannot read X-Ray"
+                    "description": "SigV4 signing names of the supported services: logs (CloudWatch Logs), monitoring (CloudWatch metrics), ecs, ec2, rds, cloudtrail, dynamodb, sqs, sns, cloudformation, elasticloadbalancing, autoscaling, sts (GetCallerIdentity), ssm (no parameter reads), s3, lambda"
                 },
                 "regions": {
                     "type": "array",
@@ -118,87 +122,114 @@ fn reads(action: &str) -> bool {
         })
 }
 
-/// Signing names of services whose APIs are RPC (Query, JSON or RPC v2 protocols: the action is
-/// named in the request). Every other service is treated as REST: its method and path are the
-/// operation, action names are ignored, and only GET and HEAD read.
-const RPC: &[&str] = &[
-    "athena",
-    "autoscaling",
-    "ce",
-    "cloudformation",
-    "cloudtrail",
-    "codebuild",
-    "cognito-idp",
-    "dynamodb",
-    "ec2",
-    "ecr",
-    "ecs",
-    "elasticache",
-    "elasticloadbalancing",
-    "events",
-    "firehose",
-    "glue",
-    "iam",
-    "kinesis",
-    "kms",
-    "lightsail",
-    "logs",
-    "monitoring",
-    "rds",
-    "redshift",
-    "sagemaker",
-    "secretsmanager",
-    "sns",
-    "sqs",
-    "ssm",
-    "states",
-    "sts",
+/// Where a service's requests name their action.
+#[derive(Clone, Copy)]
+struct Protocol {
+    /// JSON: `X-Amz-Target: Logs_20140328.FilterLogEvents`.
+    target: bool,
+    /// Query: `Action=` in the query or a form body.
+    query: bool,
+    /// RPC v2: `/service/<name>/operation/<action>`.
+    path: bool,
+}
+const JSON: Option<Protocol> = Some(Protocol {
+    target: true,
+    query: false,
+    path: false,
+});
+const QUERY: Option<Protocol> = Some(Protocol {
+    target: false,
+    query: true,
+    path: false,
+});
+
+/// The supported services by signing name, with their protocol (`None`: REST, whose method and
+/// path are the operation). CloudWatch takes Query, JSON and RPC v2; SQS JSON and Query.
+const SERVICES: &[(&str, Option<Protocol>)] = &[
+    ("logs", JSON),
+    (
+        "monitoring",
+        Some(Protocol {
+            target: true,
+            query: true,
+            path: true,
+        }),
+    ),
+    ("ecs", JSON),
+    ("ec2", QUERY),
+    ("rds", QUERY),
+    ("cloudtrail", JSON),
+    ("dynamodb", JSON),
+    (
+        "sqs",
+        Some(Protocol {
+            target: true,
+            query: true,
+            path: false,
+        }),
+    ),
+    ("sns", QUERY),
+    ("cloudformation", QUERY),
+    ("elasticloadbalancing", QUERY),
+    ("autoscaling", QUERY),
+    ("sts", QUERY),
+    ("ssm", JSON),
+    ("s3", None),
+    ("lambda", None),
 ];
 
-/// Every API action a request could be read as naming: `X-Amz-Target` (JSON,
-/// `Logs_20140328.FilterLogEvents`), an RPC v2 path (`/service/<name>/operation/<action>`), and
-/// `Action` in the query or a form body (Query). A service reads only its own protocol's, so all
-/// are checked and they must agree: a read in one place cannot carry a write in another. REST
-/// APIs name none.
-fn actions(path: &str, query: Option<&str>, headers: &http::HeaderMap, body: &[u8]) -> Vec<String> {
-    let mut actions = vec![];
-    if let Some(target) = headers.get("x-amz-target").and_then(|v| v.to_str().ok()) {
-        actions.push(target.rsplit('.').next().unwrap_or(target).to_owned());
-    }
+/// The action names a request carries, by where: `X-Amz-Target`, an RPC v2 path, and `Action`
+/// in the query or a form body (the content type read case-insensitively).
+struct Named {
+    target: Vec<String>,
+    path: Vec<String>,
+    query: Vec<String>,
+}
+fn named(path: &str, query: Option<&str>, headers: &http::HeaderMap, body: &[u8]) -> Named {
+    let target = headers
+        .get_all("x-amz-target")
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .map(|t| t.rsplit('.').next().unwrap_or(t).to_owned())
+        .collect();
     let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
-    if let ["service", _, "operation", action] = segments[..] {
-        actions.push(action.to_owned());
-    }
-    let named = |pairs: &[u8]| {
+    let path = match segments[..] {
+        ["service", _, "operation", action] => vec![action.to_owned()],
+        _ => vec![],
+    };
+    let actions = |pairs: &[u8]| {
         url::form_urlencoded::parse(pairs)
             .filter(|(k, _)| k.eq_ignore_ascii_case("action"))
             .map(|(_, v)| v.into_owned())
             .collect::<Vec<_>>()
     };
-    actions.extend(named(query.unwrap_or_default().as_bytes()));
+    let mut query = actions(query.unwrap_or_default().as_bytes());
     let form = headers
-        .get(http::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| {
+        .get_all(http::header::CONTENT_TYPE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .any(|v| {
             v.trim()
                 .to_ascii_lowercase()
                 .starts_with("application/x-www-form-urlencoded")
         });
     if form {
-        actions.extend(named(body));
+        query.extend(actions(body));
     }
-    actions
+    Named {
+        target,
+        path,
+        query,
+    }
 }
 
 /// Actions whose answers carry credentials or stored secrets, refused under any grant: STS
-/// other than GetCallerIdentity, names with `Token`, `Credential`, `SecretValue`, `AccessKey`,
-/// `Password` (EC2 password data, database master passwords) or `ApiKey`, SSM parameter reads
-/// (decrypted SecureStrings), Lightsail access details, Location Service key values
-/// (`geo:DescribeKey`) and Cognito app client secrets (`cognito-idp:DescribeUserPoolClient`). Other stored secrets (a Lambda function's
-/// environment, say) are the role's IAM policy's to guard.
+/// other than GetCallerIdentity, SSM parameter reads (decrypted SecureStrings), and names with
+/// `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` (EC2 password data, database
+/// master passwords) or `ApiKey`.
 fn returns_credentials(service: &str, action: &str) -> bool {
-    let named = |names: &[&str]| names.contains(&action);
     (service == "sts" && action != "GetCallerIdentity")
+        || (service == "ssm" && action.starts_with("GetParameter"))
         || [
             "Token",
             "Credential",
@@ -209,29 +240,16 @@ fn returns_credentials(service: &str, action: &str) -> bool {
         ]
         .iter()
         .any(|word| action.contains(word))
-        || (service == "ssm"
-            && named(&[
-                "GetParameter",
-                "GetParameters",
-                "GetParametersByPath",
-                "GetParameterHistory",
-            ]))
-        || (service == "lightsail" && action.contains("AccessDetails"))
-        || (service == "geo" && action == "DescribeKey")
-        || (service == "cognito-idp" && action == "DescribeUserPoolClient")
 }
 
-/// The endpoint of `service` in `region`: regional, except for global services.
+/// The endpoint of `service` in `region` (every supported service is regional).
 fn endpoint(service: &str, region: &str) -> String {
     let suffix = if region.starts_with("cn-") {
         "amazonaws.com.cn"
     } else {
         "amazonaws.com"
     };
-    match service {
-        "iam" | "cloudfront" | "route53" | "organizations" => format!("https://{service}.{suffix}"),
-        _ => format!("https://{service}.{region}.{suffix}"),
-    }
+    format!("https://{service}.{region}.{suffix}")
 }
 
 /// A region code (`us-east-1`, `us-gov-west-1`): it chooses the host the request goes to.
@@ -289,6 +307,9 @@ impl EgressHook for Aws {
         else {
             return Decision::deny("AWS is reached over HTTP");
         };
+        let Some(&(_, protocol)) = SERVICES.iter().find(|(name, _)| *name == service) else {
+            return Decision::deny(format!("The {service} service is not supported"));
+        };
         if !strings(config.get("services")).contains(&service) {
             return Decision::deny(format!("The {service} service is not granted"));
         }
@@ -300,96 +321,73 @@ impl EgressHook for Aws {
         if crate::connections::egress::rules::matches("* /**", method, path).is_none() {
             return Decision::deny("The path has empty, dot or encoded-slash segments");
         }
-        let rest = !RPC.contains(&service);
-        // An RPC request is read as AWS reads it: one target, one content type, an identity body.
-        if !rest {
-            for name in ["x-amz-target", "content-type", "content-encoding"] {
-                if headers.get_all(name).iter().count() > 1 {
-                    return Decision::deny(format!("More than one {name}"));
-                }
-            }
-            if headers
-                .get(http::header::CONTENT_ENCODING)
-                .is_some_and(|v| !v.as_bytes().eq_ignore_ascii_case(b"identity"))
-            {
-                return Decision::deny("Encoded request bodies are not checked");
-            }
-        }
-        // A REST service ignores action names: its method and path are the operation, so only
-        // the method says whether it reads.
-        let actions = if rest {
-            vec![]
-        } else {
-            actions(path, *query, headers, body)
-        };
-        if actions.iter().any(|a| *a != actions[0]) {
-            return Decision::deny(format!(
-                "The request names more than one action: {}",
-                actions.join(", ")
-            ));
-        }
-        // API Gateway returns API key values when asked to (`includeValue(s)=true`) and with a
-        // usage plan's keys.
-        if service == "apigateway"
-            && (url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
-                .any(|(k, v)| k.starts_with("includeValue") && v.eq_ignore_ascii_case("true"))
-                || crate::connections::egress::rules::matches(
-                    "* /usageplans/*/keys/**",
-                    method,
-                    path,
-                )
-                .is_some())
-        {
-            return Decision::deny("API Gateway key values are not readable");
-        }
-        if service == "geo"
-            && crate::connections::egress::rules::matches("* /metadata/v0/keys/**", method, path)
-                .is_some()
-        {
-            return Decision::deny("Location Service key values are not readable");
-        }
-        if service == "appsync"
-            && crate::connections::egress::rules::matches("* /v1/apis/*/apikeys/**", method, path)
-                .is_some()
-        {
-            return Decision::deny("AppSync API keys are not readable");
-        }
-        // Glue connections carry their passwords unless asked not to.
-        if service == "glue"
-            && actions
-                .first()
-                .is_some_and(|a| a == "GetConnection" || a == "GetConnections")
-            && serde_json::from_slice::<Value>(body)
-                .ok()
-                .and_then(|b| b.get("HidePassword")?.as_bool())
-                != Some(true)
-        {
-            return Decision::deny("Glue connections are readable with HidePassword only");
-        }
-        if let Some(action) = actions.first()
-            && returns_credentials(service, action)
-        {
-            return Decision::deny(format!("{service}:{action} returns credentials"));
-        }
+        let named = named(path, *query, headers, body);
         let get = method.eq_ignore_ascii_case("GET") || method.eq_ignore_ascii_case("HEAD");
-        if actions.is_empty() && !rest && !get {
-            return Decision::deny(format!("The {service} request names no action"));
-        }
         let read_only = config
             .get("read_only")
             .and_then(Value::as_bool)
             .unwrap_or(true);
-        let reads = match actions.first() {
-            Some(action) => reads(action),
-            None => get,
+        let Some(protocol) = protocol else {
+            // REST: the method and path are the operation; an action named anywhere is refused.
+            if !(named.target.is_empty() && named.path.is_empty() && named.query.is_empty()) {
+                return Decision::deny(format!("{service} requests name no action"));
+            }
+            if read_only && !get {
+                return Decision::deny(format!(
+                    "{service}: {method} {path} is not a read; the grant is read-only"
+                ));
+            }
+            return Decision::Allow;
         };
-        if read_only && !reads {
-            let what = actions
-                .first()
-                .cloned()
-                .unwrap_or_else(|| format!("{method} {path}"));
+        // RPC: read as AWS reads it, from the root (or an RPC v2 operation path), one target, one
+        // content type, an unencoded body, the action where the protocol carries it.
+        if !path.trim_end_matches('/').is_empty() && named.path.is_empty() {
+            return Decision::deny(format!("{service} requests go to /"));
+        }
+        for name in ["x-amz-target", "content-type", "content-encoding"] {
+            if headers.get_all(name).iter().count() > 1 {
+                return Decision::deny(format!("More than one {name}"));
+            }
+        }
+        if headers
+            .get(http::header::CONTENT_ENCODING)
+            .is_some_and(|v| !v.as_bytes().eq_ignore_ascii_case(b"identity"))
+        {
+            return Decision::deny("Encoded request bodies are not checked");
+        }
+        let misplaced = (!protocol.target && !named.target.is_empty())
+            || (!protocol.query && !named.query.is_empty())
+            || (!protocol.path && !named.path.is_empty());
+        if misplaced {
             return Decision::deny(format!(
-                "{service}:{what} is not a read; the grant is read-only"
+                "The request names its action where {service} does not read it"
+            ));
+        }
+        let actions: Vec<&String> = named
+            .target
+            .iter()
+            .chain(&named.path)
+            .chain(&named.query)
+            .collect();
+        let Some(action) = actions.first() else {
+            return Decision::deny(format!("The {service} request names no action"));
+        };
+        if actions.iter().any(|a| a != action) {
+            return Decision::deny(format!(
+                "The request names more than one action: {}",
+                actions
+                    .iter()
+                    .map(|a| a.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        if actions.iter().any(|a| returns_credentials(service, a)) {
+            return Decision::deny(format!("{service}:{action} returns credentials"));
+        }
+        if read_only && !reads(action) {
+            return Decision::deny(format!(
+                "{service}:{action} is not a read; the grant is read-only"
             ));
         }
         Decision::Allow

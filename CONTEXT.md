@@ -667,22 +667,23 @@ templates and filters name paths of a signal's context: its data below plus
 - AWS egress (`catalog::aws::egress`): the sandbox's SDK or CLI points `AWS_ENDPOINT_URL` at the
   route and signs with the egress token as its access key ID (any secret). The gateway reads the
   token, and the region and service from that signature's scope (the client's signature is not
-  checked), sends the request to `https://<service>.<region>.amazonaws.com` (a global service's
-  own host), and signs it again with the connection's credentials in the grant's `account` (its
-  own by default, else a role it lists). A grant names `services` (signing names, default `logs`
-  and `monitoring`), `regions` (empty: any) and `read_only` (default on: actions named Get, List,
-  Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by a word, or exactly
-  StartQuery or StopQuery, for the RPC services listed in `RPC`; any other service is treated as
-  REST, whose action names are ignored, so only its GET and HEAD read, and X-Ray, whose reads
-  are POSTs, cannot be read read-only). The path is checked as AWS receives it: empty, `.` and
-  `..` segments, encoded or not, are refused. Every action an RPC request names (`X-Amz-Target`, an RPC v2 path, the Query protocol's `Action` in the query or a
-  form body) must agree, a write naming none is refused, and it carries one target, one content
-  type and an unencoded body. Under any grant: STS other than GetCallerIdentity, names with
-  `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` or `ApiKey`, SSM parameter
-  reads, Lightsail access details, `geo:DescribeKey`, `cognito-idp:DescribeUserPoolClient`, API
-  Gateway key values, AppSync API keys, Location Service keys and Glue connections without
-  `HidePassword` are refused. Other stored secrets a read returns (a Lambda function's
-  environment, an S3 object) are the role's IAM policy's to guard.
+  checked), sends the request to `https://<service>.<region>.amazonaws.com`, and signs it again
+  with the connection's credentials in the grant's `account` (its own by default, else a role it
+  lists). Only vetted services are supported, each with its protocol (`SERVICES`): RPC `logs`,
+  `monitoring`, `ecs`, `ec2`, `rds`, `cloudtrail`, `dynamodb`, `sqs`, `sns`, `cloudformation`,
+  `elasticloadbalancing`, `autoscaling`, `sts`, `ssm`, and REST `s3` and `lambda`; a grant's
+  `services` is an enum of them (default `logs` and `monitoring`) and a request for any other is
+  refused. A grant also names `regions` (empty: any) and `read_only` (default on). An RPC
+  request goes to `/` (or exactly `/service/<name>/operation/<action>` for RPC v2), names its
+  action only where its service's protocol carries it (`X-Amz-Target`, `Action` in the query or
+  a form body, the RPC v2 path), once or agreeing, with one target, one content type and an
+  unencoded body; read-only, the action is named Get, List, Describe, Filter, Search, Lookup,
+  BatchGet, Query or Scan followed by a word, or exactly StartQuery or StopQuery. A REST request
+  names no action anywhere; read-only, it is a GET or HEAD. Paths with empty, `.` or `..`
+  segments, encoded or not, are refused. Under any grant: STS other than GetCallerIdentity, SSM
+  parameter reads and names with `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` or
+  `ApiKey` are refused. Other stored secrets a read returns (a Lambda function's environment, an
+  S3 object) are the role's IAM policy's to guard.
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
   enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process
