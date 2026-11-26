@@ -133,6 +133,19 @@ fn verifies(
     scope[0] == AWS_KEY && request.headers()["authorization"].to_str().unwrap() == authorization
 }
 
+/// The status of a request written as is, path unresolved.
+async fn raw(host: &str, method: &str, path: &str, authorization: &str) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(host).await.unwrap();
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nhost: {host}\r\nauthorization: {authorization}\r\ncontent-type: application/x-amz-json-1.0\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{{}}"
+    );
+    stream.write_all(request.as_bytes()).await.unwrap();
+    let mut response = vec![];
+    stream.read_to_end(&mut response).await.unwrap();
+    String::from_utf8_lossy(&response)[9..12].parse().unwrap()
+}
+
 /// A ready connection holding `values`.
 async fn connection(fx: &Fixture, provider: &str, typ: &str, values: &[(&str, &str)]) -> Uuid {
     let id = Uuid::new_v4();
@@ -343,7 +356,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                 ("secret_access_key", AWS_SECRET),
                 ("region", "us-east-1"),
             ],
-            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway", "s3", "lambda", "cognito-idp"], "regions": ["us-east-1"]}),
+            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway", "s3", "lambda", "cognito-idp", "eks", "monitoring"], "regions": ["us-east-1"]}),
         ),
     ];
     let secrets: Vec<&str> = grants
@@ -894,8 +907,45 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             "/api/v2/runs/run-1?fields%5Brun%5D=status,message",
             None,
             Present::Bearer,
-            ok,
-            vec![("authorization", "Bearer tf_fixture".into())],
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1/runs",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        // Fourth review: `;` separates parameters too; unknown services are REST.
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1?a=1;include=outputs",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "pagerduty",
+            Method::GET,
+            "/services?a=1;include%5B%5D=integrations",
+            None,
+            Present::PagerDuty,
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::DELETE,
+            "/clusters/prod?Action=ListClusters",
+            None,
+            Present::Sigv4("us-east-1", "eks"),
+            no,
+            vec![],
         ),
         (
             "terraform",
@@ -1281,6 +1331,32 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             upstream.seen.lock().unwrap().len(),
             before,
             "{service} {path} reached upstream"
+        );
+    }
+
+    // Dot segments, sent raw (HTTP clients resolve them, encoded or not), never reach AWS: the
+    // checked path is the one AWS would receive.
+    let host = fx.origin.trim_start_matches("http://").to_owned();
+    for (method, service, path) in [
+        (
+            "POST",
+            "monitoring",
+            "/sandboxes/egress/aws/service/GraniteServiceVersion20100801/operation/GetMetricData/%2E%2E/DeleteAlarms",
+        ),
+        (
+            "GET",
+            "apigateway",
+            "/sandboxes/egress/aws/usageplans/u1/x/../keys",
+        ),
+        ("GET", "s3", "/sandboxes/egress/aws/reports/./2026.csv"),
+    ] {
+        let before = upstream.seen.lock().unwrap().len();
+        let status = raw(&host, method, path, &format!("AWS4-HMAC-SHA256 Credential={token}/20261126/us-east-1/{service}/aws4_request, SignedHeaders=host, Signature=00")).await;
+        assert_eq!(status, 403, "{method} {path}");
+        assert_eq!(
+            upstream.seen.lock().unwrap().len(),
+            before,
+            "{path} reached upstream"
         );
     }
 

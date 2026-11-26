@@ -656,11 +656,11 @@ templates and filters name paths of a signal's context: its data below plus
   `organizations` refuses paths naming another or none. Jira (API token type only; the OAuth
   type's cloud-ID lookup leaves it tools-only): reads and JQL search on the connection's site,
   issue writes when `writes`. PagerDuty (by region): reads of incidents, services (never their
-  integrations, by path or `include[]`), on-calls and schedules, incident notes (`notes`, default
+  integrations, by path or `include[]`; no `;` in the query), on-calls and schedules, incident notes (`notes`, default
   on), acknowledging and resolving (`incident_updates`, default off). HCP Terraform (`hostname`,
-  else app.terraform.io): organizations, projects, workspaces, runs and their events, redacted
-  plans and applies; no `include` of state, outputs or runs, no dotted path segments (`.json`),
-  and run reads name a sparse fieldset (`fields[run]=...`) without `variables`. Grafana (the
+  else app.terraform.io): organizations, projects, workspaces, a run's events, redacted plans and
+  applies (never runs themselves, which carry their variables' values); no `include` of state,
+  outputs or runs, no dotted path segments (`.json`), no `;` in the query. Grafana (the
   connection's URL): dashboards, folders, data sources and their queries, annotations, alert
   rules, and an alertmanager's alerts and silences (never its config). Datadog (`api.<site>`),
   Prometheus (the connection's URL), Honeycomb (by region): read-only allowlists.
@@ -672,14 +672,16 @@ templates and filters name paths of a signal's context: its data below plus
   own by default, else a role it lists). A grant names `services` (signing names, default `logs`
   and `monitoring`), `regions` (empty: any) and `read_only` (default on: actions named Get, List,
   Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by a word, or exactly
-  StartQuery or StopQuery; a REST service's (S3, Lambda, X-Ray, API Gateway, AppSync) GET and
-  HEAD, whatever action names it carries, which REST services ignore). Every action an RPC
-  request names (`X-Amz-Target`, an RPC v2 path, the Query protocol's `Action` in the query or a
+  StartQuery or StopQuery, for the RPC services listed in `RPC`; any other service is treated as
+  REST, whose action names are ignored, so only its GET and HEAD read, and X-Ray, whose reads
+  are POSTs, cannot be read read-only). The path is checked as AWS receives it: empty, `.` and
+  `..` segments, encoded or not, are refused. Every action an RPC request names (`X-Amz-Target`, an RPC v2 path, the Query protocol's `Action` in the query or a
   form body) must agree, a write naming none is refused, and it carries one target, one content
   type and an unencoded body. Under any grant: STS other than GetCallerIdentity, names with
   `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` or `ApiKey`, SSM parameter
   reads, Lightsail access details, `geo:DescribeKey`, `cognito-idp:DescribeUserPoolClient`, API
-  Gateway key values, AppSync API keys and Glue connections without `HidePassword` are refused. Other stored secrets a read returns (a Lambda function's
+  Gateway key values, AppSync API keys, Location Service keys and Glue connections without
+  `HidePassword` are refused. Other stored secrets a read returns (a Lambda function's
   environment, an S3 object) are the role's IAM policy's to guard.
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at

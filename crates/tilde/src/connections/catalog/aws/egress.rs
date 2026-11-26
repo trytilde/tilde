@@ -8,7 +8,7 @@
 //! signature itself. The request goes to that service's regional endpoint
 //! (`https://<service>.<region>.amazonaws.com`, a global service's own host), re-signed. The
 //! service is the SigV4 signing name: `logs` (CloudWatch Logs), `monitoring` (CloudWatch
-//! metrics), `xray`, `s3`, `lambda`.
+//! metrics), `s3`, `lambda`.
 //!
 //! A grant names the services and regions it reaches and whether it is read-only (the default).
 //! An RPC service's request reads when its action is named Get, List, Describe, Filter, Search,
@@ -16,9 +16,11 @@
 //! (`reads`); the action is read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2
 //! path, every one the request carries must agree, a write naming none is refused, and the
 //! request carries one `X-Amz-Target`, one content type and an unencoded body, so the check reads
-//! what AWS reads. A REST service (`REST`: S3, Lambda, X-Ray, API Gateway, AppSync) ignores
-//! action names, so only its GET and HEAD read. Whatever the grant, the actions
-//! `returns_credentials` lists, API Gateway key values, AppSync API keys and Glue connections
+//! what AWS reads. Only the services in `RPC` are read that way; every other is treated as REST,
+//! whose action names are ignored, so only its GET and HEAD read (X-Ray's reads are POSTs: a
+//! read-only grant cannot read it). The path is checked as AWS receives it: empty, `.` and `..`
+//! segments, encoded or not, are refused. Whatever the grant, the actions `returns_credentials`
+//! lists, API Gateway key values, AppSync API keys, Location Service keys and Glue connections
 //! without `HidePassword` are refused. Other stored secrets a read can return (a Lambda
 //! function's environment, an object in S3) are the role's IAM policy's to guard: it stays the
 //! ceiling.
@@ -70,7 +72,7 @@ fn definition() -> Egress {
                     "minItems": 1,
                     "uniqueItems": true,
                     "default": ["logs", "monitoring"],
-                    "description": "SigV4 signing names: logs (CloudWatch Logs), monitoring (CloudWatch metrics), xray, s3, lambda..."
+                    "description": "SigV4 signing names: logs (CloudWatch Logs), monitoring (CloudWatch metrics), s3, lambda... X-Ray reads are POSTs, so a read-only grant cannot read X-Ray"
                 },
                 "regions": {
                     "type": "array",
@@ -116,14 +118,41 @@ fn reads(action: &str) -> bool {
         })
 }
 
-/// Services whose APIs are REST (the method and path name the operation), not RPC.
-const REST: &[&str] = &[
-    "s3",
-    "lambda",
-    "xray",
-    "apigateway",
-    "execute-api",
-    "appsync",
+/// Signing names of services whose APIs are RPC (Query, JSON or RPC v2 protocols: the action is
+/// named in the request). Every other service is treated as REST: its method and path are the
+/// operation, action names are ignored, and only GET and HEAD read.
+const RPC: &[&str] = &[
+    "athena",
+    "autoscaling",
+    "ce",
+    "cloudformation",
+    "cloudtrail",
+    "codebuild",
+    "cognito-idp",
+    "dynamodb",
+    "ec2",
+    "ecr",
+    "ecs",
+    "elasticache",
+    "elasticloadbalancing",
+    "events",
+    "firehose",
+    "glue",
+    "iam",
+    "kinesis",
+    "kms",
+    "lightsail",
+    "logs",
+    "monitoring",
+    "rds",
+    "redshift",
+    "sagemaker",
+    "secretsmanager",
+    "sns",
+    "sqs",
+    "ssm",
+    "states",
+    "sts",
 ];
 
 /// Every API action a request could be read as naming: `X-Amz-Target` (JSON,
@@ -267,7 +296,11 @@ impl EgressHook for Aws {
         if !regions.is_empty() && !regions.contains(&region) {
             return Decision::deny(format!("The {region} region is not granted"));
         }
-        let rest = REST.contains(&service);
+        // The path is checked as AWS receives it: no empty, `.` or `..` segments, encoded or not.
+        if crate::connections::egress::rules::matches("* /**", method, path).is_none() {
+            return Decision::deny("The path has empty, dot or encoded-slash segments");
+        }
+        let rest = !RPC.contains(&service);
         // An RPC request is read as AWS reads it: one target, one content type, an identity body.
         if !rest {
             for name in ["x-amz-target", "content-type", "content-encoding"] {
@@ -308,6 +341,12 @@ impl EgressHook for Aws {
                 .is_some())
         {
             return Decision::deny("API Gateway key values are not readable");
+        }
+        if service == "geo"
+            && crate::connections::egress::rules::matches("* /metadata/v0/keys/**", method, path)
+                .is_some()
+        {
+            return Decision::deny("Location Service key values are not readable");
         }
         if service == "appsync"
             && crate::connections::egress::rules::matches("* /v1/apis/*/apikeys/**", method, path)
