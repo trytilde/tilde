@@ -28,7 +28,7 @@ pub(crate) async fn acted_on(
     Ok(agent)
 }
 
-pub(super) fn definition(
+pub(crate) fn definition(
     name: &str,
     summary: &str,
     description: &str,
