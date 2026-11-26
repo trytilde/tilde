@@ -14,6 +14,7 @@ export {
   prepareTildeCall,
   tildeAiSdk,
   tildeCallOptions,
+  tildeConversation,
   type TildeCallOptions,
   type TildeToolsOptions,
 } from "./invocation.js";

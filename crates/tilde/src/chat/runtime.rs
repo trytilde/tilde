@@ -664,12 +664,12 @@ impl Chat {
         let lost =
             asked && suspension.suspended_for.as_deref() != Some("manual") && !suspension.saved;
         let suspending = asked && !lost;
+        let status = if lost { "failed" } else { status };
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
             if !suspending && status != "failed" {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
             }
             let run_status = match status {
-                _ if lost => "failed",
                 "stopped" => "waiting",
                 "canceled" => "canceled",
                 _ => "failed",

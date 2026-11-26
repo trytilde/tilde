@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ToolLoopAgent, stepCountIs } from "ai";
+import { ToolLoopAgent, generateText, stepCountIs } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
-import { tildeAiSdk, tildeCallOptions } from "../dist/index.js";
+import {
+  prepareTildeCall,
+  tildeAiSdk,
+  tildeCallOptions,
+  tildeConversation,
+} from "../dist/index.js";
 
 const usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -46,7 +51,11 @@ function invocation(resumed) {
     },
     agentTools: {},
     pending: [],
-    resumed,
+    takeResumed() {
+      const taken = resumed;
+      resumed = undefined;
+      return taken;
+    },
     enableSuspension(snapshot) {
       ctx.snapshot = snapshot;
     },
@@ -135,14 +144,51 @@ void test("Tilde's deadline suspends at the next step boundary and a failed call
   });
 });
 
-void test("a loop that stops on a step whose call answered pending saves that step", async () => {
+void test("a loop that stops on a pending step saves that step, with the default stop too", async () => {
+  // A quick call, then a pending one on the last allowed step.
+  const quick = {
+    ...deploy,
+    content: [{ type: "tool-call", toolCallId: "q0", toolName: "noop", input: "{}" }],
+  };
   const first = invocation();
-  const model = new MockLanguageModelV3({ doGenerate: async () => deploy });
-  const once = new ToolLoopAgent({ model, stopWhen: stepCountIs(1), ...tildeCallOptions });
-  await once.generate({ prompt: "Deploy it", ...tildeAiSdk(first) });
-  // The core suspends a loop that ended with calls pending with its snapshot.
+  first.channel.current.noop = {
+    description: "Noop",
+    inputSchema: { type: "object", properties: {} },
+    execute: async () => ({ ok: true }),
+  };
+  const replies = [quick, deploy];
+  const model = new MockLanguageModelV3({ doGenerate: async () => replies.shift() });
+  const twice = new ToolLoopAgent({ model, stopWhen: stepCountIs(2), ...tildeCallOptions });
+  await twice.generate({ prompt: "Deploy it", ...tildeAiSdk(first) });
   assert.deepEqual(
     first.snapshot().map((m) => m.role),
+    ["user", "assistant", "tool", "assistant", "tool"],
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(tildeConversation(first))), first.snapshot());
+  // generateText's own default, one step: the pending step is still the snapshot.
+  const second = invocation();
+  const settings = await prepareTildeCall(second, {
+    model: new MockLanguageModelV3({ doGenerate: async () => deploy }),
+    prompt: "Deploy it",
+  });
+  await generateText(settings);
+  assert.deepEqual(
+    second.snapshot().map((m) => m.role),
     ["user", "assistant", "tool"],
   );
+});
+
+void test("the saved conversation is handed out once: a second loop starts from its own messages", async () => {
+  const saved = [{ role: "user", content: [{ type: "text", text: "Saved" }] }];
+  const ctx = invocation({ state: saved, outcomes: new Map() });
+  const seen = [];
+  const model = new MockLanguageModelV3({
+    doGenerate: async ({ prompt }) => {
+      seen.push(prompt.filter((m) => m.role === "user").map((m) => m.content[0].text));
+      return done;
+    },
+  });
+  await agent(model).generate({ prompt: "first", ...tildeAiSdk(ctx) });
+  await agent(model).generate({ prompt: "second", ...tildeAiSdk(ctx) });
+  assert.deepEqual(seen, [["Saved"], ["second"]]);
 });

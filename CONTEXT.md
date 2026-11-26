@@ -412,8 +412,9 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   objective), `thread.participants` and `thread.search` (thread.read), `tools.result` (when the
   agent has async tools), `thread.wait_for_reply` (thread.read: answers pending at once, and its
   output is the next message routed to the agent in the thread, which then starts no run of its
-  own, written in the transaction that claims the message; a caller that cannot suspend is
-  refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
+  own, written in the transaction that claims the message; a wait is answered only while its
+  invocation runs or a checkpoint names it, and one left behind otherwise is aborted; a caller
+  that cannot suspend is refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
   `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
   agents.edit_skills; see Skills) and the wiki link tools (`wiki.link`, `wiki.unlink`; see
   Wikis). A tool acting on another agent takes its `agent_id` and checks the capability on it,
@@ -1242,8 +1243,9 @@ models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, 
   (`chat_invocations.suspended_for`: `manual`, `deadline` or `pending`): only the last two resume
   by themselves; a manual suspension waits for ResumeRun, which continues from a saved checkpoint.
   An invocation asked to suspend for the deadline or a pending call that saved nothing (a
-  framework that cannot suspend) fails its run and hands its inputs on, as Lambda ending it
-  would have. A message that arrives meanwhile starts its own run as any message does; the
+  framework that cannot suspend) fails, with its run, and hands its inputs on, as Lambda ending
+  it would have. A checkpoint names only calls of its own run's invocations. A run its channel
+  may no longer start is left to ResumeRun. A message that arrives meanwhile starts its own run as any message does; the
   suspended run resumes after it (checked again under the thread lock). An invocation that ends
   without suspending drops the run's checkpoint (a failed one keeps it, so ResumeRun continues
   from it).
@@ -1466,16 +1468,17 @@ and calls `suspend(state)` with the conversation in its framework's message form
 answers included; the core adds the pending calls (model tool-call ID and Tilde's call ID) and
 ends the invocation as a stop. A loop that ends with calls pending is suspended with its last
 snapshot; one asked to suspend that reaches no boundary within a minute likewise. On the run's
-next invocation the core reads the checkpoint, and `resumed` holds the state and each pending
-call's outcome by the model's tool-call ID; at its first step boundary the adapter replaces
+next invocation the core reads the checkpoint, and `takeResumed()` / `take_resumed()` hands out
+the state and each pending call's outcome by the model's tool-call ID once (a second loop in the
+invocation starts from its own messages); at its first step boundary the adapter replaces
 the call's own messages with the saved ones, the outcomes in place of the pending answers, and
 continues. Agent code does not change. Only calls the adapter's tool wrappers make are
 suspendable (`ToolExecution.suspendable`, Python `execute(..., suspendable=True)`); the code's own
 calls always wait. The SDK's older `checkpoint` hook is for code that keeps framework state
 itself and is not called when an adapter suspends. Per adapter: Vercel AI SDK, `prepareTildeCall`'s
-`prepareStep` (model messages, binary data as base64; a stop condition beside the call's own
-records each step's response, so a loop that stops on a step whose calls answered pending saves
-that step); Mastra, `tildeMastra`'s input processor (its message list, ended as a tripwire; a
+`prepareStep` (model messages, binary data as base64; `onStepFinish`, from `prepareTildeCall` or
+`tildeAiSdk`, records each step's response, so a loop that stops on a step whose calls answered
+pending saves that step; `tildeConversation(ctx)` is the conversation the last loop ended with); Mastra, `tildeMastra`'s input processor (its message list, ended as a tripwire; a
 loop that stops at `maxSteps` on a pending step saves the boundary before it, so that step runs
 again); LangChain, `tildeMiddleware`'s `beforeModel` (stored
 messages; restored through `RemoveMessage(REMOVE_ALL_MESSAGES)`); OpenAI Agents,

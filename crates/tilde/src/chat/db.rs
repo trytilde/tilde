@@ -1551,10 +1551,10 @@ pub use tilde_queries::queries::chat::checkpoint_results::Record as CheckpointRe
 pub async fn checkpoint_results_all(
     db: &impl GenericClient,
     calls: &[uuid::Uuid],
-    thread: uuid::Uuid,
+    run: uuid::Uuid,
 ) -> DbResult<Vec<CheckpointResultRow>> {
     Ok(tilde_queries::queries::chat::checkpoint_results::run()
-        .bind(db, &calls, &thread)
+        .bind(db, &run, &calls)
         .all()
         .await?)
 }

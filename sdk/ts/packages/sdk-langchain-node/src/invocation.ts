@@ -86,8 +86,9 @@ export function tildeMiddleware(tools: TildeToolsOptions = {}) {
       const ctx = current(runtime);
       const run = loop(ctx);
       // A resumed run continues its saved conversation instead of the call's own messages.
-      const restored = ctx.resumed && !run.restored ? restore(ctx.resumed) : undefined;
-      if (restored) run.restored = true;
+      const resumed = run.restored ? undefined : ctx.takeResumed?.();
+      run.restored = true;
+      const restored = resumed ? restore(resumed) : undefined;
       const inputs = ctx.takeInputs().map((input) => new HumanMessage(input.text));
       run.latest = [...(restored ?? state.messages), ...inputs];
       if (ctx.shouldSuspend) await ctx.suspend(toJson(run.latest));

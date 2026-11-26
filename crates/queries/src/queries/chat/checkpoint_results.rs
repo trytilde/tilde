@@ -2,8 +2,8 @@
 
 #[derive(Debug)]
 pub struct RunParams<T1: crate::ArraySql<Item = uuid::Uuid>> {
-    pub p1: T1,
     pub p2: uuid::Uuid,
+    pub p1: T1,
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Record {
@@ -112,7 +112,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT id, name, provider_id, status, output_json, error FROM chat_tool_calls WHERE id = ANY($1::UUID[]) AND thread_id = $2 ORDER BY id",
+        "SELECT t.id, t.name, t.provider_id, t.status, t.output_json, t.error FROM chat_tool_calls t JOIN chat_invocations i ON i.id = t.invocation_id AND i.run_id = $1 WHERE t.id = ANY($2::UUID[]) ORDER BY t.id",
         None,
     )
 }
@@ -127,12 +127,12 @@ impl RunStmt {
     pub fn bind<'c, 'a, 's, C: GenericClient, T1: crate::ArraySql<Item = uuid::Uuid>>(
         &'s self,
         client: &'c C,
-        p1: &'a T1,
         p2: &'a uuid::Uuid,
+        p1: &'a T1,
     ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
         RecordQuery {
             client,
-            params: [p1, p2],
+            params: [p2, p1],
             query: self.0,
             cached: self.1.as_ref(),
             extractor:
@@ -165,6 +165,6 @@ impl<'c, 'a, 's, C: GenericClient, T1: crate::ArraySql<Item = uuid::Uuid>>
         client: &'c C,
         params: &'a RunParams<T1>,
     ) -> RecordQuery<'c, 'a, 's, C, Record, 2> {
-        self.bind(client, &params.p1, &params.p2)
+        self.bind(client, &params.p2, &params.p1)
     }
 }

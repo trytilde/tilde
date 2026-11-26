@@ -51,10 +51,11 @@ export async function tildeMastra(
       const stamp = agent && dynamicInstructionsStamp(agent);
       if (stamp) ctx.activatePrompt(stamp);
       // A resumed run continues its saved conversation instead of the call's own messages.
-      if (ctx.resumed && !restored) {
-        restored = true;
+      const resumed = restored ? undefined : ctx.takeResumed?.();
+      restored = true;
+      if (resumed) {
         messageList.clear.all.db();
-        messageList.add(restore(ctx.resumed), "memory");
+        messageList.add(restore(resumed), "memory");
       }
       for (const input of ctx.takeInputs())
         messageList.add({ role: "user", content: input.text }, "input");

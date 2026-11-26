@@ -110,14 +110,15 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, scope.thread_id).await?;
-        // Calls of this conversation only: an unknown ID would keep the run waiting forever.
-        if crate::chat::db::checkpoint_results_all(&tx, &pending, scope.thread_id)
+        // Calls of this run only: another's outcome is not this agent's to read, and an unknown
+        // ID would keep the run waiting forever.
+        if crate::chat::db::checkpoint_results_all(&tx, &pending, scope.run_id)
             .await?
             .len()
             != pending.len()
         {
             return Err(ChatError::Invalid(
-                "A pending call is not in this conversation".into(),
+                "A pending call is not this run's".into(),
             ));
         }
         if crate::chat::db::controls_suspend_execute(&tx, scope.run_id, scope.id, "pending").await?
@@ -150,12 +151,9 @@ impl Chat {
             .await?
             .filter(|saved| saved.invocation_id != scope.id)
             .ok_or(ChatError::NotFound)?;
-        let results = crate::chat::db::checkpoint_results_all(
-            &client,
-            &saved.pending_call_ids,
-            scope.thread_id,
-        )
-        .await?;
+        let results =
+            crate::chat::db::checkpoint_results_all(&client, &saved.pending_call_ids, scope.run_id)
+                .await?;
         Ok(runtime_pb::GetCheckpointResponse {
             state_json: saved.state_json,
             results: results

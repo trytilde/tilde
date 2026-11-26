@@ -143,8 +143,9 @@ def _input_filter(
         items = list(data.model_data.input)
         if initial is None:
             initial = len(items)
-            if ctx.resumed is not None:
-                restored = _restore(ctx.resumed)
+            resumed = ctx.take_resumed()
+            if resumed is not None:
+                restored = _restore(resumed)
         if restored is not None:
             items = [*restored, *items[initial:]]
         inputs = ctx.take_inputs()

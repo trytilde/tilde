@@ -571,8 +571,10 @@ async def test_a_pending_call_suspends_the_run_and_the_next_invocation_reads_its
     latest: list[object] = []
 
     async def run(ctx: AgentContext) -> None:
-        if ctx.resumed is not None:
-            seen["resumed"] = ctx.resumed
+        resumed = ctx.take_resumed()
+        if resumed is not None:
+            seen["resumed"] = resumed
+            assert ctx.take_resumed() is None, "handed out once"
             return
         # An adapter's loop: a tool call per step, checking for suspension at each boundary.
         ctx.enable_suspension(lambda: latest)

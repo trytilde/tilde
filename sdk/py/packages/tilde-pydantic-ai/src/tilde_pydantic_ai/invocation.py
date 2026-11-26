@@ -67,9 +67,10 @@ class TildeInvocation(AbstractCapability[Any]):
         self, ctx: RunContext[Any], request_context: ModelRequestContext
     ) -> ModelRequestContext:
         messages = request_context.messages
-        if self.context.resumed is not None and not self.restored:
-            self.restored = True
-            messages = _restore(self.context.resumed)
+        resumed = None if self.restored else self.context.take_resumed()
+        self.restored = True
+        if resumed is not None:
+            messages = _restore(resumed)
             request_context = dataclasses.replace(request_context, messages=messages)
         self.latest = messages
         if self.context.should_suspend:

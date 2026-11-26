@@ -267,8 +267,7 @@ class AgentContext:
         self._pending: dict[str, tuple[str, str]] = {}
         self._suspend_requested = False
         self._suspended: asyncio.Future[None] | None = None
-        self.resumed: Resumed | None = None
-        """Set when this invocation continues a suspended run; read by framework adapters."""
+        self._resumed: Resumed | None = None
         self._renewal = asyncio.create_task(self._renew_tokens())
         cancellation.on_abort(self._renewal.cancel)
         self.goals = _Goals(self)
@@ -784,8 +783,15 @@ class AgentContext:
         blocking; at each step boundary the adapter checks
         ``should_suspend`` and, when set, calls ``suspend`` with the conversation so far, pending
         answers included. On the run's next invocation ``resumed`` holds that state and the
-        calls' outcomes, and the adapter continues from it."""
+        calls' outcomes (``take_resumed()``, once), and the adapter continues from it."""
         self._snapshot = snapshot
+
+    def take_resumed(self) -> Resumed | None:
+        """The state a suspended run continues from, handed out once (internal): the first
+        framework loop of a resumed invocation continues it, later loops start from their own
+        messages."""
+        resumed, self._resumed = self._resumed, None
+        return resumed
 
     @property
     def should_suspend(self) -> bool:
@@ -846,7 +852,7 @@ class AgentContext:
                 if call.status == "completed"
                 else ToolOutcome(error=call.error or f"Tool call {call.status}")
             )
-        self.resumed = Resumed(state=saved.get("state"), outcomes=outcomes)
+        self._resumed = Resumed(state=saved.get("state"), outcomes=outcomes)
 
     async def send_native_message(
         self,
@@ -1073,7 +1079,10 @@ class AgentContext:
             # mid-step after the grace is suspended with its last boundary's state. The stream
             # stays open meanwhile and keeps the invocation's lease.
             self._suspend_requested = True
-            asyncio.get_running_loop().call_later(_SUSPEND_GRACE_SECONDS, self._force_suspend)
+            timer = asyncio.get_running_loop().call_later(
+                _SUSPEND_GRACE_SECONDS, self._force_suspend
+            )
+            self.cancellation.on_abort(timer.cancel)
             await self._controls.acknowledge_command(
                 controls_pb2.AcknowledgeCommandRequest(id=command.id), **self._rpc()
             )

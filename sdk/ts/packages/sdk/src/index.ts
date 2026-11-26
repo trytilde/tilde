@@ -415,8 +415,17 @@ export class AgentContext {
   private readonly pendingCalls = new Map<string, PendingCall>();
   private suspendRequested = false;
   private suspended?: Promise<void>;
-  /** Set when this invocation continues a suspended run; read by framework adapters. */
-  resumed?: Resumed;
+  private resumed?: Resumed;
+  /**
+   * @internal The state a suspended run continues from, handed out once: the first framework
+   * loop of a resumed invocation continues it, later loops (a second `generate`) start from their
+   * own messages.
+   */
+  takeResumed(): Resumed | undefined {
+    const resumed = this.resumed;
+    this.resumed = undefined;
+    return resumed;
+  }
   constructor(
     request: InvokeRequest,
     private readonly controller: AbortController,
@@ -860,7 +869,8 @@ export class AgentContext {
    * format, as JSON). From then on a Tilde tool call its tool wrappers make (`suspendable` on the
    * execution) that runs long answers pending instead of blocking, and at each step boundary the adapter checks `shouldSuspend` and, when it is set,
    * calls `suspend` with the conversation so far, pending answers included. On the run's next
-   * invocation `resumed` holds that state and the calls' outcomes; the adapter continues from it.
+   * invocation `takeResumed()` returns that state and the calls' outcomes once; the adapter
+   * continues from it.
    */
   enableSuspension(snapshot: () => JsonValue) {
     this.snapshot = snapshot;

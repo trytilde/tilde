@@ -490,7 +490,6 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         .unwrap()
         .get(0);
     assert_eq!(runs, 1, "every invocation continued the one run");
-
     // A pending call whose process is gone (a deploy restarted it) is aborted a minute after its
     // last heartbeat, and the run resumes with that outcome.
     unsafe { std::env::set_var("TILDE_TOOL_PENDING_AFTER_MS", "300") };
@@ -556,7 +555,46 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     .await
     .expect("the deadline asks it to suspend");
     seventh.stopped().await;
-    assert_eq!(chat.run(run_id).await.unwrap().status, "failed");
+    let lost = chat.run(run_id).await.unwrap();
+    assert_eq!(
+        (lost.status.as_str(), lost.invocation_status.as_str()),
+        ("failed", "failed")
+    );
+
+    // A wait for a reply its invocation left without suspending is not awaited: the person's
+    // next message starts a run as any message does.
+    chat.resume_run(run_id).await.unwrap();
+    let eighth = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "eighth").await,
+    };
+    let left = Uuid::new_v4();
+    let answer = eighth.call("thread.wait_for_reply", left, json!({})).await;
+    assert_eq!(answer["pending"], true, "{answer}");
+    eighth.stopped().await;
+    chat.post(PostMessage {
+        id: Uuid::new_v4().to_string(),
+        thread_id: thread.id.clone(),
+        participant_id: person.id.clone(),
+        text: "Anything new?".into(),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let fresh = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "a new run").await,
+    };
+    assert_ne!(fresh.wake.run_id, started.id);
+    // A run waits only for its own calls: GetCheckpoint never serves another run's outputs.
+    let refused = reqwest::Client::new()
+        .post(format!("{base}/tilde.runtime.v1.ChatService/SuspendRun"))
+        .bearer_auth(&fresh.wake.capability)
+        .json(&json!({"stateJson": "{}", "pendingCallIds": [call]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 400);
 
     drop(pg);
     let _ = stop.send(true);

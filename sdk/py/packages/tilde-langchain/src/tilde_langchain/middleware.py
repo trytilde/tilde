@@ -138,9 +138,10 @@ class TildeMiddleware(AgentMiddleware[AgentState[Any], Any]):
         loop = _loop(ctx)
         # A resumed run continues its saved conversation instead of the call's own messages.
         restored = None
-        if ctx.resumed is not None and not loop.restored:
-            loop.restored = True
-            restored = _restore(ctx.resumed)
+        resumed = None if loop.restored else ctx.take_resumed()
+        loop.restored = True
+        if resumed is not None:
+            restored = _restore(resumed)
         inputs = [HumanMessage(content=input.text) for input in ctx.take_inputs()]
         loop.latest = [*(restored if restored is not None else state["messages"]), *inputs]
         if ctx.should_suspend:

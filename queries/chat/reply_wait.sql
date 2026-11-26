@@ -1,10 +1,13 @@
 --: Record()
 
 --! run (p1, p2) : Record
--- The agent's open `thread.wait_for_reply` call in the thread, if its run is still alive: the
--- next message routed to the agent there is its output.
+-- The agent's open `thread.wait_for_reply` call in the thread while it is still awaited: its
+-- invocation runs (it is about to suspend) or its run's checkpoint names it. The next message
+-- routed to the agent there is its output.
 SELECT t.id, t.invocation_id, t.participant_id, t.name, t.provider_id FROM chat_tool_calls t
 JOIN chat_invocations i ON i.id = t.invocation_id
 JOIN chat_runs r ON r.id = i.run_id AND r.status IN ('active', 'suspending', 'waiting')
 WHERE t.thread_id = :p1 AND i.agent_id = :p2 AND t.name = 'thread.wait_for_reply' AND t.status = 'running'
+  AND (i.status IN ('pending', 'running')
+       OR EXISTS (SELECT 1 FROM chat_run_checkpoints c WHERE c.run_id = r.id AND t.id = ANY(c.pending_call_ids)))
 ORDER BY t.created_at LIMIT 1 FOR UPDATE OF t;

@@ -124,8 +124,10 @@ void test("a pending call suspends the run with its state and the next invocatio
   const handler = createLambdaHandler({
     tracing: "existing",
     async run(ctx) {
-      if (ctx.resumed) {
-        state.resumed = ctx.resumed;
+      const resumed = ctx.takeResumed();
+      if (resumed) {
+        state.resumed = resumed;
+        assert.equal(ctx.takeResumed(), undefined, "handed out once");
         return;
       }
       ctx.enableSuspension(() => latest);

@@ -47,7 +47,11 @@ function invocation(resumed) {
     },
     agentTools: {},
     pending: [],
-    resumed,
+    takeResumed() {
+      const taken = resumed;
+      resumed = undefined;
+      return taken;
+    },
     enableSuspension(snapshot) {
       ctx.snapshot = snapshot;
     },

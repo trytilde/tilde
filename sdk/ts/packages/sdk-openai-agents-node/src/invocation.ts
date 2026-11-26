@@ -130,7 +130,8 @@ export async function tildeOpenAIAgents<TAgent extends AnyAgent>(
     // A resumed run continues its saved items instead of the run's own input.
     if (initial === undefined) {
       initial = modelData.input.length;
-      if (ctx.resumed) restored = restore(ctx.resumed);
+      const resumed = ctx.takeResumed?.();
+      if (resumed) restored = restore(resumed);
     }
     const own = restored ? [...restored, ...modelData.input.slice(initial)] : modelData.input;
     // The runner rebuilds the input each turn without filter additions, so earlier steering is
