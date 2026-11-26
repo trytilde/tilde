@@ -16,18 +16,25 @@
 //!   and the action is read only where the service's protocol carries it (`X-Amz-Target` for
 //!   JSON, `Action` in the query or a form body for Query, the path for RPC v2); one carried
 //!   anywhere else, none at all, or several that disagree are refused, and the request carries
-//!   one target, one content type and an unencoded body, so the check reads what AWS reads.
-//!   Under a read-only grant (the default) the action must be named Get, List, Describe, Filter,
-//!   Search, Lookup, BatchGet, Query or Scan followed by a word, or exactly StartQuery or
-//!   StopQuery (`reads`).
+//!   one target, one content type and an unencoded body (a form, for a Query service), so the
+//!   check reads what AWS reads. Under a read-only grant (the default) the action must be named
+//!   Get, List, Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by a word, or
+//!   be Logs' StartQuery or StopQuery (`reads`).
 //! - REST services (S3, Lambda): a request naming an action anywhere is refused; only GET and
 //!   HEAD read.
 //!
 //! Paths are checked as AWS receives them: empty, `.` and `..` segments, encoded or not, are
-//! refused. Whatever the grant, the actions `returns_credentials` lists are refused (STS but
-//! GetCallerIdentity, SSM parameter reads, names with Token, Credential, SecretValue, AccessKey,
-//! Password or ApiKey). Other stored secrets a read returns (a Lambda function's environment, an
-//! object in S3) are the role's IAM policy's to guard: it stays the ceiling.
+//! refused. Whatever the grant, these reads are refused (`returns_credentials`): STS but
+//! GetCallerIdentity; SSM parameter reads, `GetCommandInvocation` and `ListCommandInvocations`;
+//! CloudFormation `GetTemplate`; EC2 `DescribeInstanceAttribute`,
+//! `DescribeLaunchTemplateVersions`, `GetLaunchTemplateData`, `GetConsoleOutput`,
+//! `DescribeVpnConnections`, `GetVpnConnectionDeviceSampleConfiguration` and
+//! `GetFlowLogsIntegrationTemplate`; ECS `DescribeTaskDefinition`; Auto Scaling
+//! `DescribeLaunchConfigurations`; and names with Token, Credential, SecretValue, AccessKey,
+//! Password or ApiKey. Anything else stored in AWS that a read returns (stack outputs, a Lambda
+//! function's environment, an S3 object) is the role's IAM policy's to guard: it stays the
+//! ceiling. The refusals only mean something under a read-only grant: a grant that writes can
+//! reach the same secrets another way (an SSM `SendCommand`, say).
 use crate::chat::providers::Access;
 use crate::connections::egress::{
     Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, forge::strings,
@@ -107,14 +114,12 @@ fn definition() -> Egress {
 }
 
 /// Read action names: a prefix followed by a word (`GetMetricData`) or the whole name (DynamoDB's
-/// `Query`). CloudWatch Logs Insights' `StartQuery` and `StopQuery` are reads by name alone, so
-/// `StartQueryExecution` (Athena) is not.
+/// `Query`), and CloudWatch Logs Insights' `StartQuery` and `StopQuery`, for Logs alone.
 const READS: &[&str] = &[
     "Get", "List", "Describe", "Filter", "Search", "Lookup", "BatchGet", "Query", "Scan",
 ];
-const READ_NAMES: &[&str] = &["StartQuery", "StopQuery"];
-fn reads(action: &str) -> bool {
-    READ_NAMES.contains(&action)
+fn reads(service: &str, action: &str) -> bool {
+    (service == "logs" && ["StartQuery", "StopQuery"].contains(&action))
         || READS.iter().any(|prefix| {
             action.strip_prefix(prefix).is_some_and(|rest| {
                 rest.is_empty() || rest.starts_with(|c: char| c.is_ascii_uppercase())
@@ -223,12 +228,31 @@ fn named(path: &str, query: Option<&str>, headers: &http::HeaderMap, body: &[u8]
     }
 }
 
+/// Reads of the supported services that return secrets: templates, user data, launch
+/// configurations, console output, VPN configurations, task definitions' environments and
+/// command output.
+const SECRET_READS: &[(&str, &str)] = &[
+    ("cloudformation", "GetTemplate"),
+    ("ec2", "DescribeInstanceAttribute"),
+    ("ec2", "DescribeLaunchTemplateVersions"),
+    ("ec2", "GetLaunchTemplateData"),
+    ("ec2", "GetConsoleOutput"),
+    ("ec2", "DescribeVpnConnections"),
+    ("ec2", "GetVpnConnectionDeviceSampleConfiguration"),
+    ("ec2", "GetFlowLogsIntegrationTemplate"),
+    ("ecs", "DescribeTaskDefinition"),
+    ("autoscaling", "DescribeLaunchConfigurations"),
+    ("ssm", "GetCommandInvocation"),
+    ("ssm", "ListCommandInvocations"),
+];
+
 /// Actions whose answers carry credentials or stored secrets, refused under any grant: STS
-/// other than GetCallerIdentity, SSM parameter reads (decrypted SecureStrings), and names with
-/// `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` (EC2 password data, database
-/// master passwords) or `ApiKey`.
+/// other than GetCallerIdentity, SSM parameter reads (decrypted SecureStrings), `SECRET_READS`,
+/// and names with `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` (EC2 password
+/// data, database master passwords) or `ApiKey`.
 fn returns_credentials(service: &str, action: &str) -> bool {
     (service == "sts" && action != "GetCallerIdentity")
+        || SECRET_READS.contains(&(service, action))
         || (service == "ssm" && action.starts_with("GetParameter"))
         || [
             "Token",
@@ -355,6 +379,19 @@ impl EgressHook for Aws {
         {
             return Decision::deny("Encoded request bodies are not checked");
         }
+        // A Query service reads its form body; any other body it might read some other way.
+        let query_only = protocol.query && !protocol.target && !protocol.path;
+        let form = headers
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| {
+                v.trim()
+                    .to_ascii_lowercase()
+                    .starts_with("application/x-www-form-urlencoded")
+            });
+        if query_only && !body.is_empty() && !form {
+            return Decision::deny(format!("{service} request bodies are forms"));
+        }
         let misplaced = (!protocol.target && !named.target.is_empty())
             || (!protocol.query && !named.query.is_empty())
             || (!protocol.path && !named.path.is_empty());
@@ -385,7 +422,7 @@ impl EgressHook for Aws {
         if actions.iter().any(|a| returns_credentials(service, a)) {
             return Decision::deny(format!("{service}:{action} returns credentials"));
         }
-        if read_only && !reads(action) {
+        if read_only && !reads(service, action) {
             return Decision::deny(format!(
                 "{service}:{action} is not a read; the grant is read-only"
             ));

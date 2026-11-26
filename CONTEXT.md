@@ -678,12 +678,19 @@ templates and filters name paths of a signal's context: its data below plus
   action only where its service's protocol carries it (`X-Amz-Target`, `Action` in the query or
   a form body, the RPC v2 path), once or agreeing, with one target, one content type and an
   unencoded body; read-only, the action is named Get, List, Describe, Filter, Search, Lookup,
-  BatchGet, Query or Scan followed by a word, or exactly StartQuery or StopQuery. A REST request
+  BatchGet, Query or Scan followed by a word, or Logs' StartQuery or StopQuery. A REST request
   names no action anywhere; read-only, it is a GET or HEAD. Paths with empty, `.` or `..`
-  segments, encoded or not, are refused. Under any grant: STS other than GetCallerIdentity, SSM
-  parameter reads and names with `Token`, `Credential`, `SecretValue`, `AccessKey`, `Password` or
-  `ApiKey` are refused. Other stored secrets a read returns (a Lambda function's environment, an
-  S3 object) are the role's IAM policy's to guard.
+  segments, encoded or not, are refused; a Query service's body is a form. Under any grant these
+  reads are refused: STS other than GetCallerIdentity; SSM parameter reads,
+  `GetCommandInvocation`, `ListCommandInvocations`; CloudFormation `GetTemplate`; EC2
+  `DescribeInstanceAttribute`, `DescribeLaunchTemplateVersions`, `GetLaunchTemplateData`,
+  `GetConsoleOutput`, `DescribeVpnConnections`, `GetVpnConnectionDeviceSampleConfiguration`,
+  `GetFlowLogsIntegrationTemplate`; ECS `DescribeTaskDefinition`; Auto Scaling
+  `DescribeLaunchConfigurations`; names with `Token`, `Credential`, `SecretValue`, `AccessKey`,
+  `Password` or `ApiKey`. Anything else stored in AWS that a read returns (stack outputs, a
+  Lambda function's environment, an S3 object) is the role's IAM policy's to guard. The
+  refusals only mean something under a read-only grant: a grant that writes can reach the same
+  secrets another way (an SSM `SendCommand`).
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
   enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process

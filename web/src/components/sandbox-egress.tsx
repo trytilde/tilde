@@ -403,9 +403,12 @@ function EgressForm({
         )}
         {chosen?.providerId === "aws" && (
           <Warning>
-            The gateway signs each request with this connection's AWS credentials: its IAM policy is
-            the ceiling, and the grant narrows it to the supported services it names (CloudWatch,
-            ECS, EC2, RDS, S3, Lambda and a few more), regions and reads. Point the AWS CLI or an
+            The gateway signs each request with this connection's AWS credentials, and the grant
+            narrows them to the supported services it names (CloudWatch, ECS, EC2, RDS, S3, Lambda
+            and a few more), regions and reads. Reads that return secrets (task definitions, user
+            data, templates, SSM parameters and command output) are refused; anything else stored in
+            AWS, such as stack outputs or a Lambda function's environment, is the IAM policy's to
+            guard. Under a grant that writes, those refusals do not hold. Point the AWS CLI or an
             SDK at the route with <code>AWS_ENDPOINT_URL</code>; sandboxes get it set.
           </Warning>
         )}
