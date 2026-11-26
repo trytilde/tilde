@@ -29,7 +29,8 @@ use uuid::Uuid;
 pub const REPLY_WAIT: &str = "thread.wait_for_reply";
 /// What an invocation keeps of its host's limit to save its state and report.
 const MARGIN: Duration = Duration::from_secs(120);
-/// Lambda's longest invocation, which every Lambda and hosted deployment is held to.
+/// Lambda's longest invocation, which every Lambda and hosted deployment is held to. A Lambda
+/// configured with a shorter timeout is ended by Lambda before the deadline, failing as before.
 const LAMBDA_LIMIT: Duration = Duration::from_secs(900);
 const MAX_STATE: usize = 32 * 1024 * 1024;
 const MAX_PENDING: usize = 256;

@@ -664,7 +664,9 @@ impl Chat {
         let by_hand = asked && suspension.suspended_for.as_deref() == Some("manual");
         let suspending = by_hand || (asked && suspension.saved);
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
-            if !suspending && status != "failed" {
+            // A checkpoint an earlier invocation saved is stale once this one ran (and, left
+            // behind a manual suspension, would resume by itself).
+            if (!suspending && status != "failed") || (by_hand && !suspension.saved) {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
             }
             let run_status = match status {

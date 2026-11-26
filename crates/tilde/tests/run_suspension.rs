@@ -566,6 +566,26 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     };
     assert!(seventh.wake.resumes);
     assert_eq!(seventh.checkpoint().await.0, json!({"turn":6}));
+    // Suspended by hand again without saving, it leaves no older checkpoint to resume from.
+    chat.suspend_invocation(Uuid::parse_str(&seventh.wake.invocation_id).unwrap())
+        .await
+        .unwrap();
+    seventh.stopped().await;
+    assert!(
+        pg.query_opt(
+            "SELECT 1 FROM chat_run_checkpoints WHERE run_id=$1",
+            &[&run_id]
+        )
+        .await
+        .unwrap()
+        .is_none()
+    );
+    chat.resume_run(run_id).await.unwrap();
+    let seventh = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "seventh, resumed by hand").await,
+    };
+    assert!(!seventh.wake.resumes);
 
     // The deadline reaches only an invocation that can suspend (it made a suspendable call):
     // any other runs to its host's own limit, as before.
