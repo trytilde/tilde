@@ -127,6 +127,7 @@ impl Chat {
         }
         crate::chat::db::checkpoint_save_execute(&tx, scope.run_id, scope.id, state_json, &pending)
             .await?;
+        crate::chat::db::invocation_checkpointed_execute(&tx, scope.id).await?;
         // A reply that arrived while the loop was still deciding to wait is queued on this
         // invocation, unseen: it answers the wait, so the run resumes now rather than at the
         // person's next message.

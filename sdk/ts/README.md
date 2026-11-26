@@ -380,8 +380,10 @@ flight then answer pending. Waiting for a person works the same way with the bui
 `thread.wait_for_reply` tool (thread.read), whose output is the next message. Agent code does
 not change; without an adapter, tool calls block as before, and only calls the adapter's tool
 wrappers make can answer pending (calls your code makes on `ctx.tools` wait). A suspension asked
-by hand (`SuspendInvocation`) waits for `ResumeRun`; a framework that cannot suspend loses its
-run at the deadline, as Lambda ending it would.
+by hand (`SuspendInvocation`) waits for `ResumeRun`; an invocation that never made a
+suspendable call is not asked to suspend and runs to Lambda's own limit, as before. A loop that reaches no step boundary within a
+minute of Tilde's deadline is suspended at its last one, so a call that already finished in the
+step in flight (and did not answer pending) runs again on resume.
 
 Adapters implement a small contract on `AgentContext` (marked internal): `enableSuspension(snapshot)`
 before the loop, `shouldSuspend` and `suspend(state)` at each step boundary, and `resumed`

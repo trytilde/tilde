@@ -22,6 +22,8 @@ ALTER TABLE chat_invocations ADD COLUMN suspendable BOOLEAN NOT NULL DEFAULT FAL
 -- ResumeRun), the invocation's deadline, or a call that answered pending. Only the last two
 -- resume by themselves.
 ALTER TABLE chat_invocations ADD COLUMN suspended_for TEXT CHECK (suspended_for IN ('manual', 'deadline', 'pending'));
+-- The invocation saved a checkpoint (`SuspendRun`): its stop is a suspension, not an end.
+ALTER TABLE chat_invocations ADD COLUMN checkpointed BOOLEAN NOT NULL DEFAULT FALSE;
 -- A pending call's process touches this while the call runs; one that stops (a restart) leaves
 -- it to age, and the call is aborted a minute later so its run resumes with the failure.
 ALTER TABLE chat_tool_calls ADD COLUMN heartbeat_at TIMESTAMPTZ;

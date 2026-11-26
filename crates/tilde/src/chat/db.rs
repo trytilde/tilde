@@ -1665,3 +1665,12 @@ pub async fn invocation_restop_execute(
         .bind(db, &invocation)
         .await?)
 }
+
+pub async fn invocation_checkpointed_execute(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::invocation_checkpointed::run()
+        .bind(db, &invocation)
+        .await?)
+}

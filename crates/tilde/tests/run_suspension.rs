@@ -88,6 +88,23 @@ impl Woken {
         )
         .await;
     }
+    /// Acknowledge the wake, as a host does: one left unacknowledged fails after ten seconds.
+    async fn accepted(&self) {
+        runs(&self.base, &self.wake.capability)
+            .report(run::ReportRequest {
+                invocation_id: self.wake.invocation_id.clone(),
+                event: Some(run::report_request::Event::Accepted(
+                    run::RunAccepted {
+                        command_id: self.wake.command_id.clone(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+    }
     async fn stopped(&self) {
         runs(&self.base, &self.wake.capability)
             .report(run::ReportRequest {
@@ -355,6 +372,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         base: base.clone(),
         wake: next_wake(&mut wakes, "second").await,
     };
+    second.accepted().await;
     assert!(
         began.elapsed() >= Duration::from_secs(2),
         "it waited for the call"
@@ -415,6 +433,17 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     assert_eq!(
         suspend.kind.as_known(),
         Some(wire::InvocationCommandKind::Suspend)
+    );
+    // The stream stays open and keeps its keepalive while the loop reaches its boundary.
+    let keepalive = tokio::time::timeout(Duration::from_secs(15), commands.message())
+        .await
+        .expect("a keepalive after the suspend")
+        .unwrap()
+        .unwrap()
+        .to_owned_message();
+    assert_eq!(
+        keepalive.kind.as_known(),
+        Some(wire::InvocationCommandKind::Ready)
     );
     second.suspend(json!({"turn":2}), &[in_flight]).await;
     second.stopped().await;
@@ -646,6 +675,45 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         serde_json::from_str::<Value>(results[0]["outputJson"].as_str().unwrap()).unwrap(),
         json!({"message_id": quick, "text": "Go ahead"})
     );
+
+    // A message queued on an invocation that suspends for a slow call is not held for it: it
+    // starts its own run now.
+    let unseen = Uuid::new_v4();
+    chat.post(PostMessage {
+        id: unseen.to_string(),
+        thread_id: thread.id.clone(),
+        participant_id: person.id.clone(),
+        text: "Also check the logs".into(),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let resumed_id = Uuid::parse_str(&resumed.wake.invocation_id).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while pg
+            .query_opt(
+                "SELECT 1 FROM chat_inputs WHERE invocation_id=$1 AND id=$2",
+                &[&resumed_id, &unseen],
+            )
+            .await
+            .unwrap()
+            .is_none()
+        {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the message is queued on the running invocation");
+    let slow = Uuid::new_v4();
+    let answer = resumed
+        .call("ops.restart", slow, json!({"service":"stuck"}))
+        .await;
+    assert_eq!(answer["pending"], true, "{answer}");
+    resumed.suspend(json!({"turn":"slow"}), &[slow]).await;
+    resumed.stopped().await;
+    let next = next_wake(&mut wakes, "the unseen message's run").await;
+    assert_ne!(next.run_id, resumed.wake.run_id, "a run of its own");
+    assert_eq!(next.objective, "Also check the logs");
 
     drop(pg);
     let _ = stop.send(true);

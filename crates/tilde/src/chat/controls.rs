@@ -198,7 +198,7 @@ impl crate::services::tilde::runtime::v1::InvocationControlService for Rpc {
             let deadline=tokio::time::sleep(Duration::from_secs((claims.exp-chrono::Utc::now().timestamp()).max(1) as u64));tokio::pin!(deadline);
             loop {
                 let commands=chat.control_commands(&claims).await?;
-                if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop|Kind::Suspend))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
+                if !commands.iter().any(|c|matches!(c.kind.as_known(),Some(Kind::Stop))) && !ready {ready=true;yield Command{kind:Kind::Ready.into(),..Default::default()};}
                 seen.retain(|id|commands.iter().any(|c|&c.id==id));
                 // A suspend is delivered once and the stream stays open, renewing the lease while
                 // the host brings its loop to a step boundary and saves it; a stop ends it.

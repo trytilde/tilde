@@ -47,6 +47,7 @@ pub mod input_move;
 pub mod inputs_pending;
 pub mod invocation_active;
 pub mod invocation_batch;
+pub mod invocation_checkpointed;
 pub mod invocation_claim;
 pub mod invocation_create;
 pub mod invocation_cutoff;

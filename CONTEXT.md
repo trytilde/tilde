@@ -413,7 +413,8 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   agent has async tools), `thread.wait_for_reply` (thread.read: answers pending at once, and its
   output is the next message routed to the agent in the thread, which then starts no run of its
   own, written in the transaction that claims the message (a reply that was queued on the
-  invocation before it called the tool answers it when the invocation suspends); a wait is answered only while its
+  invocation before it called the tool answers it when the invocation suspends; other messages
+  queued and unseen there start their own run once it suspends); a wait is answered only while its
   invocation runs or a checkpoint names it, and one left behind otherwise is aborted; a caller
   that cannot suspend is refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
   `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
@@ -1470,7 +1471,9 @@ checks `shouldSuspend` / `should_suspend` (a call answered pending, or Tilde's d
 and calls `suspend(state)` with the conversation in its framework's message format, pending
 answers included; the core adds the pending calls (model tool-call ID and Tilde's call ID) and
 ends the invocation as a stop. A loop that ends with calls pending is suspended with its last
-snapshot; one asked to suspend that reaches no boundary within a minute likewise. On the run's
+snapshot; one asked to suspend that reaches no boundary within a minute likewise, so a call
+that already completed in the step in flight (one that did not answer pending, such as a
+bundled tool) runs again when the run resumes. On the run's
 next invocation the core reads the checkpoint, and `takeResumed()` / `take_resumed()` hands out
 the state and each pending call's outcome by the model's tool-call ID once (a second loop in the
 invocation starts from its own messages); at its first step boundary the adapter replaces

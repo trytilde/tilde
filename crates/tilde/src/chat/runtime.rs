@@ -651,16 +651,18 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, existing.thread_id).await?;
-        // A suspended run keeps its inputs: one suspended by hand waits for ResumeRun, and one
-        // that saved its state resumes by itself (`suspension`). Asked to suspend for its
-        // deadline, a loop that finished first saved nothing: its run ends as any stop does.
+        // A run suspended by hand waits for ResumeRun with its inputs; one that saved its state
+        // for a pending call or its deadline resumes by itself (`suspension`) and hands the
+        // inputs its loop never saw on now, as messages after it start their own runs. Asked to
+        // suspend for its deadline, a loop that finished first saved nothing: its run ends as
+        // any stop does.
         let suspension = crate::chat::db::invocation_suspension_one(&tx, invocation).await?;
         let asked = crate::chat::db::run_state_one(&tx, existing.run_id)
             .await?
             .status
             == "suspending";
-        let suspending =
-            asked && (suspension.saved || suspension.suspended_for.as_deref() == Some("manual"));
+        let by_hand = asked && suspension.suspended_for.as_deref() == Some("manual");
+        let suspending = by_hand || (asked && suspension.saved);
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
             if !suspending && status != "failed" {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
@@ -680,7 +682,7 @@ impl Chat {
                 status,
             )
             .await?;
-            if !suspending {
+            if !by_hand {
                 super::agent_lifecycle::requeue_inputs(self.pg()?, &tx, invocation, row.run_id)
                     .await?;
             }
@@ -1011,6 +1013,10 @@ impl Chat {
             if asked && suspension.saved {
                 crate::chat::db::invocation_restop_execute(&tx, row.id).await?;
                 crate::chat::db::run_status_execute(&tx, row.run_id, "waiting").await?;
+                if suspension.suspended_for.as_deref() != Some("manual") {
+                    super::agent_lifecycle::requeue_inputs(self.pg()?, &tx, row.id, row.run_id)
+                        .await?;
+                }
                 activity(
                     self.pg()?,
                     &tx,

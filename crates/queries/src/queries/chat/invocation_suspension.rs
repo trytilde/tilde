@@ -91,7 +91,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT i.suspended_for, EXISTS(SELECT 1 FROM chat_run_checkpoints c WHERE c.run_id = i.run_id AND c.invocation_id = i.id) AS saved FROM chat_invocations i WHERE i.id = $1",
+        "SELECT suspended_for, checkpointed AS saved FROM chat_invocations WHERE id = $1",
         None,
     )
 }
