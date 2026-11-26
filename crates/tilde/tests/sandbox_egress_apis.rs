@@ -343,7 +343,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                 ("secret_access_key", AWS_SECRET),
                 ("region", "us-east-1"),
             ],
-            json!({"services": ["logs", "sts", "ssm"], "regions": ["us-east-1"]}),
+            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway"], "regions": ["us-east-1"]}),
         ),
     ];
     let secrets: Vec<&str> = grants
@@ -842,6 +842,151 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             vec![],
         ),
         // SSM parameter reads return decrypted secrets.
+        // Second review: allowlists, query strings, and the remaining credential reads.
+        (
+            "linear",
+            Method::POST,
+            "/graphql?query=%7Bviewer%7Bid%7D%7D",
+            Some(r#"{"query":"{ viewer { id } }"}"#.into()),
+            Present::Bare,
+            no,
+            vec![],
+        ),
+        (
+            "newrelic",
+            Method::POST,
+            "/graphql?variables=%7B%7D",
+            Some(r#"{"query":"{ actor { user { name } } }"}"#.into()),
+            Present::Header("api-key"),
+            no,
+            vec![],
+        ),
+        (
+            "sentry",
+            Method::GET,
+            "/api/0/organizations/acme/api-keys/",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "sentry",
+            Method::GET,
+            "/api/0/projects/acme/web/plugins/",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "pagerduty",
+            Method::GET,
+            "/services",
+            None,
+            Present::PagerDuty,
+            ok,
+            vec![("authorization", "Token token=pd_fixture".into())],
+        ),
+        (
+            "pagerduty",
+            Method::GET,
+            "/services/S1/integrations/I1",
+            None,
+            Present::PagerDuty,
+            no,
+            vec![],
+        ),
+        (
+            "pagerduty",
+            Method::GET,
+            "/services?include%5B%5D=integrations",
+            None,
+            Present::PagerDuty,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/runs/run-1/plan/json-output-redacted",
+            None,
+            Present::Bearer,
+            ok,
+            vec![("authorization", "Bearer tf_fixture".into())],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1/assessment-results",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/organizations/acme/workspaces.json",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1?include%5B%5D=outputs",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/#Logs_20140328.StartQuery",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "logs"),
+            ok,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/#AmazonAthena.StartQueryExecution",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "athena"),
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/#AWSGlue.GetConnection",
+            Some(r#"{"Name":"warehouse"}"#.into()),
+            Present::Sigv4("us-east-1", "glue"),
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/#AWSGlue.GetConnection",
+            Some(r#"{"Name":"warehouse","HidePassword":true}"#.into()),
+            Present::Sigv4("us-east-1", "glue"),
+            ok,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::GET,
+            "/usageplans/u1/keys",
+            None,
+            Present::Sigv4("us-east-1", "apigateway"),
+            no,
+            vec![],
+        ),
         (
             "aws",
             Method::POST,
@@ -955,7 +1100,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
     // RPC request naming no action is refused.
     let form = "application/x-www-form-urlencoded; charset=utf-8";
     // (service, path and query, headers, body)
-    let confused: [Confused; 5] = [
+    let confused: [Confused; 7] = [
         (
             "sts",
             "/",
@@ -990,6 +1135,25 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             "Action=GetSessionToken&Version=2011-06-15",
         ),
         ("sts", "/", vec![("content-type", "application/json")], "{}"),
+        // One target, one content type, an unencoded body: as AWS reads the request.
+        (
+            "logs",
+            "/",
+            vec![
+                ("x-amz-target", "Logs_20140328.FilterLogEvents"),
+                ("x-amz-target", "Logs_20140328.DeleteLogGroup"),
+            ],
+            "{}",
+        ),
+        (
+            "logs",
+            "/",
+            vec![
+                ("x-amz-target", "Logs_20140328.FilterLogEvents"),
+                ("content-encoding", "gzip"),
+            ],
+            "{}",
+        ),
     ];
     for (service, path, headers, body) in confused {
         let before = upstream.seen.lock().unwrap().len();
@@ -999,7 +1163,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             .build()
             .unwrap();
         for (name, value) in &headers {
-            request.headers_mut().insert(*name, value.parse().unwrap());
+            request.headers_mut().append(*name, value.parse().unwrap());
         }
         let credentials = Credentials {
             access_key_id: token.clone(),

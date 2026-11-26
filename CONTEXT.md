@@ -642,22 +642,26 @@ templates and filters name paths of a signal's context: its data below plus
   and the default branch is pushable when the grant names it, since a tenant's repository is
   the agent's own. Entire has no HTTP protocol: its API is reached with tools.
 - API egress (`catalog::apis`): HTTP egress to the providers agents read from sandboxes, each
-  deny-by-default and read-heavy, its upstream the provider's or the connection's (never a
+  an allowlist of what agents need, its upstream the provider's or the connection's (never a
   grant's), its credential the connection type's stored mint (an OAuth access token refreshed by
   the connection as usual). None can narrow a credential per request, so the rules and the
   grant are the narrowing. Linear (`POST /graphql`): queries, and the mutations the grant names
   (default `issueCreate`, `issueUpdate`, `commentCreate`), read from the document by a small
   GraphQL scanner (`egress::graphql`: aliases, fragments, arguments; batches, subscriptions and
-  unparseable bodies refused). New Relic: NerdGraph queries only, by region. Sentry (sentry.io or
-  `base_url`): reads under `/api/0/organizations/{org}` and `/api/0/projects/{org}/{project}`,
-  issue updates when `issue_writes` (default on); a grant narrowed to `organizations` refuses
-  paths naming another or none; auth tokens, integrations, project keys and hooks are denied.
-  Jira (API token type only; the OAuth type's cloud-ID lookup leaves it tools-only): reads and
-  JQL search on the connection's site, issue writes when `writes`. PagerDuty (by region): reads,
-  incident notes (`notes`, default on), acknowledging and resolving (`incident_updates`, default
-  off). Datadog (`api.<site>`), Grafana and Prometheus (the connection's URL), Honeycomb (by
-  region), HCP Terraform (`hostname`, else app.terraform.io): read-only allowlists, with key,
-  token, service account, admin, variable and state paths denied.
+  unparseable bodies refused; a provider's denied fields refused at any depth). GraphQL requests
+  carry no query string. New Relic: NerdGraph queries only, by region, never `apiAccess` (its
+  API keys). Sentry (sentry.io or `base_url`): reads of the organization, its issues, events,
+  releases, projects, teams, environments, tags, traces, replays, monitors and stats (and a
+  project's), issue updates when `issue_writes` (default on); a grant narrowed to
+  `organizations` refuses paths naming another or none. Jira (API token type only; the OAuth
+  type's cloud-ID lookup leaves it tools-only): reads and JQL search on the connection's site,
+  issue writes when `writes`. PagerDuty (by region): reads of incidents, services (never their
+  integrations, by path or `include[]`), on-calls and schedules, incident notes (`notes`, default
+  on), acknowledging and resolving (`incident_updates`, default off). HCP Terraform (`hostname`,
+  else app.terraform.io): organizations, projects, workspaces, runs and their events, redacted
+  plans and applies; no `include` of state or outputs, no dotted path segments (`.json`).
+  Datadog (`api.<site>`), Grafana and Prometheus (the connection's URL), Honeycomb (by region):
+  read-only allowlists.
 - AWS egress (`catalog::aws::egress`): the sandbox's SDK or CLI points `AWS_ENDPOINT_URL` at the
   route and signs with the egress token as its access key ID (any secret). The gateway reads the
   token, and the region and service from that signature's scope (the client's signature is not
@@ -665,10 +669,15 @@ templates and filters name paths of a signal's context: its data below plus
   own host), and signs it again with the connection's credentials in the grant's `account` (its
   own by default, else a role it lists). A grant names `services` (signing names, default `logs`
   and `monitoring`), `regions` (empty: any) and `read_only` (default on: actions named Get, List,
-  Describe, Filter, Search, Lookup, BatchGet, Query, Scan, StartQuery or StopQuery, read from
-  `X-Amz-Target`, an RPC v2 path or the Query protocol's `Action`; a REST API's GET and HEAD).
-  Actions that return credentials (STS other than GetCallerIdentity, names with `Token`,
-  `Credential`, `SecretValue`, `AccessKey`, `PasswordData`) are refused under any grant.
+  Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by a word, or exactly
+  StartQuery or StopQuery; a REST API's GET and HEAD). Every action a request names
+  (`X-Amz-Target`, an RPC v2 path, the Query protocol's `Action` in the query or a form body)
+  must agree, an RPC service's write naming none is refused, and an RPC request carries one
+  target, one content type and an unencoded body. Under any grant: STS other than
+  GetCallerIdentity, names with `Token`, `Credential`, `SecretValue`, `AccessKey` or `Password`,
+  SSM parameter reads, Lightsail access details, API Gateway key values and Glue connections
+  without `HidePassword` are refused. Other stored secrets a read returns (a Lambda function's
+  environment, an S3 object) are the role's IAM policy's to guard.
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
   enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process

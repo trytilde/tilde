@@ -11,12 +11,14 @@
 //! metrics), `xray`, `s3`, `lambda`.
 //!
 //! A grant names the services and regions it reaches and whether it is read-only (the default):
-//! an action named Get, List, Describe, Filter, Search, Lookup, BatchGet, Query, Scan, StartQuery
-//! or StopQuery, read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2 path (every
+//! an action named Get, List, Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by
+//! a word, or exactly StartQuery or StopQuery (`reads`), read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2 path (every
 //! one the request carries, which must agree; an RPC service's request naming none is refused);
 //! a REST API's (S3, Lambda) GET and HEAD. Whatever the grant, the actions `returns_credentials`
 //! lists (STS sessions, tokens, credentials, secret values, access keys, passwords, SSM
-//! parameters, Lightsail access details, API Gateway key values) are refused. Other stored
+//! parameters, Lightsail access details), API Gateway key values and Glue connections without
+//! `HidePassword` are refused. An RPC request must carry one `X-Amz-Target`, one content type
+//! and an unencoded body, so the check reads what AWS reads. Other stored
 //! secrets a read can return (a Lambda function's environment, an object in S3) are the role's
 //! IAM policy's to guard: it stays the ceiling.
 use crate::chat::providers::Access;
@@ -97,19 +99,21 @@ fn definition() -> Egress {
     }
 }
 
+/// Read action names: a prefix followed by a word (`GetMetricData`) or the whole name (DynamoDB's
+/// `Query`). CloudWatch Logs Insights' `StartQuery` and `StopQuery` are reads by name alone, so
+/// `StartQueryExecution` (Athena) is not.
 const READS: &[&str] = &[
-    "Get",
-    "List",
-    "Describe",
-    "Filter",
-    "Search",
-    "Lookup",
-    "BatchGet",
-    "Query",
-    "Scan",
-    "StartQuery",
-    "StopQuery",
+    "Get", "List", "Describe", "Filter", "Search", "Lookup", "BatchGet", "Query", "Scan",
 ];
+const READ_NAMES: &[&str] = &["StartQuery", "StopQuery"];
+fn reads(action: &str) -> bool {
+    READ_NAMES.contains(&action)
+        || READS.iter().any(|prefix| {
+            action.strip_prefix(prefix).is_some_and(|rest| {
+                rest.is_empty() || rest.starts_with(|c: char| c.is_ascii_uppercase())
+            })
+        })
+}
 
 /// Services whose APIs are REST (the method and path name the operation), not RPC.
 const REST: &[&str] = &["s3", "lambda", "xray", "apigateway", "execute-api"];
@@ -251,6 +255,21 @@ impl EgressHook for Aws {
         if !regions.is_empty() && !regions.contains(&region) {
             return Decision::deny(format!("The {region} region is not granted"));
         }
+        let rest = REST.contains(&service);
+        // An RPC request is read as AWS reads it: one target, one content type, an identity body.
+        if !rest {
+            for name in ["x-amz-target", "content-type", "content-encoding"] {
+                if headers.get_all(name).iter().count() > 1 {
+                    return Decision::deny(format!("More than one {name}"));
+                }
+            }
+            if headers
+                .get(http::header::CONTENT_ENCODING)
+                .is_some_and(|v| !v.as_bytes().eq_ignore_ascii_case(b"identity"))
+            {
+                return Decision::deny("Encoded request bodies are not checked");
+            }
+        }
         let actions = actions(path, *query, headers, body);
         if actions.iter().any(|a| *a != actions[0]) {
             return Decision::deny(format!(
@@ -258,13 +277,31 @@ impl EgressHook for Aws {
                 actions.join(", ")
             ));
         }
-        let rest = REST.contains(&service);
-        // API Gateway returns API key values when asked to (`includeValue(s)=true`).
+        // API Gateway returns API key values when asked to (`includeValue(s)=true`) and with a
+        // usage plan's keys.
         if service == "apigateway"
-            && url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
+            && (url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
                 .any(|(k, v)| k.starts_with("includeValue") && v.eq_ignore_ascii_case("true"))
+                || crate::connections::egress::rules::matches(
+                    "* /usageplans/*/keys/**",
+                    method,
+                    path,
+                )
+                .is_some())
         {
             return Decision::deny("API Gateway key values are not readable");
+        }
+        // Glue connections carry their passwords unless asked not to.
+        if service == "glue"
+            && actions
+                .first()
+                .is_some_and(|a| a == "GetConnection" || a == "GetConnections")
+            && serde_json::from_slice::<Value>(body)
+                .ok()
+                .and_then(|b| b.get("HidePassword")?.as_bool())
+                != Some(true)
+        {
+            return Decision::deny("Glue connections are readable with HidePassword only");
         }
         if let Some(action) = actions.first()
             && returns_credentials(service, action)
@@ -280,7 +317,7 @@ impl EgressHook for Aws {
             .and_then(Value::as_bool)
             .unwrap_or(true);
         let reads = match actions.first() {
-            Some(action) => READS.iter().any(|prefix| action.starts_with(prefix)),
+            Some(action) => reads(action),
             None => get,
         };
         if read_only && !reads {

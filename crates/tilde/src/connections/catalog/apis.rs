@@ -136,6 +136,27 @@ fn https(url: Option<&str>) -> Result<String, Error> {
         .map(str::to_owned)
         .map_err(|e| Error::Invalid(e.message.unwrap_or_default()))
 }
+/// The values of every query parameter whose key starts with `prefix` (`include`, `include[]`),
+/// split at commas and lowercased.
+fn query_values(request: &EgressRequest<'_>, prefix: &str) -> Vec<String> {
+    let EgressRequest::Http { query, .. } = request else {
+        return vec![];
+    };
+    url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
+        .filter(|(k, _)| k.starts_with(prefix))
+        .flat_map(|(_, v)| {
+            v.split(',')
+                .map(|v| v.trim().to_ascii_lowercase())
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+/// GraphQL endpoints take the document in the body only: servers that also read `query`,
+/// `variables` or `extensions` from the URL would run what the check never saw.
+fn graphql_body_only(request: &EgressRequest<'_>) -> Option<Decision> {
+    matches!(request, EgressRequest::Http { query: Some(_), .. })
+        .then(|| Decision::deny("GraphQL requests carry no query string"))
+}
 fn regional(access: &Access, us: &str, eu: &str) -> String {
     match model::optional(&access.values, "region") {
         Some("eu") => eu.to_owned(),
@@ -171,7 +192,9 @@ fn linear() -> Api {
         ),
         upstream: |_| Ok("https://api.linear.app".into()),
         check: |request, config| {
-            graphql::check(body(request), &strings(config.get("mutations")), &[])
+            graphql_body_only(request).unwrap_or_else(|| {
+                graphql::check(body(request), &strings(config.get("mutations")), &[])
+            })
         },
     }
 }
@@ -197,12 +220,16 @@ fn newrelic() -> Api {
             ))
         },
         // `apiAccess` reads the account's API keys.
-        check: |request, _| graphql::check(body(request), &[], &["apiAccess"]),
+        check: |request, _| {
+            graphql_body_only(request)
+                .unwrap_or_else(|| graphql::check(body(request), &[], &["apiAccess"]))
+        },
     }
 }
 
-/// Sentry's REST API under an organization: reads, and updating an issue (resolve, ignore,
-/// assign) when the grant allows it. A grant may narrow to organizations (slugs); paths that
+/// Sentry's REST API under an organization: an allowlist of reads (the organization, its issues,
+/// events, releases, projects, teams, environments, tags, traces, replays, monitors and stats),
+/// and updating an issue (resolve, ignore, assign) when the grant allows it. A grant may narrow to organizations (slugs); paths that
 /// name none are refused then. Organization-wide paths (issues by ID, search) are not narrowed
 /// further by project.
 fn sentry() -> Api {
@@ -212,17 +239,30 @@ fn sentry() -> Api {
                 "https://sentry.io",
                 vec![
                     "GET /api/0",
-                    "GET /api/0/organizations/{organization}/**",
-                    "GET /api/0/projects/{organization}/{project}/**",
+                    "GET /api/0/organizations/{organization}",
+                    "GET /api/0/organizations/{organization}/issues/**",
+                    "GET /api/0/organizations/{organization}/events/**",
+                    "GET /api/0/organizations/{organization}/events-stats",
+                    "GET /api/0/organizations/{organization}/eventids/*",
+                    "GET /api/0/organizations/{organization}/shortids/*",
+                    "GET /api/0/organizations/{organization}/projects",
+                    "GET /api/0/organizations/{organization}/teams",
+                    "GET /api/0/organizations/{organization}/environments",
+                    "GET /api/0/organizations/{organization}/releases/**",
+                    "GET /api/0/organizations/{organization}/tags/**",
+                    "GET /api/0/organizations/{organization}/trace/**",
+                    "GET /api/0/organizations/{organization}/replays/**",
+                    "GET /api/0/organizations/{organization}/monitors/**",
+                    "GET /api/0/organizations/{organization}/stats_v2",
+                    "GET /api/0/projects/{organization}/{project}",
+                    "GET /api/0/projects/{organization}/{project}/issues/**",
+                    "GET /api/0/projects/{organization}/{project}/events/**",
+                    "GET /api/0/projects/{organization}/{project}/releases/**",
+                    "GET /api/0/projects/{organization}/{project}/environments",
+                    "GET /api/0/projects/{organization}/{project}/tags/**",
                     "PUT /api/0/organizations/{organization}/issues/*",
                 ],
-                vec![
-                    "* /api/0/organizations/*/org-auth-tokens/**",
-                    "* /api/0/organizations/*/integrations/**",
-                    "* /api/0/organizations/*/sentry-app-installations/**",
-                    "* /api/0/projects/*/*/keys/**",
-                    "* /api/0/projects/*/*/hooks/**",
-                ],
+                vec![],
                 &[("SENTRY_URL", "{url}"), ("SENTRY_AUTH_TOKEN", "{token}")],
             ),
             schema(json!({
@@ -313,8 +353,9 @@ fn jira() -> Api {
     }
 }
 
-/// PagerDuty's REST API: incidents, services, on-calls and schedules, adding notes to incidents
-/// and, when the grant allows it, acknowledging and resolving them.
+/// PagerDuty's REST API: incidents, services (never their integrations, whose keys they carry),
+/// on-calls and schedules, adding notes to incidents and, when the grant allows it,
+/// acknowledging and resolving them.
 fn pagerduty() -> Api {
     Api {
         egress: egress(
@@ -322,7 +363,8 @@ fn pagerduty() -> Api {
                 "https://api.pagerduty.com",
                 vec![
                     "GET /incidents/**",
-                    "GET /services/**",
+                    "GET /services",
+                    "GET /services/*",
                     "GET /oncalls",
                     "GET /schedules/**",
                     "GET /escalation_policies/**",
@@ -335,6 +377,8 @@ fn pagerduty() -> Api {
                     "PUT /incidents/*",
                 ],
                 vec![
+                    // Integration keys.
+                    "* /services/*/integrations/**",
                     "* /users/*/contact_methods/**",
                     "* /users/*/notification_rules/**",
                     "* /webhook_subscriptions/**",
@@ -365,6 +409,13 @@ fn pagerduty() -> Api {
             ))
         },
         check: |request, config| match request {
+            // `include[]=integrations` embeds integration keys.
+            _ if query_values(request, "include")
+                .iter()
+                .any(|v| v.contains("integration")) =>
+            {
+                Decision::deny("Service integrations are not readable")
+            }
             EgressRequest::Http { method, .. } if method.eq_ignore_ascii_case("POST") => {
                 if flag(config, "notes") {
                     Decision::Allow
@@ -534,34 +585,32 @@ fn honeycomb() -> Api {
     }
 }
 
-/// HCP Terraform's (or Terraform Enterprise's) API, read-only: workspaces, runs, redacted plans.
-/// State (also through `include`), unredacted plans, variables and tokens are refused: they hold
-/// secrets.
+/// HCP Terraform's (or Terraform Enterprise's) API, read-only, an allowlist: organizations,
+/// projects, workspaces, runs and their events, redacted plans and applies. No state, outputs,
+/// variables, assessments, plan exports or tokens, including through `include`.
 fn terraform() -> Api {
     Api {
         egress: egress(
             http(
                 "https://app.terraform.io",
-                vec!["GET /api/v2/**"],
                 vec![
-                    "* /api/v2/vars/**",
-                    "* /api/v2/varsets/**",
-                    "* /api/v2/workspaces/*/vars/**",
-                    "* /api/v2/workspaces/*/varsets/**",
-                    "* /api/v2/organizations/*/varsets/**",
-                    "* /api/v2/state-versions/**",
-                    "* /api/v2/state-version-outputs/**",
-                    "* /api/v2/workspaces/*/current-state-version/**",
-                    "* /api/v2/workspaces/*/current-state-version-outputs/**",
-                    // Unredacted plans; `json-output-redacted` stays readable.
-                    "* /api/v2/plans/*/json-output",
-                    "* /api/v2/runs/*/plan/json-output",
-                    "* /api/v2/workspaces/*/state-versions/**",
-                    "* /api/v2/authentication-tokens/**",
-                    "* /api/v2/users/*/authentication-tokens/**",
-                    "* /api/v2/teams/*/authentication-token/**",
-                    "* /api/v2/organizations/*/authentication-token/**",
+                    "GET /api/v2/organizations/*",
+                    "GET /api/v2/organizations/*/workspaces",
+                    "GET /api/v2/organizations/*/workspaces/*",
+                    "GET /api/v2/organizations/*/projects",
+                    "GET /api/v2/projects/*",
+                    "GET /api/v2/workspaces/*",
+                    "GET /api/v2/workspaces/*/runs",
+                    "GET /api/v2/runs/*",
+                    "GET /api/v2/runs/*/run-events",
+                    "GET /api/v2/runs/*/plan",
+                    "GET /api/v2/runs/*/plan/json-output-redacted",
+                    "GET /api/v2/runs/*/apply",
+                    "GET /api/v2/plans/*",
+                    "GET /api/v2/plans/*/json-output-redacted",
+                    "GET /api/v2/applies/*",
                 ],
+                vec![],
                 &[("TFE_TOKEN", "{token}")],
             ),
             schema(json!({})),
@@ -572,19 +621,20 @@ fn terraform() -> Api {
                 model::optional(&access.values, "hostname").unwrap_or("app.terraform.io")
             ))
         },
-        // `include` would embed a state version (and its signed download URL) or its outputs.
+        // `include` would embed state versions or their outputs (and signed download URLs). A
+        // `.json` suffix names the same route upstream, so no segment may carry a dot (names
+        // and IDs have none).
         check: |request, _| {
-            let EgressRequest::Http { query, .. } = request else {
+            let EgressRequest::Http { path, .. } = request else {
                 return Decision::deny("Terraform is reached over HTTP");
             };
-            let state =
-                url::form_urlencoded::parse(query.unwrap_or_default().as_bytes()).any(|(k, v)| {
-                    k == "include"
-                        && v.to_ascii_lowercase()
-                            .replace('-', "_")
-                            .contains("state_version")
-                });
-            if state {
+            if path.contains('.') {
+                return Decision::deny("Terraform paths have no dots");
+            }
+            let embeds = query_values(request, "include")
+                .iter()
+                .any(|v| v.contains("output") || v.contains("state"));
+            if embeds {
                 return Decision::deny("State versions and their outputs are not readable");
             }
             Decision::Allow
