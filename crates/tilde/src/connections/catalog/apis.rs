@@ -501,7 +501,9 @@ fn grafana() -> Api {
                     "GET /api/datasources/proxy/**",
                     "POST /api/ds/query",
                     "GET /api/annotations",
-                    "GET /api/alertmanager/**",
+                    // Alerts and silences only: an alertmanager's config holds receiver secrets.
+                    "GET /api/alertmanager/*/api/v2/alerts/**",
+                    "GET /api/alertmanager/*/api/v2/silences/**",
                     "GET /api/prometheus/**",
                     "GET /api/v1/provisioning/alert-rules/**",
                 ],
@@ -587,7 +589,9 @@ fn honeycomb() -> Api {
 
 /// HCP Terraform's (or Terraform Enterprise's) API, read-only, an allowlist: organizations,
 /// projects, workspaces, runs and their events, redacted plans and applies. No state, outputs,
-/// variables, assessments, plan exports or tokens, including through `include`.
+/// variables, assessments, plan exports or tokens, including through `include` (which cannot
+/// embed runs either). Run reads must name a sparse fieldset (`fields[run]=...`) without
+/// `variables`, whose values a run carries.
 fn terraform() -> Api {
     Api {
         egress: egress(
@@ -633,9 +637,19 @@ fn terraform() -> Api {
             }
             let embeds = query_values(request, "include")
                 .iter()
-                .any(|v| v.contains("output") || v.contains("state"));
+                .any(|v| v.contains("output") || v.contains("state") || v.contains("run"));
             if embeds {
-                return Decision::deny("State versions and their outputs are not readable");
+                return Decision::deny("State versions, outputs and runs cannot be included");
+            }
+            // A run's `variables` hold values: run reads name their fields without them.
+            let runs = ["GET /api/v2/runs/*", "GET /api/v2/workspaces/*/runs"]
+                .iter()
+                .any(|rule| rules::matches(rule, "GET", path).is_some());
+            let fields = query_values(request, "fields[run]");
+            if runs && (fields.is_empty() || fields.iter().any(|f| f.contains("variables"))) {
+                return Decision::deny(
+                    "Name a run's fields without variables, e.g. ?fields[run]=status,created-at,message",
+                );
             }
             Decision::Allow
         },

@@ -343,7 +343,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
                 ("secret_access_key", AWS_SECRET),
                 ("region", "us-east-1"),
             ],
-            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway"], "regions": ["us-east-1"]}),
+            json!({"services": ["logs", "sts", "ssm", "athena", "glue", "apigateway", "s3", "lambda", "cognito-idp"], "regions": ["us-east-1"]}),
         ),
     ];
     let secrets: Vec<&str> = grants
@@ -842,6 +842,97 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             vec![],
         ),
         // SSM parameter reads return decrypted secrets.
+        // Third review: REST services read by method alone, run variables, alertmanager config.
+        (
+            "aws",
+            Method::GET,
+            "/reports/2026.csv",
+            None,
+            Present::Sigv4("us-east-1", "s3"),
+            ok,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::PUT,
+            "/reports/2026.csv?Action=GetObject",
+            Some("data".into()),
+            Present::Sigv4("us-east-1", "s3"),
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/2015-03-31/functions/f/invocations?Action=GetFunction",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "lambda"),
+            no,
+            vec![],
+        ),
+        (
+            "aws",
+            Method::POST,
+            "/#AWSCognitoIdentityProviderService.DescribeUserPoolClient",
+            Some("{}".into()),
+            Present::Sigv4("us-east-1", "cognito-idp"),
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/runs/run-1",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/runs/run-1?fields%5Brun%5D=status,message",
+            None,
+            Present::Bearer,
+            ok,
+            vec![("authorization", "Bearer tf_fixture".into())],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1/runs?fields%5Brun%5D=status,variables",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "terraform",
+            Method::GET,
+            "/api/v2/workspaces/ws-1?include=current_run",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
+        (
+            "grafana",
+            Method::GET,
+            "/api/alertmanager/grafana/api/v2/alerts",
+            None,
+            Present::Bearer,
+            ok,
+            vec![("authorization", "Bearer glsa_fixture".into())],
+        ),
+        (
+            "grafana",
+            Method::GET,
+            "/api/alertmanager/grafana/config/api/v1/alerts",
+            None,
+            Present::Bearer,
+            no,
+            vec![],
+        ),
         // Second review: allowlists, query strings, and the remaining credential reads.
         (
             "linear",
@@ -1085,7 +1176,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
         }
         match present {
             Present::Sigv4(..) => {
-                assert!(seen.route.starts_with("POST /"), "{seen:?}");
+                assert!(seen.route.starts_with(&format!("{method} /")), "{seen:?}");
                 assert_eq!(seen.signed, Some(true), "{slug} {path}: {seen:?}");
                 assert!(seen.headers["authorization"].contains(&format!("Credential={AWS_KEY}/")));
             }
@@ -1100,7 +1191,7 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
     // RPC request naming no action is refused.
     let form = "application/x-www-form-urlencoded; charset=utf-8";
     // (service, path and query, headers, body)
-    let confused: [Confused; 7] = [
+    let confused: [Confused; 8] = [
         (
             "sts",
             "/",
@@ -1135,6 +1226,13 @@ async fn sandbox_reaches_api_providers_through_egress_within_their_grants() {
             "Action=GetSessionToken&Version=2011-06-15",
         ),
         ("sts", "/", vec![("content-type", "application/json")], "{}"),
+        // A REST service ignores action names: an invoke is a write whatever its target says.
+        (
+            "lambda",
+            "/2015-03-31/functions/f/invocations",
+            vec![("x-amz-target", "AWSLambda.GetFunction")],
+            "{}",
+        ),
         // One target, one content type, an unencoded body: as AWS reads the request.
         (
             "logs",

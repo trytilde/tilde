@@ -10,17 +10,18 @@
 //! service is the SigV4 signing name: `logs` (CloudWatch Logs), `monitoring` (CloudWatch
 //! metrics), `xray`, `s3`, `lambda`.
 //!
-//! A grant names the services and regions it reaches and whether it is read-only (the default):
-//! an action named Get, List, Describe, Filter, Search, Lookup, BatchGet, Query or Scan followed by
-//! a word, or exactly StartQuery or StopQuery (`reads`), read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2 path (every
-//! one the request carries, which must agree; an RPC service's request naming none is refused);
-//! a REST API's (S3, Lambda) GET and HEAD. Whatever the grant, the actions `returns_credentials`
-//! lists (STS sessions, tokens, credentials, secret values, access keys, passwords, SSM
-//! parameters, Lightsail access details), API Gateway key values and Glue connections without
-//! `HidePassword` are refused. An RPC request must carry one `X-Amz-Target`, one content type
-//! and an unencoded body, so the check reads what AWS reads. Other stored
-//! secrets a read can return (a Lambda function's environment, an object in S3) are the role's
-//! IAM policy's to guard: it stays the ceiling.
+//! A grant names the services and regions it reaches and whether it is read-only (the default).
+//! An RPC service's request reads when its action is named Get, List, Describe, Filter, Search,
+//! Lookup, BatchGet, Query or Scan followed by a word, or exactly StartQuery or StopQuery
+//! (`reads`); the action is read from `X-Amz-Target`, the Query protocol's `Action` or an RPC v2
+//! path, every one the request carries must agree, a write naming none is refused, and the
+//! request carries one `X-Amz-Target`, one content type and an unencoded body, so the check reads
+//! what AWS reads. A REST service (`REST`: S3, Lambda, X-Ray, API Gateway, AppSync) ignores
+//! action names, so only its GET and HEAD read. Whatever the grant, the actions
+//! `returns_credentials` lists, API Gateway key values, AppSync API keys and Glue connections
+//! without `HidePassword` are refused. Other stored secrets a read can return (a Lambda
+//! function's environment, an object in S3) are the role's IAM policy's to guard: it stays the
+//! ceiling.
 use crate::chat::providers::Access;
 use crate::connections::egress::{
     Decision, Egress, EgressHook, EgressProtocol, EgressRequest, EnvTemplate, forge::strings,
@@ -116,7 +117,14 @@ fn reads(action: &str) -> bool {
 }
 
 /// Services whose APIs are REST (the method and path name the operation), not RPC.
-const REST: &[&str] = &["s3", "lambda", "xray", "apigateway", "execute-api"];
+const REST: &[&str] = &[
+    "s3",
+    "lambda",
+    "xray",
+    "apigateway",
+    "execute-api",
+    "appsync",
+];
 
 /// Every API action a request could be read as naming: `X-Amz-Target` (JSON,
 /// `Logs_20140328.FilterLogEvents`), an RPC v2 path (`/service/<name>/operation/<action>`), and
@@ -155,8 +163,9 @@ fn actions(path: &str, query: Option<&str>, headers: &http::HeaderMap, body: &[u
 
 /// Actions whose answers carry credentials or stored secrets, refused under any grant: STS
 /// other than GetCallerIdentity, names with `Token`, `Credential`, `SecretValue`, `AccessKey`,
-/// `Password` (EC2 password data, database master passwords), SSM parameter reads (decrypted
-/// SecureStrings) and Lightsail access details. Other stored secrets (a Lambda function's
+/// `Password` (EC2 password data, database master passwords) or `ApiKey`, SSM parameter reads
+/// (decrypted SecureStrings), Lightsail access details, Location Service key values
+/// (`geo:DescribeKey`) and Cognito app client secrets (`cognito-idp:DescribeUserPoolClient`). Other stored secrets (a Lambda function's
 /// environment, say) are the role's IAM policy's to guard.
 fn returns_credentials(service: &str, action: &str) -> bool {
     let named = |names: &[&str]| names.contains(&action);
@@ -167,6 +176,7 @@ fn returns_credentials(service: &str, action: &str) -> bool {
             "SecretValue",
             "AccessKey",
             "Password",
+            "ApiKey",
         ]
         .iter()
         .any(|word| action.contains(word))
@@ -178,6 +188,8 @@ fn returns_credentials(service: &str, action: &str) -> bool {
                 "GetParameterHistory",
             ]))
         || (service == "lightsail" && action.contains("AccessDetails"))
+        || (service == "geo" && action == "DescribeKey")
+        || (service == "cognito-idp" && action == "DescribeUserPoolClient")
 }
 
 /// The endpoint of `service` in `region`: regional, except for global services.
@@ -270,7 +282,13 @@ impl EgressHook for Aws {
                 return Decision::deny("Encoded request bodies are not checked");
             }
         }
-        let actions = actions(path, *query, headers, body);
+        // A REST service ignores action names: its method and path are the operation, so only
+        // the method says whether it reads.
+        let actions = if rest {
+            vec![]
+        } else {
+            actions(path, *query, headers, body)
+        };
         if actions.iter().any(|a| *a != actions[0]) {
             return Decision::deny(format!(
                 "The request names more than one action: {}",
@@ -290,6 +308,12 @@ impl EgressHook for Aws {
                 .is_some())
         {
             return Decision::deny("API Gateway key values are not readable");
+        }
+        if service == "appsync"
+            && crate::connections::egress::rules::matches("* /v1/apis/*/apikeys/**", method, path)
+                .is_some()
+        {
+            return Decision::deny("AppSync API keys are not readable");
         }
         // Glue connections carry their passwords unless asked not to.
         if service == "glue"
