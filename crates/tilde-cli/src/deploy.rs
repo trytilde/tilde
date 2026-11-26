@@ -11,7 +11,7 @@ use std::{env, path::PathBuf};
 use tilde_contracts::proto::tilde::management::v1 as wire;
 use tilde_contracts::proto::tilde::types::v1 as types;
 
-#[derive(Args)]
+#[derive(Args, Default)]
 pub struct Deploy {
     /// Module declaring the agent's prompts, skills and bundled tools. Defaults to the
     /// project's own entry point.

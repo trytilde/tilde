@@ -15,8 +15,8 @@ pub fn request(args: &Deploy, declarations: &Declarations) -> Result<wire::Apply
     request_with(args, declarations, &Default::default())
 }
 /// The request with each Hosted agent's bundle (by key) in its external ID's digest, so changed
-/// code is a new deployment even when its declarations are not.
-fn request_with(
+/// code is a new deployment even when its declarations are not. `tilde build` writes an agent of it.
+pub(crate) fn request_with(
     args: &Deploy,
     declarations: &Declarations,
     bundles: &Bundles,
@@ -99,8 +99,8 @@ fn request_with(
 }
 
 /// Hosted agents' bundles, by key.
-type Bundles = std::collections::BTreeMap<String, Vec<u8>>;
-const HOSTED: &str = "DEPLOYMENT_TARGET_HOSTED";
+pub(crate) type Bundles = std::collections::BTreeMap<String, Vec<u8>>;
+pub(crate) const HOSTED: &str = "DEPLOYMENT_TARGET_HOSTED";
 fn bundle_digest(bundle: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(bundle))

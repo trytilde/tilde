@@ -8,6 +8,10 @@
 //! `prompts/` and `skills/` copied beside it for code that reads them from disk; and a
 //! `package.json` carrying the SDK's version, which the SDK reads from beside its module. esbuild
 //! is the project's own, else a pinned one installed for the build. Node.js code only.
+//!
+//! The zip is reproducible: entries in path order, each with the same fixed time (2020-01-01, as
+//! Tilde Cloud's published Factory Manager bundle has it), so the same sources give the same
+//! digest. `tilde build` writes this same bundle without deploying it.
 use crate::api::Client;
 use anyhow::{Context, Result, bail};
 use std::io::Write;
@@ -70,8 +74,9 @@ fn walk(root: &Path, prefix: &str) -> Result<Vec<(String, PathBuf)>> {
     if !root.is_dir() {
         return Ok(files);
     }
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
+    let mut entries = std::fs::read_dir(root)?.collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
         let name = format!("{prefix}/{}", entry.file_name().to_string_lossy());
         let kind = entry.file_type()?;
         if kind.is_symlink()
@@ -96,7 +101,10 @@ fn zip(files: &[(String, PathBuf)]) -> Result<Vec<u8>> {
     let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
-        .unix_permissions(0o644);
+        .unix_permissions(0o644)
+        .last_modified_time(
+            zip::DateTime::from_date_and_time(2020, 1, 1, 0, 0, 0).expect("a valid zip time"),
+        );
     for (name, path) in files {
         writer.start_file(name.as_str(), options)?;
         writer.write_all(&std::fs::read(path)?)?;
