@@ -774,7 +774,7 @@ class AgentContext:
         raise ConnectError(Code.INTERNAL, "Tool call ended without a result")
 
     # ----- suspension -----------------------------------------------------------------------
-    def enable_suspension(self, snapshot: Callable[[], Any]) -> None:
+    def enable_suspension(self, snapshot: Callable[[], Any | None]) -> None:
         """The suspension contract of framework adapters (internal). An adapter that can stop
         its loop at a step boundary and continue it from saved state calls this before the loop
         runs, with the loop's state at its last step boundary (the conversation in the
@@ -782,8 +782,9 @@ class AgentContext:
         make (``execute(..., suspendable=True)``) that runs long answers pending instead of
         blocking; at each step boundary the adapter checks
         ``should_suspend`` and, when set, calls ``suspend`` with the conversation so far, pending
-        answers included. On the run's next invocation ``resumed`` holds that state and the
-        calls' outcomes (``take_resumed()``, once), and the adapter continues from it."""
+        answers included. ``snapshot`` returns None once the loop has ended (its last step called
+        no tool): there is nothing to resume. On the run's next invocation ``take_resumed()``
+        returns that state and the calls' outcomes once, and the adapter continues from it."""
         self._snapshot = snapshot
 
     def take_resumed(self) -> Resumed | None:
@@ -823,10 +824,11 @@ class AgentContext:
 
     async def settle_pending(self) -> None:
         """Host hook: a loop that ended with calls still pending suspends with its last state."""
-        if self._snapshot is None or self._suspended is not None or not self._pending:
+        state = self._snapshot() if self._snapshot is not None else None
+        if state is None or self._suspended is not None or not self._pending:
             return
         try:
-            await self.suspend(self._snapshot())
+            await self.suspend(state)
         except StopLoop:
             pass
 
@@ -1120,7 +1122,14 @@ class AgentContext:
     def _force_suspend(self) -> None:
         if self._snapshot is None or self._suspended is not None or self.cancellation.aborted:
             return
-        self._suspended = asyncio.ensure_future(self._save(self._snapshot()))
+        # Not once the loop ended: its run is done, and resuming it would answer twice.
+        state = self._snapshot()
+        if state is not None:
+            self._suspended = asyncio.ensure_future(self._save(state))
+
+    def end_suspension(self) -> None:
+        """Host hook: ``run`` returned, so no framework loop runs any more."""
+        self._snapshot = None
 
 
 def _encode(value: Any) -> str:

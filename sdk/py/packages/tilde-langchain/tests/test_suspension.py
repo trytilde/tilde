@@ -66,4 +66,5 @@ async def test_a_pending_tool_call_suspends_the_graph_and_the_next_invocation_co
     assert seen[0].content == "Deploy it", "the saved conversation, not the call's own"
     assert isinstance(seen[2], ToolMessage) and json.loads(seen[2].content) == {"version": 7}
     assert result["messages"][-1].content == "Deployed"
+    assert ctx._snapshot is not None and ctx._snapshot() is None, "the graph ended"
     assert len(gateway.suspensions) == 1, "nothing pending, nothing saved"

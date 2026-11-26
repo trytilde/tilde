@@ -20,7 +20,7 @@ type Settings = {
   instructions?: Instructions;
   system?: Instructions;
   prepareStep?: PrepareStepFunction<any>;
-  onStepFinish?: (step: { response: { messages: ModelMessage[] } }) => unknown;
+  onStepFinish?: (step: Step) => unknown;
 };
 
 function withSummary(instructions: Instructions | undefined, summary: string) {
@@ -46,11 +46,14 @@ function withSummary(instructions: Instructions | undefined, summary: string) {
  *   conversation so far (`ctx.suspend`) and ends the invocation; the run resumes with the
  *   outcome in a new invocation.
  */
+type Step = { response: { messages: ModelMessage[] }; toolCalls: unknown[] };
 type Loop = {
   prepareStep: PrepareStepFunction<any>;
-  onStepFinish: (step: { response: { messages: ModelMessage[] } }) => void;
+  onStepFinish: (step: Step) => void;
   /** The conversation at the last step boundary or step end, as the model saw it. */
   latest: ModelMessage[];
+  /** The last step called no tool: the loop is over and nothing is left to resume. */
+  ended: boolean;
 };
 /** Each invocation's current loop, which `tildeAiSdk`'s `onStepFinish` and `conversation` reach. */
 const loops = new WeakMap<AgentContext, Loop>();
@@ -68,10 +71,11 @@ function invocationStep(ctx: AgentContext, inner?: PrepareStepFunction<any>): Lo
   };
   const loop: Loop = {
     latest: [],
+    ended: false,
     prepareStep: async (step) => {
       if (first === undefined) {
         first = step.messages;
-        const resumed = ctx.takeResumed?.();
+        const resumed = ctx.takeResumed();
         if (resumed) restored = restore(resumed);
       }
       const responses = step.messages.slice(first.length);
@@ -82,6 +86,7 @@ function invocationStep(ctx: AgentContext, inner?: PrepareStepFunction<any>): Lo
         });
       const messages = assemble(responses);
       loop.latest = messages;
+      loop.ended = false;
       if (ctx.shouldSuspend) await ctx.suspend(toJson(messages));
       if (!restored && !steering.length) return inner?.(step);
       const result = await inner?.({ ...step, messages });
@@ -91,10 +96,11 @@ function invocationStep(ctx: AgentContext, inner?: PrepareStepFunction<any>): Lo
     // resuming does not call them again. Only a snapshot: steering waits for the next step.
     onStepFinish: (step) => {
       loop.latest = assemble(step.response.messages);
+      loop.ended = step.toolCalls.length === 0;
     },
   };
   loops.set(ctx, loop);
-  ctx.enableSuspension?.(() => toJson(loop.latest));
+  ctx.enableSuspension(() => (loop.ended ? undefined : toJson(loop.latest)));
   return loop;
 }
 
@@ -140,7 +146,7 @@ export async function prepareTildeCall<S extends object>(
     [key]: withSummary(own[key], summary),
     prepareStep: step.prepareStep,
     // generateText/streamText; a ToolLoopAgent's call takes it from `tildeAiSdk`.
-    onStepFinish: async (finished: Parameters<NonNullable<Settings["onStepFinish"]>>[0]) => {
+    onStepFinish: async (finished: Step) => {
       await own.onStepFinish?.(finished);
       step.onStepFinish(finished);
     },
@@ -175,7 +181,6 @@ export function tildeAiSdk(ctx: AgentContext, tools?: TildeToolsOptions) {
     options: { tilde: { context: ctx, tools } } satisfies TildeCallOptions,
     abortSignal: ctx.signal,
     // `prepareCall` cannot set it: records each step for suspension (see `prepareTildeCall`).
-    onStepFinish: (step: { response: { messages: ModelMessage[] } }) =>
-      loops.get(ctx)?.onStepFinish(step),
+    onStepFinish: (step: Step) => loops.get(ctx)?.onStepFinish(step),
   };
 }

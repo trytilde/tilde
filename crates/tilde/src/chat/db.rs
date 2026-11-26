@@ -1656,3 +1656,12 @@ pub async fn input_answers_all(
         .all()
         .await?)
 }
+
+pub async fn invocation_restop_execute(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::invocation_restop::run()
+        .bind(db, &invocation)
+        .await?)
+}

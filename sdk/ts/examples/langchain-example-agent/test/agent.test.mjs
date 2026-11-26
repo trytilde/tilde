@@ -47,6 +47,9 @@ function context({ baseURL = "http://127.0.0.1:1", fetch: send = fetch, steering
     activatePrompt: (prompt) => stamps.push(prompt),
     // Steering arrives while the model works: handed over before the second model call.
     takeInputs: () => (sent.length ? steering.splice(0) : []),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
     channel: { current: { sendMessage } },
     agentTools: {},
     setBundledTools: async (tools) => void published.push(...tools.map((tool) => tool.name)),

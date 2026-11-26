@@ -89,6 +89,9 @@ test("discover reads what Mastra agents declare without running them", async () 
     signal: new AbortController().signal,
     activatePrompt: (stamp) => stamps.push(stamp),
     takeInputs: () => steering.splice(0),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
   };
   const [processor] = (await tildeMastra(ctx)).inputProcessors;
   const added = [];

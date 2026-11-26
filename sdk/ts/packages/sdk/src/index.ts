@@ -411,7 +411,7 @@ export class AgentContext {
   async settleSuspension() {
     await this.suspension;
   }
-  private snapshot?: () => JsonValue;
+  private snapshot?: () => JsonValue | undefined;
   private readonly pendingCalls = new Map<string, PendingCall>();
   private suspendRequested = false;
   private suspended?: Promise<void>;
@@ -868,11 +868,12 @@ export class AgentContext {
    * the loop's state at its last step boundary (the conversation in the framework's message
    * format, as JSON). From then on a Tilde tool call its tool wrappers make (`suspendable` on the
    * execution) that runs long answers pending instead of blocking, and at each step boundary the adapter checks `shouldSuspend` and, when it is set,
-   * calls `suspend` with the conversation so far, pending answers included. On the run's next
+   * calls `suspend` with the conversation so far, pending answers included. `snapshot` returns
+   * undefined once the loop has ended (its last step called no tool): there is nothing to resume. On the run's next
    * invocation `takeResumed()` returns that state and the calls' outcomes once; the adapter
    * continues from it.
    */
-  enableSuspension(snapshot: () => JsonValue) {
+  enableSuspension(snapshot: () => JsonValue | undefined) {
     this.snapshot = snapshot;
   }
   /** @internal A tool call answered pending, or Tilde asked this invocation to suspend. */
@@ -897,10 +898,15 @@ export class AgentContext {
     await this.suspended;
     throw new StopLoop();
   }
+  /** Internal host hook: `run` returned, so no framework loop runs any more. */
+  endSuspension() {
+    this.snapshot = undefined;
+  }
   /** Internal host hook: a loop that ended with calls still pending suspends with its last state. */
   async settlePending() {
-    if (!this.snapshot || this.suspended || !this.pendingCalls.size) return;
-    await this.suspend(this.snapshot()).catch((error: unknown) => {
+    const state = this.snapshot?.();
+    if (state === undefined || this.suspended || !this.pendingCalls.size) return;
+    await this.suspend(state).catch((error: unknown) => {
       if (!(error instanceof StopLoop)) throw error;
     });
   }
@@ -1122,7 +1128,9 @@ export class AgentContext {
             // stays open meanwhile and keeps the invocation's lease.
             this.suspendRequested = true;
             const forced = setTimeout(() => {
-              if (this.snapshot) void this.suspend(this.snapshot()).catch(() => {});
+              // Not once the loop ended: its run is done, and resuming it would answer twice.
+              const state = this.snapshot?.();
+              if (state !== undefined) void this.suspend(state).catch(() => {});
             }, SUSPEND_GRACE_MS);
             forced.unref();
             this.signal.addEventListener("abort", () => clearTimeout(forced), { once: true });
@@ -1338,6 +1346,8 @@ async function runInvocation(
       // Module-level `inference()` and prompt renders resolve this invocation.
       await runWithContext(context, () => options.run(context));
       await context.settlePending();
+      // The loops are over: a forced suspension must not resume a finished conversation.
+      context.endSuspension();
       await context.settleSuspension();
       settle();
     } catch (error) {

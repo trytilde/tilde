@@ -44,14 +44,14 @@ export async function tildeMastra(
   // calls answered pending suspends with this, so that step runs again on resume: Mastra has no
   // per-call hook after a step's tool results short of replacing the agent's output processors.
   let latest: MastraDBMessage[] = [];
-  ctx.enableSuspension?.(() => toJson(latest));
+  ctx.enableSuspension(() => toJson(latest));
   const invocation: InputProcessor = {
     id: "tilde-invocation",
     async processInputStep({ messageList, agent, abort }) {
       const stamp = agent && dynamicInstructionsStamp(agent);
       if (stamp) ctx.activatePrompt(stamp);
       // A resumed run continues its saved conversation instead of the call's own messages.
-      const resumed = restored ? undefined : ctx.takeResumed?.();
+      const resumed = restored ? undefined : ctx.takeResumed();
       restored = true;
       if (resumed) {
         messageList.clear.all.db();

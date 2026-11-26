@@ -1,5 +1,5 @@
 import type { AgentContext, BundledTools } from "@trytilde/sdk";
-import { HumanMessage, RemoveMessage, type BaseMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, RemoveMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { createMiddleware } from "langchain";
 import {
@@ -70,12 +70,15 @@ export function tildeMiddleware(tools: TildeToolsOptions = {}) {
     return added.get(ctx)!;
   };
   // The loop's state at its last step boundary, for suspending it (see `./suspension.ts`).
-  const loops = new WeakMap<AgentContext, { restored: boolean; latest: BaseMessage[] }>();
+  // `ended`: the model's last answer called no tool, so the graph is done and nothing is left
+  // to resume.
+  type Loop = { restored: boolean; latest: BaseMessage[]; ended: boolean };
+  const loops = new WeakMap<AgentContext, Loop>();
   const loop = (ctx: AgentContext) => {
     let run = loops.get(ctx);
     if (!run) {
-      const created = { restored: false, latest: [] as BaseMessage[] };
-      ctx.enableSuspension?.(() => toJson(created.latest));
+      const created: Loop = { restored: false, latest: [], ended: false };
+      ctx.enableSuspension(() => (created.ended ? undefined : toJson(created.latest)));
       loops.set(ctx, (run = created));
     }
     return run;
@@ -86,15 +89,21 @@ export function tildeMiddleware(tools: TildeToolsOptions = {}) {
       const ctx = current(runtime);
       const run = loop(ctx);
       // A resumed run continues its saved conversation instead of the call's own messages.
-      const resumed = run.restored ? undefined : ctx.takeResumed?.();
+      const resumed = run.restored ? undefined : ctx.takeResumed();
       run.restored = true;
       const restored = resumed ? restore(resumed) : undefined;
       const inputs = ctx.takeInputs().map((input) => new HumanMessage(input.text));
       run.latest = [...(restored ?? state.messages), ...inputs];
+      run.ended = false;
       if (ctx.shouldSuspend) await ctx.suspend(toJson(run.latest));
       if (restored)
         return { messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...run.latest] };
       return inputs.length ? { messages: inputs } : undefined;
+    },
+    afterModel: (state, runtime) => {
+      const last = state.messages.at(-1);
+      loop(current(runtime)).ended = !AIMessage.isInstance(last) || !last.tool_calls?.length;
+      return undefined;
     },
     wrapModelCall: async (request, handler) => {
       const ctx = current(request.runtime);

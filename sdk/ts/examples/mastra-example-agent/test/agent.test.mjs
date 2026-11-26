@@ -53,6 +53,9 @@ function context({ baseURL = "http://127.0.0.1:1", fetch: send = fetch, steering
     activatePrompt: (prompt) => stamps.push(prompt),
     // Steering arrives while the model works: handed over at the second step.
     takeInputs: () => (sent.length ? steering.splice(0) : []),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
     skills: { directory: async () => registry },
     channel: { current: { sendMessage } },
     agentTools: {},

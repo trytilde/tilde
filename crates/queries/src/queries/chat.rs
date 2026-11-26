@@ -55,6 +55,7 @@ pub mod invocation_endpoint;
 pub mod invocation_expire;
 pub mod invocation_finish;
 pub mod invocation_heartbeat;
+pub mod invocation_restop;
 pub mod invocation_status;
 pub mod invocation_suspend_at;
 pub mod invocation_suspendable;

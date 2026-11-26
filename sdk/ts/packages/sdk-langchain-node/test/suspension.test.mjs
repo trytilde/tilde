@@ -83,6 +83,7 @@ void test("a pending tool call suspends the graph and the next invocation contin
   assert.equal(seen[1].content, "Deploy it", "the saved conversation, not the call's own");
   assert.equal(seen[3].content, JSON.stringify({ version: 7 }));
   assert.equal(result.messages.at(-1).content, "Deployed");
+  assert.equal(second.snapshot(), undefined, "the graph ended: nothing to resume");
 });
 
 void test("a failed pending call resumes as an error tool message", async () => {

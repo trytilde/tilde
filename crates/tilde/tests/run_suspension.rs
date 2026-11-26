@@ -549,8 +549,8 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     .unwrap();
     tokio::time::sleep(Duration::from_secs(2)).await;
     assert_eq!(chat.run(run_id).await.unwrap().status, "active");
-    // Asked once it can suspend, an invocation that saves nothing (a framework that cannot)
-    // loses its run, as Lambda ending it would have.
+    // Asked once it can suspend, a loop that finishes before its next step boundary saves
+    // nothing: its run ends as any stop does.
     seventh
         .call("ops.restart", Uuid::new_v4(), json!({"service":"cache"}))
         .await;
@@ -562,10 +562,10 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     .await
     .expect("the deadline asks it to suspend");
     seventh.stopped().await;
-    let lost = chat.run(run_id).await.unwrap();
+    let ended = chat.run(run_id).await.unwrap();
     assert_eq!(
-        (lost.status.as_str(), lost.invocation_status.as_str()),
-        ("failed", "failed")
+        (ended.status.as_str(), ended.invocation_status.as_str()),
+        ("waiting", "stopped")
     );
 
     // A wait for a reply its invocation left without suspending is not awaited: the person's

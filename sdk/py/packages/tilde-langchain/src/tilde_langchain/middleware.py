@@ -32,6 +32,7 @@ from langchain.agents.middleware import (
     ModelResponse,
 )
 from langchain_core.messages import (
+    AIMessage,
     BaseMessage,
     HumanMessage,
     RemoveMessage,
@@ -67,6 +68,8 @@ class _Loop:
 
     restored: bool = False
     latest: list[BaseMessage] | None = None
+    # The model's last answer called no tool: the graph is done, nothing is left to resume.
+    ended: bool = False
 
 
 _loops: weakref.WeakKeyDictionary[AgentContext, _Loop] = weakref.WeakKeyDictionary()
@@ -76,7 +79,7 @@ def _loop(ctx: AgentContext) -> _Loop:
     found = _loops.get(ctx)
     if found is None:
         found = _loops[ctx] = _Loop()
-        ctx.enable_suspension(lambda: messages_to_dict(found.latest or []))
+        ctx.enable_suspension(lambda: None if found.ended else messages_to_dict(found.latest or []))
     return found
 
 
@@ -144,11 +147,21 @@ class TildeMiddleware(AgentMiddleware[AgentState[Any], Any]):
             restored = _restore(resumed)
         inputs = [HumanMessage(content=input.text) for input in ctx.take_inputs()]
         loop.latest = [*(restored if restored is not None else state["messages"]), *inputs]
+        loop.ended = False
         if ctx.should_suspend:
             await ctx.suspend(messages_to_dict(loop.latest))
         if restored is not None:
             return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *loop.latest]}
         return {"messages": inputs} if inputs else None
+
+    async def aafter_model(
+        self, state: AgentState[Any], runtime: Runtime[Any]
+    ) -> dict[str, Any] | None:
+        ctx = current_invocation()
+        if ctx is not None:
+            last = state["messages"][-1] if state["messages"] else None
+            _loop(ctx).ended = not (isinstance(last, AIMessage) and last.tool_calls)
+        return None
 
     async def awrap_model_call(
         self,

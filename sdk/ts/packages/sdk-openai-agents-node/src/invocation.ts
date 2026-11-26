@@ -123,14 +123,14 @@ export async function tildeOpenAIAgents<TAgent extends AnyAgent>(
   let initial: number | undefined;
   let restored: AgentInputItem[] | undefined;
   let latest: AgentInputItem[] = [];
-  ctx.enableSuspension?.(() => toJson(latest));
+  ctx.enableSuspension(() => toJson(latest));
   const callModelInputFilter: CallModelInputFilter = async ({ modelData, agent: running }) => {
     const stamp = stamps.get(running.name);
     if (stamp) ctx.activatePrompt(stamp);
     // A resumed run continues its saved items instead of the run's own input.
     if (initial === undefined) {
       initial = modelData.input.length;
-      const resumed = ctx.takeResumed?.();
+      const resumed = ctx.takeResumed();
       if (resumed) restored = restore(resumed);
     }
     const own = restored ? [...restored, ...modelData.input.slice(initial)] : modelData.input;

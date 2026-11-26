@@ -42,6 +42,9 @@ function context({ baseURL = "http://127.0.0.1:1", fetch: send = fetch, steering
     activatePrompt: () => {},
     // Steering arrives while the model works: handed over at the second step.
     takeInputs: () => (sent.length ? steering.splice(0) : []),
+    // The suspension contract, unused here.
+    enableSuspension: () => {},
+    takeResumed: () => undefined,
     // A skill assigned in the registry: the AI SDK has no native skills, so it reaches the
     // model as Tilde's skill tools and a summary in the instructions.
     skills: createSkillsClient(

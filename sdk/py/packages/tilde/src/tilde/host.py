@@ -187,6 +187,8 @@ async def run_invocation(
             context.check()
             await options.run(context)
             await context.settle_pending()
+            # The loops are over: a forced suspension must not resume a finished conversation.
+            context.end_suspension()
             await context.settle_suspension()
             settle()
         except BaseException as error:  # noqa: BLE001 - every outcome is reported, never raised

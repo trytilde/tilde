@@ -1243,9 +1243,8 @@ models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, 
   calls' records. The invocation records why it was asked to suspend
   (`chat_invocations.suspended_for`: `manual`, `deadline` or `pending`): only the last two resume
   by themselves; a manual suspension waits for ResumeRun, which continues from a saved checkpoint.
-  An invocation asked to suspend for the deadline or a pending call that saved nothing (a
-  framework that cannot suspend) fails, with its run, and hands its inputs on, as Lambda ending
-  it would have. A checkpoint names only calls of its own run's invocations. A run its channel
+  An invocation asked to suspend for its deadline that saved nothing (its loop finished before
+  its next step boundary) ends as any stop does. A checkpoint names only calls of its own run's invocations. A run its channel
   may no longer start is left to ResumeRun. A message that arrives meanwhile starts its own run as any message does; the
   suspended run resumes after it (checked again under the thread lock). An invocation that ends
   without suspending drops the run's checkpoint (a failed one keeps it, so ResumeRun continues

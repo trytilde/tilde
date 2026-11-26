@@ -114,6 +114,8 @@ void test("a pending tool call suspends the loop and the next invocation continu
   assert.equal(prompt[1].content[0].text, "Deploy it");
   assert.deepEqual(prompt[3].content[0].output, { type: "json", value: { version: 7 } });
   assert.equal(second.saved, undefined, "nothing pending, nothing saved");
+  // The loop is over: a forced suspension now would resume a finished conversation.
+  assert.equal(second.snapshot(), undefined);
 });
 
 void test("Tilde's deadline suspends at the next step boundary and a failed call resumes as an error", async () => {

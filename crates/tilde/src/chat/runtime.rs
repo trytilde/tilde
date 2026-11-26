@@ -652,19 +652,15 @@ impl Chat {
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, existing.thread_id).await?;
         // A suspended run keeps its inputs: one suspended by hand waits for ResumeRun, and one
-        // that saved its state resumes by itself (`suspension`). Asked to suspend at its deadline
-        // or for a pending call without saving anything (a framework that cannot suspend), the
-        // run did not survive its invocation: it fails, as if Lambda had ended it, and its inputs
-        // go on.
+        // that saved its state resumes by itself (`suspension`). Asked to suspend for its
+        // deadline, a loop that finished first saved nothing: its run ends as any stop does.
         let suspension = crate::chat::db::invocation_suspension_one(&tx, invocation).await?;
         let asked = crate::chat::db::run_state_one(&tx, existing.run_id)
             .await?
             .status
             == "suspending";
-        let lost =
-            asked && suspension.suspended_for.as_deref() != Some("manual") && !suspension.saved;
-        let suspending = asked && !lost;
-        let status = if lost { "failed" } else { status };
+        let suspending =
+            asked && (suspension.saved || suspension.suspended_for.as_deref() == Some("manual"));
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
             if !suspending && status != "failed" {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
@@ -675,18 +671,13 @@ impl Chat {
                 _ => "failed",
             };
             crate::chat::db::run_status_execute(&tx, row.run_id, run_status).await?;
-            let ended = if lost {
-                format!("{status}: asked to suspend, it saved nothing")
-            } else {
-                status.to_owned()
-            };
             activity(
                 self.pg()?,
                 &tx,
                 row.thread_id,
                 "invocation.ended",
                 invocation,
-                &ended,
+                status,
             )
             .await?;
             if !suspending {
@@ -1018,6 +1009,7 @@ impl Chat {
                 .status
                 == "suspending";
             if asked && suspension.saved {
+                crate::chat::db::invocation_restop_execute(&tx, row.id).await?;
                 crate::chat::db::run_status_execute(&tx, row.run_id, "waiting").await?;
                 activity(
                     self.pg()?,
@@ -1025,7 +1017,7 @@ impl Chat {
                     row.thread_id,
                     "invocation.ended",
                     row.id,
-                    "failed",
+                    "stopped",
                 )
                 .await?;
                 continue;
