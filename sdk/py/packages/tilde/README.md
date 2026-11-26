@@ -132,7 +132,8 @@ the conversation with the call's outcome in place of the pending answer, and the
 Tilde's deadline (two minutes before Lambda's fifteen) suspends the same way, and the built-in
 `thread.wait_for_reply` tool waits for a person's next message like a slow call. Agent code does
 not change; without an adapter that suspends (Agno, CrewAI, or plain `run` code), calls block as
-before. The adapters' contract on `AgentContext`: `enable_suspension(snapshot)` before the loop,
+before, and only calls the adapter's tool wrappers make (`execute(..., suspendable=True)`) can
+answer pending. The adapters' contract on `AgentContext`: `enable_suspension(snapshot)` before the loop,
 `should_suspend` and `await suspend(state)` at each step boundary, and `resumed`
 (`Resumed(state, outcomes)`, outcomes by the model's tool-call ID) on the next invocation.
 

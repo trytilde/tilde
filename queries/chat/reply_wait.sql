@@ -7,4 +7,4 @@ SELECT t.id, t.invocation_id, t.participant_id, t.name, t.provider_id FROM chat_
 JOIN chat_invocations i ON i.id = t.invocation_id
 JOIN chat_runs r ON r.id = i.run_id AND r.status IN ('active', 'suspending', 'waiting')
 WHERE t.thread_id = :p1 AND i.agent_id = :p2 AND t.name = 'thread.wait_for_reply' AND t.status = 'running'
-ORDER BY t.created_at LIMIT 1;
+ORDER BY t.created_at LIMIT 1 FOR UPDATE OF t;

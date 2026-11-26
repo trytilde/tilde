@@ -3,6 +3,7 @@ import {
   jsonSchema,
   type ModelMessage,
   type PrepareStepFunction,
+  type StopCondition,
   type SystemModelMessage,
   type ToolSet,
 } from "ai";
@@ -20,6 +21,7 @@ type Settings = {
   instructions?: Instructions;
   system?: Instructions;
   prepareStep?: PrepareStepFunction<any>;
+  stopWhen?: StopCondition<any> | StopCondition<any>[];
 };
 
 function withSummary(instructions: Instructions | undefined, summary: string) {
@@ -48,28 +50,40 @@ function withSummary(instructions: Instructions | undefined, summary: string) {
 function invocationStep(
   ctx: AgentContext,
   inner?: PrepareStepFunction<any>,
-): PrepareStepFunction<any> {
+): { prepareStep: PrepareStepFunction<any>; record: StopCondition<any> } {
   const steering: { at: number; message: ModelMessage }[] = [];
-  let initial: number | undefined;
+  let first: ModelMessage[] | undefined;
   let restored: ModelMessage[] | undefined;
   let latest: ModelMessage[] = [];
   ctx.enableSuspension?.(() => toJson(latest));
-  return async (step) => {
-    if (initial === undefined) {
-      initial = step.messages.length;
-      if (ctx.resumed) restored = restore(ctx.resumed);
-    }
-    const own = restored ? [...restored, ...step.messages.slice(initial)] : step.messages;
+  // The conversation at a step boundary: the call's messages (or the saved ones), the responses
+  // so far (cumulative in the AI SDK) and steering where it arrived.
+  const boundary = (responses: ModelMessage[]) => {
+    const own = [...(restored ?? first ?? []), ...responses];
     for (const input of ctx.takeInputs())
       steering.push({ at: own.length, message: { role: "user", content: input.text } });
-    const messages = [...own];
-    steering.forEach((input, i) => messages.splice(input.at + i, 0, input.message));
+    steering.forEach((input, i) => own.splice(input.at + i, 0, input.message));
+    return own;
+  };
+  const prepareStep: PrepareStepFunction<any> = async (step) => {
+    if (first === undefined) {
+      first = step.messages;
+      if (ctx.resumed) restored = restore(ctx.resumed);
+    }
+    const messages = boundary(step.messages.slice(first.length));
     latest = messages;
     if (ctx.shouldSuspend) await ctx.suspend(toJson(messages));
     if (!restored && !steering.length) return inner?.(step);
     const result = await inner?.({ ...step, messages });
     return { ...result, messages: result?.messages ?? messages };
   };
+  // After each step, before the stop conditions decide: a loop that stops on a step whose calls
+  // answered pending suspends with that step's response, so resuming does not call them again.
+  const record: StopCondition<any> = ({ steps }) => {
+    latest = boundary(steps.at(-1)?.response.messages ?? []);
+    return false;
+  };
+  return { prepareStep, record };
 }
 
 /**
@@ -93,6 +107,7 @@ export async function prepareTildeCall<S extends object>(
   const own = settings as S & Settings;
   const { bundled, ...channel } = tools;
   const summary = await ctx.skills.summary();
+  const step = invocationStep(ctx, own.prepareStep);
   const key = "system" in own && !("instructions" in own) ? "system" : "instructions";
   return {
     ...own,
@@ -102,7 +117,11 @@ export async function prepareTildeCall<S extends object>(
       ...(summary ? convertToAiSdkTools(ctx.skills.tools()) : {}),
     },
     [key]: withSummary(own[key], summary),
-    prepareStep: invocationStep(ctx, own.prepareStep),
+    prepareStep: step.prepareStep,
+    // Only beside the call's own conditions: without any, the AI SDK's default applies.
+    ...(own.stopWhen !== undefined && {
+      stopWhen: [...(Array.isArray(own.stopWhen) ? own.stopWhen : [own.stopWhen]), step.record],
+    }),
   };
 }
 

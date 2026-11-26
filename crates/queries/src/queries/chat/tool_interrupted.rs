@@ -18,6 +18,7 @@ pub struct Record {
     pub detached: bool,
     pub display: String,
     pub personal_connection_id: Option<uuid::Uuid>,
+    pub heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 pub struct RecordBorrowed<'a> {
     pub id: uuid::Uuid,
@@ -36,6 +37,7 @@ pub struct RecordBorrowed<'a> {
     pub detached: bool,
     pub display: &'a str,
     pub personal_connection_id: Option<uuid::Uuid>,
+    pub heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 impl<'a> From<RecordBorrowed<'a>> for Record {
     fn from(
@@ -56,6 +58,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             detached,
             display,
             personal_connection_id,
+            heartbeat_at,
         }: RecordBorrowed<'a>,
     ) -> Self {
         Self {
@@ -75,6 +78,7 @@ impl<'a> From<RecordBorrowed<'a>> for Record {
             detached,
             display: display.into(),
             personal_connection_id,
+            heartbeat_at,
         }
     }
 }
@@ -147,7 +151,7 @@ where
 pub struct RunStmt(&'static str, Option<tokio_postgres::Statement>);
 pub fn run() -> RunStmt {
     RunStmt(
-        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) AND (NOT t.detached OR (t.updated_at < NOW() - INTERVAL '1 hour' AND t.name <> 'thread.wait_for_reply')) ORDER BY t.thread_id,t.id LIMIT 100",
+        "SELECT t.* FROM chat_tool_calls t JOIN chat_invocations i ON i.id=t.invocation_id WHERE t.status='running' AND (i.status<>'running' OR i.lease_expires_at<=NOW()) AND (NOT t.detached OR (t.heartbeat_at IS NOT NULL AND t.heartbeat_at < NOW() - INTERVAL '1 minute') OR (t.heartbeat_at IS NULL AND t.updated_at < NOW() - INTERVAL '1 hour' AND t.name <> 'thread.wait_for_reply')) ORDER BY t.thread_id,t.id LIMIT 100",
         None,
     )
 }
@@ -187,6 +191,7 @@ impl RunStmt {
                         detached: row.try_get(13)?,
                         display: row.try_get(14)?,
                         personal_connection_id: row.try_get(15)?,
+                        heartbeat_at: row.try_get(16)?,
                     })
                 },
             mapper: |it| Record::from(it),

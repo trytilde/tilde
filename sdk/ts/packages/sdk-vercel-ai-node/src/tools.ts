@@ -39,6 +39,7 @@ export function convertToAiSdkTools(
         execution.abortSignal?.throwIfAborted();
         // A routed tools.execute hands these options to the bundled tool it names.
         return channel.execute(input, {
+          suspendable: true,
           toolCallId: execution.toolCallId,
           frameworkContext: execution,
         });

@@ -378,7 +378,10 @@ pending answer, and the loop continues. Tilde also knows each invocation's runti
 Lambda invocation is asked to suspend two minutes before Lambda's fifteen, and calls in
 flight then answer pending. Waiting for a person works the same way with the built-in
 `thread.wait_for_reply` tool (thread.read), whose output is the next message. Agent code does
-not change; without an adapter, tool calls block as before.
+not change; without an adapter, tool calls block as before, and only calls the adapter's tool
+wrappers make can answer pending (calls your code makes on `ctx.tools` wait). A suspension asked
+by hand (`SuspendInvocation`) waits for `ResumeRun`; a framework that cannot suspend loses its
+run at the deadline, as Lambda ending it would.
 
 Adapters implement a small contract on `AgentContext` (marked internal): `enableSuspension(snapshot)`
 before the loop, `shouldSuspend` and `suspend(state)` at each step boundary, and `resumed`

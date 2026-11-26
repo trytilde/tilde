@@ -40,6 +40,9 @@ export async function tildeMastra(
   let directory: Promise<string> | undefined;
   requestContext.set(SKILLS, () => (directory ??= ctx.skills.directory()));
   let restored = false;
+  // The message list at the last step boundary. A loop that ends at `maxSteps` on a step whose
+  // calls answered pending suspends with this, so that step runs again on resume: Mastra has no
+  // per-call hook after a step's tool results short of replacing the agent's output processors.
   let latest: MastraDBMessage[] = [];
   ctx.enableSuspension?.(() => toJson(latest));
   const invocation: InputProcessor = {

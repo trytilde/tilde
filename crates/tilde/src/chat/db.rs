@@ -364,13 +364,16 @@ pub async fn controls_state_opt(
         .await?)
 }
 
+/// Move the run to `suspending` while `invocation` runs, recording why (`manual`, `deadline` or
+/// `pending`) unless a reason was recorded first.
 pub async fn controls_suspend_execute(
     db: &impl GenericClient,
-    p1: uuid::Uuid,
-    p2: uuid::Uuid,
+    run: uuid::Uuid,
+    invocation: uuid::Uuid,
+    reason: &str,
 ) -> DbResult<u64> {
     Ok(tilde_queries::queries::chat::controls::suspend::run()
-        .bind(db, &p1, &p2)
+        .bind(db, &run, &invocation, &reason)
         .await?)
 }
 
@@ -1612,5 +1615,23 @@ pub async fn reply_wait_opt(
     Ok(tilde_queries::queries::chat::reply_wait::run()
         .bind(db, &thread, &agent)
         .opt()
+        .await?)
+}
+
+pub use tilde_queries::queries::chat::invocation_suspension::Record as SuspensionRow;
+
+pub async fn invocation_suspension_one(
+    db: &impl GenericClient,
+    invocation: uuid::Uuid,
+) -> DbResult<SuspensionRow> {
+    Ok(tilde_queries::queries::chat::invocation_suspension::run()
+        .bind(db, &invocation)
+        .one()
+        .await?)
+}
+
+pub async fn tool_heartbeat_execute(db: &impl GenericClient, call: uuid::Uuid) -> DbResult<u64> {
+    Ok(tilde_queries::queries::chat::tool_heartbeat::run()
+        .bind(db, &call)
         .await?)
 }

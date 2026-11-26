@@ -130,7 +130,10 @@ void test("a pending call suspends the run with its state and the next invocatio
       }
       ctx.enableSuspension(() => latest);
       latest = [{ role: "user", content: "Deploy" }];
-      const output = await ctx.tools["ops.deploy"].execute({}, { toolCallId: "c1" });
+      const output = await ctx.tools["ops.deploy"].execute(
+        {},
+        { toolCallId: "c1", suspendable: true },
+      );
       latest = [...latest, { role: "tool", toolCallId: "c1", output }];
       assert(ctx.shouldSuspend);
       await ctx.suspend(latest);
@@ -176,7 +179,7 @@ void test("Tilde's deadline asks the loop to suspend, and a loop that ends with 
     tracing: "existing",
     async run(ctx) {
       ctx.enableSuspension(() => ["last boundary"]);
-      await ctx.tools["ops.deploy"].execute({}, { toolCallId: "c2" });
+      await ctx.tools["ops.deploy"].execute({}, { toolCallId: "c2", suspendable: true });
     },
   })(wake());
   assert.deepEqual(JSON.parse(state.saved.stateJson).state, ["last boundary"]);

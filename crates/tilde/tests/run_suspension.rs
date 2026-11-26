@@ -2,7 +2,8 @@
 //! slow Lambda tool host answers pending, the host suspends its run with its state, the call's
 //! outcome resumes the same run in a new invocation that reads both back; the deadline asks a
 //! running invocation to suspend (and a call in flight then answers pending); a wait for a
-//! reply is answered by the next message in the thread.
+//! reply is answered by the next message in the thread; an abandoned pending call is aborted;
+//! a manual suspension waits for ResumeRun; a deadline that saves nothing fails the run.
 mod common;
 use common::invocation::{drain, framed, tool_result};
 use connectrpc::client::{ClientConfig, HttpClient};
@@ -110,10 +111,11 @@ impl Woken {
 
 async fn next_wake(
     wakes: &mut tokio::sync::mpsc::UnboundedReceiver<InvokeRequest>,
+    what: &str,
 ) -> InvokeRequest {
     tokio::time::timeout(Duration::from_secs(15), wakes.recv())
         .await
-        .expect("a wake within 15 seconds")
+        .unwrap_or_else(|_| panic!("no wake within 15 seconds: {what}"))
         .expect("the host stays connected")
 }
 
@@ -141,6 +143,9 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
                     serde_json::from_str(body["call"]["inputJson"].as_str().unwrap()).unwrap();
                 if input["service"] == "slow" {
                     tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+                if input["service"] == "stuck" {
+                    tokio::time::sleep(Duration::from_secs(20)).await;
                 }
                 axum::Json(json!({"outputJson":json!({"restarted":input["service"]}).to_string()}))
             }),
@@ -216,7 +221,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     let worker = tokio::spawn(chat.clone().worker(stop_rx));
 
     // The agent's host dials in and stays ready.
-    let (_, token, _) = deployments
+    let (deployment, token, _) = deployments
         .register_deployment(
             agent,
             RegisterDeployment {
@@ -267,6 +272,20 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         }
     });
 
+    // Work is routed only to a deployment whose host is connected and ready.
+    let deployment = Uuid::parse_str(&deployment.id).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !deployments
+            .deployment(agent, deployment)
+            .await
+            .unwrap()
+            .routable
+        {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the host becomes routable");
     let user = chat.create_user("Operator").await.unwrap();
     let thread = chat
         .create_thread(CreateThread {
@@ -300,7 +319,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     // A slow call answers pending once it has run for the threshold, and goes on.
     let first = Woken {
         base: base.clone(),
-        wake: next_wake(&mut wakes).await,
+        wake: next_wake(&mut wakes, "first").await,
     };
     assert_eq!(first.wake.run_id, started.id);
     assert!(!first.wake.resumes);
@@ -309,11 +328,13 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     let answer = first
         .call("ops.restart", call, json!({"service":"slow"}))
         .await;
-    assert!(
-        began.elapsed() < Duration::from_millis(1500),
-        "it did not wait for the host"
-    );
     assert_eq!(answer["pending"], true, "{answer}");
+    let status: String = pg
+        .query_one("SELECT status FROM chat_tool_calls WHERE id=$1", &[&call])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(status, "running", "it did not wait for the host");
     let output: Value = serde_json::from_str(answer["outputJson"].as_str().unwrap()).unwrap();
     assert_eq!(output["status"], "pending");
     // A call that finishes in time answers as always.
@@ -332,7 +353,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     // The call outlives the invocation; its outcome starts the same run's next invocation.
     let second = Woken {
         base: base.clone(),
-        wake: next_wake(&mut wakes).await,
+        wake: next_wake(&mut wakes, "second").await,
     };
     assert!(
         began.elapsed() >= Duration::from_secs(2),
@@ -376,7 +397,10 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         .call("ops.restart", in_flight, json!({"service":"slow"}))
         .await;
     assert_eq!(answer["pending"], true, "{answer}");
-    assert!(began.elapsed() < Duration::from_millis(1500));
+    assert!(
+        began.elapsed() < Duration::from_secs(30),
+        "the deadline, not the minute's threshold"
+    );
     let suspend = loop {
         let command = tokio::time::timeout(Duration::from_secs(5), commands.message())
             .await
@@ -396,7 +420,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     second.stopped().await;
     let third = Woken {
         base: base.clone(),
-        wake: next_wake(&mut wakes).await,
+        wake: next_wake(&mut wakes, "third").await,
     };
     assert_eq!(third.wake.run_id, started.id);
     let (restored, results) = third.checkpoint().await;
@@ -431,7 +455,7 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
     .unwrap();
     let fourth = Woken {
         base: base.clone(),
-        wake: next_wake(&mut wakes).await,
+        wake: next_wake(&mut wakes, "fourth").await,
     };
     assert_eq!(fourth.wake.run_id, started.id, "the reply resumed the run");
     let (restored, results) = fourth.checkpoint().await;
@@ -466,6 +490,73 @@ async fn suspended_runs_resume_with_their_state_and_pending_results() {
         .unwrap()
         .get(0);
     assert_eq!(runs, 1, "every invocation continued the one run");
+
+    // A pending call whose process is gone (a deploy restarted it) is aborted a minute after its
+    // last heartbeat, and the run resumes with that outcome.
+    unsafe { std::env::set_var("TILDE_TOOL_PENDING_AFTER_MS", "300") };
+    chat.resume_run(run_id).await.unwrap();
+    let fifth = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "fifth").await,
+    };
+    let stuck = Uuid::new_v4();
+    let answer = fifth
+        .call("ops.restart", stuck, json!({"service":"stuck"}))
+        .await;
+    assert_eq!(answer["pending"], true, "{answer}");
+    pg.execute(
+        "UPDATE chat_tool_calls SET heartbeat_at=NOW()-INTERVAL '2 minutes' WHERE id=$1",
+        &[&stuck],
+    )
+    .await
+    .unwrap();
+    fifth.suspend(json!({"turn":5}), &[stuck]).await;
+    fifth.stopped().await;
+    let sixth = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "sixth").await,
+    };
+    let (_, results) = sixth.checkpoint().await;
+    assert_eq!(results[0]["status"], "aborted");
+
+    // A suspension asked by hand waits for ResumeRun, even with its state saved.
+    chat.suspend_invocation(Uuid::parse_str(&sixth.wake.invocation_id).unwrap())
+        .await
+        .unwrap();
+    sixth.suspend(json!({"turn":6}), &[]).await;
+    sixth.stopped().await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), wakes.recv())
+            .await
+            .is_err(),
+        "a manual suspension does not resume by itself"
+    );
+    chat.resume_run(run_id).await.unwrap();
+    let seventh = Woken {
+        base: base.clone(),
+        wake: next_wake(&mut wakes, "seventh").await,
+    };
+    assert!(seventh.wake.resumes);
+    assert_eq!(seventh.checkpoint().await.0, json!({"turn":6}));
+
+    // Asked to suspend at its deadline, an invocation that saves nothing (a framework that
+    // cannot suspend) loses its run, as Lambda ending it would have.
+    let seventh_id = Uuid::parse_str(&seventh.wake.invocation_id).unwrap();
+    pg.execute(
+        "UPDATE chat_invocations SET suspend_at=NOW() WHERE id=$1",
+        &[&seventh_id],
+    )
+    .await
+    .unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while chat.run(run_id).await.unwrap().status != "suspending" {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the deadline asks it to suspend");
+    seventh.stopped().await;
+    assert_eq!(chat.run(run_id).await.unwrap().status, "failed");
 
     drop(pg);
     let _ = stop.send(true);

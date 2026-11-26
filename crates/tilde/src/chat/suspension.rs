@@ -44,7 +44,8 @@ fn threshold() -> Duration {
 
 /// When an invocation on a deployment of `target` is asked to suspend, from its wake.
 pub(crate) fn deadline(target: Option<&str>) -> Option<Duration> {
-    matches!(target, Some("lambda" | "hosted")).then_some(LAMBDA_LIMIT - MARGIN)
+    let limited = target == Some("lambda");
+    limited.then_some(LAMBDA_LIMIT - MARGIN)
 }
 
 pub(crate) fn waits_for_reply(definition: &types::ToolDefinition) -> bool {
@@ -119,7 +120,9 @@ impl Chat {
                 "A pending call is not in this conversation".into(),
             ));
         }
-        if crate::chat::db::controls_suspend_execute(&tx, scope.run_id, scope.id).await? == 0 {
+        if crate::chat::db::controls_suspend_execute(&tx, scope.run_id, scope.id, "pending").await?
+            == 0
+        {
             return Err(ChatError::Conflict);
         }
         crate::chat::db::checkpoint_save_execute(&tx, scope.run_id, scope.id, state_json, &pending)
@@ -171,8 +174,8 @@ impl Chat {
         })
     }
 
-    /// Ask invocations at their deadline to suspend.
-    pub(crate) async fn suspend_due(&self) -> Result<()> {
+    /// Ask invocations at their deadline to suspend (one pass of the chat worker's).
+    pub async fn suspend_due(&self) -> Result<()> {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         for due in crate::chat::db::runs_suspend_due_all(&tx).await? {
@@ -190,8 +193,9 @@ impl Chat {
         Ok(())
     }
 
-    /// Start the next invocation of every suspended run whose pending calls have all finished.
-    pub(crate) async fn resume_suspended(&self) -> Result<()> {
+    /// Start the next invocation of every suspended run whose pending calls have all finished
+    /// (one pass of the chat worker's).
+    pub async fn resume_suspended(&self) -> Result<()> {
         let runs = crate::chat::db::runs_resumable_all(&self.pg()?.get().await?).await?;
         for run in runs {
             // Another process may resume it first, or the agent start something meanwhile.
@@ -205,33 +209,37 @@ impl Chat {
     }
 
     /// The next message routed to the agent in a thread where it waits for a reply is that
-    /// wait's output; it starts no run of its own.
+    /// wait's output, written in the transaction that claims the message (which then starts no
+    /// run of its own). False when the wait was answered meanwhile: the message routes as usual.
     pub(crate) async fn answer_reply_wait(
         &self,
+        tx: &crate::database::Transaction<'_>,
         wait: crate::chat::db::ReplyWaitRow,
         thread: Uuid,
         message: Uuid,
         text: &str,
-    ) -> Result<()> {
-        self.report_tool_call(
-            &Scope {
-                capabilities: Default::default(),
-                id: wait.invocation_id,
-                run_id: Uuid::nil(),
-                thread_id: thread,
-                agent_id: Uuid::nil(),
-                participant_id: wait.participant_id,
-                inference: vec![],
-            },
-            types::ToolCall {
-                id: wait.id.to_string(),
-                name: wait.name,
-                provider_id: wait.provider_id,
-                status: "completed".into(),
-                output_json: json!({"message_id": message, "text": text}).to_string(),
-                ..Default::default()
-            },
-        )
-        .await
+    ) -> Result<bool> {
+        let scope = Scope {
+            capabilities: Default::default(),
+            id: wait.invocation_id,
+            run_id: Uuid::nil(),
+            thread_id: thread,
+            agent_id: Uuid::nil(),
+            participant_id: wait.participant_id,
+            inference: vec![],
+        };
+        let tool = types::ToolCall {
+            id: wait.id.to_string(),
+            name: wait.name,
+            provider_id: wait.provider_id,
+            status: "completed".into(),
+            output_json: json!({"message_id": message, "text": text}).to_string(),
+            ..Default::default()
+        };
+        match self.write_tool_call(tx, &scope, tool).await {
+            Ok(()) => Ok(true),
+            Err(ChatError::Conflict) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 }

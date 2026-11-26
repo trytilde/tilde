@@ -498,8 +498,23 @@ impl Registry {
                     // Slow: the call goes on past this answer, and its record is the outcome the
                     // run's next invocation reads once the caller suspended with it.
                     execution.detach().await?;
+                    execution.heartbeat().await?;
                     let task = async move {
-                        let mut result = work.await;
+                        // The heartbeat says this process still runs the call: a restart leaves
+                        // it to age, and the call is aborted (`tool_interrupted.sql`).
+                        let every = std::time::Duration::from_secs(20);
+                        let mut beat =
+                            tokio::time::interval_at(tokio::time::Instant::now() + every, every);
+                        let mut result = loop {
+                            tokio::select! {
+                                result = &mut work => break result,
+                                _ = beat.tick() => {
+                                    if let Err(error) = execution.heartbeat().await {
+                                        tracing::warn!(%call, %error, "Heartbeat of a pending tool call failed");
+                                    }
+                                }
+                            }
+                        };
                         if let Err(error) = execution.finish(&mut result).await {
                             tracing::warn!(%call, %error, "Recording a pending tool call's outcome failed");
                         }

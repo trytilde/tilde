@@ -38,9 +38,13 @@ class ChannelTool:
         if self._catalog.get(self.tool_name) is not self._source:
             raise RuntimeError("Channel tool is no longer available in this invocation")
 
-    async def execute(self, input: Any, *, tool_call_id: str | None = None) -> Any:
+    async def execute(
+        self, input: Any, *, tool_call_id: str | None = None, suspendable: bool = False
+    ) -> Any:
         self._available()
-        return await self._source.execute(input, tool_call_id=tool_call_id or str(uuid.uuid4()))
+        return await self._source.execute(
+            input, tool_call_id=tool_call_id or str(uuid.uuid4()), suspendable=suspendable
+        )
 
     async def __call__(self, input: Any, *, tool_call_id: str | None = None) -> Any:
         return await self.execute(input, tool_call_id=tool_call_id)

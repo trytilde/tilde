@@ -51,7 +51,9 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, row.thread_id).await?;
-        if crate::chat::db::controls_suspend_execute(&tx, row.run_id, invocation).await? == 0 {
+        if crate::chat::db::controls_suspend_execute(&tx, row.run_id, invocation, "manual").await?
+            == 0
+        {
             return Err(ChatError::Conflict);
         }
         super::activity(

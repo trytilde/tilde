@@ -216,6 +216,11 @@ export type ToolExecution = {
    * RunContext). A `tools.execute` naming a bundled tool hands it to that tool's native runner.
    */
   frameworkContext?: unknown;
+  /**
+   * Set by framework adapters' tool wrappers: the call may answer pending (it then goes on in
+   * Tilde) when the adapter suspends its loop. Calls agent code makes itself always wait.
+   */
+  suspendable?: boolean;
 };
 /** How calls of the agent's bundled tools show in end-user chats. Traces keep full detail. */
 export type ToolDisplayMode = "full" | "summary" | "hidden";
@@ -729,7 +734,13 @@ export class AgentContext {
             // The adapter's executor audits the call; the outer tools.execute is not audited.
             if (bundled) return bundled.execute(inner ?? {}, execution);
           }
-          return this.invokeProviderTool(definition.name, input, undefined, execution.toolCallId);
+          return this.invokeProviderTool(
+            definition.name,
+            input,
+            undefined,
+            execution.toolCallId,
+            execution.suspendable,
+          );
         },
       };
       if (chunkSchema)
@@ -809,6 +820,7 @@ export class AgentContext {
     input: unknown,
     chunks: AsyncIterable<unknown> | undefined,
     toolCallId: string,
+    allowPending = false,
   ) {
     this.signal.throwIfAborted();
     const callId = toolId(this.invocationId, toolCallId, name);
@@ -817,7 +829,7 @@ export class AgentContext {
       if (encoded === undefined) throw new Error("Tool inputs must be JSON values");
       return encoded;
     };
-    const suspendable = !!this.snapshot && !chunks;
+    const suspendable = allowPending && !!this.snapshot && !chunks;
     async function* frames() {
       yield { name, callId, sequence: 0, inputJson: encode(input), finish: !chunks, suspendable };
       if (!chunks) return;
@@ -845,8 +857,8 @@ export class AgentContext {
    * @internal The suspension contract of framework adapters. An adapter that can stop its loop
    * at a step boundary and continue it from saved state calls this before the loop runs, with
    * the loop's state at its last step boundary (the conversation in the framework's message
-   * format, as JSON). From then on a Tilde tool call that runs long answers pending instead of
-   * blocking, and at each step boundary the adapter checks `shouldSuspend` and, when it is set,
+   * format, as JSON). From then on a Tilde tool call its tool wrappers make (`suspendable` on the
+   * execution) that runs long answers pending instead of blocking, and at each step boundary the adapter checks `shouldSuspend` and, when it is set,
    * calls `suspend` with the conversation so far, pending answers included. On the run's next
    * invocation `resumed` holds that state and the calls' outcomes; the adapter continues from it.
    */
@@ -1207,7 +1219,11 @@ export class AgentContext {
 
 /** Options shared by every host shape: what to run and how to checkpoint it. */
 export type InvocationOptions = {
-  /** Persist framework state before suspension; resume loads it in run(). */
+  /**
+   * Persist framework state before suspension; resume loads it in run(). For code that keeps
+   * framework state itself: a framework adapter that suspends (`enableSuspension`) saves its own,
+   * and then this is not called.
+   */
   checkpoint?: (context: AgentContext) => Promise<void>;
   /** Existing OTel provider must include agentSpanProcessor. */
   tracing?: "existing";

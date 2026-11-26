@@ -170,6 +170,13 @@ impl Chat {
             .await?
             .ok_or(ChatError::Conflict)?;
         crate::chat::db::thread_lock_one(&tx, thread).await?;
+        // Checked again under the thread lock: one invocation of an agent per thread.
+        if crate::chat::db::invocation_active_opt(&tx, thread, agent)
+            .await?
+            .is_some()
+        {
+            return Err(ChatError::Conflict);
+        }
         let row = crate::chat::db::run_resume_opt(&tx, run)
             .await?
             .ok_or(ChatError::Conflict)?;
@@ -200,7 +207,8 @@ impl Chat {
         drop(tx_client);
         self.run(run).await
     }
-    async fn route_pending(&self) -> Result<bool> {
+    /// Route messages to their agents (one pass of the chat worker's); true when more wait.
+    pub async fn route_pending(&self) -> Result<bool> {
         let messages = crate::chat::db::route_pending_all(&self.pg()?.get().await?).await?;
         let more = messages.len() == 50;
         for message in messages {
@@ -244,11 +252,12 @@ impl Chat {
             }
             if let Some(wait) =
                 crate::chat::db::reply_wait_opt(&tx, message.thread_id, message.agent_id).await?
+                && self
+                    .answer_reply_wait(&tx, wait, message.thread_id, message.id, &message.text)
+                    .await?
             {
                 tx.commit().await?;
                 drop(tx_client);
-                self.answer_reply_wait(wait, message.thread_id, message.id, &message.text)
-                    .await?;
                 continue;
             }
             if let Some(active) =
@@ -642,29 +651,42 @@ impl Chat {
         let mut tx_client = self.pg()?.get().await?;
         let tx = tx_client.transaction().await?;
         crate::chat::db::thread_lock_one(&tx, existing.thread_id).await?;
-        // A suspended run keeps its inputs: a checkpoint resumes it by itself (`suspension`),
-        // otherwise ResumeRun carries them forward.
-        let suspending = crate::chat::db::run_state_one(&tx, existing.run_id)
+        // A suspended run keeps its inputs: one suspended by hand waits for ResumeRun, and one
+        // that saved its state resumes by itself (`suspension`). Asked to suspend at its deadline
+        // or for a pending call without saving anything (a framework that cannot suspend), the
+        // run did not survive its invocation: it fails, as if Lambda had ended it, and its inputs
+        // go on.
+        let suspension = crate::chat::db::invocation_suspension_one(&tx, invocation).await?;
+        let asked = crate::chat::db::run_state_one(&tx, existing.run_id)
             .await?
             .status
             == "suspending";
+        let lost =
+            asked && suspension.suspended_for.as_deref() != Some("manual") && !suspension.saved;
+        let suspending = asked && !lost;
         if let Some(row) = crate::chat::db::invocation_finish_opt(&tx, invocation, status).await? {
             if !suspending && status != "failed" {
                 crate::chat::db::checkpoint_clear_execute(&tx, row.run_id).await?;
             }
             let run_status = match status {
+                _ if lost => "failed",
                 "stopped" => "waiting",
                 "canceled" => "canceled",
                 _ => "failed",
             };
             crate::chat::db::run_status_execute(&tx, row.run_id, run_status).await?;
+            let ended = if lost {
+                format!("{status}: asked to suspend, it saved nothing")
+            } else {
+                status.to_owned()
+            };
             activity(
                 self.pg()?,
                 &tx,
                 row.thread_id,
                 "invocation.ended",
                 invocation,
-                status,
+                &ended,
             )
             .await?;
             if !suspending {

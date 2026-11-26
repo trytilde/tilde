@@ -392,10 +392,13 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   `tools.result` reads it. A detached call abandoned by a crashed process is aborted after an
   hour.
 - Pending call: any server-executed tool call of a caller that can suspend its loop
-  (`InvokeToolRequest.suspendable`, set by the SDKs' framework adapters) that is still running
+  (`InvokeToolRequest.suspendable`, set only on calls the SDKs' framework adapters' tool wrappers
+  make, never on the agent code's own) that is still running
   after the threshold (`TILDE_TOOL_PENDING_AFTER_MS`, a minute), or at its invocation's deadline,
   answers `pending` (`InvokeToolResponse.pending`) and goes on in the background: its record is
-  marked detached so the invocation's end leaves it running, and its outcome is that record. The
+  marked detached so the invocation's end leaves it running, and its outcome is that record. Its
+  process heartbeats it (`heartbeat_at`, every 20 s); one whose process is gone (a restart) is
+  aborted a minute after its last heartbeat, and its run resumes with that. The
   adapter then suspends the run with the call pending (see Suspended run). Streamed-input calls,
   background tools and sidecar invocations never answer pending; a caller that cannot suspend
   waits as before.
@@ -409,7 +412,8 @@ principal for `sts:AssumeRole`, with `sts:ExternalId` when `external_id` is set.
   objective), `thread.participants` and `thread.search` (thread.read), `tools.result` (when the
   agent has async tools), `thread.wait_for_reply` (thread.read: answers pending at once, and its
   output is the next message routed to the agent in the thread, which then starts no run of its
-  own; a caller that cannot suspend is refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
+  own, written in the transaction that claims the message; a caller that cannot suspend is
+  refused), the skill tools (`skills::tools`: `skills.write` with skills.edit,
   `skills.assign` with agents.edit_skills and skills.read or skills.edit, `skills.unassign` with
   agents.edit_skills; see Skills) and the wiki link tools (`wiki.link`, `wiki.unlink`; see
   Wikis). A tool acting on another agent takes its `agent_id` and checks the capability on it,
@@ -1234,9 +1238,15 @@ models (`skills::tools`, gateway-hosted agents): `skills.write` `{source, name, 
   invocation ends, to `waiting` without handing its inputs on. Once none of those calls is
   running and the agent runs nothing else in the thread, the worker resumes it (`ResumeRun`'s
   path): the next invocation's wake has `resumes`, and `GetCheckpoint` returns the state and the
-  calls' records. A message that arrives meanwhile starts its own run as any message does; the
-  suspended run resumes after it. An invocation that ends without suspending drops the run's
-  checkpoint (a failed one keeps it, so ResumeRun continues from it).
+  calls' records. The invocation records why it was asked to suspend
+  (`chat_invocations.suspended_for`: `manual`, `deadline` or `pending`): only the last two resume
+  by themselves; a manual suspension waits for ResumeRun, which continues from a saved checkpoint.
+  An invocation asked to suspend for the deadline or a pending call that saved nothing (a
+  framework that cannot suspend) fails its run and hands its inputs on, as Lambda ending it
+  would have. A message that arrives meanwhile starts its own run as any message does; the
+  suspended run resumes after it (checked again under the thread lock). An invocation that ends
+  without suspending drops the run's checkpoint (a failed one keeps it, so ResumeRun continues
+  from it).
 - Invocation deadline: Tilde, not the agent, owns the host's runtime limit. A Lambda or hosted
   wake sets `chat_invocations.suspend_at` to Lambda's fifteen minutes less a two-minute margin;
   at it the run moves to `suspending` (activity `invocation.suspend_requested`, `deadline`), the
@@ -1459,9 +1469,15 @@ snapshot; one asked to suspend that reaches no boundary within a minute likewise
 next invocation the core reads the checkpoint, and `resumed` holds the state and each pending
 call's outcome by the model's tool-call ID; at its first step boundary the adapter replaces
 the call's own messages with the saved ones, the outcomes in place of the pending answers, and
-continues. Agent code does not change. Per adapter: Vercel AI SDK, `prepareTildeCall`'s
-`prepareStep` (model messages, binary data as base64); Mastra, `tildeMastra`'s input processor
-(its message list, ended as a tripwire); LangChain, `tildeMiddleware`'s `beforeModel` (stored
+continues. Agent code does not change. Only calls the adapter's tool wrappers make are
+suspendable (`ToolExecution.suspendable`, Python `execute(..., suspendable=True)`); the code's own
+calls always wait. The SDK's older `checkpoint` hook is for code that keeps framework state
+itself and is not called when an adapter suspends. Per adapter: Vercel AI SDK, `prepareTildeCall`'s
+`prepareStep` (model messages, binary data as base64; a stop condition beside the call's own
+records each step's response, so a loop that stops on a step whose calls answered pending saves
+that step); Mastra, `tildeMastra`'s input processor (its message list, ended as a tripwire; a
+loop that stops at `maxSteps` on a pending step saves the boundary before it, so that step runs
+again); LangChain, `tildeMiddleware`'s `beforeModel` (stored
 messages; restored through `RemoveMessage(REMOVE_ALL_MESSAGES)`); OpenAI Agents,
 `callModelInputFilter` (input items); Python LangChain `abefore_model`, OpenAI Agents
 `call_model_input_filter`, Pydantic AI `before_model_request` (`ModelMessagesTypeAdapter`;

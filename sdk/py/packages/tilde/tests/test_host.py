@@ -577,7 +577,7 @@ async def test_a_pending_call_suspends_the_run_and_the_next_invocation_reads_its
         # An adapter's loop: a tool call per step, checking for suspension at each boundary.
         ctx.enable_suspension(lambda: latest)
         latest.append({"role": "user", "content": "Deploy"})
-        output = await ctx.tools["ops.deploy"].execute({}, tool_call_id="c1")
+        output = await ctx.tools["ops.deploy"].execute({}, tool_call_id="c1", suspendable=True)
         latest.append({"role": "tool", "toolCallId": "c1", "output": output})
         assert ctx.should_suspend
         await ctx.suspend(latest)

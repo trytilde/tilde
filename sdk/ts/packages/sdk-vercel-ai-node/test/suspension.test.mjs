@@ -134,3 +134,15 @@ void test("Tilde's deadline suspends at the next step boundary and a failed call
     value: "Tool call aborted",
   });
 });
+
+void test("a loop that stops on a step whose call answered pending saves that step", async () => {
+  const first = invocation();
+  const model = new MockLanguageModelV3({ doGenerate: async () => deploy });
+  const once = new ToolLoopAgent({ model, stopWhen: stepCountIs(1), ...tildeCallOptions });
+  await once.generate({ prompt: "Deploy it", ...tildeAiSdk(first) });
+  // The core suspends a loop that ended with calls pending with its snapshot.
+  assert.deepEqual(
+    first.snapshot().map((m) => m.role),
+    ["user", "assistant", "tool"],
+  );
+});

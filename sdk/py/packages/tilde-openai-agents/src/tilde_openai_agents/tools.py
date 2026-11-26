@@ -58,7 +58,9 @@ def _invoker(channel: ChannelTool | Tool):
         arguments = json.loads(input_json) if input_json.strip() else {}
         token = _TOOL_CONTEXT.set(ctx)
         try:
-            result = await channel.execute(arguments, tool_call_id=ctx.tool_call_id)
+            result = await channel.execute(
+                arguments, tool_call_id=ctx.tool_call_id, suspendable=True
+            )
         finally:
             _TOOL_CONTEXT.reset(token)
         return json.dumps(result, default=str)

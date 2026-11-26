@@ -24,6 +24,7 @@ from tilde._tools import (
     ToolCatalog,
     as_object,
     as_string,
+    suspendable_call,
     tool_id,
 )
 from tilde._tools import ToolDisplay as ToolDisplayName
@@ -740,7 +741,7 @@ class AgentContext:
         self.check()
         call_id = tool_id(self.invocation_id, tool_call_id, name)
 
-        suspendable = self._snapshot is not None and chunks is None
+        suspendable = self._snapshot is not None and chunks is None and suspendable_call.get()
 
         async def frames() -> AsyncIterator[chat_pb2.InvokeToolRequest]:
             yield chat_pb2.InvokeToolRequest(
@@ -778,8 +779,9 @@ class AgentContext:
         """The suspension contract of framework adapters (internal). An adapter that can stop
         its loop at a step boundary and continue it from saved state calls this before the loop
         runs, with the loop's state at its last step boundary (the conversation in the
-        framework's message format, as JSON). From then on a Tilde tool call that runs long
-        answers pending instead of blocking; at each step boundary the adapter checks
+        framework's message format, as JSON). From then on a Tilde tool call its tool wrappers
+        make (``execute(..., suspendable=True)``) that runs long answers pending instead of
+        blocking; at each step boundary the adapter checks
         ``should_suspend`` and, when set, calls ``suspend`` with the conversation so far, pending
         answers included. On the run's next invocation ``resumed`` holds that state and the
         calls' outcomes, and the adapter continues from it."""

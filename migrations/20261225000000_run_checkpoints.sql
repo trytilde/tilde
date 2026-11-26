@@ -15,3 +15,10 @@ CREATE TABLE chat_run_checkpoints (
 -- minutes), with a margin to save. NULL where the host has no limit.
 ALTER TABLE chat_invocations ADD COLUMN suspend_at TIMESTAMPTZ;
 CREATE INDEX chat_invocations_suspend_at ON chat_invocations(suspend_at) WHERE status = 'running' AND suspend_at IS NOT NULL;
+-- Why the run was asked to suspend: a person or an operator (`manual`, which waits for
+-- ResumeRun), the invocation's deadline, or a call that answered pending. Only the last two
+-- resume by themselves.
+ALTER TABLE chat_invocations ADD COLUMN suspended_for TEXT CHECK (suspended_for IN ('manual', 'deadline', 'pending'));
+-- A pending call's process touches this while the call runs; one that stops (a restart) leaves
+-- it to age, and the call is aborted a minute later so its run resumes with the failure.
+ALTER TABLE chat_tool_calls ADD COLUMN heartbeat_at TIMESTAMPTZ;

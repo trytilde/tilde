@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ChannelBinding, Message } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 import type { Tool, ToolCatalog } from "./index.js";
-import type { Channels, ChannelTool, ChannelTools } from "./channel-types.js";
+import type { ChannelExecution, Channels, ChannelTool, ChannelTools } from "./channel-types.js";
 
 /** Group only the tools published for this invocation. The API remains the authorization boundary. */
 export function createChannels(
@@ -28,9 +28,12 @@ export function createChannels(
       if (catalog[name] !== source)
         throw new Error("Channel tool is no longer available in this invocation");
     };
-    const execute = (input: unknown, execution: { toolCallId?: string } = {}) => {
+    const execute = (input: unknown, execution: ChannelExecution = {}) => {
       available();
-      return source.execute(input, { toolCallId: execution.toolCallId ?? randomUUID() });
+      return source.execute(input, {
+        toolCallId: execution.toolCallId ?? randomUUID(),
+        ...(execution.suspendable && { suspendable: true }),
+      });
     };
     const call: ChannelTool = Object.assign(execute, {
       description: source.description,

@@ -63,7 +63,7 @@ def _execute(channel: ChannelTool | TildeTool):
     async def execute(ctx: RunContext[Any], /, **arguments: Any) -> Any:
         token = _RUN_CONTEXT.set(ctx)
         try:
-            return await channel.execute(arguments, tool_call_id=ctx.tool_call_id)
+            return await channel.execute(arguments, tool_call_id=ctx.tool_call_id, suspendable=True)
         finally:
             _RUN_CONTEXT.reset(token)
 

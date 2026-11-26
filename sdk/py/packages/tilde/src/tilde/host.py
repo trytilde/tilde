@@ -46,6 +46,8 @@ class InvocationOptions:
     """What to run and how to checkpoint it, shared by every host shape."""
 
     run: RunFn
+    # Called on a suspend command for code that keeps framework state itself; a framework
+    # adapter that suspends (``enable_suspension``) saves its own and this is not called.
     checkpoint: CheckpointFn | None = None
     tracing: Literal["existing"] | None = None
     logging: Literal["existing"] | None = None
