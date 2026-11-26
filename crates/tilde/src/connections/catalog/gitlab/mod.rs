@@ -133,6 +133,9 @@ impl EgressHook for Gitlab {
                 protocol,
                 method,
                 path,
+                query,
+                headers,
+                body,
             } => {
                 // The project segment is checked here, then stands in as a plain segment so
                 // the manifest rules see no encoded slash in it.
@@ -161,6 +164,9 @@ impl EgressHook for Gitlab {
                     protocol,
                     method,
                     path: &path,
+                    query: *query,
+                    headers,
+                    body,
                 });
                 let writes = config
                     .get("merge_requests")

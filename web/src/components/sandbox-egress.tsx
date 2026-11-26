@@ -286,7 +286,10 @@ function EgressForm({
         <DialogDescription>
           Sandboxes reach the connection at{" "}
           <code>/sandboxes/egress/{form.watch("slug") || "slug"}</code> on the gateway, limited to
-          what this grant allows.
+          what this grant allows. Their shells get the address and a token to present in place of
+          the connection's credential (
+          <code>TILDE_EGRESS_{(form.watch("slug") || "slug").toUpperCase()}_URL</code> and{" "}
+          <code>_TOKEN</code>), and the provider's own client variables.
         </DialogDescription>
       </DialogHeader>
       <form
@@ -363,7 +366,8 @@ function EgressForm({
           />
           {!offered.length && (
             <p className="text-xs text-muted-foreground">
-              No connection that offers egress, such as GitHub, GitLab or Entire, is left to grant.
+              No connection that offers egress, such as GitHub, GitLab, Linear, Sentry or AWS, is
+              left to grant.
             </p>
           )}
         </div>
@@ -389,12 +393,23 @@ function EgressForm({
             </p>
           )}
         </div>
-        {chosen && chosen.typeId !== "github_app" && (
+        {chosen && chosen.typeId !== "github_app" && chosen.providerId !== "aws" && (
           <Warning>
             This connection's token cannot be narrowed to the grant, so only the gateway's checks
             limit what sandboxes do with it.
             {chosen.providerId === "github" &&
               " A GitHub App connection also mints a token limited to the grant."}
+          </Warning>
+        )}
+        {chosen?.providerId === "aws" && (
+          <Warning>
+            The gateway signs each request with this connection's AWS credentials, and the grant
+            narrows them to the supported services it names (CloudWatch, ECS, EC2, RDS, S3, Lambda
+            and a few more), regions and reads. Reads that return secrets (task definitions, user
+            data, templates, SSM parameters and command output) are refused; anything else stored in
+            AWS, such as stack outputs or a Lambda function's environment, is the IAM policy's to
+            guard. Under a grant that writes, those refusals do not hold. Point the AWS CLI or an
+            SDK at the route with <code>AWS_ENDPOINT_URL</code>; sandboxes get it set.
           </Warning>
         )}
         {schema && (

@@ -1,8 +1,11 @@
 //! Mints: the credential a connection's consumer sends upstream, as narrow as the consumer asks.
 //!
 //! A connection type mints one of two ways. `Stored` sends the stored credential as it is (a
-//! personal access token or API key, or an OAuth access token the connection keeps refreshed);
-//! nothing narrower exists, so the scope is ignored and consumers narrow in their own checks.
+//! personal access token or API key, or an OAuth access token the connection keeps refreshed),
+//! in the headers its provider takes (`stored`: a bearer token by default; Linear API keys bare,
+//! PagerDuty's `Token token=`, Jira's Basic `email:token`, Datadog's, New Relic's and Honeycomb's
+//! key headers); nothing narrower exists, so the scope is ignored and consumers narrow in their
+//! own checks.
 //! `Custom` is provider code: GitHub App installation tokens limited to the scope's repositories
 //! and permissions, AWS STS sessions in the scope's account, and Entire service account tokens
 //! exchanged from the connection's secret.
@@ -151,7 +154,7 @@ pub async fn mint(
     consumer: &str,
 ) -> ToolResult<Minted> {
     match (strategy(provider, typ), provider) {
-        (Mint::Stored, _) => stored(access),
+        (Mint::Stored, _) => stored(access, provider, typ),
         // AWS sessions are cached per identity and role inside sts, in this same cache.
         (Mint::Custom, "aws") => {
             let account = scope.resources.first().map(String::as_str);
@@ -163,7 +166,7 @@ pub async fn mint(
             })
         }
         // The installation token the connection keeps refreshed serves unscoped consumers.
-        (Mint::Custom, "github") if scope.is_empty() => stored(access),
+        (Mint::Custom, "github") if scope.is_empty() => stored(access, provider, typ),
         (Mint::Custom, "github") => {
             networked(access, provider, scope, consumer, async {
                 crate::connections::catalog::github::installation_token(access, scope).await
@@ -219,13 +222,62 @@ async fn networked(
     .await
 }
 
-/// The stored OAuth access token, else a personal token or API key, as a bearer token.
-fn stored(access: &Access) -> ToolResult<Minted> {
-    ["access_token", "token", "api_key"]
-        .iter()
-        .find_map(|key| access.values.get(*key))
-        .map(|token| Minted::bearer(token.expose_secret(), None))
-        .ok_or_else(|| ConnectError::failed_precondition("The connection holds no credential"))
+/// The stored credential in the headers the provider takes: the OAuth access token, else a
+/// personal token or API key, as a bearer token, unless the provider names its own headers.
+fn stored(access: &Access, provider: &str, typ: &str) -> ToolResult<Minted> {
+    use http::header::AUTHORIZATION;
+    let value = |key: &str| access.secret(key);
+    let header = |name: &'static str, value: String| {
+        (HeaderName::from_static(name), SecretString::from(value))
+    };
+    let headers = match (provider, typ) {
+        ("linear", "api_key") => vec![(
+            AUTHORIZATION,
+            SecretString::from(value("api_key")?.to_owned()),
+        )],
+        ("pagerduty", "api_token") => vec![(
+            AUTHORIZATION,
+            SecretString::from(format!("Token token={}", value("api_token")?)),
+        )],
+        ("jira", "api_token") => {
+            use base64::Engine;
+            let pair =
+                zeroize::Zeroizing::new(format!("{}:{}", value("email")?, value("api_token")?));
+            vec![(
+                AUTHORIZATION,
+                SecretString::from(format!(
+                    "Basic {}",
+                    base64::engine::general_purpose::STANDARD.encode(pair.as_bytes())
+                )),
+            )]
+        }
+        ("datadog", _) => vec![
+            header("dd-api-key", value("api_key")?.to_owned()),
+            header("dd-application-key", value("app_key")?.to_owned()),
+        ],
+        ("newrelic", _) => vec![header("api-key", value("api_key")?.to_owned())],
+        ("honeycomb", _) => vec![header("x-honeycomb-team", value("api_key")?.to_owned())],
+        ("sentry", "token") => return Ok(Minted::bearer(value("auth_token")?, None)),
+        // A Prometheus without authentication takes none.
+        ("prometheus", _)
+            if crate::connections::model::optional(&access.values, "token").is_none() =>
+        {
+            vec![]
+        }
+        _ => {
+            return ["access_token", "token", "api_key"]
+                .iter()
+                .find_map(|key| access.values.get(*key))
+                .map(|token| Minted::bearer(token.expose_secret(), None))
+                .ok_or_else(|| {
+                    ConnectError::failed_precondition("The connection holds no credential")
+                });
+        }
+    };
+    Ok(Minted {
+        credential: Credential::Headers(headers),
+        expires_at: None,
+    })
 }
 
 async fn single_flight<F, Fut>(key: String, mint: F) -> ToolResult<Minted>

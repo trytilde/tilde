@@ -1,12 +1,15 @@
 //! The egress route on the runtime listener: `/sandboxes/egress/{slug}/{*path}`.
 //!
-//! A sandbox process authenticates with its egress token (`Authorization: Bearer`, `token`, or a
-//! Basic password, which is how git sends the credential helper's answer). The token names the
+//! A sandbox process authenticates with its egress token wherever its client sends a credential
+//! (`presented`: Bearer, a Basic password, which is how git sends the credential helper's answer,
+//! an API's key header, a SigV4 access key ID). The token names the
 //! sandbox, its blueprint's enabled grant `slug` names the connection; the provider's hook checks
 //! the request (for a push, the ref updates and the pack it carries, read before anything is
 //! forwarded) against its rules and the grant's config. The client's credentials are dropped,
-//! the narrowest credential the grant needs is minted and attached, and the request streams to
-//! the provider's upstream (fixed, or the connection's own instance or cluster). The path is
+//! the narrowest credential the grant needs is minted and attached (AWS credentials sign the
+//! request for the service and region the client signed for), and the request streams to the
+//! provider's upstream (fixed, the connection's own instance or cluster, or for AWS the
+//! service's regional endpoint, `EgressHook::route`). The path is
 //! checked and forwarded as the client sent it, still percent-encoded, except that escapes of
 //! unreserved characters are decoded first, so no rule is sidestepped by escaping a letter of
 //! it. Redirects are not followed: a same-host `Location` is rewritten to the route, any other passes to the client,
@@ -45,28 +48,54 @@ pub fn router(sandboxes: Sandboxes) -> axum::Router {
             &format!("{PREFIX}/{{slug}}/{{*path}}"),
             axum::routing::any(egress),
         )
+        // The upstream's root: AWS SDKs post JSON and Query protocol calls to `/`.
+        .route(&format!("{PREFIX}/{{slug}}/"), axum::routing::any(egress))
         .with_state(sandboxes)
 }
 
-/// The egress token a request presents, whichever way its client sends credentials
-/// (`PRIVATE-TOKEN` is GitLab clients' header).
+/// Headers API clients send their key in, which carry the egress token when the sandbox's
+/// client is pointed at the route: GitLab's `PRIVATE-TOKEN`, Datadog's keys, New Relic's
+/// `API-Key` and Honeycomb's `X-Honeycomb-Team`. None of them travels upstream.
+const TOKEN_HEADERS: &[&str] = &["private-token", "dd-api-key", "api-key", "x-honeycomb-team"];
+
+/// The egress token a request presents, whichever way its client sends credentials: one of
+/// `TOKEN_HEADERS`, or `Authorization` as Bearer, `token`, PagerDuty's `Token token=`, a Basic
+/// password, a bare value (Linear's API keys) or, from an AWS SDK, the access key ID of a SigV4
+/// signature (the gateway signs again; the client's signature is not checked).
 pub fn presented(headers: &HeaderMap) -> Option<String> {
-    if let Some(token) = headers.get("private-token") {
+    if let Some(token) = TOKEN_HEADERS.iter().find_map(|name| headers.get(*name)) {
         return Some(token.to_str().ok()?.trim().to_owned());
     }
-    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    let (scheme, credential) = value.split_once(' ')?;
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?.trim();
+    let Some((scheme, credential)) = value.split_once(' ') else {
+        return Some(value.to_owned()).filter(|v| !v.is_empty());
+    };
+    let credential = credential.trim();
     match scheme.to_ascii_lowercase().as_str() {
-        "bearer" | "token" => Some(credential.trim().to_owned()),
+        "bearer" => Some(credential.to_owned()),
+        "token" => Some(
+            credential
+                .strip_prefix("token=")
+                .unwrap_or(credential)
+                .to_owned(),
+        ),
         "basic" => {
             let decoded = base64::engine::general_purpose::STANDARD
-                .decode(credential.trim())
+                .decode(credential)
                 .ok()?;
             let decoded = String::from_utf8(decoded).ok()?;
             Some(decoded.split_once(':')?.1.to_owned())
         }
+        "aws4-hmac-sha256" => Some(crate::connections::egress::sigv4(value)?.0.to_owned()),
         _ => None,
     }
+}
+
+/// The region and service a SigV4-signed request is for.
+fn sigv4_scope(headers: &HeaderMap) -> Option<(&str, &str)> {
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let (_, region, service) = crate::connections::egress::sigv4(value)?;
+    Some((region, service))
 }
 
 fn refuse(status: StatusCode, message: &str) -> Response {
@@ -97,9 +126,13 @@ fn admit(sandbox: uuid::Uuid) -> bool {
 
 async fn egress(
     State(sandboxes): State<Sandboxes>,
-    Path((slug, _)): Path<(String, String)>,
+    Path(params): Path<Vec<(String, String)>>,
     request: Request,
 ) -> Response {
+    let slug = params
+        .into_iter()
+        .find_map(|(name, value)| (name == "slug").then_some(value))
+        .unwrap_or_default();
     // The path as sent: decoding it here would turn an encoded slash into a path separator.
     let path = request
         .uri()
@@ -225,15 +258,18 @@ async fn forward(
         EgressProtocol::Http { .. } => format!("{}_api", grant.provider_id),
         EgressProtocol::Git { .. } => format!("{}_git", grant.provider_id),
     };
-    let upstream = match hook.upstream(protocol, &access) {
+    let base = match hook.upstream(protocol, &access) {
         Ok(upstream) => upstream,
         Err(_) => return refuse(StatusCode::FORBIDDEN, "The connection names no upstream"),
     };
-    let upstream = access
-        .endpoints
-        .get(&endpoint, &upstream)
-        .trim_end_matches('/')
-        .to_owned();
+    let overridden = |upstream: &str| {
+        access
+            .endpoints
+            .get(&endpoint, upstream)
+            .trim_end_matches('/')
+            .to_owned()
+    };
+    let mut upstream = overridden(&base);
     let (deny_default_branch, replicas) = match protocol {
         EgressProtocol::Git {
             deny_default_branch,
@@ -346,14 +382,24 @@ async fn forward(
                     );
                 }
             }
-            hook.check(
-                &EgressRequest::Http {
-                    protocol,
-                    method,
-                    path,
+            let request = EgressRequest::Http {
+                protocol,
+                method,
+                path,
+                query,
+                headers: &parts.headers,
+                body: body_bytes.as_deref().unwrap_or_default(),
+            };
+            match hook.check(&request, &grant.config) {
+                Decision::Allow => match hook.route(base.clone(), &request) {
+                    Ok(routed) => {
+                        upstream = overridden(&routed);
+                        Decision::Allow
+                    }
+                    Err(denied) => denied,
                 },
-                &grant.config,
-            )
+                denied => denied,
+            }
         }
     };
     if let Decision::Deny(reason) = decision {
@@ -419,7 +465,24 @@ async fn forward(
                     .map_err(std::io::Error::other),
             )),
         };
-        let response = match outbound.send().await {
+        let Ok(mut outbound) = outbound.build() else {
+            return refuse(StatusCode::BAD_REQUEST, "The request cannot be forwarded");
+        };
+        // AWS credentials sign the request for the service and region the client signed for.
+        if let mints::Credential::Aws(credentials) = &minted.credential {
+            let Some((region, service)) = sigv4_scope(&parts.headers) else {
+                return refuse(StatusCode::FORBIDDEN, "Sign the request with AWS SigV4");
+            };
+            let signer = client_aws_sigv4::Signer::new(credentials.clone(), region, service);
+            let body = body_bytes.as_deref().unwrap_or_default();
+            if signer
+                .sign_request_at(&mut outbound, body, std::time::SystemTime::now())
+                .is_err()
+            {
+                return refuse(StatusCode::BAD_GATEWAY, "The request could not be signed");
+            }
+        }
+        let response = match access.http.client.execute(outbound).await {
             Ok(response) => response,
             Err(_) => return refuse(StatusCode::BAD_GATEWAY, "The upstream could not be reached"),
         };
@@ -462,14 +525,22 @@ async fn forward(
         .unwrap_or_else(|_| refuse(StatusCode::BAD_GATEWAY, "Invalid upstream response"))
 }
 
-/// Request headers that travel upstream: never the client's credentials, cookies or hop-by-hop
-/// headers; the host and length are the outbound request's own.
+/// Request headers that travel upstream: never the client's credentials (its key headers, its
+/// SigV4 signature and session token), cookies or hop-by-hop headers; the host and length are
+/// the outbound request's own.
 fn forwarded(name: &str) -> bool {
     !matches!(
         name,
         "authorization"
             | "proxy-authorization"
             | "private-token"
+            | "dd-api-key"
+            | "dd-application-key"
+            | "api-key"
+            | "x-honeycomb-team"
+            | "x-amz-security-token"
+            | "x-amz-date"
+            | "x-amz-content-sha256"
             | "cookie"
             | "host"
             | "connection"

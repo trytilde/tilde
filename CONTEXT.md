@@ -161,7 +161,10 @@ resolves the alias from the same in-memory map (gateway loader or sidecar config
 Mints (`connections::mints`) turn a connection's stored credential into what a consumer (`tool`,
 `chat`, later `egress`) sends upstream. A connection type mints `Stored` (the credential as it is:
 an OAuth access token the connection keeps refreshed, else a `token` or `api_key`; the scope cannot
-narrow it) or `Custom` (provider code). Custom mints: a GitHub App installation token limited to a
+narrow it; sent in the headers its provider takes: a bearer token by default, a Linear API key
+bare, PagerDuty's `Token token=`, Jira's Basic `email:token`, Datadog's `DD-API-KEY` and
+`DD-APPLICATION-KEY`, New Relic's `API-Key`, Honeycomb's `X-Honeycomb-Team`, nothing for a
+Prometheus without a token) or `Custom` (provider code). Custom mints: a GitHub App installation token limited to a
 `MintScope` of `owner/repo` resources of the installation's account and App permissions (an
 unscoped GitHub consumer gets the installation token the connection keeps), AWS STS sessions in
 the scope's account, and Entire service account tokens (the connection's secret exchanged at its
@@ -617,7 +620,8 @@ templates and filters name paths of a signal's context: its data below plus
   enabled). Its slug (`^[a-z][a-z0-9_]{0,31}$`) names it in the route; a blueprint grants a
   connection once. The connection must be ready, installation-owned and of a type with the
   `egress` capability, which a provider offers when it declares egress (`connections::egress`,
-  built-in catalog code: the git forges GitHub, GitLab and Entire). A provider's egress is its protocols (HTTP with
+  built-in catalog code: the git forges GitHub, GitLab and Entire, the API providers in
+  `catalog::apis` and AWS). A provider's egress is its protocols (HTTP with
   deny-by-default `METHOD /path` allow and deny rules, deny winning; git smart-HTTP with its
   services, how the upstream takes the token (Basic as a provider's user, or bearer) and whether
   pushes may delete refs, rewrite them or touch the default branch), its
@@ -637,14 +641,67 @@ templates and filters name paths of a signal's context: its data below plus
   (`project/repo`, served under `et/`) and push branches; pushes never delete or rewrite refs,
   and the default branch is pushable when the grant names it, since a tenant's repository is
   the agent's own. Entire has no HTTP protocol: its API is reached with tools.
+- API egress (`catalog::apis`): HTTP egress to the providers agents read from sandboxes, each
+  an allowlist of what agents need, its upstream the provider's or the connection's (never a
+  grant's), its credential the connection type's stored mint (an OAuth access token refreshed by
+  the connection as usual). None can narrow a credential per request, so the rules and the
+  grant are the narrowing. Linear (`POST /graphql`): queries, and the mutations the grant names
+  (default `issueCreate`, `issueUpdate`, `commentCreate`), read from the document by a small
+  GraphQL scanner (`egress::graphql`: aliases, fragments, arguments; batches, subscriptions and
+  unparseable bodies refused; a provider's denied fields refused at any depth). GraphQL requests
+  carry no query string. New Relic: NerdGraph queries only, by region, never `apiAccess` (its
+  API keys). Sentry (sentry.io or `base_url`): reads of the organization, its issues, events,
+  releases, projects, teams, environments, tags, traces, replays, monitors and stats (and a
+  project's), issue updates when `issue_writes` (default on); a grant narrowed to
+  `organizations` refuses paths naming another or none. Jira (API token type only; the OAuth
+  type's cloud-ID lookup leaves it tools-only): reads and JQL search on the connection's site,
+  issue writes when `writes`. PagerDuty (by region): reads of incidents, services (never their
+  integrations, by path or `include[]`; no `;` in the query), on-calls and schedules, incident notes (`notes`, default
+  on), acknowledging and resolving (`incident_updates`, default off). HCP Terraform (`hostname`,
+  else app.terraform.io): organizations, projects, workspaces, a run's events, redacted plans and
+  applies (never runs themselves, which carry their variables' values); no `include` of state,
+  outputs or runs, no dotted path segments (`.json`), no `;` in the query. Grafana (the
+  connection's URL): dashboards, folders, data sources and their queries, annotations, alert
+  rules, and an alertmanager's alerts and silences (never its config). Datadog (`api.<site>`),
+  Prometheus (the connection's URL), Honeycomb (by region): read-only allowlists.
+- AWS egress (`catalog::aws::egress`): the sandbox's SDK or CLI points `AWS_ENDPOINT_URL` at the
+  route and signs with the egress token as its access key ID (any secret). The gateway reads the
+  token, and the region and service from that signature's scope (the client's signature is not
+  checked), sends the request to `https://<service>.<region>.amazonaws.com`, and signs it again
+  with the connection's credentials in the grant's `account` (its own by default, else a role it
+  lists). Only vetted services are supported, each with its protocol (`SERVICES`): RPC `logs`,
+  `monitoring`, `ecs`, `ec2`, `rds`, `cloudtrail`, `dynamodb`, `sqs`, `sns`, `cloudformation`,
+  `elasticloadbalancing`, `autoscaling`, `sts`, `ssm`, and REST `s3` and `lambda`; a grant's
+  `services` is an enum of them (default `logs` and `monitoring`) and a request for any other is
+  refused. A grant also names `regions` (empty: any) and `read_only` (default on). An RPC
+  request goes to `/` (or exactly `/service/<name>/operation/<action>` for RPC v2), names its
+  action only where its service's protocol carries it (`X-Amz-Target`, `Action` in the query or
+  a form body, the RPC v2 path), once or agreeing, with one target, one content type and an
+  unencoded body; read-only, the action is named Get, List, Describe, Filter, Search, Lookup,
+  BatchGet, Query or Scan followed by a word, or Logs' StartQuery or StopQuery. A REST request
+  names no action anywhere; read-only, it is a GET or HEAD. Paths with empty, `.` or `..`
+  segments, encoded or not, are refused; a Query service's body is a form. Under any grant these
+  reads are refused: STS other than GetCallerIdentity; SSM parameter reads,
+  `GetCommandInvocation`, `ListCommandInvocations`; CloudFormation `GetTemplate`; EC2
+  `DescribeInstanceAttribute`, `DescribeLaunchTemplateVersions`, `GetLaunchTemplateData`,
+  `GetConsoleOutput`, `DescribeVpnConnections`, `GetVpnConnectionDeviceSampleConfiguration`,
+  `GetFlowLogsIntegrationTemplate`; ECS `DescribeTaskDefinition`; Auto Scaling
+  `DescribeLaunchConfigurations`; names with `Token`, `Credential`, `SecretValue`, `AccessKey`,
+  `Password` or `ApiKey`. Anything else stored in AWS that a read returns (stack outputs, a
+  Lambda function's environment, an S3 object) is the role's IAM policy's to guard. The
+  refusals only mean something under a read-only grant: a grant that writes can reach the same
+  secrets another way (an SSM `SendCommand`).
 - Egress route: `{runtime}/sandboxes/egress/{slug}/{*path}` on the runtime listener
   (`sandboxes::gateway`). A sandbox process's egress token (issued with its session at
   enrollment, digest in `sandboxes.egress_hash`, valid while the row lives; a re-enrolled process
   gets a new one) authenticates as Bearer, `token` or a Basic password (git). The token's
   sandbox's blueprint's enabled grant `slug` names the connection (still ready,
   installation-owned and egress-capable); a grant saved under an older config version is
-  refused. A GitLab client's `PRIVATE-TOKEN` header also carries the egress token and never
-  travels upstream. Git smart-HTTP paths (`<repository>[.git]/info/refs|git-upload-pack|git-receive-pack`,
+  refused. The token also comes the ways API clients send their keys, and none of them travels
+  upstream: GitLab's `PRIVATE-TOKEN`, Datadog's `DD-API-KEY`, New Relic's `API-Key`, Honeycomb's
+  `X-Honeycomb-Team`, PagerDuty's `Authorization: Token token=`, a bare `Authorization` (Linear
+  API keys) and the access key ID of a SigV4 signature (AWS SDKs). The upstream's root (`/`) is a
+  path like any other. Git smart-HTTP paths (`<repository>[.git]/info/refs|git-upload-pack|git-receive-pack`,
   the repository any number of plain segments) are git, anything else HTTP; the path is checked
   and forwarded as sent, still percent-encoded, except that escapes of unreserved characters
   are decoded first (`%76ariables` is `variables` to the rules too) and a `%` that starts no
@@ -655,16 +712,19 @@ templates and filters name paths of a signal's context: its data below plus
   from upstream's upload-pack advertisement (unknown refuses the push). The hook decides; the
   client's credentials, cookies and hop-by-hop headers are dropped, the scoped credential minted
   (git sends it as Basic `x-access-token` to GitHub, Basic `oauth2` to GitLab and as a bearer
-  to Entire), and the request streams to the provider's
-  upstream. Redirects are not followed: a same-host `Location` is rewritten to the route. The
+  to Entire; HTTP in the provider's headers; AWS credentials sign the request with SigV4 for the
+  service and region the client signed for), and the request streams to the provider's
+  upstream (for AWS, the service's endpoint in that region). Redirects are not followed: a same-host `Location` is rewritten to the route. The
   exception is a git upstream with replicas (Entire's entry host redirects to nodes under its
   own host): the gateway buffers the request and follows up to three such redirects itself,
   with the credential, to the upstream's origin or a host under it only. 20
   requests a second per sandbox (burst 200). Each request is a `sandbox.egress {slug}` span on the
   sandbox's latest invocation (slug, protocol, method and path or git service and repository,
   decision and reason, status, ref updates as events). Registration carries `egress_token` (with
-  the session only), `egress_env` (`TILDE_EGRESS_<SLUG>_URL` and the provider's HTTP templates,
-  `{token}` filled in by the process) and `git` rewrites of each git upstream to the route
+  the session only), `egress_env` (`TILDE_EGRESS_<SLUG>_URL`, `TILDE_EGRESS_<SLUG>_TOKEN` and the
+  provider's HTTP templates for its standard clients, e.g. `LINEAR_API_URL`, `SENTRY_URL` and
+  `SENTRY_AUTH_TOKEN`, `DD_API_KEY`, `GRAFANA_URL`, `HONEYCOMB_API_ENDPOINT`, `AWS_ENDPOINT_URL`
+  and `AWS_ACCESS_KEY_ID`; `{token}` filled in by the process) and `git` rewrites of each git upstream to the route
   (the connection's upstream; for Entire both `entire://<cluster>/` and `https://<cluster>/`, so
   `git clone entire://...` works in a sandbox without Entire's remote helper);
   `tilde sandbox connect` writes them to the shell environment and `/etc/gitconfig` with

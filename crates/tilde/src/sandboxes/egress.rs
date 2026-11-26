@@ -153,8 +153,8 @@ impl Sandboxes {
             hook,
         }))
     }
-    /// The blueprint's enabled grants as a sandbox process wires them: `TILDE_EGRESS_<SLUG>_URL`
-    /// and the provider's HTTP environment templates for each, and for git, the upstream
+    /// The blueprint's enabled grants as a sandbox process wires them: `TILDE_EGRESS_<SLUG>_URL`,
+    /// `TILDE_EGRESS_<SLUG>_TOKEN` and the provider's HTTP environment templates for each, and for git, the upstream
     /// rewritten to the route. `{token}` stays for the process to fill in.
     pub(crate) async fn egress_wiring(&self, blueprint: Uuid) -> Result<Wiring, Error> {
         let mut wiring = Wiring {
@@ -175,6 +175,12 @@ impl Sandboxes {
             wiring.env.push((
                 format!("TILDE_EGRESS_{}_URL", row.slug.to_uppercase()),
                 url.clone(),
+            ));
+            // For clients with no variable of their own: `curl -H "Authorization: Bearer
+            // $TILDE_EGRESS_<SLUG>_TOKEN" "$TILDE_EGRESS_<SLUG>_URL/..."`.
+            wiring.env.push((
+                format!("TILDE_EGRESS_{}_TOKEN", row.slug.to_uppercase()),
+                "{token}".into(),
             ));
             for protocol in &hook.definition().protocols {
                 match protocol {

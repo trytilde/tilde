@@ -34,7 +34,7 @@ pub fn definition() -> model::Provider {
                     "token":{"type":"string","title":"Service account token","description":"e.g. glsa_...","minLength":1,"writeOnly":true}
                 },"required":["url","token"],"additionalProperties":false}),
             },
-            capabilities: vec![model::Capability::Tool],
+            capabilities: vec![model::Capability::Tool, model::Capability::Egress],
         }],
     }
 }
