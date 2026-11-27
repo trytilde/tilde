@@ -67,9 +67,12 @@ There is no user-facing Save draft control.
 Connection setup overviews remain provider catalog `instructions`. Ordered
 `setup_instructions` come from `Runtime::instructions(&ConnectionType)` on the
 adapter selected by provider and connection type. The iframe renders them below
-its overview. Channel-capable setups expose a read-only Webhook URL below the
-account name with a copy action, rather than generic webhook guidance appended
-to every setup. The field is not a credential or submitted form value.
+its overview. Channel- and signal-capable setups expose a read-only Webhook URL
+below the account name with a copy action, rather than generic webhook guidance
+appended to every setup; authorization-code setups show the Redirect URL the
+same way. Neither is a credential or submitted form value. The URL names the
+connection, so the web app's native account dialog hands these setups to the
+hosted page (`hostedSetup`).
 `Runtime::account_name_field(&ConnectionType)` optionally binds the account name
 to a credential field. The shared broker omits that field from the projected form,
 rejects client-supplied overrides, then injects the saved account name before full

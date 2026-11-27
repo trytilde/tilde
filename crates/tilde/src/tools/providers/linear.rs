@@ -71,10 +71,10 @@ impl Runtime for LinearSetup {
     fn instructions(&self, typ: &model::ConnectionType) -> &'static [&'static str] {
         match typ.id.as_str() {
             "oauth" => &[
-                "In Linear, go to Settings > API > OAuth applications and create a new application.",
+                "In Linear, go to Settings > API > OAuth applications and create an application for this connection.",
                 "Add the redirect URL below to its callback URLs.",
                 "For routines, turn on webhooks, paste the webhook URL below and select Issues and Issue comments.",
-                "Save, then copy the client ID, client secret and any webhook signing secret into the fields below.",
+                "Save, then copy the client ID, client secret and (with webhooks) signing secret into the fields below.",
                 "Continue, and approve the read and write access Linear asks for.",
             ],
             "api_key" => &[

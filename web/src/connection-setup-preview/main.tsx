@@ -17,10 +17,10 @@ const setup = {
   instructions:
     "Connect Linear so agents can read, comment on and move issues, and so routines can start when issues or comments change.",
   setupInstructions: [
-    "In Linear, go to Settings > API > OAuth applications and create a new application.",
+    "In Linear, go to Settings > API > OAuth applications and create an application for this connection.",
     "Add the redirect URL below to its callback URLs.",
     "For routines, turn on webhooks, paste the webhook URL below and select Issues and Issue comments.",
-    "Save, then copy the client ID, client secret and any webhook signing secret into the fields below.",
+    "Save, then copy the client ID, client secret and (with webhooks) signing secret into the fields below.",
     "Continue, and approve the read and write access Linear asks for.",
   ],
   webhookUrl: "https://tilde.example/connections/webhooks/conn_123",
