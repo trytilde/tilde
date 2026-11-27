@@ -226,7 +226,8 @@ const beforeReply = [
 const afterReply = [
   messageEvent(15n, 104, reply),
   thought(16n, 105, "Booking the morning flight"),
-  toolEvent(17n, 106, tool("book", "bookFlight", "running")),
+  // Stamped with its transaction's start, before the reasoning it committed after.
+  toolEvent(17n, 104.5, tool("book", "bookFlight", "running")),
 ];
 // The transcript top to bottom: a message's id, or a block's kind and contents.
 const transcript = (container: HTMLElement) =>
@@ -280,8 +281,8 @@ it("interleaves live messages, including the person's reply, and keeps an edited
   for (const event of afterReply) await act(async () => emit?.(event));
   await screen.findByText("bookFlight");
   expect(transcript(view.container)).toEqual(expected);
-  // An edit to the oldest message arrives mid-thought: it leaves the message where it was written
-  // and does not split the reasoning around it.
+  // An edit to the oldest message and the call's completion arrive mid-thought: the message stays
+  // where it was written, and neither splits the reasoning around it.
   await act(async () => emit?.(thought(18n, 107, "Checking seats")));
   await act(async () =>
     emit?.(
@@ -294,7 +295,8 @@ it("interleaves live messages, including the person's reply, and keeps an edited
       }),
     ),
   );
-  await act(async () => emit?.(thought(20n, 109, " in row 3")));
+  await act(async () => emit?.(toolEvent(20n, 109, tool("book", "bookFlight", "completed"))));
+  await act(async () => emit?.(thought(21n, 110, " in row 3")));
   await screen.findByText("Earlier answer, corrected");
   expect(transcript(view.container)).toEqual([...expected, "reasoning: Checking seats in row 3"]);
 });

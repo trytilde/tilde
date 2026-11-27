@@ -532,22 +532,17 @@ function ChatWindow({
   const thinking = activities.thoughts
     .filter((thought) => thought.invocation === session?.run?.invocationId)
     .at(-1)?.key;
+  const dayOf = (item?: (typeof items)[number]) => (item?.at ? dayKey(new Date(item.at)) : "");
   const rows = items.map((item, index) => {
     const sameSender = (other?: (typeof items)[number]) =>
       item.kind === "message" &&
       other?.kind === "message" &&
       other.message.participantId === item.message.participantId &&
-      day(other.message) === day(item.message);
-    const itemDay = item.kind === "message" ? day(item.message) : dayKey(new Date(item.at));
-    const previous = items[index - 1];
-    const previousDay = !previous
-      ? ""
-      : previous.kind === "message"
-        ? day(previous.message)
-        : dayKey(new Date(previous.at));
+      dayOf(other) === dayOf(item);
+    const itemDay = dayOf(item);
     return {
       item,
-      showDay: !search && !!itemDay && itemDay !== previousDay,
+      showDay: !search && !!itemDay && itemDay !== dayOf(items[index - 1]),
       itemDay,
       continuedPrevious: sameSender(items[index - 1]),
       continuedNext: sameSender(items[index + 1]),
@@ -896,9 +891,6 @@ function ChatWindow({
       </div>
     </section>
   );
-}
-function day(message?: Message) {
-  return message?.createdAt ? dayKey(new Date(Number(message.createdAt.seconds) * 1000)) : "";
 }
 function toolRow(tool: ToolCall): ToolChipRow {
   const failed = Boolean(tool.error) || /fail|error/.test(tool.status);

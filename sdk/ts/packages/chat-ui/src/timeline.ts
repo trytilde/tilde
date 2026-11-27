@@ -1,7 +1,7 @@
 import type { Activity, Message, ToolCall } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 
-/** Where an entry happened: its time, with the activity sequence breaking ties. */
-type Place = { at: number; sequence?: bigint };
+/** An entry's first activity: its commit-ordered sequence, and its time for messages without one. */
+type Place = { sequence: bigint; at: number };
 /** One stretch of an invocation's reasoning, unbroken by a tool call or message. */
 type Thought = Place & { key: string; invocation: string; text: string };
 /**
@@ -9,34 +9,36 @@ type Thought = Place & { key: string; invocation: string; text: string };
  * a reload's `recentActivity` so both place entries alike.
  */
 export type Activities = {
-  /** Each tool call's first sighting. */
+  /** Each tool call's first event. */
   tools: Record<string, Place>;
-  /** Each message's first creation event; edits, deletions and aborts never move it. */
+  /** Each message's creation event; edits, deletions and aborts never move it. */
   messages: Record<string, Place>;
   thoughts: Thought[];
-  /** A tool call or message arrived since the last reasoning, which starts a new stretch. */
+  /** A tool call or message started since the last reasoning, which starts a new stretch. */
   broken: boolean;
 };
 export const noActivity: Activities = { tools: {}, messages: {}, thoughts: [], broken: false };
-const creations = new Set(["message.created", "message.started", "message.completed"]);
+const creations = new Set(["message.started", "message.completed"]);
 
 export type TimelineItem = { key: string; at: number } & (
   | { kind: "message"; message: Message }
   | { kind: "tools"; tools: ToolCall[] }
-  | { kind: "reasoning"; invocation: string; text: string }
+  | { kind: "reasoning"; text: string }
 );
 
 export function record(state: Activities, activities: Activity[]): Activities {
   let { tools, messages, thoughts, broken } = state;
   for (const activity of activities) {
     const place = {
-      at: activity.createdAt ? millis(activity.createdAt) : Date.now(),
       sequence: activity.sequence,
+      at: activity.createdAt ? millis(activity.createdAt) : 0,
     };
     if (activity.detail.case === "toolCall") {
       const id = activity.detail.value.id;
-      if (!tools[id]) tools = { ...tools, [id]: place };
-      broken = true;
+      if (!tools[id]) {
+        tools = { ...tools, [id]: place };
+        broken = true;
+      }
     } else if (activity.detail.case === "message") {
       const id = activity.detail.value.id;
       if (!messages[id] && creations.has(activity.kind)) {
@@ -64,64 +66,57 @@ export function record(state: Activities, activities: Activity[]): Activities {
 }
 
 /**
- * Messages, tool calls and reasoning in the order they happened, each placed by its first
- * activity (gateway time, then sequence). A message no loaded activity created (older history,
- * or a just-posted message whose activity has not arrived) falls back to its own `createdAt`.
- * A reload replays only recent activity, so a call or message whose first event fell outside it
- * is placed at its first event inside it. Consecutive tool calls share one block; a message or
- * reasoning between them starts a new one.
+ * Messages, tool calls and reasoning in the order they happened. Entries with a first activity
+ * follow its sequence, the thread's commit order (activity times mix database and gateway clocks).
+ * A message no loaded activity created (older history, or a just-posted message whose activity
+ * has not arrived) is merged in by its `createdAt`. A reload replays only recent activity, so a
+ * call or message whose first event fell outside it is placed at its first event inside it.
+ * Consecutive tool calls share one block; a message or reasoning between them starts a new one.
  */
 export function timeline(
   messages: Message[],
   tools: ToolCall[],
   activities: Activities,
 ): TimelineItem[] {
-  type Entry = { item: TimelineItem; place: Place; tool?: ToolCall };
-  const entries: Entry[] = [
-    ...messages.map((message) => {
-      const place = activities.messages[message.id] ?? {
-        at: message.createdAt ? millis(message.createdAt) : 0,
-      };
-      return {
-        item: { kind: "message" as const, key: `message:${message.id}`, at: place.at, message },
-        place,
-      };
-    }),
-    ...tools.map((tool) => {
-      // Tool calls only arrive as activity, so every one has a place; now is a safe default.
-      const place = activities.tools[tool.id] ?? { at: Date.now() };
-      return {
-        item: { kind: "tools" as const, key: `tools:${tool.id}`, at: place.at, tools: [tool] },
-        place,
-        tool,
-      };
-    }),
-    ...activities.thoughts.map((thought) => ({
-      item: {
-        kind: "reasoning" as const,
-        key: thought.key,
-        at: thought.at,
-        invocation: thought.invocation,
-        text: thought.text,
-      },
-      place: thought,
-    })),
-  ];
-  // One lexicographic key (time, then sequence, then key) keeps the sort consistent.
-  const last = BigInt(Number.MAX_SAFE_INTEGER);
-  entries.sort((a, b) => {
-    if (a.place.at !== b.place.at) return a.place.at - b.place.at;
-    const left = a.place.sequence ?? last;
-    const right = b.place.sequence ?? last;
-    if (left !== right) return left < right ? -1 : 1;
-    return a.item.key.localeCompare(b.item.key);
-  });
-  const items: TimelineItem[] = [];
-  for (const entry of entries) {
-    const previous = items.at(-1);
-    if (entry.tool && previous?.kind === "tools") previous.tools.push(entry.tool);
-    else items.push(entry.item);
+  type Entry = { item: TimelineItem; sequence: bigint; tool?: ToolCall };
+  const placed: Entry[] = [];
+  const unplaced: TimelineItem[] = [];
+  for (const message of messages) {
+    const place = activities.messages[message.id];
+    const at = place?.at ?? (message.createdAt ? millis(message.createdAt) : 0);
+    const item = { kind: "message" as const, key: `message:${message.id}`, at, message };
+    if (place) placed.push({ item, sequence: place.sequence });
+    else unplaced.push(item);
   }
+  for (const tool of tools) {
+    // Tool calls arrive only as activity, so each has a place.
+    const place = activities.tools[tool.id];
+    if (place)
+      placed.push({
+        item: { kind: "tools", key: `tools:${tool.id}`, at: place.at, tools: [tool] },
+        sequence: place.sequence,
+        tool,
+      });
+  }
+  for (const thought of activities.thoughts)
+    placed.push({
+      item: { kind: "reasoning", key: thought.key, at: thought.at, text: thought.text },
+      sequence: thought.sequence,
+    });
+  placed.sort((a, b) => (a.sequence < b.sequence ? -1 : a.sequence > b.sequence ? 1 : 0));
+  unplaced.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  const items: TimelineItem[] = [];
+  const push = (item: TimelineItem, tool?: ToolCall) => {
+    const previous = items.at(-1);
+    if (tool && previous?.kind === "tools") previous.tools.push(tool);
+    else items.push(item);
+  };
+  let next = 0;
+  for (const entry of placed) {
+    while (next < unplaced.length && unplaced[next].at <= entry.item.at) push(unplaced[next++]);
+    push(entry.item, entry.tool);
+  }
+  while (next < unplaced.length) push(unplaced[next++]);
   return items;
 }
 function millis(at: { seconds: bigint; nanos: number }) {
