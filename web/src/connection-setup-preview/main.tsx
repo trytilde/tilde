@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { AuthDriver, StandardSetup, mount, type Theme } from "@trytilde/connection-ui";
 import { dark, light, withCanvas } from "../chat-ui-preview/themes";
 
-// Linear's OAuth app setup, as Tilde Cloud's catalog defines it.
+// An OAuth app setup with both URLs to copy and steps that refer to them.
 const setup = {
   providerName: "Linear",
   connectionName: "Linear",
@@ -20,7 +20,7 @@ const setup = {
     "In Linear, go to Settings > API > OAuth applications and create a new application.",
     "Add the redirect URL below to its callback URLs.",
     "For routines, turn on webhooks, paste the webhook URL below and select Issues and Issue comments.",
-    "Save, then copy the client ID, client secret and webhook signing secret into the fields below.",
+    "Save, then copy the client ID, client secret and any webhook signing secret into the fields below.",
     "Continue, and approve the read and write access Linear asks for.",
   ],
   webhookUrl: "https://tilde.example/connections/webhooks/conn_123",

@@ -450,6 +450,7 @@ pub(crate) fn runtime(id: &str, type_id: &str) -> &'static dyn runtime::Runtime 
         ("whatsapp", "meta") => &whatsapp::Whatsapp,
         ("telnyx", "whatsapp") => &telnyx::Telnyx,
         ("tilde", "application") => &tilde::Tilde,
+        ("linear", "api_key" | "oauth") => &crate::tools::providers::linear::LinearSetup,
         _ => inference::runtime(id).unwrap_or(&runtime::Configured),
     }
 }

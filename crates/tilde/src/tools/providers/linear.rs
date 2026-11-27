@@ -6,14 +6,14 @@
 //! Linear's hosted MCP server joins this provider as its `mcp_oauth` type (`tools::mcp_catalog`).
 use super::ToolProvider;
 use crate::chat::{providers::Access, tools::ToolResult};
-use crate::connections::model;
+use crate::connections::{catalog::runtime::Runtime, model};
 use crate::proto::tilde::types::v1 as types;
 use connectrpc::ConnectError;
 use futures::future::BoxFuture;
 use serde_json::{Value, json};
 
 const API: &str = "https://api.linear.app/graphql";
-const WEBHOOK_SECRET: &str = "Optional. To receive issue and comment events as signals, create a Linear webhook (Settings > API > Webhooks, or your OAuth application's webhook) with this connection's webhook URL, subscribe it to Issues and Comments, and paste its signing secret here.";
+const WEBHOOK_SECRET: &str = "Optional. The signing secret of the Linear webhook, so routines can start on issue and comment events.";
 
 pub fn definition() -> model::Provider {
     let mut oauth = model::OAuth::standard("https://api.linear.app/oauth/token");
@@ -26,7 +26,7 @@ pub fn definition() -> model::Provider {
         account_name_label: Some("Linear workspace".into()),
         icon_url: Some("/provider-icons/linear.svg".into()),
         instructions: Some(
-            "Connect Linear so agents can read, comment on and move issues, and so routines can start when issues or comments change. Use a personal API key (Settings > Security & access > Personal API keys) or a Linear OAuth application."
+            "Connect Linear so agents can read, comment on and move issues, and so routines can start when issues or comments change."
                 .into(),
         ),
         id: "linear".into(),
@@ -60,6 +60,31 @@ pub fn definition() -> model::Provider {
                 capabilities: vec![model::Capability::Tool, model::Capability::Signal, model::Capability::Egress],
             },
         ],
+    }
+}
+
+/// Setup steps for the shared form, which shows the redirect and webhook URLs they refer to.
+/// Signals read Issue and Comment payloads; tools need only the `read` and `write` scopes.
+pub(crate) struct LinearSetup;
+#[async_trait::async_trait]
+impl Runtime for LinearSetup {
+    fn instructions(&self, typ: &model::ConnectionType) -> &'static [&'static str] {
+        match typ.id.as_str() {
+            "oauth" => &[
+                "In Linear, go to Settings > API > OAuth applications and create a new application.",
+                "Add the redirect URL below to its callback URLs.",
+                "For routines, turn on webhooks, paste the webhook URL below and select Issues and Issue comments.",
+                "Save, then copy the client ID, client secret and any webhook signing secret into the fields below.",
+                "Continue, and approve the read and write access Linear asks for.",
+            ],
+            "api_key" => &[
+                "In Linear, go to Settings > Security & access > Personal API keys and create a key.",
+                "For routines, a workspace admin creates a webhook under Settings > API > Webhooks with the webhook URL below.",
+                "Select Issues and Issue comments, then save the webhook.",
+                "Paste the API key, and the signing secret from the webhook's page, into the fields below.",
+            ],
+            _ => &[],
+        }
     }
 }
 
