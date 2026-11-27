@@ -518,7 +518,7 @@ function ChatWindow({
         ? matches.map((message) => ({
             kind: "message" as const,
             key: `message:${message.id}`,
-            at: 0,
+            at: message.createdAt ? Number(message.createdAt.seconds) * 1000 : 0,
             message,
           }))
         : timeline(
@@ -528,10 +528,9 @@ function ChatWindow({
           ),
     [search, matches, messages, tools, activities],
   );
-  // Only the running invocation's latest stretch of reasoning is still being thought.
-  const thinking = activities.thoughts
-    .filter((thought) => thought.invocation === session?.run?.invocationId)
-    .at(-1)?.key;
+  // Reasoning is still being thought only while it is the newest entry.
+  const newest = items.at(-1);
+  const thinking = newest?.kind === "reasoning" ? newest.key : undefined;
   const dayOf = (item?: (typeof items)[number]) => (item?.at ? dayKey(new Date(item.at)) : "");
   const rows = items.map((item, index) => {
     const sameSender = (other?: (typeof items)[number]) =>

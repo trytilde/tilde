@@ -18,7 +18,8 @@ export type Activities = {
   broken: boolean;
 };
 export const noActivity: Activities = { tools: {}, messages: {}, thoughts: [], broken: false };
-const creations = new Set(["message.started", "message.completed"]);
+// Self-hosted runtimes record a posted message as `message.created`.
+const creations = new Set(["message.created", "message.started", "message.completed"]);
 
 export type TimelineItem = { key: string; at: number } & (
   | { kind: "message"; message: Message }
@@ -62,6 +63,13 @@ export function record(state: Activities, activities: Activity[]): Activities {
       broken = false;
     }
   }
+  if (
+    tools === state.tools &&
+    messages === state.messages &&
+    thoughts === state.thoughts &&
+    broken === state.broken
+  )
+    return state;
   return { tools, messages, thoughts, broken };
 }
 
@@ -70,7 +78,8 @@ export function record(state: Activities, activities: Activity[]): Activities {
  * follow its sequence, the thread's commit order (activity times mix database and gateway clocks).
  * A message no loaded activity created (older history, or a just-posted message whose activity
  * has not arrived) is merged in by its `createdAt`. A reload replays only recent activity, so a
- * call or message whose first event fell outside it is placed at its first event inside it.
+ * call whose first event fell outside it is placed at its first event inside it, and a message
+ * whose creation fell outside it is merged by `createdAt`.
  * Consecutive tool calls share one block; a message or reasoning between them starts a new one.
  */
 export function timeline(
