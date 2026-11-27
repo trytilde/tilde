@@ -38,6 +38,7 @@ import {
   type ChatFetch,
 } from "./client.js";
 import { themeStyle, type Theme } from "./theme.js";
+import { see, timeline, type Order } from "./timeline.js";
 export interface ChatProps {
   sessionId: string;
   identity: string;
@@ -81,7 +82,9 @@ function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [queue, setQueue] = useState<QueuedInput[]>([]);
   const [tools, setTools] = useState<Record<string, ToolCall>>({});
-  const [reasoning, setReasoning] = useState("");
+  // Reasoning text per invocation.
+  const [reasoning, setReasoning] = useState<Record<string, string>>({});
+  const [order, setOrder] = useState<Order>({});
   const [typing, setTyping] = useState("");
   const lastTyping = useRef(0);
   const [error, setError] = useState("");
@@ -224,15 +227,16 @@ function ChatWindow({
       cursor = initial.cursor;
       sequence.current = initial.sequence;
       if (abort.signal.aborted) return;
-      setReasoning(
-        (initial.recentActivity ?? [])
-          .filter((event) => event.kind === "reasoning.delta")
-          .map((event) => event.textDelta)
-          .join(""),
-      );
+      const recent = initial.recentActivity ?? [];
+      const thoughts: Record<string, string> = {};
+      for (const event of recent)
+        if (event.kind === "reasoning.delta")
+          thoughts[event.entityId] = (thoughts[event.entityId] ?? "") + event.textDelta;
+      setReasoning(thoughts);
+      setOrder(see({}, recent));
       setTools(
         Object.fromEntries(
-          (initial.recentActivity ?? []).flatMap((event) =>
+          recent.flatMap((event) =>
             event.detail.case === "toolCall" ? [[event.detail.value.id, event.detail.value]] : [],
           ),
         ),
@@ -258,6 +262,7 @@ function ChatWindow({
             if (!activity) continue;
             sequence.current =
               activity.sequence > sequence.current ? activity.sequence : sequence.current;
+            setOrder((old) => see(old, [activity]));
             if (activity.detail.case === "message") {
               const message = activity.detail.value;
               setMessages((old) =>
@@ -284,7 +289,10 @@ function ChatWindow({
               );
             }
             if (activity.kind === "reasoning.delta")
-              setReasoning((old) => old + activity.textDelta);
+              setReasoning((old) => ({
+                ...old,
+                [activity.entityId]: (old[activity.entityId] ?? "") + activity.textDelta,
+              }));
             if (activity.detail.case === "toolCall") {
               const tool = activity.detail.value;
               setTools((old) => ({ ...old, [tool.id]: tool }));
@@ -331,7 +339,7 @@ function ChatWindow({
   }, [client, sessionId, proxy, identity]);
   useEffect(() => {
     if (stick.current) scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
-  }, [messages, reasoning]);
+  }, [messages, reasoning, tools]);
   const markRead = () => {
     if (client && document.visibilityState === "visible" && document.hasFocus() && stick.current)
       void client
@@ -514,19 +522,31 @@ function ChatWindow({
   const me = session?.thread?.participants.find((p) => p.userId === user?.id);
   const others = session?.thread?.participants.filter((p) => p.id !== me?.id) ?? [];
   const agentName = agent?.name || "Chat";
-  const shown = search ? matches : messages;
-  const rows = shown.map((message, index) => {
-    const sameSender = (other?: Message) =>
-      other?.participantId === message.participantId && day(other) === day(message);
+  const visibleTools = Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN);
+  // Search shows only matching messages; otherwise messages, tool calls and reasoning interleave
+  // in the order they happened.
+  const items = search
+    ? matches.map((message) => ({ kind: "message" as const, key: message.id, message }))
+    : timeline(messages, visibleTools, reasoning, order);
+  let lastDay = "";
+  const rows = items.map((item, index) => {
+    if (item.kind !== "message") return { item };
+    const message = item.message;
+    const sameSender = (other?: (typeof items)[number]) =>
+      other?.kind === "message" &&
+      other.message.participantId === message.participantId &&
+      day(other.message) === day(message);
+    const showDay = !search && lastDay !== day(message);
+    lastDay = day(message);
     return {
+      item,
       message,
       own: message.participantId === me?.id,
-      showDay: !search && day(shown[index - 1]) !== day(message),
-      continuedPrevious: sameSender(shown[index - 1]),
-      continuedNext: sameSender(shown[index + 1]),
+      showDay,
+      continuedPrevious: sameSender(items[index - 1]),
+      continuedNext: sameSender(items[index + 1]),
     };
   });
-  const visibleTools = Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN);
   function jumpToLatest() {
     stick.current = true;
     scroll.current?.scrollTo({ top: scroll.current.scrollHeight, behavior: "smooth" });
@@ -660,7 +680,33 @@ function ChatWindow({
               {search && !searching && !matches.length ? (
                 <p className="tc-state">No matching messages</p>
               ) : null}
-              {rows.map(({ message, own, showDay, continuedPrevious, continuedNext }) => {
+              {rows.map(({ item, message, own, showDay, continuedPrevious, continuedNext }) => {
+                if (item.kind === "reasoning")
+                  return (
+                    <div key={item.key} className="chat-event" role="group" aria-label="Reasoning">
+                      <TraceBlock
+                        activeLabel="Thinking"
+                        doneLabel="Reasoning"
+                        working={busy && item.invocation === session?.run?.invocationId}
+                        rows={item.text
+                          .split(/\n{2,}/)
+                          .filter(Boolean)
+                          .map((text, i) => ({ id: String(i), primary: text, prose: true }))}
+                      />
+                    </div>
+                  );
+                // The server already withholds hidden calls and summary-only detail; this only
+                // lays out what arrives.
+                if (item.kind === "tools")
+                  return (
+                    <div key={item.key} className="chat-event" role="group" aria-label="Tool calls">
+                      <ToolChipsBlock
+                        headerLabel={`${item.tools.length} tool call${item.tools.length === 1 ? "" : "s"}`}
+                        rows={item.tools.map(toolRow)}
+                      />
+                    </div>
+                  );
+                if (!message) return null;
                 const created = message.createdAt
                   ? new Date(Number(message.createdAt.seconds) * 1000)
                   : undefined;
@@ -742,29 +788,6 @@ function ChatWindow({
                 >
                   More matches
                 </button>
-              ) : null}
-              {!search && reasoning ? (
-                <div className="chat-event" role="group" aria-label="Reasoning">
-                  <TraceBlock
-                    activeLabel="Thinking"
-                    doneLabel="Reasoning"
-                    working={busy}
-                    rows={reasoning
-                      .split(/\n{2,}/)
-                      .filter(Boolean)
-                      .map((text, i) => ({ id: String(i), primary: text, prose: true }))}
-                  />
-                </div>
-              ) : null}
-              {/* The server already withholds hidden calls and summary-only detail; this only
-                  lays out what arrives. */}
-              {!search && visibleTools.length ? (
-                <div className="chat-event" role="group" aria-label="Tool calls">
-                  <ToolChipsBlock
-                    headerLabel={`${visibleTools.length} tool call${visibleTools.length === 1 ? "" : "s"}`}
-                    rows={visibleTools.map(toolRow)}
-                  />
-                </div>
               ) : null}
               {!search && typing ? (
                 <ThinkingIndicator>{typing} is typing…</ThinkingIndicator>

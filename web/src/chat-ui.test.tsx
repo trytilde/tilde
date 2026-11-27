@@ -5,6 +5,7 @@ import { Chat, ListSessions } from "../../sdk/ts/packages/chat-ui/src/index";
 import {
   ActivitySchema,
   MessageSchema,
+  ToolCallSchema,
   ThreadSchema,
   UserSchema,
 } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
@@ -163,6 +164,126 @@ it("loads history, sends as the server-resolved identity, renders live messages 
   });
   view.unmount();
   expect(watchSignal?.aborted).toBe(true);
+});
+// The agent searches, tells the person what it found with its sendMessage tool, the person
+// answers, and the agent carries on with another call: each message lands between the calls
+// around it, and only calls with no message between them share a block.
+const at = (seconds: number) => ({ seconds: BigInt(seconds), nanos: 0 });
+const tool = (id: string, name: string, status: string) =>
+  create(ToolCallSchema, { id, name, status, providerId: "tilde" });
+const agentMessage = create(MessageSchema, {
+  id: "found",
+  text: "I found two flights",
+  threadId: "session",
+  participantId: "bot",
+  status: "complete",
+  createdAt: at(102),
+});
+const turn = (reply: ReturnType<typeof create<typeof MessageSchema>>) => [
+  create(ActivitySchema, {
+    sequence: 10n,
+    kind: "tool.started",
+    createdAt: at(100),
+    detail: { case: "toolCall", value: tool("search", "searchFlights", "running") },
+  }),
+  create(ActivitySchema, {
+    sequence: 11n,
+    kind: "tool.completed",
+    createdAt: at(101),
+    detail: { case: "toolCall", value: tool("search", "searchFlights", "completed") },
+  }),
+  create(ActivitySchema, {
+    sequence: 12n,
+    kind: "tool.started",
+    createdAt: at(102),
+    detail: { case: "toolCall", value: tool("send", "sendMessage", "running") },
+  }),
+  create(ActivitySchema, {
+    sequence: 13n,
+    kind: "message.completed",
+    createdAt: at(102),
+    detail: { case: "message", value: agentMessage },
+  }),
+  create(ActivitySchema, {
+    sequence: 14n,
+    kind: "tool.completed",
+    createdAt: at(103),
+    detail: { case: "toolCall", value: tool("send", "sendMessage", "completed") },
+  }),
+  create(ActivitySchema, {
+    sequence: 15n,
+    kind: "message.completed",
+    createdAt: at(104),
+    detail: { case: "message", value: reply },
+  }),
+  create(ActivitySchema, {
+    sequence: 16n,
+    kind: "tool.started",
+    createdAt: at(105),
+    detail: { case: "toolCall", value: tool("book", "bookFlight", "running") },
+  }),
+];
+const reply = create(MessageSchema, {
+  id: "reply",
+  text: "Book the morning one",
+  threadId: "session",
+  participantId: "human",
+  status: "complete",
+  createdAt: at(104),
+});
+// The transcript top to bottom: message text, or a tool block's call names.
+const transcript = (container: HTMLElement) =>
+  Array.from(
+    container.querySelectorAll<HTMLElement>(
+      '[data-message-id], [role="group"][aria-label="Tool calls"]',
+    ),
+  ).map((node) =>
+    node.dataset.messageId
+      ? (node.textContent ?? "").replace(/\s+/g, " ").includes("I found two flights")
+        ? "found"
+        : node.dataset.messageId
+      : `tools: ${Array.from(node.querySelectorAll("button"))
+          .slice(1)
+          .map((row) => (row.textContent ?? "").trim())
+          .join(", ")}`,
+  );
+const expected = [
+  "old",
+  "tools: searchFlights, sendMessage",
+  "found",
+  "reply",
+  "tools: bookFlight",
+];
+it("interleaves messages with the tool calls around them after a reload", async () => {
+  api.getSession.mockResolvedValue({
+    session,
+    cursor: "resume",
+    sequence: 16n,
+    messages: [message("old", "Earlier answer"), agentMessage, reply],
+    nextMessageToken: "",
+    recentActivity: turn(reply),
+  });
+  const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
+  await screen.findByText("bookFlight");
+  expect(transcript(view.container)).toEqual(expected);
+});
+it("interleaves live messages, including the person's own reply, with the tool calls around them", async () => {
+  const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
+  await screen.findByText("Earlier answer");
+  await waitFor(() => expect(emit).toBeDefined());
+  const events = turn(reply);
+  for (const event of events.slice(0, 5)) await act(async () => emit?.(event));
+  await screen.findByText("I found two flights");
+  // The person replies through the composer: the posted message shows before its activity.
+  api.postMessage.mockResolvedValueOnce({ message: reply });
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+    target: { value: "Book the morning one" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+  await screen.findByText("Book the morning one");
+  for (const event of events.slice(5)) await act(async () => emit?.(event));
+  await screen.findByText("bookFlight");
+  expect(transcript(view.container)).toEqual(expected);
 });
 it("without its header shows only the transcript and the message bar, and still sends", async () => {
   const view = render(
