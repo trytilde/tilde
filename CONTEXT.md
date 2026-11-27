@@ -1999,7 +1999,10 @@ selection, and streaming Connect forwarding. It allows only the provider contrac
 forwards browser cookies or credentials upstream. `@trytilde/chat-next` adapts Web requests
 and async catch-all route params. `@trytilde/chat-ui` exports Chat and ListSessions, reusing
 Dispatch's composer and markdown presentation with native history, search, read state,
-attachments, live replay and queue controls. The browser receives no provider key. Components
+attachments, live replay and queue controls. Chat's timeline orders messages, tool calls
+and reasoning stretches by their first activity's sequence, puts history from before the replayed
+activity first and a just-posted message last, and groups only consecutive tool calls. A reload replays at most the last
+100 activity events. The browser receives no provider key. Components
 sharing a proxy and UI identity invalidate each other's lists; unmount aborts streams and
 revokes attachment object URLs. These packages build through `task build:chat`, including
 SDK pack/publish workflows, and are exercised by `task test:chat-ui`.
