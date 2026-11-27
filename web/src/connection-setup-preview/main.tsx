@@ -9,22 +9,36 @@ import { createRoot } from "react-dom/client";
 import { AuthDriver, StandardSetup, mount, type Theme } from "@trytilde/connection-ui";
 import { dark, light, withCanvas } from "../chat-ui-preview/themes";
 
+// Linear's OAuth app setup, as Tilde Cloud's catalog defines it.
 const setup = {
   providerName: "Linear",
   connectionName: "Linear",
-  accountNameLabel: "Workspace name",
-  instructions: "Create a personal API key in Linear under Settings → Security & access.",
-  setupInstructions: ["Open Linear's API settings.", "Create a key and paste it below."],
+  accountNameLabel: "Linear workspace",
+  instructions:
+    "Connect Linear so agents can read, comment on and move issues, and so routines can start when issues or comments change.",
+  setupInstructions: [
+    "In Linear, go to Settings > API > OAuth applications and create a new application.",
+    "Add the redirect URL below to its callback URLs.",
+    "For routines, turn on webhooks, paste the webhook URL below and select Issues and Issue comments.",
+    "Save, then copy the client ID, client secret and webhook signing secret into the fields below.",
+    "Continue, and approve the read and write access Linear asks for.",
+  ],
   webhookUrl: "https://tilde.example/connections/webhooks/conn_123",
   actionId: "action",
-  authDriver: AuthDriver.STATIC,
+  authDriver: AuthDriver.OAUTH_CODE,
   draft: [],
   inputSchemaJson: JSON.stringify({
     type: "object",
-    required: ["api_key"],
+    required: ["client_id", "client_secret"],
     properties: {
-      api_key: { type: "string", title: "API key", writeOnly: true, minLength: 1 },
-      team: { type: "string", title: "Team", enum: ["Platform", "Growth"] },
+      client_id: { type: "string", title: "Client ID", minLength: 1 },
+      client_secret: { type: "string", title: "Client secret", writeOnly: true, minLength: 1 },
+      webhook_secret: {
+        type: "string",
+        title: "Webhook signing secret",
+        description: "Optional. The signing secret of the Linear webhook.",
+        writeOnly: true,
+      },
     },
   }),
   action: { case: "form", value: {} },
@@ -41,7 +55,7 @@ function Frame({ label, theme }: { label: string; theme?: Theme }) {
         port1.postMessage({
           id: data.id,
           state:
-            data.method === "saveCredentials"
+            data.method === "startOAuth"
               ? { ...setup, action: { case: "complete", value: {} } }
               : setup,
         });

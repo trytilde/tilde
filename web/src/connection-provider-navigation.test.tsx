@@ -150,7 +150,7 @@ it("submits the provider-labelled account name with the credential form before s
   );
   const writeText = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal("navigator", Object.create(navigator, { clipboard: { value: { writeText } } }));
-  fireEvent.click(screen.getByRole("button", { name: "Copy webhook URL" }));
+  fireEvent.click(screen.getByRole("button", { name: "Copy Webhook URL" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(initial.webhookUrl));
   await screen.findByText("Webhook URL copied");
   expect(setConnectionName).not.toHaveBeenCalled();
@@ -191,7 +191,7 @@ it.each([true, false])(
     try {
       render(<Provider />);
       const field = (await screen.findByLabelText("Webhook URL")) as HTMLInputElement;
-      fireEvent.click(screen.getByRole("button", { name: "Copy webhook URL" }));
+      fireEvent.click(screen.getByRole("button", { name: "Copy Webhook URL" }));
       await waitFor(() => expect(execCommand).toHaveBeenCalledWith("copy"));
       expect(document.activeElement).toBe(field);
       expect(field.selectionStart).toBe(0);

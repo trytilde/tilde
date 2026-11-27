@@ -182,7 +182,9 @@ export function Page({ setup, children }: { setup: Setup; children: ReactNode })
             </div>
           </>
         )}
-        {state?.webhookUrl && <WebhookUrl key={state.webhookUrl} url={state.webhookUrl} />}
+        {state?.webhookUrl && (
+          <CopyUrl key={state.webhookUrl} label="Webhook URL" url={state.webhookUrl} />
+        )}
         {action?.case === "form" && children}
         {action?.case === "redirect" && (
           <div className="flex justify-end">
@@ -353,7 +355,8 @@ function ProviderPost({
   );
 }
 
-function WebhookUrl({ url }: { url: string }) {
+/** A read-only URL the person pastes into the provider, with a copy button. */
+export function CopyUrl({ label, url }: { label: string; url: string }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
@@ -379,7 +382,7 @@ function WebhookUrl({ url }: { url: string }) {
   }
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>Webhook URL</Label>
+      <Label htmlFor={id}>{label}</Label>
       <div className="flex">
         <Input
           ref={input}
@@ -393,7 +396,7 @@ function WebhookUrl({ url }: { url: string }) {
           variant="outline"
           size="icon"
           className="rounded-l-none border-l-0"
-          aria-label="Copy webhook URL"
+          aria-label={`Copy ${label}`}
           onClick={() => void copy()}
         >
           {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
@@ -401,7 +404,7 @@ function WebhookUrl({ url }: { url: string }) {
       </div>
       {copied && (
         <p role="status" className="sr-only">
-          Webhook URL copied
+          {label} copied
         </p>
       )}
       {error && (

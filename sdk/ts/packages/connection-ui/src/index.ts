@@ -1,5 +1,5 @@
 // Small, optional building blocks. Providers remain ordinary React apps, not form descriptors.
-export { useSetup, useConnectionForm, Form, Page, mount, type Setup } from "./setup.js";
+export { useSetup, useConnectionForm, Form, Page, CopyUrl, mount, type Setup } from "./setup.js";
 export { Button, buttonVariants } from "./components/button.js";
 export { Input } from "./components/input.js";
 export { Label, Textarea, NativeSelect } from "./components/controls.js";
