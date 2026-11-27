@@ -1,88 +1,110 @@
 import type { Activity, Message, ToolCall } from "@trytilde/contracts/tilde/types/v1/chat_pb.js";
 
-/** Where an entity first appeared in the thread's activity. The sequence is authoritative;
- * the time orders it against messages no loaded activity covers (older history, or a just
- * posted message whose activity has not arrived). */
-export type Seen = { sequence: bigint; at: number };
-/** First sighting per entity, keyed `message:<id>`, `tool:<id>` or `reasoning:<invocation id>`. */
-export type Order = Record<string, Seen>;
+/** Where an entry happened: its time, with the activity sequence breaking ties. */
+type Place = { at: number; sequence?: bigint };
+/** One stretch of an invocation's reasoning, unbroken by a tool call or message. */
+type Thought = Place & { key: string; invocation: string; text: string };
+/**
+ * What the transcript knows about activity, built the same way from the watch stream and from
+ * a reload's `recentActivity` so both place entries alike.
+ */
+export type Activities = {
+  /** Each tool call's first sighting. */
+  tools: Record<string, Place>;
+  thoughts: Thought[];
+  /** A tool call or message arrived since the last reasoning, which starts a new stretch. */
+  broken: boolean;
+};
+export const noActivity: Activities = { tools: {}, thoughts: [], broken: false };
 
-export type TimelineItem =
-  | { kind: "message"; key: string; message: Message }
-  | { kind: "tools"; key: string; tools: ToolCall[] }
-  | { kind: "reasoning"; key: string; invocation: string; text: string };
+export type TimelineItem = { key: string; at: number } & (
+  | { kind: "message"; message: Message }
+  | { kind: "tools"; tools: ToolCall[] }
+  | { kind: "reasoning"; invocation: string; text: string }
+);
 
-/** The entity an activity orders, if it is one the transcript shows. */
-export function orderKey(activity: Activity): string | undefined {
-  if (activity.detail.case === "message") return `message:${activity.detail.value.id}`;
-  if (activity.detail.case === "toolCall") return `tool:${activity.detail.value.id}`;
-  if (activity.kind === "reasoning.delta" && activity.entityId)
-    return `reasoning:${activity.entityId}`;
-  return undefined;
-}
-
-/** Record activities' first sightings; later events of the same entity keep its place. */
-export function see(order: Order, activities: Activity[]): Order {
-  const next = { ...order };
-  let added = false;
+export function record(state: Activities, activities: Activity[]): Activities {
+  let { tools, thoughts, broken } = state;
   for (const activity of activities) {
-    const key = orderKey(activity);
-    if (!key || next[key]) continue;
-    next[key] = {
-      sequence: activity.sequence,
+    const place = {
       at: activity.createdAt ? millis(activity.createdAt) : Date.now(),
+      sequence: activity.sequence,
     };
-    added = true;
+    if (activity.detail.case === "toolCall") {
+      const id = activity.detail.value.id;
+      if (!tools[id]) tools = { ...tools, [id]: place };
+      broken = true;
+    } else if (activity.detail.case === "message") {
+      broken = true;
+    } else if (activity.kind === "reasoning.delta" && activity.textDelta) {
+      const last = thoughts.at(-1);
+      thoughts =
+        last && !broken && last.invocation === activity.entityId
+          ? [...thoughts.slice(0, -1), { ...last, text: last.text + activity.textDelta }]
+          : [
+              ...thoughts,
+              {
+                ...place,
+                key: `reasoning:${activity.sequence}`,
+                invocation: activity.entityId,
+                text: activity.textDelta,
+              },
+            ];
+      broken = false;
+    }
   }
-  return added ? next : order;
-}
-function millis(at: { seconds: bigint; nanos: number }) {
-  return Number(at.seconds) * 1000 + at.nanos / 1e6;
+  return { tools, thoughts, broken };
 }
 
 /**
- * Messages, tool calls and reasoning in the order they happened. Consecutive tool calls share
- * one block; a message (or reasoning) between them starts a new one.
+ * Messages, tool calls and reasoning in the order they happened. A message is placed by its own
+ * creation time (the database clock), which its edits and deletions never change; a tool call and
+ * reasoning by their first activity (the gateway clock). A message carries no sequence, and
+ * `message.completed` both creates posted messages and ends streamed ones, so time is the shared
+ * key. Consecutive tool calls share one block; a message or reasoning between them starts a new one.
  */
 export function timeline(
   messages: Message[],
   tools: ToolCall[],
-  reasoning: Record<string, string>,
-  order: Order,
+  activities: Activities,
 ): TimelineItem[] {
-  type Entry = { item: TimelineItem; tool?: ToolCall; seen?: Seen; at: number };
+  type Entry = { item: TimelineItem; place: Place; tool?: ToolCall };
   const entries: Entry[] = [
     ...messages.map((message) => {
-      const seen = order[`message:${message.id}`];
-      const created = message.createdAt ? millis(message.createdAt) : 0;
+      const at = message.createdAt ? millis(message.createdAt) : 0;
       return {
-        item: { kind: "message" as const, key: message.id, message },
-        seen,
-        at: seen?.at ?? created,
+        item: { kind: "message" as const, key: `message:${message.id}`, at, message },
+        place: { at },
       };
     }),
     ...tools.map((tool) => {
-      const seen = order[`tool:${tool.id}`];
+      // Tool calls only arrive as activity, so every one has a place; now is a safe default.
+      const place = activities.tools[tool.id] ?? { at: Date.now() };
       return {
-        item: { kind: "tools" as const, key: tool.id, tools: [tool] },
+        item: { kind: "tools" as const, key: `tools:${tool.id}`, at: place.at, tools: [tool] },
+        place,
         tool,
-        seen,
-        at: seen?.at ?? Number.MAX_SAFE_INTEGER,
       };
     }),
-    ...Object.entries(reasoning).map(([invocation, text]) => {
-      const seen = order[`reasoning:${invocation}`];
-      return {
-        item: { kind: "reasoning" as const, key: `reasoning:${invocation}`, invocation, text },
-        seen,
-        at: seen?.at ?? Number.MAX_SAFE_INTEGER,
-      };
-    }),
+    ...activities.thoughts.map((thought) => ({
+      item: {
+        kind: "reasoning" as const,
+        key: thought.key,
+        at: thought.at,
+        invocation: thought.invocation,
+        text: thought.text,
+      },
+      place: thought,
+    })),
   ];
+  // One lexicographic key (time, then sequence, then key) keeps the sort consistent.
+  const last = BigInt(Number.MAX_SAFE_INTEGER);
   entries.sort((a, b) => {
-    if (a.seen && b.seen && a.seen.sequence !== b.seen.sequence)
-      return a.seen.sequence < b.seen.sequence ? -1 : 1;
-    return a.at - b.at || a.item.key.localeCompare(b.item.key);
+    if (a.place.at !== b.place.at) return a.place.at - b.place.at;
+    const left = a.place.sequence ?? last;
+    const right = b.place.sequence ?? last;
+    if (left !== right) return left < right ? -1 : 1;
+    return a.item.key.localeCompare(b.item.key);
   });
   const items: TimelineItem[] = [];
   for (const entry of entries) {
@@ -91,4 +113,7 @@ export function timeline(
     else items.push(entry.item);
   }
   return items;
+}
+function millis(at: { seconds: bigint; nanos: number }) {
+  return Number(at.seconds) * 1000 + at.nanos / 1e6;
 }

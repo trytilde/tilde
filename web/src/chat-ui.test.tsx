@@ -165,10 +165,14 @@ it("loads history, sends as the server-resolved identity, renders live messages 
   view.unmount();
   expect(watchSignal?.aborted).toBe(true);
 });
-// The agent searches, tells the person what it found with its sendMessage tool, the person
-// answers, and the agent carries on with another call: each message lands between the calls
-// around it, and only calls with no message between them share a block.
-const at = (seconds: number) => ({ seconds: BigInt(seconds), nanos: 0 });
+// The agent thinks, searches, tells the person what it found with its sendMessage tool, the
+// person answers, and the agent thinks again and carries on with another call. Each message lands
+// between the calls around it, only calls with no message between them share a block, and the
+// turn's reasoning splits where a message or call came between.
+const at = (seconds: number) => ({
+  seconds: BigInt(Math.floor(seconds)),
+  nanos: Math.round((seconds % 1) * 1e9),
+});
 const tool = (id: string, name: string, status: string) =>
   create(ToolCallSchema, { id, name, status, providerId: "tilde" });
 const agentMessage = create(MessageSchema, {
@@ -179,50 +183,6 @@ const agentMessage = create(MessageSchema, {
   status: "complete",
   createdAt: at(102),
 });
-const turn = (reply: ReturnType<typeof create<typeof MessageSchema>>) => [
-  create(ActivitySchema, {
-    sequence: 10n,
-    kind: "tool.started",
-    createdAt: at(100),
-    detail: { case: "toolCall", value: tool("search", "searchFlights", "running") },
-  }),
-  create(ActivitySchema, {
-    sequence: 11n,
-    kind: "tool.completed",
-    createdAt: at(101),
-    detail: { case: "toolCall", value: tool("search", "searchFlights", "completed") },
-  }),
-  create(ActivitySchema, {
-    sequence: 12n,
-    kind: "tool.started",
-    createdAt: at(102),
-    detail: { case: "toolCall", value: tool("send", "sendMessage", "running") },
-  }),
-  create(ActivitySchema, {
-    sequence: 13n,
-    kind: "message.completed",
-    createdAt: at(102),
-    detail: { case: "message", value: agentMessage },
-  }),
-  create(ActivitySchema, {
-    sequence: 14n,
-    kind: "tool.completed",
-    createdAt: at(103),
-    detail: { case: "toolCall", value: tool("send", "sendMessage", "completed") },
-  }),
-  create(ActivitySchema, {
-    sequence: 15n,
-    kind: "message.completed",
-    createdAt: at(104),
-    detail: { case: "message", value: reply },
-  }),
-  create(ActivitySchema, {
-    sequence: 16n,
-    kind: "tool.started",
-    createdAt: at(105),
-    detail: { case: "toolCall", value: tool("book", "bookFlight", "running") },
-  }),
-];
 const reply = create(MessageSchema, {
   id: "reply",
   text: "Book the morning one",
@@ -231,48 +191,82 @@ const reply = create(MessageSchema, {
   status: "complete",
   createdAt: at(104),
 });
-// The transcript top to bottom: message text, or a tool block's call names.
+const toolEvent = (sequence: bigint, seconds: number, call: ReturnType<typeof tool>) =>
+  create(ActivitySchema, {
+    sequence,
+    kind: call.status === "running" ? "tool.started" : "tool.completed",
+    createdAt: at(seconds),
+    detail: { case: "toolCall", value: call },
+  });
+const messageEvent = (sequence: bigint, seconds: number, value: typeof reply) =>
+  create(ActivitySchema, {
+    sequence,
+    kind: "message.completed",
+    createdAt: at(seconds),
+    entityId: value.id,
+    detail: { case: "message", value },
+  });
+const thought = (sequence: bigint, seconds: number, text: string) =>
+  create(ActivitySchema, {
+    sequence,
+    kind: "reasoning.delta",
+    createdAt: at(seconds),
+    entityId: "invocation",
+    textDelta: text,
+  });
+const beforeReply = [
+  thought(9n, 99, "Looking for flights"),
+  toolEvent(10n, 100, tool("search", "searchFlights", "running")),
+  toolEvent(11n, 101, tool("search", "searchFlights", "completed")),
+  toolEvent(12n, 101.5, tool("send", "sendMessage", "running")),
+  messageEvent(13n, 102, agentMessage),
+  toolEvent(14n, 103, tool("send", "sendMessage", "completed")),
+];
+const afterReply = [
+  messageEvent(15n, 104, reply),
+  thought(16n, 105, "Booking the morning flight"),
+  toolEvent(17n, 106, tool("book", "bookFlight", "running")),
+];
+// The transcript top to bottom: a message's id, or a block's kind and contents.
 const transcript = (container: HTMLElement) =>
   Array.from(
-    container.querySelectorAll<HTMLElement>(
-      '[data-message-id], [role="group"][aria-label="Tool calls"]',
-    ),
-  ).map((node) =>
-    node.dataset.messageId
-      ? (node.textContent ?? "").replace(/\s+/g, " ").includes("I found two flights")
-        ? "found"
-        : node.dataset.messageId
-      : `tools: ${Array.from(node.querySelectorAll("button"))
-          .slice(1)
-          .map((row) => (row.textContent ?? "").trim())
-          .join(", ")}`,
-  );
+    container.querySelectorAll<HTMLElement>("[data-message-id], .chat-event[role='group']"),
+  ).map((node) => {
+    if (node.dataset.messageId) return node.dataset.messageId;
+    if (node.getAttribute("aria-label") === "Reasoning")
+      return `reasoning: ${(node.textContent ?? "").replace(/^(Thinking|Reasoning)/, "").trim()}`;
+    const calls = Array.from(node.querySelectorAll("button:not([aria-expanded='true'])"))
+      .map((row) => (row.textContent ?? "").trim())
+      .filter(Boolean);
+    return `tools: ${calls.join(", ")}`;
+  });
 const expected = [
   "old",
+  "reasoning: Looking for flights",
   "tools: searchFlights, sendMessage",
   "found",
   "reply",
+  "reasoning: Booking the morning flight",
   "tools: bookFlight",
 ];
-it("interleaves messages with the tool calls around them after a reload", async () => {
+it("interleaves messages, tool calls and reasoning in event order after a reload", async () => {
   api.getSession.mockResolvedValue({
     session,
     cursor: "resume",
-    sequence: 16n,
+    sequence: 17n,
     messages: [message("old", "Earlier answer"), agentMessage, reply],
     nextMessageToken: "",
-    recentActivity: turn(reply),
+    recentActivity: [...beforeReply, ...afterReply],
   });
   const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
   await screen.findByText("bookFlight");
   expect(transcript(view.container)).toEqual(expected);
 });
-it("interleaves live messages, including the person's own reply, with the tool calls around them", async () => {
+it("interleaves live messages, including the person's reply, and keeps an edited message in place", async () => {
   const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
   await screen.findByText("Earlier answer");
   await waitFor(() => expect(emit).toBeDefined());
-  const events = turn(reply);
-  for (const event of events.slice(0, 5)) await act(async () => emit?.(event));
+  for (const event of beforeReply) await act(async () => emit?.(event));
   await screen.findByText("I found two flights");
   // The person replies through the composer: the posted message shows before its activity.
   api.postMessage.mockResolvedValueOnce({ message: reply });
@@ -281,8 +275,23 @@ it("interleaves live messages, including the person's own reply, with the tool c
   });
   fireEvent.click(screen.getByRole("button", { name: "Send message" }));
   await screen.findByText("Book the morning one");
-  for (const event of events.slice(5)) await act(async () => emit?.(event));
+  expect(transcript(view.container)).toEqual(expected.slice(0, 5));
+  for (const event of afterReply) await act(async () => emit?.(event));
   await screen.findByText("bookFlight");
+  expect(transcript(view.container)).toEqual(expected);
+  // An edit to the oldest message arrives last but leaves it where it was written.
+  await act(async () =>
+    emit?.(
+      create(ActivitySchema, {
+        sequence: 18n,
+        kind: "message.updated",
+        createdAt: at(107),
+        entityId: "old",
+        detail: { case: "message", value: message("old", "Earlier answer, corrected") },
+      }),
+    ),
+  );
+  await screen.findByText("Earlier answer, corrected");
   expect(transcript(view.container)).toEqual(expected);
 });
 it("without its header shows only the transcript and the message bar, and still sends", async () => {

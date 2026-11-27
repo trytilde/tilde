@@ -38,7 +38,7 @@ import {
   type ChatFetch,
 } from "./client.js";
 import { themeStyle, type Theme } from "./theme.js";
-import { see, timeline, type Order } from "./timeline.js";
+import { noActivity, record, timeline, type Activities } from "./timeline.js";
 export interface ChatProps {
   sessionId: string;
   identity: string;
@@ -82,9 +82,7 @@ function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [queue, setQueue] = useState<QueuedInput[]>([]);
   const [tools, setTools] = useState<Record<string, ToolCall>>({});
-  // Reasoning text per invocation.
-  const [reasoning, setReasoning] = useState<Record<string, string>>({});
-  const [order, setOrder] = useState<Order>({});
+  const [activities, setActivities] = useState<Activities>(noActivity);
   const [typing, setTyping] = useState("");
   const lastTyping = useRef(0);
   const [error, setError] = useState("");
@@ -228,12 +226,7 @@ function ChatWindow({
       sequence.current = initial.sequence;
       if (abort.signal.aborted) return;
       const recent = initial.recentActivity ?? [];
-      const thoughts: Record<string, string> = {};
-      for (const event of recent)
-        if (event.kind === "reasoning.delta")
-          thoughts[event.entityId] = (thoughts[event.entityId] ?? "") + event.textDelta;
-      setReasoning(thoughts);
-      setOrder(see({}, recent));
+      setActivities(record(noActivity, recent));
       setTools(
         Object.fromEntries(
           recent.flatMap((event) =>
@@ -262,7 +255,7 @@ function ChatWindow({
             if (!activity) continue;
             sequence.current =
               activity.sequence > sequence.current ? activity.sequence : sequence.current;
-            setOrder((old) => see(old, [activity]));
+            setActivities((old) => record(old, [activity]));
             if (activity.detail.case === "message") {
               const message = activity.detail.value;
               setMessages((old) =>
@@ -288,11 +281,6 @@ function ChatWindow({
                 ),
               );
             }
-            if (activity.kind === "reasoning.delta")
-              setReasoning((old) => ({
-                ...old,
-                [activity.entityId]: (old[activity.entityId] ?? "") + activity.textDelta,
-              }));
             if (activity.detail.case === "toolCall") {
               const tool = activity.detail.value;
               setTools((old) => ({ ...old, [tool.id]: tool }));
@@ -339,7 +327,7 @@ function ChatWindow({
   }, [client, sessionId, proxy, identity]);
   useEffect(() => {
     if (stick.current) scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
-  }, [messages, reasoning, tools]);
+  }, [messages, activities, tools]);
   const markRead = () => {
     if (client && document.visibilityState === "visible" && document.hasFocus() && stick.current)
       void client
@@ -522,27 +510,41 @@ function ChatWindow({
   const me = session?.thread?.participants.find((p) => p.userId === user?.id);
   const others = session?.thread?.participants.filter((p) => p.id !== me?.id) ?? [];
   const agentName = agent?.name || "Chat";
-  const visibleTools = Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN);
   // Search shows only matching messages; otherwise messages, tool calls and reasoning interleave
   // in the order they happened.
-  const items = search
-    ? matches.map((message) => ({ kind: "message" as const, key: message.id, message }))
-    : timeline(messages, visibleTools, reasoning, order);
-  let lastDay = "";
+  const items = useMemo(
+    () =>
+      search
+        ? matches.map((message) => ({
+            kind: "message" as const,
+            key: `message:${message.id}`,
+            at: 0,
+            message,
+          }))
+        : timeline(
+            messages,
+            Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN),
+            activities,
+          ),
+    [search, matches, messages, tools, activities],
+  );
   const rows = items.map((item, index) => {
-    if (item.kind !== "message") return { item };
-    const message = item.message;
     const sameSender = (other?: (typeof items)[number]) =>
+      item.kind === "message" &&
       other?.kind === "message" &&
-      other.message.participantId === message.participantId &&
-      day(other.message) === day(message);
-    const showDay = !search && lastDay !== day(message);
-    lastDay = day(message);
+      other.message.participantId === item.message.participantId &&
+      day(other.message) === day(item.message);
+    const itemDay = item.kind === "message" ? day(item.message) : dayKey(new Date(item.at));
+    const previous = items[index - 1];
+    const previousDay = !previous
+      ? ""
+      : previous.kind === "message"
+        ? day(previous.message)
+        : dayKey(new Date(previous.at));
     return {
       item,
-      message,
-      own: message.participantId === me?.id,
-      showDay,
+      showDay: !search && !!itemDay && itemDay !== previousDay,
+      itemDay,
       continuedPrevious: sameSender(items[index - 1]),
       continuedNext: sameSender(items[index + 1]),
     };
@@ -680,33 +682,41 @@ function ChatWindow({
               {search && !searching && !matches.length ? (
                 <p className="tc-state">No matching messages</p>
               ) : null}
-              {rows.map(({ item, message, own, showDay, continuedPrevious, continuedNext }) => {
+              {rows.map(({ item, showDay, itemDay, continuedPrevious, continuedNext }) => {
+                const separator = showDay ? <TranscriptTimeSeparator dateTime={itemDay} /> : null;
                 if (item.kind === "reasoning")
                   return (
-                    <div key={item.key} className="chat-event" role="group" aria-label="Reasoning">
-                      <TraceBlock
-                        activeLabel="Thinking"
-                        doneLabel="Reasoning"
-                        working={busy && item.invocation === session?.run?.invocationId}
-                        rows={item.text
-                          .split(/\n{2,}/)
-                          .filter(Boolean)
-                          .map((text, i) => ({ id: String(i), primary: text, prose: true }))}
-                      />
-                    </div>
+                    <Fragment key={item.key}>
+                      {separator}
+                      <div className="chat-event" role="group" aria-label="Reasoning">
+                        <TraceBlock
+                          activeLabel="Thinking"
+                          doneLabel="Reasoning"
+                          working={busy && item.invocation === session?.run?.invocationId}
+                          rows={item.text
+                            .split(/\n{2,}/)
+                            .filter(Boolean)
+                            .map((text, i) => ({ id: String(i), primary: text, prose: true }))}
+                        />
+                      </div>
+                    </Fragment>
                   );
                 // The server already withholds hidden calls and summary-only detail; this only
                 // lays out what arrives.
                 if (item.kind === "tools")
                   return (
-                    <div key={item.key} className="chat-event" role="group" aria-label="Tool calls">
-                      <ToolChipsBlock
-                        headerLabel={`${item.tools.length} tool call${item.tools.length === 1 ? "" : "s"}`}
-                        rows={item.tools.map(toolRow)}
-                      />
-                    </div>
+                    <Fragment key={item.key}>
+                      {separator}
+                      <div className="chat-event" role="group" aria-label="Tool calls">
+                        <ToolChipsBlock
+                          headerLabel={`${item.tools.length} tool call${item.tools.length === 1 ? "" : "s"}`}
+                          rows={item.tools.map(toolRow)}
+                        />
+                      </div>
+                    </Fragment>
                   );
-                if (!message) return null;
+                const message = item.message;
+                const own = message.participantId === me?.id;
                 const created = message.createdAt
                   ? new Date(Number(message.createdAt.seconds) * 1000)
                   : undefined;
@@ -719,10 +729,8 @@ function ChatWindow({
                     "Reply to earlier message"
                   : undefined;
                 return (
-                  <Fragment key={message.id}>
-                    {showDay && created ? (
-                      <TranscriptTimeSeparator dateTime={dayKey(created)} />
-                    ) : null}
+                  <Fragment key={item.key}>
+                    {separator}
                     <ConversationMessage
                       messageId={message.id}
                       role={own ? "user" : "assistant"}
