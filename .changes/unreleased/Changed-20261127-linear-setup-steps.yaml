@@ -1,3 +1,0 @@
-kind: Changed
-body: Linear setup lists numbered steps for its OAuth app and API key; the setup page shows the OAuth redirect URL with a copy button; and connections with a webhook set up in the hosted page, which shows the webhook URL to copy.
-time: 2026-11-27T18:30:00.000000+00:00
