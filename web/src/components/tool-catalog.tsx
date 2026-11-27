@@ -18,7 +18,7 @@ import { connections, tools } from "@/client";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { randomUUID } from "@/lib/browser-crypto";
-import { AccountSetupDialog, credentialFields } from "./tool-account-setup";
+import { AccountSetupDialog, hostedSetup } from "./tool-account-setup";
 import { ConnectionSetupDialog, type Brokering } from "./connection-setup-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -429,8 +429,8 @@ export function ToolProviderDialogs({
     if (!provider) return;
     setError("");
     const chosen = methods.find((method) => method.id === typeId) ?? methods[0];
-    // Provider-owned setup UI stays in its sandboxed page.
-    if (chosen && !credentialFields(chosen)) {
+    // Provider-owned and webhook setups run in the sandboxed hosted page.
+    if (chosen && hostedSetup(chosen)) {
       const id = randomUUID();
       setStage({
         kind: "frame",

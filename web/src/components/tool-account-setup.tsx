@@ -113,6 +113,17 @@ export function credentialFields(type: ConnectionType): CredentialField[] | unde
     initial: property.default === undefined ? "" : String(property.default),
   }));
 }
+/**
+ * Whether the hosted setup page runs this type's setup: a provider-owned UI, or a webhook whose
+ * URL names the connection, so it exists only once the setup starts (as the server decides).
+ */
+export function hostedSetup(type: ConnectionType) {
+  return (
+    !credentialFields(type) ||
+    type.capabilities.includes(Capability.SIGNAL) ||
+    type.capabilities.includes(Capability.CHANNEL)
+  );
+}
 /** The authorization-code grant continues in the browser. */
 function browserSignIn(type?: ConnectionType) {
   return (
@@ -184,13 +195,16 @@ export function AccountSetupDialog({
   });
   const typeId = form.watch("typeId");
   const method = methods.find((candidate) => candidate.id === typeId) ?? methods[0];
-  const fields = useMemo(() => (method ? (credentialFields(method) ?? []) : []), [method]);
+  const fields = useMemo(
+    () => (method && !hostedSetup(method) ? (credentialFields(method) ?? []) : []),
+    [method],
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [authorizationUrl, setAuthorizationUrl] = useState("");
   const started = useRef<Started | null>(null);
   const completed = useRef(false);
-  const browser = browserSignIn(method);
+  const browser = !!method && !hostedSetup(method) && browserSignIn(method);
 
   useEffect(() => {
     for (const field of fields) form.setValue(`fields.${field.key}`, field.initial);
@@ -292,7 +306,7 @@ export function AccountSetupDialog({
         };
         onStarted();
       }
-      if (!credentialFields(method)) {
+      if (hostedSetup(method)) {
         onCustom(
           { title: setupTitle(provider.name), url: started.current.url },
           started.current.connectionId,

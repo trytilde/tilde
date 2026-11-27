@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { AuthDriver, type Brokering } from "@trytilde/sdk/connection-setup";
-import { Page, Form, useSetup, useConnectionForm, type Setup } from "./setup.js";
+import { Page, Form, CopyUrl, useSetup, useConnectionForm, type Setup } from "./setup.js";
 import { Input } from "./components/input.js";
 import { Label, Textarea, NativeSelect } from "./components/controls.js";
 import { readPrefill, secretKey } from "./prefill.js";
@@ -113,10 +113,10 @@ export function CredentialForm({ setup, state }: { setup: Setup; state: Brokerin
   return (
     <Form setup={setup} form={form} onSubmit={(values) => setup.submit(payload(values))}>
       {state.authDriver === AuthDriver.OAUTH_CODE && (
-        <p className="text-sm">
-          OAuth redirect URL:{" "}
-          <code>{new URL("/connections/callback", window.location.href).href}</code>
-        </p>
+        <CopyUrl
+          label="Redirect URL"
+          url={new URL("/connections/callback", window.location.href).href}
+        />
       )}
       {entries.map(([key, property], index) => {
         const name = `field_${index}`;

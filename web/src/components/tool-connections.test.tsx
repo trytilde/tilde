@@ -295,3 +295,41 @@ it("shows a refused key and resubmits it to the same setup", async () => {
     expect.objectContaining({ actionId: "act2", fields: [{ key: "api_key", value: "good" }] }),
   );
 });
+
+it("runs a signal method's setup in the hosted page, where its webhook URL exists", async () => {
+  // The webhook URL names the connection, so the native form, shown before it starts, cannot.
+  rpc.connections.listProviders.mockResolvedValue({
+    providers: [
+      create(ProviderSchema, {
+        id: "linear",
+        name: "Linear",
+        categories: ["project_management"],
+        connectionTypes: [
+          {
+            id: "oauth",
+            name: "Linear OAuth app",
+            capabilities: [Capability.TOOL, Capability.SIGNAL],
+            credentialSource: {
+              case: "oauth",
+              value: {
+                grant: OAuthGrant.AUTHORIZATION_CODE,
+                configuration: { client: OAuthClient.FORM, tokenUrl: "https://linear.test/token" },
+              },
+            },
+          },
+        ],
+      }),
+    ],
+    categories: ["project_management"],
+    nextPageToken: "",
+  });
+  const setup = await openSetup("Linear");
+
+  expect(within(setup).queryByLabelText(/Client ID/)).toBeNull();
+  expect(rpc.connections.startConnection).toHaveBeenCalledWith(
+    expect.objectContaining({ providerId: "linear", typeId: "oauth" }),
+  );
+  expect((await within(setup).findByTitle("Add a Linear account")).getAttribute("src")).toBe(
+    "http://localhost:3000/connections/broker/s1?connection_setup_token=tok",
+  );
+});
