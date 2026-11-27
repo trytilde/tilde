@@ -264,6 +264,37 @@ it("interleaves messages, tool calls and reasoning in event order after a reload
   await screen.findByText("bookFlight");
   expect(transcript(view.container)).toEqual(expected);
 });
+it("after a reload puts history from before the replayed activity first, whatever its clock", async () => {
+  // The person's message was created just before the replayed window; the runtime that reported
+  // the next call runs three seconds behind the database.
+  const before = create(MessageSchema, {
+    id: "before",
+    text: "Find me a flight",
+    threadId: "session",
+    participantId: "human",
+    status: "complete",
+    createdAt: at(100),
+  });
+  api.getSession.mockResolvedValue({
+    session,
+    cursor: "resume",
+    sequence: 52n,
+    messages: [message("old", "Earlier answer"), before],
+    nextMessageToken: "",
+    recentActivity: [
+      toolEvent(51n, 97.5, tool("search", "searchFlights", "running")),
+      thought(52n, 97.6, "Comparing fares"),
+    ],
+  });
+  const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
+  await screen.findByText("searchFlights");
+  expect(transcript(view.container)).toEqual([
+    "old",
+    "before",
+    "tools: searchFlights",
+    "reasoning: Comparing fares",
+  ]);
+});
 it("interleaves live messages, including the person's reply, and keeps an edited message in place", async () => {
   const view = render(<Chat sessionId="session" identity="alice" proxy="/api/chat" />);
   await screen.findByText("Earlier answer");
@@ -281,8 +312,8 @@ it("interleaves live messages, including the person's reply, and keeps an edited
   for (const event of afterReply) await act(async () => emit?.(event));
   await screen.findByText("bookFlight");
   expect(transcript(view.container)).toEqual(expected);
-  // An edit to the oldest message and the call's completion arrive mid-thought: the message stays
-  // where it was written, and neither splits the reasoning around it.
+  // An edit to the agent's message and the call's completion arrive mid-thought: the message stays
+  // between the calls around it, and neither splits the reasoning around it.
   await act(async () => emit?.(thought(18n, 107, "Checking seats")));
   await act(async () =>
     emit?.(
@@ -290,14 +321,14 @@ it("interleaves live messages, including the person's reply, and keeps an edited
         sequence: 19n,
         kind: "message.updated",
         createdAt: at(108),
-        entityId: "old",
-        detail: { case: "message", value: message("old", "Earlier answer, corrected") },
+        entityId: "found",
+        detail: { case: "message", value: { ...agentMessage, text: "I found three flights" } },
       }),
     ),
   );
   await act(async () => emit?.(toolEvent(20n, 109, tool("book", "bookFlight", "completed"))));
   await act(async () => emit?.(thought(21n, 110, " in row 3")));
-  await screen.findByText("Earlier answer, corrected");
+  await screen.findByText("I found three flights");
   expect(transcript(view.container)).toEqual([...expected, "reasoning: Checking seats in row 3"]);
 });
 it("without its header shows only the transcript and the message bar, and still sends", async () => {

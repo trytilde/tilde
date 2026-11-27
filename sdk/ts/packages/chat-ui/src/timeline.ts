@@ -75,27 +75,29 @@ export function record(state: Activities, activities: Activity[]): Activities {
 
 /**
  * Messages, tool calls and reasoning in the order they happened. Entries with a first activity
- * follow its sequence, the thread's commit order (activity times mix database and gateway clocks).
- * A message no loaded activity created (older history, or a just-posted message whose activity
- * has not arrived) is merged in by its `createdAt`. A reload replays only recent activity, so a
- * call whose first event fell outside it is placed at its first event inside it, and a message
- * whose creation fell outside it is merged by `createdAt`.
- * Consecutive tool calls share one block; a message or reasoning between them starts a new one.
+ * follow its sequence, the thread's commit order (activity times mix database and runtime clocks).
+ * History and the replayed activity are cut at the same sequence, so a loaded message no activity
+ * created came before all of it and goes first, by `createdAt`. A message `posted` here whose
+ * activity has not arrived goes last. A reload replays only recent activity, so a call whose first
+ * event fell outside it is placed at its first event inside it. Consecutive tool calls share one
+ * block; a message or reasoning between them starts a new one.
  */
 export function timeline(
   messages: Message[],
   tools: ToolCall[],
   activities: Activities,
+  posted: ReadonlySet<string>,
 ): TimelineItem[] {
   type Entry = { item: TimelineItem; sequence: bigint; tool?: ToolCall };
   const placed: Entry[] = [];
-  const unplaced: TimelineItem[] = [];
+  const earlier: TimelineItem[] = [];
+  const pending: TimelineItem[] = [];
   for (const message of messages) {
     const place = activities.messages[message.id];
     const at = place?.at ?? (message.createdAt ? millis(message.createdAt) : 0);
     const item = { kind: "message" as const, key: `message:${message.id}`, at, message };
     if (place) placed.push({ item, sequence: place.sequence });
-    else unplaced.push(item);
+    else (posted.has(message.id) ? pending : earlier).push(item);
   }
   for (const tool of tools) {
     // Tool calls arrive only as activity, so each has a place.
@@ -113,21 +115,19 @@ export function timeline(
       sequence: thought.sequence,
     });
   placed.sort((a, b) => (a.sequence < b.sequence ? -1 : a.sequence > b.sequence ? 1 : 0));
-  unplaced.sort((a, b) => a.at - b.at || a.key.localeCompare(b.key));
+  const byTime = (a: TimelineItem, b: TimelineItem) => a.at - b.at || a.key.localeCompare(b.key);
   const items: TimelineItem[] = [];
-  const push = (item: TimelineItem, tool?: ToolCall) => {
+  for (const { item, tool } of [
+    ...earlier.sort(byTime).map((item) => ({ item, tool: undefined })),
+    ...placed,
+    ...pending.sort(byTime).map((item) => ({ item, tool: undefined })),
+  ]) {
     const previous = items.at(-1);
     if (tool && previous?.kind === "tools") previous.tools.push(tool);
     else items.push(item);
-  };
-  let next = 0;
-  for (const entry of placed) {
-    while (next < unplaced.length && unplaced[next].at <= entry.item.at) push(unplaced[next++]);
-    push(entry.item, entry.tool);
   }
-  while (next < unplaced.length) push(unplaced[next++]);
   return items;
 }
-function millis(at: { seconds: bigint; nanos: number }) {
+export function millis(at: { seconds: bigint; nanos: number }) {
   return Number(at.seconds) * 1000 + at.nanos / 1e6;
 }

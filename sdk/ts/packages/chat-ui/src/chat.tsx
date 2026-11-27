@@ -38,7 +38,7 @@ import {
   type ChatFetch,
 } from "./client.js";
 import { themeStyle, type Theme } from "./theme.js";
-import { noActivity, record, timeline, type Activities } from "./timeline.js";
+import { millis, noActivity, record, timeline, type Activities } from "./timeline.js";
 export interface ChatProps {
   sessionId: string;
   identity: string;
@@ -83,6 +83,8 @@ function ChatWindow({
   const [queue, setQueue] = useState<QueuedInput[]>([]);
   const [tools, setTools] = useState<Record<string, ToolCall>>({});
   const [activities, setActivities] = useState<Activities>(noActivity);
+  // Messages posted from this composer, placed last until their activity arrives.
+  const [posted, setPosted] = useState<ReadonlySet<string>>(new Set());
   const [typing, setTyping] = useState("");
   const lastTyping = useRef(0);
   const [error, setError] = useState("");
@@ -464,10 +466,13 @@ function ChatWindow({
       );
       if (lifetime.current.signal.aborted) return;
       pendingSend.current = undefined;
-      if (result.message)
+      if (result.message) {
+        const id = result.message.id;
+        setPosted((old) => new Set(old).add(id));
         setMessages((old) =>
           sortMessages([...old.filter((m) => m.id !== result.message!.id), result.message!]),
         );
+      }
       sendTyping(false);
       form.reset();
       setReply(undefined);
@@ -518,15 +523,16 @@ function ChatWindow({
         ? matches.map((message) => ({
             kind: "message" as const,
             key: `message:${message.id}`,
-            at: message.createdAt ? Number(message.createdAt.seconds) * 1000 : 0,
+            at: message.createdAt ? millis(message.createdAt) : 0,
             message,
           }))
         : timeline(
             messages,
             Object.values(tools).filter((tool) => tool.display !== ToolDisplay.HIDDEN),
             activities,
+            posted,
           ),
-    [search, matches, messages, tools, activities],
+    [search, matches, messages, tools, activities, posted],
   );
   // Reasoning is still being thought only while it is the newest entry.
   const newest = items.at(-1);

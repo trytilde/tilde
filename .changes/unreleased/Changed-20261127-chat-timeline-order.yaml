@@ -1,3 +1,3 @@
 kind: Changed
-body: "chat-ui: Chat shows messages, tool calls and reasoning in the order they happened, live and after a reload (within the recent activity a reload replays). Only consecutive tool calls share a block. Reasoning splits where a message or tool call comes between, and editing a message no longer moves it."
+body: "chat-ui: Chat shows messages, tool calls and reasoning in the order they happened, live and after a reload (within the recent activity a reload replays). Only consecutive tool calls share a block. Reasoning splits where a message or tool call comes between."
 time: 2026-11-27T17:00:21.000000+00:00
