@@ -174,7 +174,7 @@ const at = (seconds: number) => ({
   nanos: Math.round((seconds % 1) * 1e9),
 });
 const tool = (id: string, name: string, status: string) =>
-  create(ToolCallSchema, { id, name, status, providerId: "tilde" });
+  create(ToolCallSchema, { id, name, status, providerId: "native" });
 const agentMessage = create(MessageSchema, {
   id: "found",
   text: "I found two flights",
@@ -218,9 +218,10 @@ const beforeReply = [
   thought(9n, 99, "Looking for flights"),
   toolEvent(10n, 100, tool("search", "searchFlights", "running")),
   toolEvent(11n, 101, tool("search", "searchFlights", "completed")),
-  toolEvent(12n, 101.5, tool("send", "sendMessage", "running")),
+  // Native sendMessage reports its start, the message and its end at one instant.
+  toolEvent(12n, 102, tool("send", "sendMessage", "running")),
   messageEvent(13n, 102, agentMessage),
-  toolEvent(14n, 103, tool("send", "sendMessage", "completed")),
+  toolEvent(14n, 102, tool("send", "sendMessage", "completed")),
 ];
 const afterReply = [
   messageEvent(15n, 104, reply),
@@ -279,20 +280,23 @@ it("interleaves live messages, including the person's reply, and keeps an edited
   for (const event of afterReply) await act(async () => emit?.(event));
   await screen.findByText("bookFlight");
   expect(transcript(view.container)).toEqual(expected);
-  // An edit to the oldest message arrives last but leaves it where it was written.
+  // An edit to the oldest message arrives mid-thought: it leaves the message where it was written
+  // and does not split the reasoning around it.
+  await act(async () => emit?.(thought(18n, 107, "Checking seats")));
   await act(async () =>
     emit?.(
       create(ActivitySchema, {
-        sequence: 18n,
+        sequence: 19n,
         kind: "message.updated",
-        createdAt: at(107),
+        createdAt: at(108),
         entityId: "old",
         detail: { case: "message", value: message("old", "Earlier answer, corrected") },
       }),
     ),
   );
+  await act(async () => emit?.(thought(20n, 109, " in row 3")));
   await screen.findByText("Earlier answer, corrected");
-  expect(transcript(view.container)).toEqual(expected);
+  expect(transcript(view.container)).toEqual([...expected, "reasoning: Checking seats in row 3"]);
 });
 it("without its header shows only the transcript and the message bar, and still sends", async () => {
   const view = render(

@@ -528,6 +528,10 @@ function ChatWindow({
           ),
     [search, matches, messages, tools, activities],
   );
+  // Only the running invocation's latest stretch of reasoning is still being thought.
+  const thinking = activities.thoughts
+    .filter((thought) => thought.invocation === session?.run?.invocationId)
+    .at(-1)?.key;
   const rows = items.map((item, index) => {
     const sameSender = (other?: (typeof items)[number]) =>
       item.kind === "message" &&
@@ -692,7 +696,7 @@ function ChatWindow({
                         <TraceBlock
                           activeLabel="Thinking"
                           doneLabel="Reasoning"
-                          working={busy && item.invocation === session?.run?.invocationId}
+                          working={busy && item.key === thinking}
                           rows={item.text
                             .split(/\n{2,}/)
                             .filter(Boolean)

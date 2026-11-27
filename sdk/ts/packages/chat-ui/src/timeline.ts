@@ -11,11 +11,14 @@ type Thought = Place & { key: string; invocation: string; text: string };
 export type Activities = {
   /** Each tool call's first sighting. */
   tools: Record<string, Place>;
+  /** Each message's first creation event; edits, deletions and aborts never move it. */
+  messages: Record<string, Place>;
   thoughts: Thought[];
   /** A tool call or message arrived since the last reasoning, which starts a new stretch. */
   broken: boolean;
 };
-export const noActivity: Activities = { tools: {}, thoughts: [], broken: false };
+export const noActivity: Activities = { tools: {}, messages: {}, thoughts: [], broken: false };
+const creations = new Set(["message.created", "message.started", "message.completed"]);
 
 export type TimelineItem = { key: string; at: number } & (
   | { kind: "message"; message: Message }
@@ -24,7 +27,7 @@ export type TimelineItem = { key: string; at: number } & (
 );
 
 export function record(state: Activities, activities: Activity[]): Activities {
-  let { tools, thoughts, broken } = state;
+  let { tools, messages, thoughts, broken } = state;
   for (const activity of activities) {
     const place = {
       at: activity.createdAt ? millis(activity.createdAt) : Date.now(),
@@ -35,7 +38,11 @@ export function record(state: Activities, activities: Activity[]): Activities {
       if (!tools[id]) tools = { ...tools, [id]: place };
       broken = true;
     } else if (activity.detail.case === "message") {
-      broken = true;
+      const id = activity.detail.value.id;
+      if (!messages[id] && creations.has(activity.kind)) {
+        messages = { ...messages, [id]: place };
+        broken = true;
+      }
     } else if (activity.kind === "reasoning.delta" && activity.textDelta) {
       const last = thoughts.at(-1);
       thoughts =
@@ -53,15 +60,16 @@ export function record(state: Activities, activities: Activity[]): Activities {
       broken = false;
     }
   }
-  return { tools, thoughts, broken };
+  return { tools, messages, thoughts, broken };
 }
 
 /**
- * Messages, tool calls and reasoning in the order they happened. A message is placed by its own
- * creation time (the database clock), which its edits and deletions never change; a tool call and
- * reasoning by their first activity (the gateway clock). A message carries no sequence, and
- * `message.completed` both creates posted messages and ends streamed ones, so time is the shared
- * key. Consecutive tool calls share one block; a message or reasoning between them starts a new one.
+ * Messages, tool calls and reasoning in the order they happened, each placed by its first
+ * activity (gateway time, then sequence). A message no loaded activity created (older history,
+ * or a just-posted message whose activity has not arrived) falls back to its own `createdAt`.
+ * A reload replays only recent activity, so a call or message whose first event fell outside it
+ * is placed at its first event inside it. Consecutive tool calls share one block; a message or
+ * reasoning between them starts a new one.
  */
 export function timeline(
   messages: Message[],
@@ -71,10 +79,12 @@ export function timeline(
   type Entry = { item: TimelineItem; place: Place; tool?: ToolCall };
   const entries: Entry[] = [
     ...messages.map((message) => {
-      const at = message.createdAt ? millis(message.createdAt) : 0;
+      const place = activities.messages[message.id] ?? {
+        at: message.createdAt ? millis(message.createdAt) : 0,
+      };
       return {
-        item: { kind: "message" as const, key: `message:${message.id}`, at, message },
-        place: { at },
+        item: { kind: "message" as const, key: `message:${message.id}`, at: place.at, message },
+        place,
       };
     }),
     ...tools.map((tool) => {
